@@ -26,15 +26,17 @@ BASE=(--yes --version 1.2.3 --image-prefix ghcr.io/acme/bizview
 D="$WORK/i1"
 code=$(run "${BASE[@]}" --dir "$D")
 check "exit 0" '[[ $code == 0 ]]'
-check "layout" '[[ -f $D/.env && -f $D/docker-compose.yml && -d $D/branding && -d $D/workspace ]]'
-check "worker service" 'grep -q "^  worker:" "$D/docker-compose.yml" && grep -q "app.worker" "$D/docker-compose.yml"'
-check "workspace mounted read-only" '[[ $(grep -c "./workspace:/workspace:ro" "$D/docker-compose.yml") == 2 ]]'
+check "layout" '[[ -f $D/.env && -f $D/bizview.yml && ! -e $D/branding && ! -e $D/workspace ]]'
+check "compose file selected in .env" 'grep -q "^COMPOSE_FILE=bizview.yml" "$D/.env"'
+check "worker service" 'grep -q "^  worker:" "$D/bizview.yml" && grep -q "app.worker" "$D/bizview.yml"'
+check "no workspace or branding mounts" '! grep -qE "/(workspace|branding):" "$D/bizview.yml"'
+check "certificate source passed" 'grep -q "CADDY_TLS" "$D/bizview.yml" && grep -q "^CADDY_TLS=auto" "$D/.env"'
 check "projects folder" '[[ -d "$D/projects" ]]'
-check "projects mounted in backend only" '[[ $(grep -c "./projects:/app/data/projects" "$D/docker-compose.yml") == 1 ]]'
+check "projects mounted in backend only" '[[ $(grep -c "./projects:/app/data/projects" "$D/bizview.yml") == 1 ]]'
 check "project size setting" 'grep -q "^PROJECT_MAX_MB=20" "$D/.env"'
 check "timezone written" 'grep -q "^TIMEZONE='"'"'" "$D/.env"'
 check ".env is 600" '[[ $(stat -c %a "$D/.env") == 600 ]]'
-check "compose is 644" '[[ $(stat -c %a "$D/docker-compose.yml") == 644 ]]'
+check "compose is 644" '[[ $(stat -c %a "$D/bizview.yml") == 644 ]]'
 check "version pinned" 'grep -q "^BIZVIEW_VERSION='"'"'1.2.3'"'"'" "$D/.env"'
 check "email lower-cased" 'grep -q "^SUPER_USER_EMAIL='"'"'admin@example.com'"'"'" "$D/.env"'
 check "db url literal" 'grep -qF "DATABASE_URL_BI='"'"'postgresql://u:p\$ss@db.example:5432/bizview'"'"'" "$D/.env"'
@@ -47,7 +49,7 @@ check "email placeholders commented" 'grep -q "^# SMTP_HOST=" "$D/.env"'
 check "share links placeholder commented" 'grep -q "^# SHARE_LINKS_ENABLED=false" "$D/.env"'
 check "no active email/share links setting" '! grep -qE "^(SMTP_|EMAIL_ALLOWED_DOMAINS|SHARE_LINKS_ENABLED)" "$D/.env"'
 check "unstamped source url commented" 'grep -q "^# SOURCE_URL=" "$D/.env"'
-check "no placeholders left" '! grep -q "__[A-Z_]*__" "$D/.env" "$D/docker-compose.yml"'
+check "no placeholders left" '! grep -q "__[A-Z_]*__" "$D/.env" "$D/bizview.yml"'
 key=$(sed -n "s/^BIZVIEW_SECRET_KEY='\(.*\)'$/\1/p" "$D/.env")
 check "secret key generated (32 bytes)" '[[ $(printf %s "$key" | tr "_-" "/+" | base64 -d 2>/dev/null | wc -c) == 32 ]]'
 check "unattended profile auto" 'grep -q "^SECURITY_PROFILE=auto" "$D/.env"'
@@ -57,13 +59,13 @@ code=$(run "${BASE[@]}" --dir "$D")
 check "refuse overwrite exit 3" '[[ $code == 3 ]]'
 check "password unchanged" 'grep -q "$pw" "$D/.env"'
 
-# 3. --force overwrites settings, keeps branding
-touch "$D/branding/logo.svg"
+# 3. --force overwrites settings, keeps the data folder
+touch "$D/projects/marker"
 code=$(run "${BASE[@]}" --dir "$D" --force --admin-password 'Another-pass-99')
 check "force exit 0" '[[ $code == 0 ]]'
 check "password replaced" 'grep -q "Another-pass-99" "$D/.env"'
 check "given password not printed" '! grep -q "Another-pass-99" "$WORK/out"'
-check "branding kept" '[[ -f $D/branding/logo.svg ]]'
+check "projects kept" '[[ -f $D/projects/marker ]]'
 
 # 4. domain → HTTPS settings
 D="$WORK/i4"
@@ -71,6 +73,7 @@ code=$(run "${BASE[@]}" --dir "$D" --site dashboard.acme.com)
 check "domain exit 0" '[[ $code == 0 ]]'
 check "domain cookie secure" 'grep -q "^COOKIE_SECURE=true" "$D/.env"'
 check "domain ports" 'grep -q "^HTTP_PORT=80" "$D/.env" && grep -q "^HTTPS_PORT=443" "$D/.env"'
+check "domain host allow-list" 'grep -q "^CADDY_ALLOWED_HOSTS='"'"'dashboard.acme.com'"'"'" "$D/.env"'
 check "summary https url" 'grep -q "https://dashboard.acme.com" "$WORK/out"'
 
 # 4b. explicit profiles

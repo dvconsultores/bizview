@@ -418,6 +418,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The installer writes the same shape as the repository**: `deploy/install.sh` now generates
+  `bizview.yml` (with `COMPOSE_FILE=bizview.yml` in `.env`, so plain `docker compose up -d` works)
+  and no longer creates or mounts `branding/` or `workspace/` — the logo ships inside the image,
+  and BI projects live in `projects/`. It also passes `CADDY_ALLOWED_HOSTS` and the `CADDY_TLS`
+  settings, defaulting the allow-list to the site's own domain.
 - **Certificate source is selectable** (`CADDY_TLS`): `auto` keeps automatic HTTPS; `internal`
   serves Caddy's local CA for a proxy in front that does not verify the origin certificate; `file`
   serves a pair you supply in `CADDY_TLS_DIR` (e.g. a Cloudflare Origin CA certificate). The last

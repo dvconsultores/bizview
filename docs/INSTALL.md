@@ -10,11 +10,11 @@ version. No code is copied or changed per customer.
 └── .env                      all settings (mode 600: database, super user, AI)
 ```
 
-The logo ships inside the `bizview-web` image, so there is no `branding/` folder, and the shipped
-compose file mounts no customer checkout, so there is no `workspace/` folder either.
-`deploy/install.sh` still writes the older shape (`docker-compose.yml` plus `branding/` and an
-empty `workspace/`, which that file mounts read-only); such an installation keeps working as it
-is. When you copy the files from this repository, `bizview.yml` + `.env` are all the server needs.
+The logo ships inside the `bizview-web` image, so there is no `branding/` folder, and nothing
+mounts a customer checkout, so there is no `workspace/` folder either. When you copy the files
+from this repository, `bizview.yml` + `.env` are all the server needs; `deploy/install.sh` writes
+exactly that pair (plus `projects/`, which holds the BI projects and must be backed up with the
+database).
 
 ## 1. Requirements
 
@@ -251,9 +251,8 @@ integration's runs, checks and next run, and runs one on demand. Dataset tables 
 ## 7. Branding
 
 The logo ships inside the `bizview-web` image and Caddy serves it at `/branding/logo.svg`; there
-is nothing to copy to the server. To use another logo, either mount a folder over `/branding` in
-the `caddy` service (`- ./branding:/branding:ro`) or point `LOGO_URL` at any reachable URL, then
-set:
+is nothing to copy to the server. To use another logo, set `LOGO_URL` to a URL the browser can
+reach, then set:
 
 ```ini
 LOGO_URL=/branding/logo.svg
