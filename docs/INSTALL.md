@@ -167,6 +167,13 @@ the connection test warns otherwise. Installations upgraded from a version that 
 
 ### Direct reports on the BI database (`DIRECT_BI_ROLE`)
 
+**You do not need this.** To report on your own data, register the database in
+**Administración → Fuentes de datos** and report from that source, or let an integration put the
+data in a dataset (`ds_<integration>`) and report from it. Both work with
+`DIRECT_REPORTS_BI=false`, need no database role, and are read-only by construction. The
+`bi` source below exists only for reading tables of the **product's own** database, which an
+internet-facing installation must not allow without the read-only role.
+
 Direct reports with `source: bi` read the BI database through the normal pooled
 connection, read-only. When `DIRECT_BI_ROLE` is set, each such session runs
 `SET LOCAL ROLE <role>` for the read-only transaction of the direct session, so it only
