@@ -83,6 +83,43 @@ TRUSTED_PROXIES=172.16.0.0/12    # the proxy's container network; a single IP wo
 The `Host` header must reach Caddy unchanged (NPM's default `proxy_set_header Host $host`), or
 `CADDY_ALLOWED_HOSTS` answers **421**.
 
+### Cloudflare or NPM shows an error instead of the app
+
+The address works from the server but not from outside, so the edge cannot reach the app. Each
+Cloudflare error names a different fault; check it before changing anything:
+
+| Code | Meaning | Usually |
+|---|---|---|
+| **521** | origin refused the connection | nothing listening on the port the edge targets (stack down, wrong `HTTPS_PORT`) |
+| **525** | TLS handshake with the origin failed | the edge targets a **plain-HTTP** port (`HTTP_PORT`, e.g. `8090`) instead of the TLS one (`HTTPS_PORT`, `9443`), or the proxy host has **no certificate** |
+| **526** | origin certificate invalid | Cloudflare **Full (strict)** while Caddy uses `CADDY_TLS=internal`; switch to **Full** or supply a Cloudflare Origin CA pair with `CADDY_TLS=file` |
+| **502** | proxy reached the app, which did not answer | NPM cannot verify Caddy's internal CA (`proxy_ssl_verify off;`) or targets the wrong port |
+| **421** | the app refused the `Host` | the proxy rewrote `Host`, or the name is missing from `CADDY_ALLOWED_HOSTS` |
+
+Two commands separate "the app is fine" from "the edge is misconfigured", run on the server:
+
+```bash
+# the app over TLS, with the right SNI (a bare -H Host is not enough: TLS needs the name)
+curl -k -o /dev/null -w '%{http_code}\n' \
+  --resolve bi.example.com:9443:127.0.0.1 https://bi.example.com:9443/api/health
+# a certificate for the name on the port the edge uses (empty output = nothing TLS there)
+echo | openssl s_client -connect 127.0.0.1:443 -servername bi.example.com 2>&1 | grep -E 'subject=|issuer='
+```
+
+The first returning `200` and the second returning nothing means the app is healthy and the
+terminating proxy has no certificate: add one to the proxy host (NPM's **SSL** tab), or point the
+edge straight at `HTTPS_PORT` and use SSL mode **Full**.
+
+A `tlsv1 alert internal error` from the first command means the name used in it does not match
+`SITE_ADDRESS`; Caddy only holds a certificate for that name.
+
+To test the origin while the record is proxied, set the DNS record to **DNS only** (grey cloud)
+temporarily and address the origin by IP with the name as SNI:
+
+```bash
+curl -k --resolve bi.example.com:9443:<origin-ip> https://bi.example.com:9443/api/health
+```
+
 ## 2. Install
 
 An installation is the compose file plus its settings, nothing else: copy [`bizview.yml`](../bizview.yml)
