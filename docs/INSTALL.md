@@ -74,17 +74,14 @@ upload one, then enable **Force SSL** and **HTTP/2**. Nothing else is required: 
 WebSockets, no server-sent events, and uvicorn already runs with `--proxy-headers`.
 
 Finally, tell Caddy to trust the proxy, or every client looks like the proxy address (rate
-limiting, audit and `ADMIN_ALLOWED_NETWORKS` all see one IP):
+limiting, audit and `ADMIN_ALLOWED_NETWORKS` all see one IP). Use the proxy's container network
+when Nginx Proxy Manager is in front, or Cloudflare's ranges when the CDN reaches the origin
+directly; a space-separated list is accepted. Cloudflare's published ranges as of this writing
+(re-copy from <https://www.cloudflare.com/ips/> if they change):
 
 ```dotenv
-TRUSTED_PROXIES=172.16.0.0/12    # the proxy's container network; a single IP works too
+TRUSTED_PROXIES=103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 104.16.0.0/13 104.24.0.0/14 108.162.192.0/18 131.0.72.0/22 141.101.64.0/18 162.158.0.0/15 172.64.0.0/13 173.245.48.0/20 188.114.96.0/20 190.93.240.0/20 197.234.240.0/22 198.41.128.0/17 2400:cb00::/32 2405:8100::/32 2405:b500::/32 2606:4700::/32 2803:f800::/32 2a06:98c0::/29 2c0f:f248::/32
 ```
-
-Set it to **whatever actually connects to Caddy**: the proxy's network when Nginx Proxy Manager is
-in front, or Cloudflare's published ranges when nothing else is (space-separated works, e.g.
-`TRUSTED_PROXIES="173.245.48.0/20 103.21.244.0/22 …"` from
-<https://www.cloudflare.com/ips/>). Leaving it at the default while a CDN is in front makes every
-visitor share one address, which breaks per-client sign-in throttling and pollutes the audit log.
 
 The `Host` header must reach Caddy unchanged (NPM's default `proxy_set_header Host $host`), or
 `CADDY_ALLOWED_HOSTS` answers **421**.
