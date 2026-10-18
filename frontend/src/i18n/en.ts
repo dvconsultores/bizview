@@ -981,7 +981,7 @@ export const en: Catalogue = {
     artifactsSummary: (i: number, r: number, d: number) =>
       `${i === 1 ? "1 integration" : `${i} integrations`} · ${r === 1 ? "1 report" : `${r} reports`} · ${d === 1 ? "1 distribution" : `${d} distributions`}`,
     appliedSummary: (n: number) => `${n} applied`,
-    folderNotWritable: "The projects folder cannot be written. Check PROJECTS_DIR in the installation before creating or importing projects.",
+    folderNotWritable: "The container (uid 10001) cannot write the projects folder. On the host: sudo mkdir -p projects attachments && sudo chown -R 10001:10001 projects attachments, then restart. If you changed PROJECTS_DIR, check that path exists and is writable.",
     lastAppliedBy: (version: number, date: string, by: string | null) =>
       `Version ${version} applied ${date}${by ? ` by ${by}` : ""}`,
     editDetails: "Edit name and description",

@@ -961,7 +961,7 @@ export const es = {
     artifactsSummary: (i: number, r: number, d: number) =>
       `${i === 1 ? "1 integración" : `${i} integraciones`} · ${r === 1 ? "1 reporte" : `${r} reportes`} · ${d === 1 ? "1 distribución" : `${d} distribuciones`}`,
     appliedSummary: (n: number) => (n === 1 ? "1 aplicado" : `${n} aplicados`),
-    folderNotWritable: "La carpeta de proyectos no se puede escribir. Revisa PROJECTS_DIR en la instalación antes de crear o importar proyectos.",
+    folderNotWritable: "La carpeta de proyectos no se puede escribir por el contenedor (uid 10001). En el servidor: sudo mkdir -p projects attachments && sudo chown -R 10001:10001 projects attachments, y reinicia. Si cambiaste PROJECTS_DIR, revisa que esa ruta exista y sea escribible.",
     lastAppliedBy: (version: number, date: string, by: string | null) =>
       `Versión ${version} aplicada ${date}${by ? ` por ${by}` : ""}`,
     editDetails: "Editar nombre y descripción",
