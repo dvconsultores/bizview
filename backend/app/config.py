@@ -148,7 +148,10 @@ class Settings(BaseSettings):
 
     # Vibe reporting (feature 005): the customer's workspace checkout (mounted read-only), the
     # installation time zone (integration schedules and report periods), and the worker.
-    workspace_path: str = "/workspace"
+    # Feature 020: reports and integrations normally come from BI projects below, so the shipped
+    # compose mounts no checkout; this default is an internal, always-present folder and only an
+    # operator who wants a Git checkout sets WORKSPACE_PATH and adds the volume.
+    workspace_path: str = "/app/data/workspace"
     timezone: str = "UTC"
     worker_poll_seconds: int = Field(default=10, ge=1, le=3600)
     # BI projects (feature 020): one writable folder per project (backend only), size cap in MB.

@@ -208,7 +208,7 @@ what reports and integrations read. No checkout or extra folder is needed on the
 A customer Git checkout is still supported as an **optional** source (created with `bizview init`;
 author guide: [VIBE-REPORTING.md](VIBE-REPORTING.md)). The shipped compose file does not mount it.
 To use one, add `- ${WORKSPACE_DIR:-./workspace}:/workspace:ro` to both the `backend` and `worker`
-services, change their `WORKSPACE_PATH` to `/workspace`, and clone the repository once:
+services, add `WORKSPACE_PATH: /workspace` to their `environment:`, and clone the repository once:
 
 ```bash
 git clone <customer workspace repo> workspace

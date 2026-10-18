@@ -1,5 +1,5 @@
 # caddy (edge: SPA + /api proxy + TLS) → backend (FastAPI) → BI database (always external: DATABASE_URL_BI)
-# worker: integration runs from the applied workspace (BI projects, feature 020)
+# worker: integration runs from the applied version of BI projects (feature 020)
 #
 # Two ways to run this file, same services:
 #   developer: docker compose -f bizview.yml up -d --build    # builds the images from this tree
@@ -9,7 +9,7 @@ name: bizview
 
 services:
   backend:
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-backend:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -17,7 +17,6 @@ services:
     restart: unless-stopped
     expose: ["8000"]
     environment:
-      WORKSPACE_PATH: /app/data/workspace
       POLARS_TEMP_DIR: ${POLARS_TEMP_DIR:-/tmp/bizview-polars}
       PROJECTS_DIR: /app/data/projects
       ATTACHMENTS_DIR: /app/data/attachments
@@ -26,14 +25,13 @@ services:
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # chat image briefs (feature 024)
 
   worker:                      # integration runs (feature 005): same image, other entry point
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-backend:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
     command: ["python", "-m", "app.worker"]
     env_file: .env
     environment:
-      WORKSPACE_PATH: /app/data/workspace
       POLARS_TEMP_DIR: ${POLARS_TEMP_DIR:-/tmp/bizview-polars}  # Polars streaming spill (whole-mode transforms)
       ATTACHMENTS_DIR: /app/data/attachments   # feature 024: the worker sweeps unsent images
     restart: unless-stopped
@@ -46,7 +44,7 @@ services:
         condition: service_healthy
 
   caddy:
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-web:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-web:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: deploy/caddy/Dockerfile
