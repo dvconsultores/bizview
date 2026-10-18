@@ -123,6 +123,7 @@ above) and publish a free port, or keep Caddy behind the existing reverse proxy 
 SECURITY_PROFILE=internet   # HTTPS everywhere, two-step sign-in for administrators
 COOKIE_SECURE=true
 CADDY_ALLOWED_HOSTS=bi.example.com
+DIRECT_REPORTS_BI=false     # true requires DIRECT_BI_ROLE, or the stack refuses to start
 ```
 
 **Publishing images.** `./deploy.sh` logs in to Docker Hub with `DOCKER_USERNAME` /
