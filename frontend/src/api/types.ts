@@ -887,8 +887,6 @@ export interface AssistantRunSummary { id: number; started_at: string; finished_
 export interface AssistantActivity { busy: boolean; model: string; run: AssistantActivityRun | null; rounds: AssistantActivityRound[]; background: { kind: "preview"; status: "pending" | "running"; since: string }[]; runs: AssistantRunSummary[]; }
 
 // Feature 018: dashboard sharing (expiring links, email, scheduled sends).
-export type ShareLinkStatus = "active" | "expired" | "revoked";
-
 export type ShareLinkOrigin = "manual" | "email" | "subscription";
 
 export interface ShareLink {

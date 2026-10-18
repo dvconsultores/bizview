@@ -23,11 +23,6 @@ export function formatDate(iso: string | null | undefined): string {
   return dateTimeFormat({ dateStyle: "medium" }).format(new Date(iso));
 }
 
-export function todayLong(): string {
-  const s = dateTimeFormat({ weekday: "long", day: "numeric", month: "long" }).format(new Date());
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }

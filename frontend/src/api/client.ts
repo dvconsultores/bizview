@@ -55,7 +55,6 @@ async function request<T>(method: string, path: string, body?: Json, retried = f
     if (res.status === 403 && err.code === "reauth_required" && !retried && reauthHandler) {
       if (await reauthHandler()) return request<T>(method, path, body, true);
     }
-    if (res.status === 403 && err.code === "mfa_enrollment_required") mfaEnrollmentHandler?.();
     throw err;
   }
   return data as T;
@@ -70,11 +69,6 @@ export function setReauthHandler(fn: (() => Promise<boolean>) | null) {
 /** Step-up for requests outside `api` (e.g. raw zip uploads): false when nobody can ask. */
 export function askReauth(): Promise<boolean> {
   return reauthHandler ? reauthHandler() : Promise.resolve(false);
-}
-
-let mfaEnrollmentHandler: (() => void) | null = null;
-export function setMfaEnrollmentHandler(fn: (() => void) | null) {
-  mfaEnrollmentHandler = fn;
 }
 
 let unauthenticatedHandler: ((e: ApiError) => void) | null = null;

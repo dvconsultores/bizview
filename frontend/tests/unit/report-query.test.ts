@@ -3,7 +3,6 @@ import type { ReportDefinition } from "../../src/api/types";
 import {
   MAX_FILTER_VALUES,
   compareChoices,
-  countActiveFilters,
   countChanges,
   defaultSelection,
   filterOptionsQuery,
@@ -436,19 +435,6 @@ describe("reportQuery", () => {
     });
   });
 
-  describe("countActiveFilters", () => {
-    it("returns total number of filter values", () => {
-      const selection: ReportSelection = {
-        ...baseSelection,
-        filters: { brand: ["Nike", "Adidas"], store: ["s1"] },
-      };
-      expect(countActiveFilters(selection)).toBe(3);
-    });
-
-    it("returns zero when no filters", () => {
-      expect(countActiveFilters(baseSelection)).toBe(0);
-    });
-  });
 
   describe("isIncompleteCustom", () => {
     it("returns false for non-custom", () => {

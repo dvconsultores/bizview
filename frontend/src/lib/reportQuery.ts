@@ -149,14 +149,6 @@ export function countChanges(draft: ReportSelection, applied: ReportSelection): 
   return changes;
 }
 
-export function countActiveFilters(s: ReportSelection): number {
-  let count = 0;
-  for (const values of Object.values(s.filters)) {
-    count += values.length;
-  }
-  return count;
-}
-
 export function isIncompleteCustom(s: ReportSelection): boolean {
   return s.period === "custom" && (s.from === "" || s.to === "");
 }
