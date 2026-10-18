@@ -418,6 +418,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Certificate source is selectable** (`CADDY_TLS`): `auto` keeps automatic HTTPS; `internal`
+  serves Caddy's local CA for a proxy in front that does not verify the origin certificate; `file`
+  serves a pair you supply in `CADDY_TLS_DIR` (e.g. a Cloudflare Origin CA certificate). The last
+  two issue nothing over the network, so an installation whose host ports 80 and 443 belong to
+  other services can still serve HTTPS on a published port such as 8443. `README.md` and
+  `docs/INSTALL.md` document the three cases, including the Cloudflare **525** that a proxied
+  hostname shows while the origin is unreachable on 443.
 - **Transform stage speed, memory and batch size** (005 amendment, 2026-10-12): the
   declared-type check of a text batch now reads the materialised typed frame instead of
   re-evaluating every cast (1 M rows: `transform_ms` 654 ms → 287 ms at 200 000 rows per batch), and
@@ -503,6 +510,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Removed
 
+- Dead frontend code: the orphan `AssistantPage` (the `admin/asistente` route only redirected to
+  `/proyectos`), the unused `todayLong` formatter, the unused `ShareLinkStatus` type, the unused
+  `countActiveFilters` helper, and the `setMfaEnrollmentHandler` hook that nothing registered
+  (`RequireAuth` already sends administrators who must enrol a second factor to the setup screen).
 - The planned in-app assistant and feature 001's built-in sales ETL (superseded by feature 005).
 - Caddy no longer trusts `X-Forwarded-For` from private networks by default (`TRUSTED_PROXIES`).
 

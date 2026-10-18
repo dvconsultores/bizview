@@ -52,12 +52,17 @@ services:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
       CADDY_ALLOWED_HOSTS: ${CADDY_ALLOWED_HOSTS:-localhost}
       CADDY_MAX_REQUEST_BODY: ${CADDY_MAX_REQUEST_BODY:-100MB}
+      CADDY_TLS: ${CADDY_TLS:-auto}
+      CADDY_TLS_CERT: ${CADDY_TLS_CERT:-/certs/origin.pem}
+      CADDY_TLS_KEY: ${CADDY_TLS_KEY:-/certs/origin-key.pem}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
       - "${HTTP_PORT:-8081}:80"
       - "${HTTPS_PORT:-8443}:443"
       - "${HTTPS_PORT:-8443}:443/udp"
     volumes:
+      # Only read when CADDY_TLS=file; an empty directory is harmless.
+      - ${CADDY_TLS_DIR:-./deploy/caddy/certs}:/certs:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

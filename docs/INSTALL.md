@@ -25,6 +25,25 @@ is. When you copy the files from this repository, `bizview.yml` + `.env` are all
   and a role that owns it, not the `postgres` superuser.
 - For HTTPS: a domain name pointing to the server, and ports 80 and 443 open.
 
+### When 80 and 443 already belong to another service
+
+Automatic HTTPS needs one of those two host ports free: the TLS-ALPN challenge runs on 443 and
+the HTTP challenge on 80. On a shared server where both are taken, publish a different host port
+(`HTTPS_PORT=8443`) and choose the certificate source with `CADDY_TLS`:
+
+| `CADDY_TLS` | What Caddy does | What else is needed |
+|---|---|---|
+| `auto` (default) | obtains and renews a certificate | host 443 or 80 reachable |
+| `internal` | serves a certificate from its own local CA | a proxy in front that accepts it, e.g. Cloudflare with SSL mode **Full** (not *Full (strict)*) |
+| `file` | serves the certificate pair in `CADDY_TLS_DIR` (`origin.pem` + `origin-key.pem`, default `./deploy/caddy/certs`) | a valid pair, e.g. a Cloudflare Origin CA certificate; needed for **Full (strict)** |
+
+Nothing is issued by those two modes, so no host port is needed for certificates; the container
+still listens on 443 inside and you publish whatever `HTTPS_PORT` says. If a CDN sits in front,
+point it at that port: Cloudflare accepts the origin HTTPS ports 443, 2053, 2083, 2087, 2096 and
+8443, set per hostname in an **Origin Rule** (Rules → Origin Rules → *Destination Port*). With
+Cloudflare proxying a name that is not reachable at the origin, visitors see **525** (TLS
+handshake failed) — that is this situation, not an application error.
+
 ## 2. Install
 
 Get [`deploy/install.sh`](../deploy/install.sh) from this repository and run it with `sudo bash`.
@@ -71,7 +90,9 @@ super user; later starts only apply new migrations.
 | `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` | branding (see below) |
 | `FOOTER_CREDIT` | who publishes this installation, shown after the license in every footer (default `GlobalDV`) |
 | `SITE_ADDRESS` | `:80` for plain HTTP, or a domain for automatic HTTPS; a domain makes shared-dashboard links and links in emails use `https://<domain>/s/…` (see "Email and shared links") |
-| `HTTP_PORT`, `HTTPS_PORT` | published ports |
+| `HTTP_PORT`, `HTTPS_PORT` | published ports (see "When 80 and 443 already belong to another service") |
+| `CADDY_TLS` | `auto` (default), `internal` or `file`: where Caddy gets its certificate |
+| `CADDY_TLS_DIR` | host folder with `origin.pem` + `origin-key.pem` when `CADDY_TLS=file` (default `./deploy/caddy/certs`) |
 | `COOKIE_SECURE` | `true` with HTTPS (required in production) |
 | `SOURCE_URL` | optional: override the source-code link shown to users |
 | `DEFAULT_LOCALE` | Interface, API messages, emails and Telegram fall back to this language (`es` or `en`, default `es`) when neither the account nor the browser decides. It does NOT affect the `bizview` CLI. |

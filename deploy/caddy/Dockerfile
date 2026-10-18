@@ -15,6 +15,11 @@ LABEL org.opencontainers.image.title="bizview-web" \
       org.opencontainers.image.version="${BIZVIEW_VERSION}" \
       org.opencontainers.image.source="${BIZVIEW_SOURCE_URL}"
 COPY deploy/caddy/Caddyfile /etc/caddy/Caddyfile
+COPY deploy/caddy/entrypoint.sh /usr/bin/caddy-entrypoint.sh
 COPY deploy/branding /branding
 COPY --from=web /web/dist /srv
-RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# Empty by default so `caddy validate` succeeds; the entrypoint rewrites it at container start.
+RUN chmod 755 /usr/bin/caddy-entrypoint.sh \
+ && : >/etc/caddy/tls.snippet \
+ && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+ENTRYPOINT ["/usr/bin/caddy-entrypoint.sh"]

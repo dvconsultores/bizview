@@ -105,12 +105,16 @@ the same name in `CADDY_ALLOWED_HOSTS`: a space-separated allow-list of `Host` n
 serves; any other host gets `421 Misdirected Request` before it reaches the application. With the
 domain set, Caddy obtains and renews the certificate automatically, but the ACME challenge must be
 reachable: publish `HTTPS_PORT=443` (TLS-ALPN, the usual choice when port 80 belongs to another
-stack) or `HTTP_PORT=80` (HTTP-01). If neither host port is free, keep Caddy behind the existing
-reverse proxy (`SITE_ADDRESS=:80`), which then terminates TLS itself.
+stack) or `HTTP_PORT=80` (HTTP-01). If neither host port is free, choose a certificate source that
+is not issued over the network: `CADDY_TLS=internal` (Caddy's own CA, for a proxy in front that
+does not verify the origin certificate, such as Cloudflare *Full*) or `CADDY_TLS=file` (a pair you
+supply in `CADDY_TLS_DIR`, such as a Cloudflare Origin CA certificate, for *Full (strict)*). Both
+combine with a non-standard `HTTPS_PORT`; point the CDN at it with an Origin Rule.
 
-On a shared host where another stack already owns 80/443 there are two options: free the ports for
-this Caddy (it must terminate TLS itself), or keep Caddy behind the existing reverse proxy — then
-set `SITE_ADDRESS=:80`, publish `HTTP_PORT` on a free port, point the proxy at it, and set
+On a shared host where another stack already owns 80/443 there are three options: free the ports
+for this Caddy (it must terminate TLS itself), give it a certificate out of band (`CADDY_TLS`, see
+above) and publish a free port, or keep Caddy behind the existing reverse proxy — then set
+`SITE_ADDRESS=:80`, publish `HTTP_PORT` on a free port, point the proxy at it, and set
 `TRUSTED_PROXIES` to the proxy's network so client addresses cannot be forged.
 
 **Anything reachable from the internet** should run with:
@@ -148,7 +152,7 @@ Requirements, branding, upgrades and backups are in [docs/INSTALL.md](docs/INSTA
 | Group | Settings |
 |---|---|
 | Images | `BIZVIEW_IMAGE_PREFIX` (Docker Hub user or registry prefix; the stack runs `<prefix>/bizview-backend` and `<prefix>/bizview-web`), `BIZVIEW_VERSION` (image tag) |
-| Site and TLS | `SITE_ADDRESS` (public domain, or `:80` behind another TLS terminator), `CADDY_ALLOWED_HOSTS` (space-separated `Host` allow-list), `HTTP_PORT` (default 8081), `HTTPS_PORT` (default 8443; `443` needs the port free), `TRUSTED_PROXIES`, `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` |
+| Site and TLS | `SITE_ADDRESS` (public domain, or `:80` behind another TLS terminator), `CADDY_ALLOWED_HOSTS` (space-separated `Host` allow-list), `HTTP_PORT` (default 8081), `HTTPS_PORT` (default 8443; `443` needs the port free), `CADDY_TLS` (`auto`/`internal`/`file`), `TRUSTED_PROXIES`, `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` |
 | Security | `SECURITY_PROFILE` (`private` / `internet` / `auto`), `COOKIE_SECURE`, `BIZVIEW_SECRET_KEY` (encrypts stored credentials; back it up separately), `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` (first start only), `ADMIN_ALLOWED_NETWORKS`, `LOGIN_RATE_LIMIT` |
 | Database | `DATABASE_URL_BI` (always external), `DIRECT_REPORTS_BI`, `DIRECT_BI_ROLE`, `DB_POOL_SIZE` |
 | Sign in with Google (optional) | `GOOGLE_AUTH_ENABLED` (`false` by default), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (this installation's own OAuth client), `GOOGLE_ALLOWED_DOMAINS`, `GOOGLE_REDIRECT_URI` |

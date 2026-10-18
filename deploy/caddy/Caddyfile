@@ -14,6 +14,10 @@
 }
 
 {$SITE_ADDRESS::80} {
+	# Certificate source, written by the image entrypoint from CADDY_TLS (auto|internal|file).
+	# Empty = automatic HTTPS (ACME, needs 80 or 443 reachable); otherwise a fixed certificate.
+	import /etc/caddy/tls.snippet
+
 	# Bound the request body before the app buffers and validates it. Generous by default so
 	# image briefs (ATTACHMENTS_MAX_MB × ATTACHMENTS_MAX_PER_MESSAGE) and project zip imports
 	# (PROJECT_MAX_MB) keep working; override with CADDY_MAX_REQUEST_BODY on the container.

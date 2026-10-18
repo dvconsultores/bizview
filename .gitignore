@@ -25,6 +25,9 @@ playwright-report/
 *.pem
 *.key
 *.p12
+# Certificate pairs supplied with CADDY_TLS=file (never published).
+deploy/caddy/certs/*
+!deploy/caddy/certs/.gitkeep
 *.sqlite
 *.dump
 
