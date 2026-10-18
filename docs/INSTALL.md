@@ -80,6 +80,12 @@ limiting, audit and `ADMIN_ALLOWED_NETWORKS` all see one IP):
 TRUSTED_PROXIES=172.16.0.0/12    # the proxy's container network; a single IP works too
 ```
 
+Set it to **whatever actually connects to Caddy**: the proxy's network when Nginx Proxy Manager is
+in front, or Cloudflare's published ranges when nothing else is (space-separated works, e.g.
+`TRUSTED_PROXIES="173.245.48.0/20 103.21.244.0/22 …"` from
+<https://www.cloudflare.com/ips/>). Leaving it at the default while a CDN is in front makes every
+visitor share one address, which breaks per-client sign-in throttling and pollutes the audit log.
+
 The `Host` header must reach Caddy unchanged (NPM's default `proxy_set_header Host $host`), or
 `CADDY_ALLOWED_HOSTS` answers **421**.
 
