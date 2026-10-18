@@ -104,7 +104,7 @@ def test_link_shown_once_and_stored_hashed(applied, monkeypatch):
     link_row = sql(
         "SELECT created_at, expires_at FROM share_link ORDER BY id DESC LIMIT 1"
     )[0]
-    delta = link_row[1] - link_row[0]
+    delta = link_row[1].astimezone(UTC) - link_row[0].astimezone(UTC)
     assert abs(delta.total_seconds() - 7 * 86400) < 60
 
     monkeypatch.setattr(get_settings(), "site_address", "bi.example.com")
@@ -135,7 +135,8 @@ def test_days_and_note_validation(applied):
         "SELECT created_at, expires_at FROM share_link WHERE id = :i",
         i=default.json()["id"],
     )
-    assert abs((default_row[0][1] - default_row[0][0]).total_seconds() - 7 * 86400) < 60
+    default_utc = default_row[0][1].astimezone(UTC) - default_row[0][0].astimezone(UTC)
+    assert abs(default_utc.total_seconds() - 7 * 86400) < 60
 
 
 def test_at_most_twenty_active_links(applied):
@@ -505,7 +506,7 @@ def test_admin_networks_cover_share_links_and_keep_user_reads(applied, user, mon
     """FR-022: a stolen admin session outside the allow-list cannot mint a public link."""
     enable_sharing()
     monkeypatch.setattr(get_settings(), "admin_allowed_networks", "10.0.0.0/8")
-    outside = client_from("203.0.113.50")
+    outside = client_from("198.51.100.50")
     r = outside.post("/api/auth/login", json={"email": "root@example.com",
                                               "password": PASSWORD})
     assert r.status_code == 200, r.text
@@ -522,7 +523,7 @@ def test_admin_networks_cover_share_links_and_keep_user_reads(applied, user, mon
     # Reading the share controls and the dashboard catalogue is not a state change.
     assert outside.get("/api/dashboards/ventas/links").status_code == 200
 
-    normal = client_from("203.0.113.50")
+    normal = client_from("198.51.100.50")
     assert normal.post("/api/auth/login", json={"email": user.email,
                                                 "password": PASSWORD}).status_code == 200
     assert normal.get("/api/dashboards").status_code == 200
