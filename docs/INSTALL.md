@@ -45,6 +45,10 @@ point it at that port: Cloudflare accepts the origin HTTPS ports 443, 2053, 2083
 Cloudflare proxying a name that is not reachable at the origin, visitors see **525** (TLS
 handshake failed) — that is this situation, not an application error.
 
+If the plan does not offer **Destination Port** on an Origin Rule (the selector is missing from the
+"Then…" section), the edge can only reach the origin on its standard ports. Terminate TLS at the
+proxy instead, as described next: the proxy listens on 443 and forwards to `HTTPS_PORT`.
+
 ### Behind Nginx Proxy Manager (or any TLS-terminating proxy)
 
 Keep `SITE_ADDRESS` a **domain** and `CADDY_TLS=internal`: the proxy terminates the public
