@@ -77,7 +77,13 @@ are inside the `bizview-web` image, and the only host folders are `projects/` an
 
 ```bash
 cp .env.example .env      # then edit it
+mkdir -p projects attachments
+sudo chown -R 10001:10001 projects attachments   # the containers run as uid 10001
 ```
+
+Those two folders hold the in-app data, and the containers run as **uid 10001** (`app`), so they
+must be owned by it — otherwise Docker creates them as root, the app can read but not write, and
+BI projects and chat images fail at the first use (`PROJECTS_DIR … not writable` in the log).
 
 Two flows share this one file. The services run the images named by `BIZVIEW_IMAGE_PREFIX` —
 `<prefix>/bizview-backend` and `<prefix>/bizview-web` — at the tag in `BIZVIEW_VERSION`

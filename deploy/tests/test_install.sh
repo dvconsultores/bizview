@@ -32,6 +32,7 @@ check "worker service" 'grep -q "^  worker:" "$D/bizview.yml" && grep -q "app.wo
 check "no workspace or branding mounts" '! grep -qE "/(workspace|branding):" "$D/bizview.yml"'
 check "certificate source passed" 'grep -q "CADDY_TLS" "$D/bizview.yml" && grep -q "^CADDY_TLS=auto" "$D/.env"'
 check "projects folder" '[[ -d "$D/projects" ]]'
+check "attachments folder" '[[ -d "$D/attachments" ]]'
 check "projects mounted in backend only" '[[ $(grep -c "./projects:/app/data/projects" "$D/bizview.yml") == 1 ]]'
 check "project size setting" 'grep -q "^PROJECT_MAX_MB=20" "$D/.env"'
 check "timezone written" 'grep -q "^TIMEZONE='"'"'" "$D/.env"'

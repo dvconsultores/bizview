@@ -6,6 +6,7 @@
 """
 import argparse
 import logging
+import os
 import sys
 
 from sqlalchemy import select
@@ -51,7 +52,10 @@ def bootstrap(db: Session) -> str:
     throttle.purge(db)
     from app.projects import fs as project_fs
     if not project_fs.check_dir():       # 020 plan: say it at start, not on the first create
-        log.warning("PROJECTS_DIR is missing or not writable; BI projects cannot be created")
+        log.warning("PROJECTS_DIR %s is missing or not writable by uid %s (the container runs as "
+                    "the 'app' user): BI projects cannot be created. On the host: "
+                    "sudo mkdir -p projects attachments && sudo chown -R 10001:10001 projects "
+                    "attachments", get_settings().projects_dir, os.getuid())
     from app.projects.service import purge_trash
     purge_trash(db)
     from app.sources.service import import_legacy_origin

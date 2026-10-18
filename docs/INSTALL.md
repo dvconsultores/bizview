@@ -48,7 +48,18 @@ handshake failed) — that is this situation, not an application error.
 ## 2. Install
 
 An installation is the compose file plus its settings, nothing else: copy [`bizview.yml`](../bizview.yml)
-and a filled-in `.env` into a folder and start it with `docker compose -f bizview.yml up -d`.
+and a filled-in `.env` into a folder, create the two data folders owned by the container user, and
+start it:
+
+```bash
+mkdir -p projects attachments
+sudo chown -R 10001:10001 projects attachments   # the containers run as uid 10001
+docker compose -f bizview.yml up -d
+```
+
+The containers run as **uid 10001** (`app`), so `projects/` and `attachments/` must be owned by it.
+Docker would create them as root, and the app could read but not write them: BI projects and chat
+images then fail at first use, and the log says `PROJECTS_DIR … is not writable`.
 
 [`deploy/install.sh`](../deploy/install.sh) does that for you. Run it with `sudo bash`.
 Interactive (asks for the missing answers):

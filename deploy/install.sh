@@ -211,16 +211,17 @@ if [[ -e $DIR/.env && $FORCE != 1 ]]; then
 fi
 
 # --- write the installation -------------------------------------------------------------------
-mkdir -p "$DIR/projects" 2>/dev/null \
+mkdir -p "$DIR/projects" "$DIR/attachments" 2>/dev/null \
   || die 2 "cannot create $DIR (run with sudo or choose --dir)"
 chmod 755 "$DIR"
-# BI projects (feature 020): one folder per project, written only by the backend (uid 10001).
-chmod 0750 "$DIR/projects"
+# In-app data written by the containers, which run as uid 10001 ('app'): BI projects (feature 020,
+# one folder per project) and the images attached to the assistant (feature 024).
+chmod 0750 "$DIR/projects" "$DIR/attachments"
 if [[ $(id -u) == 0 ]]; then
-  chown 10001:10001 "$DIR/projects"
+  chown 10001:10001 "$DIR/projects" "$DIR/attachments"
   PROJECTS_NOTE=""
 else
-  PROJECTS_NOTE="  Projects:    run: sudo chown 10001:10001 $DIR/projects   (the backend writes there)"
+  PROJECTS_NOTE="  Projects:    run: sudo chown -R 10001:10001 $DIR/projects $DIR/attachments"
 fi
 
 SECRET_KEY=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '\n')
