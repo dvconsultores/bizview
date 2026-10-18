@@ -79,7 +79,7 @@ WEB_IMAGE="$HUB_USER/bizview-web"
 
 IMAGE_PREFIX="$(env_val BIZVIEW_IMAGE_PREFIX)"
 PREFIX_USER="${IMAGE_PREFIX%%/*}"   # "andresdom2004" out of "andresdom2004/bizview"
-if [[ -n "$IMAGE_PREFIX" && "$IMAGE_PREFIX" != "your-dockerhub-user" && "$PREFIX_USER" != "$HUB_USER" ]]; then
+if [[ -n "$IMAGE_PREFIX" && "$PREFIX_USER" != "$HUB_USER" ]]; then
   echo "⚠️  BIZVIEW_IMAGE_PREFIX=$IMAGE_PREFIX differs from DOCKER_USERNAME=$HUB_USER:" >&2
   echo "   the stack pulls ${IMAGE_PREFIX}-{backend,web} on the server, but this run pushes <$HUB_USER>/bizview-*." >&2
 fi
