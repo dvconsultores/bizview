@@ -45,6 +45,44 @@ point it at that port: Cloudflare accepts the origin HTTPS ports 443, 2053, 2083
 Cloudflare proxying a name that is not reachable at the origin, visitors see **525** (TLS
 handshake failed) — that is this situation, not an application error.
 
+### Behind Nginx Proxy Manager (or any TLS-terminating proxy)
+
+Keep `SITE_ADDRESS` a **domain** and `CADDY_TLS=internal`: the proxy terminates the public
+certificate and Bizview keeps answering HTTPS on its published port, so the `internet` profile and
+the addresses built from `SITE_ADDRESS` stay correct. In Nginx Proxy Manager, **Hosts → Proxy
+Hosts → Add Proxy Host**:
+
+| Field | Value |
+|---|---|
+| Domain Names | `bi.example.com` |
+| Scheme | `https` |
+| Forward Hostname / IP | the Docker host (`172.17.0.1`, or the host's LAN IP), or the Caddy container's name if both share a network |
+| Forward Port | the published `HTTPS_PORT` (`9443` in this example) |
+| Block Common Exploits | on |
+| Websockets Support | on (unused today, harmless) |
+
+On the **Advanced** tab:
+
+```nginx
+proxy_ssl_verify off;          # Caddy's internal CA is not in the proxy's trust store
+client_max_body_size 100m;     # must match CADDY_MAX_REQUEST_BODY (attachments, project zips)
+proxy_read_timeout 300s;
+```
+
+On the **SSL** tab request a certificate (Let's Encrypt needs the domain reachable on port 80) or
+upload one, then enable **Force SSL** and **HTTP/2**. Nothing else is required: the app uses no
+WebSockets, no server-sent events, and uvicorn already runs with `--proxy-headers`.
+
+Finally, tell Caddy to trust the proxy, or every client looks like the proxy address (rate
+limiting, audit and `ADMIN_ALLOWED_NETWORKS` all see one IP):
+
+```dotenv
+TRUSTED_PROXIES=172.16.0.0/12    # the proxy's container network; a single IP works too
+```
+
+The `Host` header must reach Caddy unchanged (NPM's default `proxy_set_header Host $host`), or
+`CADDY_ALLOWED_HOSTS` answers **421**.
+
 ## 2. Install
 
 An installation is the compose file plus its settings, nothing else: copy [`bizview.yml`](../bizview.yml)
