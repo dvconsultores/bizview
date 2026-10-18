@@ -53,6 +53,7 @@ services:
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
       CADDY_ALLOWED_HOSTS: ${CADDY_ALLOWED_HOSTS:-localhost}
+      CADDY_MAX_REQUEST_BODY: ${CADDY_MAX_REQUEST_BODY:-100MB}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
       - "${HTTP_PORT:-8081}:80"
