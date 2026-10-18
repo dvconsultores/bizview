@@ -10,11 +10,11 @@ version. No code is copied or changed per customer.
 └── .env                      all settings (mode 600: database, super user, AI)
 ```
 
-The logo ships inside the `bizview-web` image, so there is no `branding/` folder, and nothing
-mounts a customer checkout, so there is no `workspace/` folder either. When you copy the files
-from this repository, `bizview.yml` + `.env` are all the server needs; `deploy/install.sh` writes
-exactly that pair (plus `projects/`, which holds the BI projects and must be backed up with the
-database).
+A server folder needs only `bizview.yml` and `.env`: the SPA and the logo are inside the
+`bizview-web` image, so there is no `branding/` folder, and nothing mounts a customer checkout,
+so there is no `workspace/` folder. The only host folders are `projects/` and `attachments/` (the
+in-app data), which the compose file creates. `deploy/install.sh` writes exactly this pair and
+starts it; if you copy the files from this repository, the same two files are all you need.
 
 ## 1. Requirements
 
@@ -23,7 +23,8 @@ database).
 - A PostgreSQL database for the product (the "BI database"), reachable from the server. The
   product creates its tables in the database's `public` schema. Recommended: a dedicated database
   and a role that owns it, not the `postgres` superuser.
-- For HTTPS: a domain name pointing to the server, and ports 80 and 443 open.
+- For HTTPS: a domain name pointing to the server, and host 443 or 80 free for the automatic
+  certificate (see below when both belong to another service).
 
 ### When 80 and 443 already belong to another service
 
@@ -46,7 +47,10 @@ handshake failed) — that is this situation, not an application error.
 
 ## 2. Install
 
-Get [`deploy/install.sh`](../deploy/install.sh) from this repository and run it with `sudo bash`.
+An installation is the compose file plus its settings, nothing else: copy [`bizview.yml`](../bizview.yml)
+and a filled-in `.env` into a folder and start it with `docker compose -f bizview.yml up -d`.
+
+[`deploy/install.sh`](../deploy/install.sh) does that for you. Run it with `sudo bash`.
 Interactive (asks for the missing answers):
 
 ```bash
@@ -87,7 +91,7 @@ super user; later starts only apply new migrations.
 | `BIZVIEW_IMAGE_PREFIX` | where the images come from: `<prefix>-backend` and `<prefix>-web`. `./deploy.sh` pushes to Docker Hub (`andresdom2004/bizview-backend`, `andresdom2004/bizview-web`), so that prefix is `andresdom2004/bizview`; any registry that stores the same two images works. An unstamped `install.sh` requires `--image-prefix`. |
 | `DATABASE_URL_BI` | the product's PostgreSQL database |
 | `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` | used only to create the super user on first start, and by the recovery command |
-| `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` | branding (see below) |
+| `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` | names shown to users; the logo ships in the `bizview-web` image, and `LOGO_URL` points at another one |
 | `FOOTER_CREDIT` | who publishes this installation, shown after the license in every footer (default `GlobalDV`) |
 | `SITE_ADDRESS` | `:80` for plain HTTP, or a domain for automatic HTTPS; a domain makes shared-dashboard links and links in emails use `https://<domain>/s/…` (see "Email and shared links") |
 | `HTTP_PORT`, `HTTPS_PORT` | published ports (see "When 80 and 443 already belong to another service") |
@@ -103,7 +107,7 @@ super user; later starts only apply new migrations.
 | `DIRECT_BI_ROLE` | optional read-only database role for `source: bi`; required on the `internet` profile when `DIRECT_REPORTS_BI=true`; see §5 |
 | `AI_*` | optional AI provider (see below) |
 
-After editing: `cd /opt/bizview && docker compose up -d`.
+After editing: `cd /opt/bizview && docker compose -f bizview.yml up -d`.
 
 ### Language (English / Spanish)
 
@@ -127,7 +131,7 @@ because there is no browser at send time. Telegram bot replies use the linked ac
 language, then Telegram's language code, then `DEFAULT_LOCALE`.
 
 To change the default language, set `DEFAULT_LOCALE=en` in `.env` and run
-`docker compose up -d`.
+`docker compose -f bizview.yml up -d`.
 
 Report specs can carry optional English labels for titles, descriptions, metrics, and
 dimensions; see `docs/VIBE-REPORTING.md`, section "English labels (optional)".
@@ -148,7 +152,7 @@ dimensions; see `docs/VIBE-REPORTING.md`, section "English labels (optional)".
 - **Rotate the key** (yearly, or if `.env` may have leaked): put the current key in
   `BIZVIEW_SECRET_KEY_PREVIOUS`, a new one in `BIZVIEW_SECRET_KEY`
   (`python3 -c "import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"`),
-  restart, run `docker compose run --rm backend python -m app.cli rotate-secret-key`, then remove
+  restart, run `docker compose -f bizview.yml run --rm backend python -m app.cli rotate-secret-key`, then remove
   `BIZVIEW_SECRET_KEY_PREVIOUS` and restart.
 - Optional: `ADMIN_ALLOWED_NETWORKS=10.0.0.0/8` (administration only from these networks),
   `SOURCES_ALLOW_PRIVATE_NETWORKS=false` (data sources only on public addresses),
@@ -218,52 +222,23 @@ such a recreation. For a stable setup, create a dedicated reporting schema maint
 the external process, apply the grants there, and keep `ds_*` schemas out of direct
 reports. Set `DIRECT_BI_ROLE=bizview_direct` in `.env` and restart the application.
 
-## 6. Vibe reporting: workspace and worker
+## 6. Vibe reporting
 
-Integrations (ETL) and reports are **specs**. The shipped `bizview.yml` runs a `worker` service
-(same image as the backend) for the integration schedules. Integrations and reports come from
-**BI projects** (feature 020), edited in the app and applied from **Proyectos**: applying a
-project creates a workspace version with it and the other applied projects, and that version is
-what reports and integrations read. No checkout or extra folder is needed on the server.
+Integrations (ETL) and reports are **specs**. They come from **BI projects** (feature 020), edited
+in the app and applied from **Proyectos**: applying a project creates a workspace version with it
+and the other applied projects, and that version is what reports and integrations read. There is
+nothing to copy to the server and nothing to mount, and the compose file already runs everything
+the product needs, so there is no extra process to install or schedule.
 
-A customer Git checkout is still supported as an **optional** source (created with `bizview init`;
-author guide: [VIBE-REPORTING.md](VIBE-REPORTING.md)). The shipped compose file does not mount it.
-To use one, add `- ${WORKSPACE_DIR:-./workspace}:/workspace:ro` to both the `backend` and `worker`
-services, add `WORKSPACE_PATH: /workspace` to their `environment:`, and clone the repository once:
+A `bizview init` checkout can still be applied through **Espacio de trabajo → Validar → Aplicar**
+(`/admin/espacio`, which has no tile in Administración since the 024 polish); the shipped
+`bizview.yml` does not mount one. Applying copies the validated version into the database (the
+engine never runs files that changed after validation); **Volver a la versión anterior** rolls
+back. **Administración → Integraciones** shows each integration's runs, checks and next run, and
+runs one on demand. Dataset tables live in schemas `ds_<integration>` of the product database,
+owned by the engine.
 
-```bash
-git clone <customer workspace repo> workspace
-```
-
-A workspace can use the legacy flat layout or the **project layout** (`projects/<slug>/…`, created
-by `bizview init` and `bizview project new`). Git projects appear in **Proyectos** read-only; a
-project edited in the app with the same slug makes the Git apply stop and name it ("Convertir en
-proyecto de la aplicación" moves a Git project to the app for good).
-
-A mounted checkout is validated and applied in **Espacio de trabajo → Validar → Aplicar**
-(`/admin/espacio`: the screen has no tile in Administración since the 024 polish); BI projects are
-validated and applied from **Proyectos**. Applying copies the validated
-version into the database (the engine never runs files that changed after validation);
-**Volver a la versión anterior** rolls back. **Administración → Integraciones** shows each
-integration's runs, checks and next run, and runs one on demand. Dataset tables live in schemas
-`ds_<integration>` of the product database, owned by the engine.
-
-## 7. Branding
-
-The logo ships inside the `bizview-web` image and Caddy serves it at `/branding/logo.svg`; there
-is nothing to copy to the server. To use another logo, set `LOGO_URL` to a URL the browser can
-reach, then set:
-
-```ini
-LOGO_URL=/branding/logo.svg
-PRODUCT_NAME='Bizview AI Powered'
-ORGANIZATION_NAME='Customer Inc.'
-# FOOTER_CREDIT='Customer Inc.'    # the credit at the end of the footer (default GlobalDV)
-```
-
-With no logo, the product shows a text mark built from the product name.
-
-## 8. AI (optional)
+## 7. AI (optional)
 
 AI is off by default and everything works without it. It is used for report narratives (only
 with the aggregated metrics the spec lists) and by the assistant, which proposes integration and
@@ -304,9 +279,9 @@ applied projects; the version records which project owns each artifact.
 A mockup attached to a conversation as the report brief is stored outside the project, in
 `ATTACHMENTS_DIR` (default `./attachments` next to the compose file, mounted as
 `ATTACHMENTS_DIR_HOST`; `ATTACHMENTS_MAX_MB` 5 and `ATTACHMENTS_MAX_PER_MESSAGE` 4 by default;
-`AI_VISION` decides whether a model may receive images). The backend and the worker both need
-that folder writable — the worker sweeps uploads that never became a message — and it must be
-**part of the backups** with `projects/` and the database.
+`AI_VISION` decides whether a model may receive images). The containers that use it must be able
+to write there: the app reads the images and sweeps the ones that never became a message. It must
+be **part of the backups** with `projects/` and the database.
 
 The super user describes a dashboard in a conversation; the assistant reads only source
 structure and aggregates, checks its queries, runs a preview and leaves the draft "Listo
@@ -368,8 +343,8 @@ working. Administrators on the `internet` profile still enter their two-step cod
 
 1. In Telegram, talk to [@BotFather](https://t.me/BotFather) → `/newbot`. Note the bot name (it
    ends in `bot`) and its credential. Use one bot per installation and do not set a webhook.
-2. The `worker` service must reach `https://api.telegram.org` (outbound HTTPS only; no public
-   address is needed).
+2. The stack must reach `https://api.telegram.org` (outbound HTTPS only; no public address is
+   needed).
 3. Sign in as the super user → **Seguridad** → **Ingreso con Telegram**: enter the bot name and
    credential, **Guardar**, **Probar**, then switch **Activar ingreso con Telegram** on.
 
@@ -397,7 +372,7 @@ that installation.
    `https://<your-domain>/api/auth/google/callback`, with the domain of `SITE_ADDRESS`.
 4. Copy the client id and the client secret into the installation's `.env`
    (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), set `GOOGLE_AUTH_ENABLED=true`, and restart:
-   `docker compose up -d`.
+   `docker compose -f bizview.yml up -d`.
 5. Optional: `GOOGLE_ALLOWED_DOMAINS=cliente.com,socio.com` restricts which email domains may sign
    in (empty = any domain). `GOOGLE_REDIRECT_URI` overrides the redirect URI and is only for
    unusual proxy setups; empty derives it from `SITE_ADDRESS`.
@@ -434,7 +409,7 @@ Troubleshooting:
   screen in the customer's Workspace domain.
 - **Nobody is locked out.** Password sign-in works in every one of those cases — and with
   `GOOGLE_AUTH_ENABLED=false` — so the super user can still enter with email and password and fix
-  the settings (see §11 to recover the super user).
+  the settings (see §10 to recover the super user).
 
 ### Email and shared links (optional)
 
@@ -459,13 +434,13 @@ expire after 1–90 days.
    SHARE_LINKS_ENABLED=true     # lets administrators press Compartir on a dashboard
    ```
 
-   Email is on when `SMTP_HOST` and `SMTP_FROM` are set. Restart the `backend` and `worker`
-   services (`docker compose up -d`) after any change; an invalid value stops them at startup
-   with a message naming the variable.
-3. The `worker` service sends the mail. It must be able to reach the SMTP host and port
-   (outbound only; no public address is needed).
+   Email is on when `SMTP_HOST` and `SMTP_FROM` are set. After any change restart the stack
+   (`docker compose -f bizview.yml up -d`); an invalid value stops it at startup with a message
+   naming the variable.
+3. Mail leaves from the stack, so it must be able to reach the SMTP host and port (outbound
+   only; no public address is needed).
 4. Check the setup with a test email (there is no email option in **Administración**):
-   `docker compose run --rm backend python -m app.cli mail-test <address>` sends one message and
+   `docker compose -f bizview.yml run --rm backend python -m app.cli mail-test <address>` sends one message and
    prints success or a sanitized reason (never the password).
 
 Safety notes. `SMTP_SECURITY=none` is refused at startup on the `internet` profile, and STARTTLS
@@ -507,19 +482,19 @@ emails. Recipients outside the network need the site to be reachable from where 
 
 Scheduled sends use the installation time zone (`TIMEZONE`).
 
-## 9. Upgrade
+## 8. Upgrade
 
 ```bash
 cd /opt/bizview
 sed -i "s/^BIZVIEW_VERSION=.*/BIZVIEW_VERSION='0.2.0'/" .env
-docker compose pull && docker compose up -d
+docker compose -f bizview.yml pull && docker compose -f bizview.yml up -d
 ```
 
 Migrations run automatically. Going back to an older version is not supported once a newer one
 has migrated the database: restore a backup instead (next section). Read the release notes
 before upgrading.
 
-## 10. Backup and restore
+## 9. Backup and restore
 
 The database holds all product data (users, access, audit, applied workspace versions, file
 history of the projects, run history, and the `ds_*` datasets, which can also be rebuilt by a
@@ -527,8 +502,7 @@ full run); the installation folder holds the settings, the **`projects/` folder*
 (the files of every BI project — back it up with the database) and the **`attachments/` folder**
 (`ATTACHMENTS_DIR`: the images attached to the chat as report briefs, feature 024; they are not
 in the database, not in a project folder and not in a project export, so a backup without it
-loses them); the logo is inside the `bizview-web` image, and an optional Git workspace lives in
-its own repository.
+loses them); the logo is inside the `bizview-web` image.
 
 ```bash
 pg_dump --format=custom --file bizview-$(date +%F).dump "$DATABASE_URL_BI"   # database
@@ -536,26 +510,26 @@ tar czf bizview-install-$(date +%F).tgz -C /opt bizview                        #
 ```
 
 Restore: `pg_restore --clean --dbname "$DATABASE_URL_BI" bizview-YYYY-MM-DD.dump`, put the
-folder back, `docker compose up -d`. Keep backups encrypted: they contain the `.env` secrets.
+folder back, `docker compose -f bizview.yml up -d`. Keep backups encrypted: they contain the `.env` secrets.
 
-## 11. Recover the super user
+## 10. Recover the super user
 
 Forgotten password or locked out: set the new password in `SUPER_USER_PASSWORD` in `.env`, then
 
 ```bash
-cd /opt/bizview && docker compose run --rm backend python -m app.cli reset-superuser-password
+cd /opt/bizview && docker compose -f bizview.yml run --rm backend python -m app.cli reset-superuser-password
 ```
 
 Changing the variable alone does nothing: a password changed in the interface always wins.
 
-Lost authenticator **and** recovery codes: `docker compose run --rm backend python -m app.cli
+Lost authenticator **and** recovery codes: `docker compose -f bizview.yml run --rm backend python -m app.cli
 reset-superuser-mfa`, then sign in and enroll again. Other users: the super user resets them in
 their user page (*Restablecer doble factor*).
 
-## 12. Uninstall
+## 11. Uninstall
 
 ```bash
-cd /opt/bizview && docker compose down -v     # stops containers, removes certificate volumes
+cd /opt/bizview && docker compose -f bizview.yml down -v     # stops containers, removes certificate volumes
 ```
 
 The database is not touched; drop it separately if the customer no longer needs the data.

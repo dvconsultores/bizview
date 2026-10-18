@@ -180,6 +180,12 @@ case $SECURITY_PROFILE in
   internet) [[ $SITE != :* ]] || die 2 "the internet profile requires a domain with HTTPS (--site)" ;;
   *) die 2 "invalid --security-profile '$SECURITY_PROFILE' (private, internet, or auto)" ;;
 esac
+# The internet profile refuses to start while direct reports may read the BI database with the
+# application's own credentials and no read-only role is configured (app/security/profile.py).
+DIRECT_REPORTS=true
+if [[ $SECURITY_PROFILE == internet || ( $SECURITY_PROFILE == auto && $SITE != :* ) ]]; then
+  DIRECT_REPORTS=false
+fi
 
 if [[ -z $TIMEZONE ]]; then
   TIMEZONE=$(cat /etc/timezone 2>/dev/null || true)
@@ -268,6 +274,10 @@ BIZVIEW_SECRET_KEY='$SECRET_KEY'
 # LOGIN_RATE_LIMIT=20                    # failed sign-ins per address per window
 # LOGIN_RATE_WINDOW_MINUTES=15
 # TRUSTED_PROXIES=10.0.0.0/8            # only if a load balancer sits in front of this server
+# Direct reports (feature 019): reports that read the BI database without an integration.
+# The internet profile requires DIRECT_BI_ROLE (below) while this is true, so it stays off until
+# a read-only role exists: create it, set DIRECT_BI_ROLE, then set this to true.
+DIRECT_REPORTS_BI=$DIRECT_REPORTS
 # DIRECT_BI_ROLE=                      # read-only role for built-in bi sessions; create it with:
 #   CREATE ROLE bizview_direct NOLOGIN;
 #   GRANT USAGE ON SCHEMA public TO bizview_direct;

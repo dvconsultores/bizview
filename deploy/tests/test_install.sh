@@ -44,6 +44,7 @@ pw=$(sed -n "s/^SUPER_USER_PASSWORD='\(.*\)'$/\1/p" "$D/.env")
 check "generated password 20 chars" '[[ ${#pw} == 20 ]]'
 check "password shown once" '[[ $(grep -c "$pw" "$WORK/out") == 1 ]]'
 check "http site: cookie not secure" 'grep -q "^COOKIE_SECURE=false" "$D/.env"'
+check "http site: direct reports allowed" 'grep -q "^DIRECT_REPORTS_BI=true" "$D/.env"'
 check "AI off by default" 'grep -q "^AI_PROVIDER=none" "$D/.env"'
 check "email placeholders commented" 'grep -q "^# SMTP_HOST=" "$D/.env"'
 check "share links placeholder commented" 'grep -q "^# SHARE_LINKS_ENABLED=false" "$D/.env"'
@@ -74,6 +75,9 @@ check "domain exit 0" '[[ $code == 0 ]]'
 check "domain cookie secure" 'grep -q "^COOKIE_SECURE=true" "$D/.env"'
 check "domain ports" 'grep -q "^HTTP_PORT=80" "$D/.env" && grep -q "^HTTPS_PORT=443" "$D/.env"'
 check "domain host allow-list" 'grep -q "^CADDY_ALLOWED_HOSTS='"'"'dashboard.acme.com'"'"'" "$D/.env"'
+# The guard in app/security/profile.py refuses to start an internet installation whose direct
+# reports use the application's own credentials, so the generated settings must not enable them.
+check "internet site: direct reports off" 'grep -q "^DIRECT_REPORTS_BI=false" "$D/.env"'
 check "summary https url" 'grep -q "https://dashboard.acme.com" "$WORK/out"'
 
 # 4b. explicit profiles
@@ -126,6 +130,11 @@ if [[ ${REAL_DOCKER:-0} == 1 ]]; then
   check "compose config valid" '(cd "$WORK/i4" && PATH=$REAL_PATH docker compose config -q)'
   check "compose images" '(cd "$WORK/i4" && PATH=$REAL_PATH docker compose config --images | sort | tr "\n" " ") | grep -q "ghcr.io/acme/bizview-backend:1.2.3 ghcr.io/acme/bizview-web:1.2.3"'
 fi
+
+# 10. the shipped .env.example must boot with the profile it declares: the internet profile
+# refuses to start while direct reports are on and no read-only role is configured.
+check ".env.example bootable" \
+  '! grep -qE "^SECURITY_PROFILE=internet" "$HERE/../../.env.example" || grep -qE "^DIRECT_REPORTS_BI=false" "$HERE/../../.env.example"'
 
 echo "installer tests: $pass passed, $fail failed"
 [[ $fail == 0 ]]

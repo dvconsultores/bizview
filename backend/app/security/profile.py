@@ -24,7 +24,8 @@ def enforce_at_start(settings: Settings) -> None:
         raise ProfileError("SECURITY_PROFILE=internet requires SMTP_SECURITY=starttls or ssl")
     if settings.direct_reports_bi and not settings.direct_bi_role:
         raise ProfileError("SECURITY_PROFILE=internet with DIRECT_REPORTS_BI=true requires "
-                           "DIRECT_BI_ROLE (a read-only database role, see docs/INSTALL.md)")
+                           "DIRECT_BI_ROLE (a read-only database role, see docs/INSTALL.md) — "
+                           "or set DIRECT_REPORTS_BI=false to turn direct reports off")
 
 
 def url_problem(url: str, settings: Settings) -> str | None:

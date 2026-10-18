@@ -524,6 +524,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The shipped templates could not start an internet installation**: `.env.example` and the
+  installer both set `SECURITY_PROFILE=internet` while leaving `DIRECT_REPORTS_BI` at its default
+  `true` with no `DIRECT_BI_ROLE`, which the startup guard refuses — the backend exits with
+  `ProfileError` before serving. The example now ships `DIRECT_REPORTS_BI=false`, the installer
+  writes `false` whenever the profile resolves to `internet` and `true` otherwise, and the guard's
+  message names the second way out.
 - **Projects page and Safari 14** (019–023 final suites, 2026-10-11): the status bar (validation,
   **Listo para aplicar**, save state) sits under every pane, so phones see readiness without
   opening the editor; the explorer renames with F2 and deletes with Delete (the tree holds only
