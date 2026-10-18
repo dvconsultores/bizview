@@ -100,7 +100,7 @@ Two commands separate "the app is fine" from "the edge is misconfigured", run on
 
 ```bash
 # the app over TLS, with the right SNI (a bare -H Host is not enough: TLS needs the name)
-curl -k -o /dev/null -w '%{http_code}\n' \
+curl -sk -o /dev/null -w '%{http_code}\n' \
   --resolve bi.example.com:9443:127.0.0.1 https://bi.example.com:9443/api/health
 # a certificate for the name on the port the edge uses (empty output = nothing TLS there)
 echo | openssl s_client -connect 127.0.0.1:443 -servername bi.example.com 2>&1 | grep -E 'subject=|issuer='
