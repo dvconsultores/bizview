@@ -365,8 +365,11 @@ services:
       CADDY_TLS_KEY: ${CADDY_TLS_KEY:-/certs/origin-key.pem}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
+      # LEFT of the colon is the host port (the only side that can collide with another stack);
+      # RIGHT is inside the container, where Caddy always listens on 80 and 443.
       - "${HTTP_PORT}:80"
       - "${HTTPS_PORT}:443"
+      # HTTP/3 (QUIC) uses the same number over UDP; delete this line if that port is taken.
       - "${HTTPS_PORT}:443/udp"
     volumes:
       - ${CADDY_TLS_DIR:-./caddy-certs}:/certs:ro

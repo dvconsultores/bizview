@@ -9,7 +9,7 @@ name: bizview
 
 services:
   backend:
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-backend:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -25,7 +25,7 @@ services:
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # chat image briefs (feature 024)
 
   worker:                      # integration runs (feature 005): same image, other entry point
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-backend:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -44,7 +44,7 @@ services:
         condition: service_healthy
 
   caddy:
-    image: ${BIZVIEW_IMAGE_PREFIX:-andresdom2004}/bizview-web:${BIZVIEW_VERSION:-latest}
+    image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-web:${BIZVIEW_VERSION:-latest}
     build:
       context: .
       dockerfile: deploy/caddy/Dockerfile
@@ -57,8 +57,13 @@ services:
       CADDY_TLS_KEY: ${CADDY_TLS_KEY:-/certs/origin-key.pem}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
+      # LEFT of the colon is the host port and the only side that can collide with another stack.
+      # RIGHT is inside the container, where Caddy always listens on 80 and 443: publishing 8443
+      # does not bind or need host 443, so a host whose 443 belongs to another service is fine.
       - "${HTTP_PORT:-8081}:80"
       - "${HTTPS_PORT:-8443}:443"
+      # HTTP/3 (QUIC) uses the same number over UDP; delete this line if that host UDP port is
+      # taken (only the HTTP/3 fast path is lost, HTTPS keeps working over TCP).
       - "${HTTPS_PORT:-8443}:443/udp"
     volumes:
       # Only read when CADDY_TLS=file; an empty directory is harmless.
