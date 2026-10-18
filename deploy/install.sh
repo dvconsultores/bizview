@@ -297,6 +297,10 @@ TIMEZONE='$TIMEZONE'
 # BI projects (feature 020): ./projects is mounted read-write into the backend only.
 PROJECT_MAX_MB=20
 
+# Watchtower pulls a newer image of BIZVIEW_VERSION every N seconds; it only recreates the
+# services of this installation. With a fixed version tag it waits until the tag changes.
+WATCHTOWER_POLL_INTERVAL=300
+
 # AI (optional, off by default). Providers: none | anthropic | openai_compatible
 #   anthropic:          AI_API_KEY required; AI_MODEL defaults to claude-opus-5-5
 #   openai_compatible:  AI_BASE_URL (e.g. http://ollama:11434/v1) and AI_MODEL required
@@ -347,6 +351,8 @@ name: bizview
 services:
   backend:
     image: ${BIZVIEW_IMAGE_PREFIX}-backend:${BIZVIEW_VERSION}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     env_file: .env
     restart: unless-stopped
     expose: ["8000"]
@@ -354,12 +360,19 @@ services:
       PROJECTS_DIR: /app/data/projects
     volumes:
       - ./projects:/app/data/projects
+      - ./attachments:/app/data/attachments
 
   worker:
     image: ${BIZVIEW_IMAGE_PREFIX}-backend:${BIZVIEW_VERSION}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     command: ["python", "-m", "app.worker"]
     env_file: .env
+    environment:
+      ATTACHMENTS_DIR: /app/data/attachments
     restart: unless-stopped
+    volumes:
+      - ./attachments:/app/data/attachments
     healthcheck:
       disable: true
     depends_on:
@@ -368,6 +381,8 @@ services:
 
   web:
     image: ${BIZVIEW_IMAGE_PREFIX}-web:${BIZVIEW_VERSION}
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
       CADDY_ALLOWED_HOSTS: ${CADDY_ALLOWED_HOSTS:-}
@@ -390,6 +405,20 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+  # Pulls a new image when the tag in BIZVIEW_VERSION is republished, and recreates only the
+  # labelled services above (never other stacks on a shared host). Remove it to upgrade by hand.
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: bizview-watchtower
+    restart: unless-stopped
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-300}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   caddy_data:

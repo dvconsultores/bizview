@@ -154,10 +154,10 @@ echo "On the server, in the folder that holds bizview.yml:"
 echo "   docker compose -f bizview.yml pull"
 echo "   docker compose -f bizview.yml up -d"
 echo "(set BIZVIEW_IMAGE_PREFIX=$HUB_USER and BIZVIEW_VERSION to the tag you want to run;"
-echo " Watchtower can pull these tags on its own.)"
+echo " the stack's Watchtower container, bizview-watchtower, applies new :latest images itself.)"
 for tag in "${pushed[@]}"; do
   if [[ $tag == latest ]]; then
-    echo "or let Watchtower pull $BACKEND_IMAGE:latest and $WEB_IMAGE:latest on its own."
+    echo "or let bizview-watchtower pull $BACKEND_IMAGE:latest and $WEB_IMAGE:latest on its own."
     break
   fi
 done

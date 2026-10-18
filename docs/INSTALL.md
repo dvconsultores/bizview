@@ -512,6 +512,22 @@ Migrations run automatically. Going back to an older version is not supported on
 has migrated the database: restore a backup instead (next section). Read the release notes
 before upgrading.
 
+The stack also runs **`watchtower`** (container `bizview-watchtower`): every
+`WATCHTOWER_POLL_INTERVAL` seconds (default 300) it pulls a newer image of the tag in
+`BIZVIEW_VERSION` and recreates only the containers of this installation, one service at a time,
+so the site stays up. It is scoped by label and never touches other stacks on the host. Two
+consequences:
+
+- with `BIZVIEW_VERSION=latest`, a publish updates the installation by itself — the commands
+  above are then only needed to pin a version;
+- with a fixed tag such as `0.1.0`, nothing happens until you change the tag, which keeps an
+  upgrade a deliberate act (the recommended setting for a customer).
+
+To check immediately instead of waiting: `docker compose -f bizview.yml run --rm watchtower
+--run-once`. It needs the Docker socket, which can control every container on the host; remove the
+`watchtower` service from the compose file if that is not acceptable, and upgrade with the commands
+above.
+
 ## 9. Backup and restore
 
 The database holds all product data (users, access, audit, applied workspace versions, file

@@ -139,6 +139,15 @@ DIRECT_REPORTS_BI=false     # true requires DIRECT_BI_ROLE, or the stack refuses
 `BIZVIEW_IMAGE_PREFIX` to that same user and `BIZVIEW_VERSION` to the tag, so `pull` gets exactly
 what was pushed. No SSH is involved.
 
+**Automatic updates.** The stack runs `watchtower` (container `bizview-watchtower`), which pulls a
+newer image of the tag in `BIZVIEW_VERSION` every `WATCHTOWER_POLL_INTERVAL` seconds (default 300)
+and recreates the container that uses it, one service at a time. It is scoped by label, so it
+touches **only** the three Bizview containers and never the other stacks on the host. With the
+`latest` tag, publishing from `deploy.sh` is the whole upgrade. A fixed version tag changes only
+when you edit it, which is the safer choice for a customer installation. To check right away:
+`docker compose -f bizview.yml run --rm watchtower --run-once`. Watchtower needs the Docker socket,
+which can control every container on the host; delete the service if that is not acceptable.
+
 **The customer path is different**: [`deploy/install.sh`](deploy/install.sh) writes an installation
 folder in `/opt/bizview` that runs published images — `<prefix>-backend` and `<prefix>-web`, the
 same two images `./deploy.sh` pushes to Docker Hub — and upgrades by changing a version. Run it

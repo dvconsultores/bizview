@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Automatic image updates**: the compose file runs `containrrr/watchtower:1.7.1` as
+  `bizview-watchtower`. Every `WATCHTOWER_POLL_INTERVAL` seconds (default 300) it pulls a newer
+  image of the `BIZVIEW_VERSION` tag and recreates the affected container with rolling restarts, so
+  a publish from `deploy.sh` reaches the server without SSH. It is scoped with
+  `WATCHTOWER_LABEL_ENABLE` and the `com.centurylinklabs.watchtower.enable` label on the three
+  services, so it never touches another stack on a shared host. Both the shipped compose file and
+  the one `install.sh` generates include it; remove the service to upgrade by hand instead.
+  Documented in `README.md` and `docs/INSTALL.md` (section 8), including the difference between the
+  `latest` tag (updates by itself) and a fixed version tag (updates only when edited).
+
 - **Sign in with Google** (feature 027): an installation may now offer sign-in with Google as an
   additional identity for users who already exist. It is off by default (`GOOGLE_AUTH_ENABLED=false`)
   and configured with that installation's own OAuth client — `GOOGLE_CLIENT_ID`,

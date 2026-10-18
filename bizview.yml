@@ -9,6 +9,8 @@ name: bizview
 
 services:
   backend:
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
@@ -25,6 +27,8 @@ services:
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # chat image briefs (feature 024)
 
   worker:                      # integration runs (feature 005): same image, other entry point
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
     build:
       context: .
@@ -44,6 +48,8 @@ services:
         condition: service_healthy
 
   caddy:
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-web:${BIZVIEW_VERSION:-latest}
     build:
       context: .
@@ -74,6 +80,24 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+  # Pulls a new image when deploy.sh publishes one and recreates only the containers labelled
+  # above, so other stacks on a shared host are never touched (WATCHTOWER_LABEL_ENABLE). Needs the
+  # Docker socket: it can control every container on the host, so remove this service if the host
+  # is not trusted with it.
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: bizview-watchtower
+    restart: unless-stopped
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"            # only the labelled services, never the whole host
+      WATCHTOWER_CLEANUP: "true"                 # delete the superseded image after a swap
+      WATCHTOWER_ROLLING_RESTART: "true"         # one at a time, so the site stays up
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-300}
+      TZ: ${TIMEZONE:-UTC}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # No ports, no volumes of its own: it only talks to the Docker API.
 
 
 volumes:
