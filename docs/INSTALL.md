@@ -68,10 +68,17 @@ Hosts → Add Proxy Host**:
 On the **Advanced** tab:
 
 ```nginx
-proxy_ssl_verify off;          # Caddy's internal CA is not in the proxy's trust store
-client_max_body_size 100m;     # must match CADDY_MAX_REQUEST_BODY (attachments, project zips)
+proxy_ssl_server_name on;                  # nginx sends no SNI by default …
+proxy_ssl_name bi.example.com;             # … and Caddy refuses a TLS connection without it
+proxy_ssl_verify off;                      # Caddy's internal CA is not in the proxy's trust store
+client_max_body_size 100m;                 # match CADDY_MAX_REQUEST_BODY (attachments, project zips)
 proxy_read_timeout 300s;
 ```
+
+The first two lines are not optional: with `SITE_ADDRESS` set to a name, Caddy holds a certificate
+only for that name and answers a connection without SNI with `tlsv1 alert internal error`, which
+the proxy reports as **502**. That is also why pointing the proxy at `HTTP_PORT` instead does not
+help: Caddy redirects plain HTTP to HTTPS there.
 
 On the **SSL** tab request a certificate (Let's Encrypt needs the domain reachable on port 80) or
 upload one, then enable **Force SSL** and **HTTP/2**. Nothing else is required: the app uses no
@@ -100,7 +107,7 @@ Cloudflare error names a different fault; check it before changing anything:
 | **521** | origin refused the connection | nothing listening on the port the edge targets (stack down, wrong `HTTPS_PORT`) |
 | **525** | TLS handshake with the origin failed | the edge targets a **plain-HTTP** port (`HTTP_PORT`, e.g. `8090`) instead of the TLS one (`HTTPS_PORT`, `9443`), or the proxy host has **no certificate** |
 | **526** | origin certificate invalid | Cloudflare **Full (strict)** while Caddy uses `CADDY_TLS=internal`; switch to **Full** or supply a Cloudflare Origin CA pair with `CADDY_TLS=file` |
-| **502** | proxy reached the app, which did not answer | NPM cannot verify Caddy's internal CA (`proxy_ssl_verify off;`) or targets the wrong port |
+| **502** | proxy reached the app, which did not answer | the proxy sends **no SNI** (`proxy_ssl_server_name on;` + `proxy_ssl_name <domain>;`), cannot verify Caddy's internal CA (`proxy_ssl_verify off;`), or targets the wrong port |
 | **421** | the app refused the `Host` | the proxy rewrote `Host`, or the name is missing from `CADDY_ALLOWED_HOSTS` |
 
 Two commands separate "the app is fine" from "the edge is misconfigured", run on the server:
