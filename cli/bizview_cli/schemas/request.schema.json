@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bizview REST/SOAP request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "records",
+    "fields"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Pista opcional del editor con la URL del esquema; el validador la ignora.",
+      "type": "string"
+    },
+    "method": {
+      "description": "Método HTTP de la petición: GET o POST.",
+      "enum": [
+        "GET",
+        "POST"
+      ]
+    },
+    "path": {
+      "description": "Ruta relativa a la URL base de la fuente; para Supabase/PostgREST es una tabla o vista.",
+      "type": "string"
+    },
+    "operation": {
+      "description": "Nombre de la operación SOAP que se invoca.",
+      "type": "string"
+    },
+    "params": {
+      "description": "Parámetros de query-string; admite los marcadores {window_start} y {window_end}.",
+      "type": "object"
+    },
+    "body": {
+      "description": "Cuerpo de la petición para POST; puede ser un objeto o una cadena."
+    },
+    "pagination": {
+      "description": "Configuración de paginación para recorrer todas las páginas de resultados.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "description": "Tipo de paginación: none, page, offset, cursor o link.",
+          "enum": [
+            "none",
+            "page",
+            "offset",
+            "cursor",
+            "link"
+          ]
+        },
+        "param": {
+          "description": "Nombre del parámetro de página, offset o cursor.",
+          "type": "string"
+        },
+        "size_param": {
+          "description": "Nombre del parámetro que define el tamaño de página.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Tamaño de página, entre 1 y 10000.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "cursor_path": {
+          "description": "Ruta JSON del siguiente cursor dentro de la respuesta, p. ej. $.next_cursor.",
+          "type": "string"
+        },
+        "max_pages": {
+          "description": "Límite de seguridad para el número máximo de páginas, entre 1 y 10000.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      }
+    },
+    "records": {
+      "description": "Ruta JSON de la lista de registros en la respuesta; usa \"$\" para un arreglo de nivel superior.",
+      "type": "string"
+    },
+    "fields": {
+      "description": "Mapa de columnas; cada clave es el nombre de columna y el valor la ruta JSON dentro de cada registro.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "description": "Nombre de columna: minúsculas, números o guion bajo.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "description": "Ruta JSON de la columna dentro de cada registro, p. ej. $.campo.",
+        "type": "string"
+      }
+    }
+  }
+}

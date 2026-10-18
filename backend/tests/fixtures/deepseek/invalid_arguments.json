@@ -1,0 +1,37 @@
+{
+  "id": "chatcmpl-003",
+  "object": "chat.completion",
+  "created": 1769000002,
+  "model": "deepseek-v4-pro",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "reasoning_content": "Voy a consultar la descripción de la fuente ERP.",
+        "tool_calls": [
+          {
+            "id": "call_describe_source_1",
+            "type": "function",
+            "function": {
+              "name": "describe_source",
+              "arguments": "{\"name\": \"ERP\""
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 22,
+    "total_tokens": 117,
+    "prompt_cache_hit_tokens": 70,
+    "prompt_cache_miss_tokens": 25,
+    "completion_tokens_details": {
+      "reasoning_tokens": 9
+    }
+  }
+}

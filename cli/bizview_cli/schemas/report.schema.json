@@ -1,0 +1,1537 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bizview report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "spec",
+    "title",
+    "date",
+    "metrics",
+    "views"
+  ],
+  "oneOf": [
+    {
+      "description": "Reporte sobre datasets de integraciones (uses).",
+      "required": [
+        "uses"
+      ]
+    },
+    {
+      "description": "Reporte directo sobre tablas de una fuente (direct).",
+      "required": [
+        "direct"
+      ]
+    }
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Pista opcional del editor con la URL del esquema; el validador la ignora.",
+      "type": "string"
+    },
+    "id": {
+      "description": "Identificador único del informe; debe coincidir con el nombre de la carpeta reports/<id>/.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,49}$"
+    },
+    "spec": {
+      "description": "Ruta de la carpeta de especificación, p. ej. specs/reports/001-resumen.",
+      "type": "string"
+    },
+    "title": {
+      "description": "Título del informe que se muestra en la cabecera del dashboard.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "title_en": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Título del informe en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa title."
+    },
+    "description": {
+      "description": "Subtítulo breve que se muestra bajo el título del informe.",
+      "type": "string",
+      "maxLength": 200
+    },
+    "description_en": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Descripción del informe en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa description."
+    },
+    "icon": {
+      "description": "Nombre del icono para el menú, p. ej. chart.",
+      "type": "string",
+      "maxLength": 40
+    },
+    "uses": {
+      "description": "Mapa de alias a conjuntos de datos; cada alias apunta a <integration>.<dataset>, p. ej. lines: ventas.sale_lines.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "description": "Alias del conjunto de datos; se usa después como alias.columna en sql.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "description": "Referencia a un dataset como <integration>.<dataset>, p. ej. ventas.sale_lines.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{1,49}\\.[a-z][a-z0-9_]{0,40}$"
+      }
+    },
+    "direct": {
+      "description": "Alternativa a uses: lee tablas ya preparadas por otro proceso directamente desde la fuente, sin integración.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "tables"
+      ],
+      "properties": {
+        "source": {
+          "description": "'bi' para la base de datos BI de la instalación o el nombre de una fuente catálogo PostgreSQL con «Permitir reportes directos» habilitado.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "tables": {
+          "description": "Mapa de alias a definiciones de tablas para consulta directa.",
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 8,
+          "propertyNames": {
+            "description": "Alias usado como alias.columna en sql.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "additionalProperties": {
+            "description": "Definición de una tabla o vista de lectura directa.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "table",
+              "columns"
+            ],
+            "properties": {
+              "table": {
+                "description": "Tabla o vista como esquema.tabla, p. ej. public.bi_ventas.",
+                "type": "string",
+                "pattern": "^[a-z_][a-z0-9_]{0,62}\\.[a-z_][a-z0-9_]{0,62}$"
+              },
+              "columns": {
+                "description": "Columnas del contrato disponibles para el reporte.",
+                "type": "object",
+                "minProperties": 1,
+                "propertyNames": {
+                  "description": "Nombre de columna pública; se usa como alias.columna.",
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/column"
+                }
+              },
+              "description": {
+                "description": "Descripción libre de la tabla o vista.",
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "cache_seconds": {
+          "description": "Segundos de caché para resultados; por defecto 300.",
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
+        "timeout_seconds": {
+          "description": "Límite de ejecución en segundos; por defecto 15.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 15
+        },
+        "max_rows": {
+          "description": "Máximo de filas de la vista de tabla; por defecto 500.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000,
+          "default": 500
+        }
+      }
+    },
+    "joins": {
+      "description": "Lista de uniones entre datasets; cada una une alias.columna con alias.columna.",
+      "type": "array",
+      "items": {
+        "description": "Definición de una unión entre dos datasets.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "left",
+          "right"
+        ],
+        "properties": {
+          "left": {
+            "description": "Columna izquierda de la unión como alias.columna.",
+            "type": "string"
+          },
+          "right": {
+            "description": "Columna derecha de la unión como alias.columna.",
+            "type": "string"
+          },
+          "type": {
+            "description": "Tipo de unión: left (por defecto) o inner.",
+            "enum": [
+              "left",
+              "inner"
+            ]
+          }
+        }
+      }
+    },
+    "date": {
+      "description": "Columna de fecha o timestamptz (alias.columna) que filtra los periodos.",
+      "type": "string"
+    },
+    "materialize": {
+      "description": "Precalcular agregados diarios: none o daily.",
+      "enum": [
+        "none",
+        "daily"
+      ]
+    },
+    "metrics": {
+      "description": "Mapa de métricas; la clave es el id de la métrica y el valor su definición.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "description": "Identificador de la métrica: minúsculas, números o guion bajo.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "description": "Definición de una métrica: etiqueta y una expresión sql o fórmula.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "oneOf": [
+          {
+            "description": "Métrica con sql: expresión de agregación sobre alias.columna.",
+            "required": [
+              "sql"
+            ]
+          },
+          {
+            "description": "Métrica con formula: aritmética sobre ids de métricas con sql.",
+            "required": [
+              "formula"
+            ]
+          }
+        ],
+        "properties": {
+          "label": {
+            "description": "Etiqueta visible de la métrica.",
+            "type": "string",
+            "maxLength": 60
+          },
+          "label_en": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Etiqueta de la métrica en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa metric.label."
+          },
+          "sql": {
+            "description": "Expresión SQL de agregación con sum/count/avg/min/max/coalesce/round/date_trunc, p. ej. sum(lines.net_amount).",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "formula": {
+            "description": "Fórmula aritmética con + - * / y paréntesis sobre ids de métricas, p. ej. net_sales / orders.",
+            "type": "string",
+            "maxLength": 300
+          },
+          "format": {
+            "description": "Formato de visualización: currency, integer, number, percent o text.",
+            "enum": [
+              "currency",
+              "integer",
+              "number",
+              "percent",
+              "text"
+            ]
+          },
+          "better": {
+            "description": "Dirección considerada buena para comparaciones: higher o lower.",
+            "enum": [
+              "higher",
+              "lower"
+            ]
+          },
+          "description": {
+            "description": "Descripción breve de la métrica para documentar su significado.",
+            "type": "string",
+            "maxLength": 300
+          },
+          "description_en": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Descripción de la métrica en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa metric.description."
+          }
+        }
+      }
+    },
+    "dimensions": {
+      "description": "Mapa de dimensiones; la clave es el id de la dimensión y el valor su definición.",
+      "type": "object",
+      "propertyNames": {
+        "description": "Identificador de la dimensión: minúsculas, números o guion bajo.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "description": "Definición de una dimensión: etiqueta y expresión SQL.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "sql"
+        ],
+        "properties": {
+          "label": {
+            "description": "Etiqueta visible de la dimensión.",
+            "type": "string",
+            "maxLength": 60
+          },
+          "label_en": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Etiqueta de la dimensión en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa dimension.label."
+          },
+          "sql": {
+            "description": "Expresión SQL sobre alias.columna, p. ej. products.name.",
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "periods": {
+      "description": "Periodos predefinidos para filtrar el informe.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "description": "Periodo seleccionado por defecto.",
+          "enum": [
+            "today",
+            "yesterday",
+            "last_7_days",
+            "mtd",
+            "last_month",
+            "qtd",
+            "ytd",
+            "last_12_months",
+            "custom"
+          ]
+        },
+        "allowed": {
+          "description": "Periodos disponibles para seleccionar; al menos uno.",
+          "type": "array",
+          "items": {
+            "description": "Uno de los periodos permitidos.",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "mtd",
+              "last_month",
+              "qtd",
+              "ytd",
+              "last_12_months",
+              "custom"
+            ]
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "compare": {
+      "description": "Opciones de comparación con periodos anteriores.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "description": "Comparación seleccionada por defecto.",
+          "enum": [
+            "none",
+            "previous_period",
+            "previous_year"
+          ]
+        },
+        "allowed": {
+          "description": "Comparaciones disponibles: none, previous_period o previous_year.",
+          "type": "array",
+          "items": {
+            "description": "Uno de los modos de comparación permitidos.",
+            "enum": [
+              "none",
+              "previous_period",
+              "previous_year"
+            ]
+          }
+        }
+      }
+    },
+    "views": {
+      "description": "Lista de vistas que se muestran en el dashboard.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "Una vista del dashboard: kpis, trend, ranking o table.",
+        "oneOf": [
+          {
+            "description": "Vista de indicadores KPI con hasta 8 métricas.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "metrics"
+            ],
+            "properties": {
+              "type": {
+                "description": "Tipo de vista; valor fijo \"kpis\".",
+                "const": "kpis"
+              },
+              "id": {
+                "description": "Id opcional de la vista (minúsculas, números o guion bajo); layout.web y layout.pdf enlazan por este id, así que una vista referenciada debe declararlo.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "metrics": {
+                "description": "Métricas a mostrar en la vista; entre 1 y 8 ids.",
+                "type": "array",
+                "items": {
+                  "description": "Id de una métrica.",
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "minItems": 1,
+                "maxItems": 8
+              }
+            }
+          },
+          {
+            "description": "Vista de tendencia de una métrica en el tiempo.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "metric"
+            ],
+            "properties": {
+              "type": {
+                "description": "Tipo de vista; valor fijo \"trend\".",
+                "const": "trend"
+              },
+              "id": {
+                "description": "Id opcional de la vista (minúsculas, números o guion bajo); layout.web y layout.pdf enlazan por este id, así que una vista referenciada debe declararlo.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "metric": {
+                "description": "Id de la métrica a mostrar en la tendencia.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "grain": {
+                "description": "Granularidad temporal: auto, day, week o month.",
+                "enum": [
+                  "auto",
+                  "day",
+                  "week",
+                  "month"
+                ]
+              }
+            }
+          },
+          {
+            "description": "Vista de ranking de una dimensión según una métrica.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "dimension",
+              "metric"
+            ],
+            "properties": {
+              "type": {
+                "description": "Tipo de vista; valor fijo \"ranking\".",
+                "const": "ranking"
+              },
+              "id": {
+                "description": "Id opcional de la vista (minúsculas, números o guion bajo); layout.web y layout.pdf enlazan por este id, así que una vista referenciada debe declararlo.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "dimension": {
+                "description": "Id de la dimensión para agrupar el ranking.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "metric": {
+                "description": "Id de la métrica que ordena el ranking.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "limit": {
+                "description": "Número máximo de posiciones a mostrar, entre 1 y 100.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "title": {
+                "description": "Título opcional de la vista.",
+                "type": "string"
+              },
+              "title_en": {
+                "type": "string",
+                "description": "Título de la vista en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa view.title."
+              }
+            }
+          },
+          {
+            "description": "Vista de tabla con dimensiones y métricas.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "dimensions",
+              "metrics"
+            ],
+            "properties": {
+              "type": {
+                "description": "Tipo de vista; valor fijo \"table\".",
+                "const": "table"
+              },
+              "id": {
+                "description": "Id opcional de la vista (minúsculas, números o guion bajo); layout.web y layout.pdf enlazan por este id, así que una vista referenciada debe declararlo.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,40}$"
+              },
+              "dimensions": {
+                "description": "Dimensiones a incluir como columnas descriptivas.",
+                "type": "array",
+                "items": {
+                  "description": "Id de una dimensión.",
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "minItems": 1
+              },
+              "metrics": {
+                "description": "Métricas a incluir como columnas numéricas.",
+                "type": "array",
+                "items": {
+                  "description": "Id de una métrica.",
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "minItems": 1
+              },
+              "limit": {
+                "description": "Número máximo de filas a mostrar, entre 1 y 500.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500
+              },
+              "title": {
+                "description": "Título opcional de la vista.",
+                "type": "string"
+              },
+              "title_en": {
+                "type": "string",
+                "description": "Título de la vista en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa view.title."
+              }
+            }
+          }
+        ]
+      }
+    },
+    "filters": {
+      "description": "Dimensiones ofrecidas como filtros interactivos en el dashboard.",
+      "type": "array",
+      "items": {
+        "description": "Id de una dimensión usada como filtro.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      }
+    },
+    "access": {
+      "description": "Control de acceso al informe.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "description": "Roles que pueden ver el informe: admin o user.",
+          "type": "array",
+          "items": {
+            "description": "Uno de los roles permitidos.",
+            "enum": [
+              "admin",
+              "user"
+            ]
+          }
+        },
+        "grants": {
+          "description": "Si además se requieren permisos por usuario.",
+          "type": "boolean"
+        }
+      }
+    },
+    "pdf": {
+      "description": "Configuración de exportación a PDF.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "description": "Si la exportación a PDF está habilitada.",
+          "type": "boolean"
+        },
+        "orientation": {
+          "description": "Orientación del PDF: portrait o landscape.",
+          "enum": [
+            "portrait",
+            "landscape"
+          ]
+        },
+        "views": {
+          "description": "Índices de las vistas a incluir en el PDF; sin duplicados.",
+          "type": "array",
+          "items": {
+            "description": "Índice de una vista dentro del arreglo views.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "layout": {
+      "description": "Composición declarativa del informe: web y pdf. Ausente = comportamiento actual.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "web": {
+          "description": "Composición declarativa del dashboard.",
+          "$ref": "#/$defs/web_layout"
+        },
+        "pdf": {
+          "description": "Composición declarativa del PDF exportado.",
+          "$ref": "#/$defs/pdf_layout"
+        }
+      }
+    },
+    "ai_narrative": {
+      "description": "Configuración del resumen generado por IA.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "description": "Si el resumen generado por IA está habilitado.",
+          "type": "boolean"
+        },
+        "inputs": {
+          "description": "Métricas que la IA puede leer para redactar el resumen.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica disponible para la IA.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          }
+        },
+        "with_comparison": {
+          "description": "Si el resumen incluye el periodo de comparación.",
+          "type": "boolean"
+        },
+        "instructions": {
+          "description": "Instrucciones adicionales para la IA, máximo 1000 caracteres.",
+          "type": "string",
+          "maxLength": 1000
+        }
+      }
+    }
+  },
+  "$defs": {
+    "column": {
+      "description": "Definición de una columna en el contrato del reporte.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "description": "Tipo de la columna en el contrato: text, integer, bigint, numeric, boolean, date o timestamptz.",
+          "type": "string",
+          "enum": [
+            "text",
+            "integer",
+            "bigint",
+            "numeric",
+            "boolean",
+            "date",
+            "timestamptz"
+          ]
+        },
+        "nullable": {
+          "description": "Indica si la columna puede ser nula.",
+          "type": "boolean"
+        },
+        "description": {
+          "description": "Descripción libre de la columna.",
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    "color_role": {
+      "description": "Rol de color semántico que resuelve el tema de la instalación; nunca un color literal (hexadecimal, rgb() o hsl()).",
+      "enum": [
+        "primary",
+        "positive",
+        "negative",
+        "neutral",
+        "muted",
+        "series1",
+        "series2",
+        "series3",
+        "series4",
+        "series5",
+        "series6",
+        "series7",
+        "series8"
+      ]
+    },
+    "font_name": {
+      "description": "Familia tipográfica con nombre: sans, sans_bold, serif o mono.",
+      "enum": [
+        "sans",
+        "sans_bold",
+        "serif",
+        "mono"
+      ]
+    },
+    "web_layout": {
+      "description": "Composición del dashboard: componentes, su orden y su ancho en la rejilla.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "components"
+      ],
+      "properties": {
+        "components": {
+          "description": "Componentes en orden de lectura; en el móvil se apilan en este mismo orden.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/web_component"
+          }
+        },
+        "gutter": {
+          "description": "Separación entre componentes: sm, md (por defecto) o lg.",
+          "enum": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        }
+      }
+    },
+    "web_component": {
+      "description": "Un componente del dashboard: tipo, vista y métricas; los campos extra dependen del tipo.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "description": "Tipo del componente: kpi, line, area, bar, pie, donut, table, text, filters o spacer.",
+          "enum": [
+            "kpi",
+            "line",
+            "area",
+            "bar",
+            "pie",
+            "donut",
+            "table",
+            "text",
+            "filters",
+            "spacer"
+          ]
+        },
+        "id": {
+          "description": "Identificador único del componente dentro de components; se usa en los mensajes de validación.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "view": {
+          "description": "Id de la vista a la que se enlaza el componente: el id declarado en views (la vista debe declararlo).",
+          "type": "string"
+        },
+        "span": {
+          "description": "Columnas de la rejilla de 12 desde el ancho de escritorio, 1–12; por defecto 12 (ancho completo).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "title": {
+          "description": "Título del componente; si falta se usa el de la vista y luego la etiqueta de la métrica.",
+          "type": "string",
+          "maxLength": 80
+        },
+        "title_en": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Título del componente en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa title."
+        },
+        "colors": {
+          "description": "Rol de color o lista de roles del componente; nunca un color literal.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/color_role"
+            },
+            {
+              "description": "Roles de color en orden de series.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/color_role"
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "summary": {
+          "description": "Mostrar el resumen generado por el motor (accesibilidad); por defecto true.",
+          "type": "boolean"
+        },
+        "metric": {
+          "description": "Id de la métrica del componente kpi.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "delta": {
+          "description": "Comparación del kpi: previous_period (por defecto) o none.",
+          "enum": [
+            "previous_period",
+            "none"
+          ]
+        },
+        "sparkline": {
+          "description": "Mostrar la minigráfica del kpi; por defecto false.",
+          "type": "boolean"
+        },
+        "x": {
+          "description": "Dimensión o granularidad del eje de categorías (line, area, bar).",
+          "type": "string"
+        },
+        "series": {
+          "description": "Métricas de las series (line, area, bar); al menos una.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica de la serie.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "orientation": {
+          "description": "Orientación de las barras: vertical (por defecto) u horizontal.",
+          "enum": [
+            "vertical",
+            "horizontal"
+          ]
+        },
+        "stacked": {
+          "description": "Apilar las series de las barras; requiere dos o más series.",
+          "type": "boolean"
+        },
+        "category": {
+          "description": "Dimensión de las categorías (pie, donut).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Métrica del valor de cada categoría (pie, donut).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "top_n": {
+          "description": "Categorías principales antes de agrupar el resto en «otros»: 2–12, por defecto 6.",
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "other_label": {
+          "description": "Etiqueta de la categoría agrupada; por defecto, el texto del catálogo de la interfaz.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "other_label_en": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Etiqueta de la categoría agrupada en inglés (opcional); si falta se usa other_label."
+        },
+        "columns": {
+          "description": "Columnas de la tabla en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica o dimensión de la tabla.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "totals": {
+          "description": "Añadir la fila de totales; por defecto false.",
+          "type": "boolean"
+        },
+        "sort": {
+          "description": "Orden inicial de la tabla.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "by"
+          ],
+          "properties": {
+            "by": {
+              "description": "Id de una columna de la tabla (debe estar en columns).",
+              "type": "string"
+            },
+            "dir": {
+              "description": "Dirección del orden: asc (por defecto) o desc.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        },
+        "page_size": {
+          "description": "Filas por página de la tabla, 5–200; por defecto, el límite de la vista.",
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 200
+        },
+        "text": {
+          "description": "Texto del componente; admite negrita, cursiva, enlaces y saltos de línea (sin HTML).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "text_en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Texto del componente en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa text."
+        },
+        "style": {
+          "description": "Estilo del texto: heading, paragraph (por defecto) o caption.",
+          "enum": [
+            "heading",
+            "paragraph",
+            "caption"
+          ]
+        },
+        "only": {
+          "description": "Ids de los filtros del informe que muestra el componente; sin only, todos.",
+          "type": "array",
+          "items": {
+            "description": "Id de una dimensión declarada en filters.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "size": {
+          "description": "Tamaño del espaciador: sm, md o lg.",
+          "enum": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "font_name": {
+          "description": "Familia tipográfica de un componente de texto; por defecto la de la interfaz.",
+          "$ref": "#/$defs/font_name"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "kpi",
+                "description": "Componente kpi."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "metric",
+              "view"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "line",
+                  "area",
+                  "bar"
+                ],
+                "description": "Componente de gráfico con ejes."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "x",
+              "series",
+              "view"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "pie",
+                  "donut"
+                ],
+                "description": "Componente de categorías."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "category",
+              "value",
+              "view"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "table",
+                "description": "Componente de tabla."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "view"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "text",
+                "description": "Componente de texto."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "text"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stacked": {
+                "const": true,
+                "description": "Barras apiladas: exigen dos o más series."
+              }
+            },
+            "required": [
+              "stacked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "series": {
+                "description": "Series de las barras apiladas; al menos dos.",
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "font_name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "text",
+                "description": "Tipo del componente de texto: font_name solo se admite aquí."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        }
+      ]
+    },
+    "pdf_layout": {
+      "description": "Composición del PDF exportado: página y bloques en orden.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blocks"
+      ],
+      "properties": {
+        "page": {
+          "description": "Página del PDF: tamaño, orientación y márgenes; por defecto A4 vertical con 12 mm arriba y abajo y 10 mm a los lados.",
+          "$ref": "#/$defs/pdf_page"
+        },
+        "blocks": {
+          "description": "Bloques del PDF en orden de aparición.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pdf_block"
+          }
+        },
+        "overflow": {
+          "description": "Política por defecto de las tablas: continue (por defecto, repite la cabecera) o truncate (imprime «y N más»).",
+          "enum": [
+            "continue",
+            "truncate"
+          ]
+        }
+      }
+    },
+    "pdf_page": {
+      "description": "Página del PDF con tamaño y orientación por nombre y márgenes en milímetros.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "size": {
+          "description": "Tamaño de página: a4 (por defecto) o letter.",
+          "enum": [
+            "a4",
+            "letter"
+          ]
+        },
+        "orientation": {
+          "description": "Orientación: portrait (por defecto) o landscape; manda sobre pdf.orientation.",
+          "enum": [
+            "portrait",
+            "landscape"
+          ]
+        },
+        "margins": {
+          "description": "Márgenes en milímetros (5–40 cada uno).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "top": {
+              "description": "Margen superior en milímetros, 5–40; por defecto 12.",
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 40
+            },
+            "right": {
+              "description": "Margen derecho en milímetros, 5–40; por defecto 10.",
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 40
+            },
+            "bottom": {
+              "description": "Margen inferior en milímetros, 5–40; por defecto 12.",
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 40
+            },
+            "left": {
+              "description": "Margen izquierdo en milímetros, 5–40; por defecto 10.",
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 40
+            }
+          }
+        }
+      }
+    },
+    "pdf_block": {
+      "description": "Un bloque del PDF: tipo, vista y datos; los campos extra dependen del tipo.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id"
+      ],
+      "properties": {
+        "type": {
+          "description": "Tipo del bloque: header, kpi_row, chart, table, text, page_break o footer.",
+          "enum": [
+            "header",
+            "kpi_row",
+            "chart",
+            "table",
+            "text",
+            "page_break",
+            "footer"
+          ]
+        },
+        "id": {
+          "description": "Identificador único del bloque dentro de blocks; se usa en los mensajes de validación.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "view": {
+          "description": "Id de la vista a la que se enlaza el bloque: el id declarado en views (la vista debe declararlo).",
+          "type": "string"
+        },
+        "title": {
+          "description": "En header, mostrar el título del informe.",
+          "type": "boolean"
+        },
+        "subtitle": {
+          "description": "En header, mostrar la descripción del informe.",
+          "type": "boolean"
+        },
+        "period": {
+          "description": "En header, mostrar el periodo aplicado.",
+          "type": "boolean"
+        },
+        "logo": {
+          "description": "En header, mostrar el logo de la instalación.",
+          "type": "boolean"
+        },
+        "logo_role": {
+          "description": "Rol del logo: brand o none; nunca una ruta ni una dirección.",
+          "enum": [
+            "brand",
+            "none"
+          ]
+        },
+        "items": {
+          "description": "Métricas de la fila de indicadores (kpi_row); al menos una.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica del indicador.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "delta": {
+          "description": "En kpi_row, mostrar la comparación con el periodo anterior.",
+          "type": "boolean"
+        },
+        "kind": {
+          "description": "Tipo de gráfico del bloque chart: los mismos que en la web (line, area, bar, pie o donut).",
+          "enum": [
+            "line",
+            "area",
+            "bar",
+            "pie",
+            "donut"
+          ]
+        },
+        "x": {
+          "description": "Dimensión o granularidad del eje de categorías del gráfico.",
+          "type": "string"
+        },
+        "series": {
+          "description": "Métricas de las series del gráfico; al menos una.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica de la serie.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "category": {
+          "description": "Dimensión de las categorías del gráfico (pie, donut).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Métrica del valor de cada categoría (pie, donut).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "top_n": {
+          "description": "Categorías principales antes de agrupar el resto en «otros»: 2–12, por defecto 6.",
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "height_mm": {
+          "description": "Altura del gráfico en milímetros, 30–200; por defecto 60.",
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 200
+        },
+        "columns": {
+          "description": "Columnas de la tabla del PDF en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica o dimensión de la tabla.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
+        "widths": {
+          "description": "Pesos relativos de las columnas; tantas entradas como columns.",
+          "type": "array",
+          "items": {
+            "description": "Peso relativo de una columna; al menos 1.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1
+        },
+        "totals": {
+          "description": "Añadir la fila de totales a la tabla; por defecto false.",
+          "type": "boolean"
+        },
+        "overflow": {
+          "description": "Política de la tabla: continue (por defecto, la de layout.pdf.overflow) o truncate.",
+          "enum": [
+            "continue",
+            "truncate"
+          ]
+        },
+        "text": {
+          "description": "Texto del bloque; admite negrita, cursiva, enlaces y saltos de línea (sin HTML).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "text_en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Texto del bloque en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa text."
+        },
+        "style": {
+          "description": "Estilo del texto: heading, paragraph (por defecto) o caption.",
+          "enum": [
+            "heading",
+            "paragraph",
+            "caption"
+          ]
+        },
+        "align": {
+          "description": "Alineación del texto: left (por defecto), center o right.",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "font_name": {
+          "description": "Familia tipográfica del bloque de texto; por defecto la del documento.",
+          "$ref": "#/$defs/font_name"
+        },
+        "generated_at": {
+          "description": "En footer, mostrar la fecha de generación.",
+          "type": "boolean"
+        },
+        "page_numbers": {
+          "description": "En footer, mostrar el número de página.",
+          "type": "boolean"
+        },
+        "legal": {
+          "description": "En footer, línea legal del documento.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "legal_en": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Línea legal en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa legal."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "kpi_row",
+                  "chart",
+                  "table"
+                ],
+                "description": "Bloque enlazado a una vista del informe."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "view"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "kpi_row",
+                "description": "Bloque kpi_row."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "items"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "chart",
+                "description": "Bloque chart."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "line",
+                  "area",
+                  "bar"
+                ],
+                "description": "Gráfico con ejes."
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "x",
+              "series"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "pie",
+                  "donut"
+                ],
+                "description": "Gráfico de categorías."
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "category",
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "text",
+                "description": "Bloque de texto."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "text"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "font_name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "text",
+                "description": "Tipo del bloque de texto: font_name solo se admite aquí."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

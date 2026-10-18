@@ -1,0 +1,30 @@
+# Petición GET a la tabla `facturas` de Supabase vía PostgREST.
+# {window_start} y {window_end} son reemplazadas por el motor con la ventana
+# incremental (timestamps ISO). La clave de API vive en la fuente de la
+# instalación; nunca se escribe en este workspace.
+method: GET
+path: facturas
+
+params:
+  select: numero,fecha_emision,emitida_en,cliente_id,estado,moneda,monto_neto,impuesto,monto_total
+  order: numero.asc
+  and: "(emitida_en.gte.{window_start},emitida_en.lt.{window_end})"
+
+pagination:
+  type: offset
+  param: offset
+  size_param: limit
+  size: 1000
+
+records: "$"
+
+fields:
+  numero: "$.numero"
+  fecha_emision: "$.fecha_emision"
+  emitida_en: "$.emitida_en"
+  cliente_id: "$.cliente_id"
+  estado: "$.estado"
+  moneda: "$.moneda"
+  monto_neto: "$.monto_neto"
+  impuesto: "$.impuesto"
+  monto_total: "$.monto_total"

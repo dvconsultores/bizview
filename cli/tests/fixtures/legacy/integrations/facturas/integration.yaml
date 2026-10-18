@@ -1,0 +1,62 @@
+# Integración de facturas de venta desde origen_ventas.
+# Carga incremental por hora; reconstrucción completa opcional los domingos.
+id: facturas
+spec: specs/integrations/001-facturas
+source: origen_ventas
+schedule: "0 * * * *"            # cada hora
+timezone: America/Caracas
+time_limit_minutes: 15           # tope de ejecución
+
+datasets:
+  facturas:
+    description: Facturas emitidas con estado, moneda y montos.
+    primary_key: [numero]
+    date_column: fecha_emision
+    columns:
+      numero:
+        type: text
+        nullable: false
+        description: Número de factura (único).
+      fecha_emision:
+        type: date
+        nullable: false
+        description: Fecha contable de emisión.
+      emitida_en:
+        type: timestamptz
+        description: Momento exacto en que se emitió.
+      cliente_id:
+        type: text
+        description: Identificador del cliente.
+      estado:
+        type: text
+        nullable: false
+        enum: [emitida, pagada, anulada]
+        description: Estado de la factura.
+      moneda:
+        type: text
+        description: Código de moneda (ej. USD).
+      monto_neto:
+        type: numeric
+        description: Monto sin impuesto.
+      impuesto:
+        type: numeric
+        description: Impuesto aplicado.
+      monto_total:
+        type: numeric
+        nullable: false
+        description: Monto total de la factura.
+
+    extract:
+      query: queries/facturas.sql
+      params: [window_start, window_end]   # filtra por la ventana incremental
+
+    incremental:
+      window_days: 7                       # 7 días hacia atrás, por hora
+      full_rebuild_cron: "0 3 * * 0"       # domingos a las 03:00
+      slice: month                         # cortes por mes
+
+    checks:
+      - type: row_count
+        min: 0
+      - type: not_null
+        columns: [numero, fecha_emision, estado, monto_total]

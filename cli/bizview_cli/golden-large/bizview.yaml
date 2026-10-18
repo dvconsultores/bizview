@@ -1,0 +1,5 @@
+# Bizview workspace manifest
+name: ejemplo-grande
+product: bizview
+timezone: America/Caracas
+currency: USD

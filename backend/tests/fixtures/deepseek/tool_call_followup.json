@@ -1,0 +1,27 @@
+{
+  "id": "chatcmpl-002",
+  "object": "chat.completion",
+  "created": 1769000001,
+  "model": "deepseek-v4-pro",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Encontré 3 fuentes: ERP, ventas y marketing.",
+        "reasoning_content": "Con la lista de fuentes ya puedo responder la pregunta original."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 210,
+    "completion_tokens": 35,
+    "total_tokens": 245,
+    "prompt_cache_hit_tokens": 150,
+    "prompt_cache_miss_tokens": 60,
+    "completion_tokens_details": {
+      "reasoning_tokens": 14
+    }
+  }
+}

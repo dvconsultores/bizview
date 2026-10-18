@@ -1,0 +1,33 @@
+.env
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+test-results/
+playwright-report/
+.specify/integrations/.cache/
+/workspace/
+/projects/
+/attachments/
+
+# Secret-bearing local config must never reach a public repository.
+.env.bak*
+.env.local
+.env.*.local
+
+# Local test/build scratch and any stray secrets must never be published.
+*.log
+.pytest-*
+*.tsbuildinfo
+*.pem
+*.key
+*.p12
+*.sqlite
+*.dump
+
+# Scratch output from local test runs (never part of the product).
+.*-out.txt
+.dod-*

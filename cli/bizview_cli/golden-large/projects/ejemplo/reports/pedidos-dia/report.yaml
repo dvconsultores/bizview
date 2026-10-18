@@ -1,0 +1,72 @@
+# Reporte diario de pedidos.
+# materialize: daily mantiene un rollup diario; solo métricas sum/count/avg.
+id: pedidos-dia
+spec: specs/002-pedidos-dia
+title: Pedidos por día
+description: Volumen y ticket promedio de pedidos por día, por moneda.
+icon: receipt
+
+uses:
+  p: pedidos.pedidos
+
+date: p.fecha
+materialize: daily                     # rollup diario; solo métricas sum/count/avg
+
+metrics:
+  total_pedidos:
+    label: Total pedidos
+    sql: "sum(p.monto_total)"
+    format: currency
+    better: higher
+  pedidos:
+    label: Pedidos
+    sql: "count(p.numero)"
+    format: integer
+    better: higher
+  ticket_promedio:
+    label: Ticket promedio
+    formula: total_pedidos / pedidos
+    format: currency
+    better: higher
+  impuesto_promedio:
+    label: Impuesto promedio
+    sql: "avg(p.impuesto)"
+    format: currency
+    better: higher
+
+dimensions:
+  moneda:
+    label: Moneda
+    sql: p.moneda
+
+views:
+  - type: kpis
+    metrics: [total_pedidos, pedidos, ticket_promedio]
+  - type: trend
+    metric: total_pedidos
+    grain: day
+  - type: ranking
+    dimension: moneda
+    metric: total_pedidos
+    limit: 10
+    title: "Top por moneda"
+  - type: table
+    dimensions: [moneda]
+    metrics: [pedidos, total_pedidos, impuesto_promedio]
+    limit: 100
+    title: "Detalle por moneda"
+
+filters:
+  - moneda
+
+periods:
+  default: last_7_days
+  allowed: [today, yesterday, last_7_days, mtd, last_month, ytd]
+
+compare:
+  default: previous_period
+  allowed: [none, previous_period, previous_year]
+
+access:
+  roles: [admin, user]
+  grants: true

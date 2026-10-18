@@ -1,0 +1,17 @@
+# weekday 0 = lunes según especificación
+id: envio-semanal
+spec: specs/003-envio-semanal
+report: facturas-dia
+subscriptions:
+  - frequency: weekly
+    weekday: 0
+    hour: 7
+    period: last_7_days
+    recipients:
+      roles:
+        - admin
+    attach_pdf: true
+    link_days: 7
+share:
+  allowed: true
+  max_days: 30

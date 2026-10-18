@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bizview workspace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "description": "Nombre del workspace: minúsculas, números o guiones.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,49}$"
+    },
+    "product": {
+      "description": "Etiqueta informativa del producto o edición.",
+      "type": "string"
+    },
+    "timezone": {
+      "description": "Zona horaria IANA informativa; la configuración TIMEZONE de la instalación gobierna horarios y periodos.",
+      "type": "string"
+    },
+    "currency": {
+      "description": "Código ISO 4217 usado por métricas con formato currency.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+# Integración de pedidos de venta desde origen_ventas.
+# Carga incremental por hora; reconstrucción completa opcional los domingos.
+# El dataset declara un transform por filas: la consulta entrega `transform.input`,
+# el motor produce las columnas de `columns`, y los checks usan la salida.
+id: pedidos
+spec: specs/001-pedidos
+source: origen_ventas
+schedule: "0 * * * *"            # cada hora
+timezone: America/Caracas
+time_limit_minutes: 30           # tope de ejecución
+
+datasets:
+  pedidos:
+    description: Pedidos de venta con moneda normalizada, impuesto no nulo y fecha local.
+    primary_key: [numero]
+    date_column: fecha
+    columns:
+      numero:
+        type: text
+        nullable: false
+        description: Número de pedido (único).
+      fecha:
+        type: date
+        nullable: false
+        description: Fecha local del pedido (día).
+      creado_en:
+        type: timestamptz
+        description: Fecha y hora de creación en la zona de la integración.
+      cliente_id:
+        type: text
+        description: Identificador del cliente.
+      moneda:
+        type: text
+        description: Código de moneda normalizado en mayúsculas y sin espacios.
+      monto_neto:
+        type: numeric
+        description: Monto neto del pedido antes de impuesto.
+      impuesto:
+        type: numeric
+        nullable: false
+        description: Impuesto del pedido; cero cuando la fuente no lo trae.
+      monto_total:
+        type: numeric
+        description: monto_neto más impuesto.
+
+    extract:
+      query: queries/pedidos.sql
+      params: [window_start, window_end]   # filtra por la ventana incremental
+
+    incremental:
+      window_days: 3                       # releer 3 días hacia atrás, por hora
+      full_rebuild_cron: "0 3 * * 0"       # domingos a las 03:00
+      slice: month                         # cortes por mes
+
+    transform:
+      # Por filas: la consulta devuelve exactamente `input`; el SQL devuelve `columns`.
+      # Modo rows porque no hay GROUP BY, DISTINCT, ventanas, ORDER BY ni agregados.
+      input:
+        numero:
+          type: text
+          nullable: false
+        creado_en:
+          type: timestamptz
+        cliente_id:
+          type: text
+        moneda:
+          type: text
+        monto_neto:
+          type: numeric
+        impuesto:
+          type: numeric
+      sql: |
+        SELECT
+          numero,
+          CAST(strftime(creado_en, '%Y-%m-%d') AS DATE) AS fecha,
+          creado_en,
+          cliente_id,
+          upper(trim(moneda)) AS moneda,
+          monto_neto,
+          coalesce(impuesto, 0) AS impuesto,
+          monto_neto + coalesce(impuesto, 0) AS monto_total
+        FROM input
+
+    checks:
+      - type: row_count
+        min: 0
+      - type: not_null
+        columns: [numero, fecha, impuesto]

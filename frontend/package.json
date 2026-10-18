@@ -1,0 +1,59 @@
+{
+  "name": "bizview-web",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check:compat": "node scripts/check-compat.mjs",
+    "e2e": "playwright test"
+  },
+  "browserslist": [
+    "> 0.3%",
+    "last 2 versions",
+    "iOS >= 14",
+    "Safari >= 14",
+    "Android >= 8",
+    "not dead",
+    "not ie 11"
+  ],
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/lang-yaml": "^6.1.3",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "lucide-react": "^1.48.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^4.14.4",
+    "react-router": "^7.18.4",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.6.1",
+    "axe-core": "4.13.0",
+    "jsdom": "^30.1.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2",
+    "yaml": "2.6.1"
+  }
+}

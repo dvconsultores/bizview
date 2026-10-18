@@ -1,0 +1,357 @@
+{
+ "data": {
+  "period=custom&from=2026-09-27&to=2026-09-27&compare=none&filter.product=P1": {
+   "filters": {
+    "product": [
+     "P1"
+    ]
+   },
+   "freshness": {
+    "data_version": "<volatile>",
+    "updated_at": "<volatile>"
+   },
+   "selection": {
+    "compare": "none",
+    "current": {
+     "from": "2026-09-27",
+     "to": "2026-09-27"
+    },
+    "grain": "day",
+    "partial": false,
+    "period": "custom",
+    "previous": null
+   },
+   "views": [
+    {
+     "items": [
+      {
+       "better": "higher",
+       "change": null,
+       "format": "currency",
+       "label": "Ventas netas",
+       "metric": "net_sales",
+       "previous": null,
+       "value": -3.0
+      },
+      {
+       "better": "higher",
+       "change": null,
+       "format": "integer",
+       "label": "Pedidos",
+       "metric": "orders",
+       "previous": null,
+       "value": 0.0
+      },
+      {
+       "better": "higher",
+       "change": null,
+       "format": "currency",
+       "label": "Ticket promedio",
+       "metric": "avg_ticket",
+       "previous": null,
+       "value": null
+      }
+     ],
+     "summary": "Indicadores del 27 de septiembre de 2026: Ventas netas -3,00 USD y Pedidos 0.",
+     "type": "kpis"
+    },
+    {
+     "format": "currency",
+     "grain": "day",
+     "label": "Ventas netas",
+     "metric": "net_sales",
+     "points": [
+      {
+       "bucket": "2026-09-27",
+       "value": -3.0
+      }
+     ],
+     "summary": "Ventas netas por día del 27 de septiembre de 2026; máximo -3,00 USD el 27.",
+     "type": "trend"
+    },
+    {
+     "dimension": "product",
+     "dimension_label": "Producto",
+     "format": "currency",
+     "items": [
+      {
+       "change": null,
+       "key": "P1",
+       "previous": null,
+       "share": 100.0,
+       "value": -3.0
+      }
+     ],
+     "label": "Ventas netas",
+     "metric": "net_sales",
+     "summary": "Ventas netas por Producto del 27 de septiembre de 2026: P1 encabeza con -3,00 USD (100,0 % del total).",
+     "title": "Ventas netas por Producto",
+     "type": "ranking"
+    }
+   ]
+  },
+  "period=custom&from=2026-09-27&to=2026-09-28&compare=previous_period": {
+   "filters": {},
+   "freshness": {
+    "data_version": "<volatile>",
+    "updated_at": "<volatile>"
+   },
+   "selection": {
+    "compare": "previous_period",
+    "current": {
+     "from": "2026-09-27",
+     "to": "2026-09-28"
+    },
+    "grain": "day",
+    "partial": false,
+    "period": "custom",
+    "previous": {
+     "from": "2026-09-25",
+     "to": "2026-09-26"
+    }
+   },
+   "views": [
+    {
+     "items": [
+      {
+       "better": "higher",
+       "change": {
+        "new": true,
+        "pct": null
+       },
+       "format": "currency",
+       "label": "Ventas netas",
+       "metric": "net_sales",
+       "previous": null,
+       "value": 11.75
+      },
+      {
+       "better": "higher",
+       "change": {
+        "new": true,
+        "pct": null
+       },
+       "format": "integer",
+       "label": "Pedidos",
+       "metric": "orders",
+       "previous": 0.0,
+       "value": 1.0
+      },
+      {
+       "better": "higher",
+       "change": {
+        "new": true,
+        "pct": null
+       },
+       "format": "currency",
+       "label": "Ticket promedio",
+       "metric": "avg_ticket",
+       "previous": null,
+       "value": 11.75
+      }
+     ],
+     "summary": "Indicadores del 27 al 28 de septiembre de 2026: Ventas netas 11,75 USD, Pedidos 1 y Ticket promedio 11,75 USD.",
+     "type": "kpis"
+    },
+    {
+     "format": "currency",
+     "grain": "day",
+     "label": "Ventas netas",
+     "metric": "net_sales",
+     "points": [
+      {
+       "bucket": "2026-09-27",
+       "previous": null,
+       "previous_bucket": "2026-09-25",
+       "value": -3.0
+      },
+      {
+       "bucket": "2026-09-28",
+       "previous": null,
+       "previous_bucket": "2026-09-26",
+       "value": 14.75
+      }
+     ],
+     "summary": "Ventas netas por día del 27 al 28 de septiembre de 2026; máximo 14,75 USD el 28.",
+     "type": "trend"
+    },
+    {
+     "dimension": "product",
+     "dimension_label": "Producto",
+     "format": "currency",
+     "items": [
+      {
+       "change": {
+        "new": true,
+        "pct": null
+       },
+       "key": "P1",
+       "previous": null,
+       "share": 63.829787234042556,
+       "value": 7.5
+      },
+      {
+       "change": {
+        "new": true,
+        "pct": null
+       },
+       "key": "P2",
+       "previous": null,
+       "share": 36.17021276595745,
+       "value": 4.25
+      }
+     ],
+     "label": "Ventas netas",
+     "metric": "net_sales",
+     "summary": "Ventas netas por Producto del 27 al 28 de septiembre de 2026: P1 encabeza con 7,50 USD (63,8 % del total).",
+     "title": "Ventas netas por Producto",
+     "type": "ranking"
+    }
+   ]
+  }
+ },
+ "definition": {
+  "ai_narrative": true,
+  "compare": {
+   "allowed": [
+    "none",
+    "previous_period",
+    "previous_year"
+   ],
+   "default": "previous_period"
+  },
+  "currency": "USD",
+  "description": "Resumen de ventas",
+  "dimensions": {
+   "product": {
+    "label": "Producto"
+   }
+  },
+  "filters": [
+   "product"
+  ],
+  "icon": "chart-line",
+  "id": "ventas",
+  "metrics": {
+   "avg_ticket": {
+    "better": "higher",
+    "description": null,
+    "format": "currency",
+    "label": "Ticket promedio"
+   },
+   "net_sales": {
+    "better": "higher",
+    "description": null,
+    "format": "currency",
+    "label": "Ventas netas"
+   },
+   "orders": {
+    "better": "higher",
+    "description": null,
+    "format": "integer",
+    "label": "Pedidos"
+   }
+  },
+  "pdf": true,
+  "pdf_layout": {
+   "orientation": "portrait",
+   "views": null
+  },
+  "periods": {
+   "allowed": [
+    "mtd",
+    "last_7_days",
+    "custom"
+   ],
+   "default": "mtd"
+  },
+  "title": "Ventas",
+  "views": [
+   {
+    "metrics": [
+     "net_sales",
+     "orders",
+     "avg_ticket"
+    ],
+    "type": "kpis"
+   },
+   {
+    "grain": "auto",
+    "metric": "net_sales",
+    "type": "trend"
+   },
+   {
+    "dimension": "product",
+    "limit": 5,
+    "metric": "net_sales",
+    "type": "ranking"
+   }
+  ]
+ },
+ "filters": {
+  "items": [
+   "P1",
+   "P2"
+  ],
+  "truncated": false
+ },
+ "pdf_lines": [
+  "Ventas",
+  "Cliente Demo · Panel de prueba",
+  "Período: Personalizado (27 sep 2026 – 28 sep 2026)",
+  "Comparado con: 25 sep 2026 – 26 sep 2026",
+  "<meta>",
+  "<meta>",
+  "Resumen",
+  "Indicador",
+  "Valor",
+  "Anterior",
+  "Variación",
+  "Ventas netas",
+  "11,75 USD",
+  "—",
+  "nuevo",
+  "Pedidos",
+  "1",
+  "0",
+  "nuevo",
+  "Ticket promedio",
+  "11,75 USD",
+  "—",
+  "nuevo",
+  "Tendencia: Ventas netas",
+  "0",
+  "5",
+  "10",
+  "Actual — anterior (discontinua)",
+  "Desde",
+  "Ventas netas",
+  "Anterior",
+  "27 sep 2026",
+  "-3,00 USD",
+  "—",
+  "28 sep 2026",
+  "14,75 USD",
+  "—",
+  "Ventas netas por Producto",
+  "#",
+  "Producto",
+  "Ventas netas",
+  "% del total",
+  "Variación",
+  "1",
+  "P1",
+  "7,50 USD",
+  "63,8 %",
+  "nuevo",
+  "2",
+  "P2",
+  "4,25 USD",
+  "36,2 %",
+  "nuevo"
+ ],
+ "version_keys": [
+  "data_version",
+  "updated_at"
+ ]
+}

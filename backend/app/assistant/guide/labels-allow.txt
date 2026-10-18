@@ -1,0 +1,34 @@
+# Bold spans of the guide that are not UI labels of the frontend catalogues (feature 023 drift
+# test): product and service names, spec kinds and stages, and other technical names. One per
+# line; lines starting with # are comments. Keep it short: a UI label belongs in the catalogue.
+BizView
+Spec Kit
+Claude
+Telegram
+Supabase
+PostgreSQL
+VS Code
+Git
+Polars
+fuente
+integracion
+reporte
+distribucion
+source
+integration
+report
+distribution
+Especificada
+Aclarada
+Planificada
+Tareas
+Implementada
+Aplicada
+Convergida
+Specified
+Clarified
+Planned
+Tasks
+Implemented
+Applied
+Converged

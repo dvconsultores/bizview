@@ -1,0 +1,41 @@
+[project]
+name = "bizview-cli"
+version = "0.3.0"
+description = "Vibe reporting toolkit for Bizview AI Powered workspaces: init, validate, describe."
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.12"
+dependencies = ["pyyaml>=6", "jsonschema>=4.23", "sqlglot>=26", "httpx>=0.27"]
+
+[project.optional-dependencies]
+transform = ["polars>=1.44,<2"]
+
+[project.scripts]
+bizview = "bizview_cli.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bizview_cli"]
+artifacts = ["bizview_cli/workspace_template/**", "bizview_cli/schemas/*.json",
+             "bizview_cli/golden/**", "bizview_cli/golden-supabase/**",
+             "bizview_cli/golden-direct/**", "bizview_cli/golden-large/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"bizview_cli/i18n/es.py" = ["E501"]
+"bizview_cli/i18n/en.py" = ["E501"]

@@ -1,0 +1,5 @@
+# Project manifest. One BI project per folder under projects/<slug>/.
+name: {name}
+slug: {slug}
+description: ""
+created: "{date}"

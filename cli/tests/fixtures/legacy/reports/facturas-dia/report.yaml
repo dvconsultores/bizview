@@ -1,0 +1,77 @@
+# Reporte de facturación diaria.
+# Métricas y dimensiones usan únicamente el alias `f` declarado en uses.
+id: facturas-dia
+spec: specs/reports/001-facturas-dia
+title: Facturación diaria
+description: Total facturado, número de facturas, ticket promedio e impuesto por día.
+icon: receipt
+
+uses:
+  f: facturas.facturas
+
+date: f.fecha_emision
+
+metrics:
+  total_facturado:
+    label: Total facturado
+    sql: "sum(f.monto_total)"
+    format: currency
+    better: higher
+  facturas:
+    label: Facturas
+    sql: "count(distinct f.numero)"
+    format: integer
+    better: higher
+  ticket_promedio:
+    label: Ticket promedio
+    formula: total_facturado / facturas    # combina métricas con sql
+    format: currency
+    better: higher
+  impuesto:
+    label: Impuesto
+    sql: "sum(coalesce(f.impuesto, 0))"
+    format: currency
+
+dimensions:
+  estado:
+    label: Estado
+    sql: f.estado
+  moneda:
+    label: Moneda
+    sql: f.moneda
+
+views:
+  - type: kpis
+    metrics: [total_facturado, facturas, ticket_promedio]
+  - type: trend
+    metric: total_facturado
+    grain: day
+  - type: ranking
+    dimension: estado
+    metric: total_facturado
+    limit: 10
+    title: "Facturación por estado"
+  - type: table
+    dimensions: [estado, moneda]
+    metrics: [facturas, total_facturado, impuesto]
+    limit: 100
+    title: "Detalle por estado y moneda"
+
+filters: [estado, moneda]
+
+periods:
+  default: last_7_days
+  allowed: [today, yesterday, last_7_days, mtd, last_month, ytd]
+
+compare:
+  default: previous_period
+  allowed: [none, previous_period, previous_year]
+
+access:
+  roles: [admin, user]
+  grants: true
+
+pdf:
+  enabled: true
+  orientation: portrait          # vertical
+  views: [0, 1, 2, 3]            # KPI, tendencia, ranking y tabla en ese orden

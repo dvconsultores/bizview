@@ -1,0 +1,81 @@
+# Single public entry point (research R2).
+# SITE_ADDRESS=":80"                   → plain HTTP (local, or behind another TLS terminator)
+# SITE_ADDRESS="dashboard.example.com" → automatic HTTPS (Let's Encrypt / ZeroSSL, auto-renew)
+# CADDY_ALLOWED_HOSTS="a.example.com b.example.com" → serve only those Host names (421 otherwise);
+#   unset or empty disables the rule, so generated installations that predate it keep working.
+{
+	admin off
+	servers {
+		# Only proxies listed here may set the client address (X-Forwarded-For). Default: none but
+		# loopback, so clients cannot forge their address. Behind a load balancer set
+		# TRUSTED_PROXIES to its network, e.g. "10.0.0.0/8".
+		trusted_proxies static {$TRUSTED_PROXIES:127.0.0.1/32}
+	}
+}
+
+{$SITE_ADDRESS::80} {
+	# Bound the request body before the app buffers and validates it. Generous by default so
+	# image briefs (ATTACHMENTS_MAX_MB × ATTACHMENTS_MAX_PER_MESSAGE) and project zip imports
+	# (PROJECT_MAX_MB) keep working; override with CADDY_MAX_REQUEST_BODY on the container.
+	request_body {
+		max_size {$CADDY_MAX_REQUEST_BODY:100MB}
+	}
+
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	@tls protocol https
+	header @tls Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Only these Host names are served; anything else is refused before it reaches the app.
+	# CADDY_ALLOWED_HOSTS is a space-separated list and must include the site's own domain.
+	# The expression keeps the rule inactive while the setting is unset or empty, so
+	# installations created before it existed (their generated compose does not pass it) work.
+	# `handle` is ordered before `respond`, so a bare respond here would be evaluated after
+	# the catch-all below and never fire; the guard is therefore the first handle block.
+	@host_not_allowed {
+		not host {$CADDY_ALLOWED_HOSTS:localhost}
+		expression `{env.CADDY_ALLOWED_HOSTS} != ""`
+	}
+	handle @host_not_allowed {
+		respond "Unknown host" 421
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000 {
+			health_uri /api/health
+			health_interval 15s
+		}
+	}
+
+	handle_path /branding/* {
+		root * /branding
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# Shared pages (/s/<token>) are never indexed or cached; the site-wide Referrer-Policy
+		# (same-origin) already keeps the token from leaking to other origins.
+		@shared path /s/*
+		header @shared {
+			X-Robots-Tag "noindex, nofollow"
+			Cache-Control "no-store"
+		}
+		@html not path /assets/* /s/*
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

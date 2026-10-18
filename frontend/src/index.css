@@ -1,0 +1,302 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Plus Jakarta Sans (Customer A's typeface), SIL OFL 1.1, vendored from
+ * @fontsource-variable/plus-jakarta-sans 5.3.0 — see assets/fonts/plus-jakarta-sans/LICENCE.txt.
+ * One variable file per subset covers every weight (200–800). */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/plus-jakarta-sans/plus-jakarta-sans-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/plus-jakarta-sans/plus-jakarta-sans-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+:root {
+  /* Steel-teal scale as RGB triplets (feature 010, Customer A look). */
+  --brand-50: 241 247 250;
+  --brand-100: 223 237 244;
+  --brand-200: 194 220 233;
+  --brand-300: 152 195 216;
+  --brand-400: 106 166 195;
+  --brand-500: 75 139 171;
+  --brand-600: 58 115 147;
+  --brand-700: 48 94 120;
+  --brand-800: 43 79 99;
+  --brand-900: 40 67 84;
+  --brand-950: 23 43 55;
+  /* Semantic colour tokens (feature 006, contracts/theme-tokens.md). Light values equal the
+   * Tailwind classes they replaced; dark values below. Brand tokens follow the --brand-* scale. */
+  color-scheme: light;
+  --c-canvas: 244 247 250;
+  --c-surface: 255 255 255;
+  --c-subtle: 248 250 252;
+  --c-surface-2: 241 245 249;
+  --c-fill: 226 232 240;
+  --c-field: 233 239 244;
+  --c-field-focus: var(--brand-600);
+  --c-line-soft: 241 245 249;
+  --c-line: 226 232 240;
+  --c-line-strong: 203 213 225;
+  --c-line-accent: var(--brand-200);
+  --c-ink: 15 23 42;
+  --c-ink-2: 30 41 59;
+  --c-ink-3: 51 65 85;
+  --c-ink-muted: 71 85 105;
+  --c-ink-soft: 94 109 131;
+  --c-ink-faint: 148 163 184;
+  --c-accent-bright: var(--brand-600);
+  --c-accent: var(--brand-600);
+  --c-accent-strong: var(--brand-800);
+  --c-accent-deep: var(--brand-900);
+  --c-accent-soft: var(--brand-50);
+  --c-accent-soft-2: var(--brand-100);
+  --c-accent-line: var(--brand-200);
+  --c-accent-line-strong: var(--brand-400);
+  --c-primary: var(--brand-600);
+  --c-primary-hover: var(--brand-700);
+  --c-primary-active: var(--brand-800);
+  --c-on-primary: 255 255 255;
+  --c-focus: var(--brand-500);
+  --c-danger-bright: 225 29 72;
+  --c-danger: 190 18 60;
+  --c-danger-strong: 159 18 57;
+  --c-danger-deep: 136 19 55;
+  --c-danger-soft: 255 241 242;
+  --c-danger-line: 254 205 211;
+  --c-danger-border: 251 113 133;
+  --c-danger-focus: 244 63 94;
+  --c-danger-solid: 225 29 72;
+  --c-danger-solid-hover: 190 18 60;
+  --c-danger-solid-active: 159 18 57;
+  --c-success-bright: 5 150 105;
+  --c-success: 4 120 87;
+  --c-success-strong: 6 95 70;
+  --c-success-deep: 6 78 59;
+  --c-success-soft: 236 253 245;
+  --c-success-line: 167 243 208;
+  --c-warning: 180 83 9;
+  --c-warning-strong: 146 64 14;
+  --c-warning-deep: 120 53 15;
+  --c-warning-soft: 255 251 235;
+  --c-warning-line: 253 230 138;
+  --c-backdrop: 15 23 42;
+  --c-toast: 15 23 42;
+  --c-chart-1: var(--brand-600);
+  --c-chart-2: var(--brand-300);
+  /* Feature 026: the remaining chart series roles the layout can name (`series3`…`series8`).
+   * Series 1 and 2 keep the two colours TrendChart already draws. */
+  --c-chart-3: 124 58 237;
+  --c-chart-4: 13 148 136;
+  --c-chart-5: 180 83 9;
+  --c-chart-6: 190 18 60;
+  --c-chart-7: 67 56 202;
+  --c-chart-8: 77 124 15;
+  --c-chart-grid: 226 232 240;
+  --c-chart-axis: 148 163 184;
+  --c-chart-label: 71 85 105;
+  --grad-from: var(--brand-600);
+  --grad-to: var(--brand-800);
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-raised: 0 10px 30px -10px rgb(40 67 84 / 0.30);
+  --hero-color: #2b4f63;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Dark theme: set on <html data-theme="dark"> by /theme-init.js before first paint and by the
+ * ThemeProvider afterwards. Contrast pairs verified in specs/006-dark-mode/research.md R4. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-canvas: 2 6 23;
+  --c-surface: 15 23 42;
+  --c-subtle: 30 41 59;
+  --c-surface-2: 30 41 59;
+  --c-fill: 51 65 85;
+  --c-field: 30 41 59;
+  --c-field-focus: var(--brand-400);
+  --c-line-soft: 30 41 59;
+  --c-line: 51 65 85;
+  --c-line-strong: 100 116 139;
+  --c-line-accent: var(--brand-700);
+  --c-ink: 248 250 252;
+  --c-ink-2: 241 245 249;
+  --c-ink-3: 226 232 240;
+  --c-ink-muted: 203 213 225;
+  --c-ink-soft: 148 163 184;
+  --c-ink-faint: 100 116 139;
+  --c-accent-bright: var(--brand-400);
+  --c-accent: var(--brand-400);
+  --c-accent-strong: var(--brand-200);
+  --c-accent-deep: var(--brand-100);
+  --c-accent-soft: 25 41 59;
+  --c-accent-soft-2: var(--brand-900);
+  --c-accent-line: var(--brand-800);
+  --c-accent-line-strong: var(--brand-500);
+  --c-on-primary: 255 255 255;
+  --c-danger-bright: 251 113 133;
+  --c-danger: 253 164 175;
+  --c-danger-strong: 254 205 211;
+  --c-danger-deep: 255 228 230;
+  --c-danger-soft: 76 5 25;
+  --c-danger-line: 159 18 57;
+  --c-danger-border: 244 63 94;
+  --c-danger-focus: 251 113 133;
+  --c-success-bright: 52 211 153;
+  --c-success: 110 231 183;
+  --c-success-strong: 167 243 208;
+  --c-success-deep: 209 250 229;
+  --c-success-soft: 2 44 34;
+  --c-success-line: 6 95 70;
+  --c-warning: 252 211 77;
+  --c-warning-strong: 253 230 138;
+  --c-warning-deep: 254 243 199;
+  --c-warning-soft: 69 26 3;
+  --c-warning-line: 146 64 14;
+  --c-backdrop: 2 6 23;
+  --c-toast: 51 65 85;
+  --c-chart-1: var(--brand-400);
+  --c-chart-2: var(--brand-600);
+  --c-chart-3: 167 139 250;
+  --c-chart-4: 45 212 191;
+  --c-chart-5: 252 211 77;
+  --c-chart-6: 251 113 133;
+  --c-chart-7: 129 140 248;
+  --c-chart-8: 163 230 53;
+  --c-chart-grid: 51 65 85;
+  --c-chart-axis: 100 116 139;
+  --c-chart-label: 148 163 184;
+  --grad-from: var(--brand-600);
+  --grad-to: var(--brand-800);
+  --shadow-card: 0 0 0 1px rgb(51 65 85 / 0.6), 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 0 0 1px rgb(51 65 85 / 0.8), 0 10px 30px -10px rgb(0 0 0 / 0.7);
+  --hero-color: #172b37;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Density of the reference app (Customer A, app.example-customer.com — its stylesheet sets
+   * `html{font-size:13px}`, `@media(min-width:1536px){13.5px}` and `@media(max-width:640px){12.5px}`):
+   * all rem sizes scale with the root, so every screen gets the same type scale. Percentages keep
+   * the user's own browser font-size setting effective, and touch targets stay 44 px (px units,
+   * unaffected). Phones get 15 px: the reference's 12.5 px is too small for the dense IDE screens
+   * beside a 16 px form control (iOS zooms into anything under 16 px). */
+  html {
+    font-size: 93.75%;        /* 15 px */
+  }
+  /* The reference has no tablet band: its 13 px applies from 641 px up (feature 025). */
+  @media (min-width: 640px) {
+    html {
+      font-size: 81.25%;      /* 13 px */
+    }
+  }
+  @media (min-width: 1536px) {
+    html {
+      font-size: 84.375%;     /* 13.5 px */
+    }
+  }
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  /* iOS zooms into inputs under 16px; keep form text at 16px on phones. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 1024px) {
+    input,
+    select,
+    textarea {
+      font-size: 1rem;
+    }
+  }
+  /* Toolbar controls: 36 px with a mouse (px, so it does not follow the type scale), and the 44 px
+   * touch target under a finger. */
+  .control-compact {
+    min-height: 36px;
+  }
+  @media (pointer: coarse) {
+    .control-compact {
+      min-height: 44px;
+    }
+  }
+  :focus-visible {
+    outline: 3px solid rgb(var(--c-focus));
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .bg-hero {
+    background-color: rgb(var(--grad-to));
+    background-image: linear-gradient(135deg, rgb(var(--grad-from)) 0%, rgb(var(--grad-to)) 100%);
+  }
+  .bg-brand-gradient {
+    background-color: rgb(var(--grad-to));
+    background-image: linear-gradient(135deg, rgb(var(--grad-from)) 0%, rgb(var(--grad-to)) 100%);
+  }
+  /* Feature 026: `chart-1`/`chart-2` are Tailwind colour tokens; the six extra series a layout can
+   * name through `colors: series3…series8` need their own utilities, which is where the role map in
+   * layoutRoles.ts points them at. */
+  .bg-chart-3 { background-color: rgb(var(--c-chart-3)); }
+  .bg-chart-4 { background-color: rgb(var(--c-chart-4)); }
+  .bg-chart-5 { background-color: rgb(var(--c-chart-5)); }
+  .bg-chart-6 { background-color: rgb(var(--c-chart-6)); }
+  .bg-chart-7 { background-color: rgb(var(--c-chart-7)); }
+  .bg-chart-8 { background-color: rgb(var(--c-chart-8)); }
+  .fill-chart-3 { fill: rgb(var(--c-chart-3)); }
+  .fill-chart-4 { fill: rgb(var(--c-chart-4)); }
+  .fill-chart-5 { fill: rgb(var(--c-chart-5)); }
+  .fill-chart-6 { fill: rgb(var(--c-chart-6)); }
+  .fill-chart-7 { fill: rgb(var(--c-chart-7)); }
+  .fill-chart-8 { fill: rgb(var(--c-chart-8)); }
+  .stroke-chart-3 { stroke: rgb(var(--c-chart-3)); }
+  .stroke-chart-4 { stroke: rgb(var(--c-chart-4)); }
+  .stroke-chart-5 { stroke: rgb(var(--c-chart-5)); }
+  .stroke-chart-6 { stroke: rgb(var(--c-chart-6)); }
+  .stroke-chart-7 { stroke: rgb(var(--c-chart-7)); }
+  .stroke-chart-8 { stroke: rgb(var(--c-chart-8)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Feature 020: CodeMirror editor themed with the semantic tokens (both themes). */
+.bizview-cm .cm-editor { height: 100%; background: transparent; color: rgb(var(--c-ink)); font-size: 13px; }
+.bizview-cm .cm-gutters { background: rgb(var(--c-subtle)); color: rgb(var(--c-ink-faint)); border-right: 1px solid rgb(var(--c-line)); }
+.bizview-cm .cm-activeLine, .bizview-cm .cm-activeLineGutter { background: rgb(var(--c-accent-soft) / 0.6); }
+.bizview-cm .cm-cursor { border-left-color: rgb(var(--c-ink)); }
+.bizview-cm .cm-selectionBackground, .bizview-cm .cm-focused .cm-selectionBackground { background: rgb(var(--c-accent-soft-2)); }
+.bizview-cm .cm-editor.cm-focused { outline: 2px solid rgb(var(--c-focus)); outline-offset: -2px; }
+.bizview-cm .cm-lintRange-error { background-image: none; text-decoration: underline wavy rgb(var(--c-danger)); }
+.bizview-cm .cm-tooltip, .bizview-cm .cm-panels { background: rgb(var(--c-surface)); color: rgb(var(--c-ink)); border: 1px solid rgb(var(--c-line)); }
+.bizview-cm .cm-searchMatch { background: rgb(var(--c-warning-soft)); }
+.bizview-cm .cm-panels input, .bizview-cm .cm-panels button { color: rgb(var(--c-ink)); background: rgb(var(--c-field)); }
