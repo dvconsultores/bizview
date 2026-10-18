@@ -108,4 +108,5 @@ def test_public_config_and_health():
                                            "telegram_bot": None, "default_locale": "es",
                                            "footer_credit": "GlobalDV",
                                            "vision_enabled": False, "attachments_max_mb": 5,
-                                           "attachments_max_per_message": 4}
+                                           "attachments_max_per_message": 4,
+                                           "google_auth": False}

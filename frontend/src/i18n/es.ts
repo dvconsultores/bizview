@@ -45,6 +45,18 @@ export const es = {
     forgot: "¿Olvidaste tu contraseña? Pide a tu administrador que la restablezca.",
     sessionEnded: "Tu sesión terminó. Ingresa de nuevo.",
     heroTagline: "Tus indicadores, claros y a mano.",
+    or: "o",
+  },
+  google: {
+    signIn: "Continuar con Google",
+    errors: {
+      // disabled, state, provider and unknown codes: one generic failure (never CSRF jargon).
+      failed: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
+      cancelled: "Cancelaste el inicio de sesión.",
+      notRegistered: "Esa cuenta de Google no está dada de alta en esta instalación.",
+      inactive: "Tu cuenta está desactivada.",
+      domain: "Esa cuenta no pertenece al dominio permitido.",
+    },
   },
   password: {
     title: "Cambiar contraseña",
@@ -449,6 +461,9 @@ export const es = {
     token_created: "Token creado",
     token_revoked: "Token revocado",
     source_described: "Fuente descrita",
+    google_sign_in: "Ingreso con Google",
+    google_sign_in_refused: "Ingreso con Google rechazado",
+    google_linked: "Cuenta de Google vinculada",
     telegram_settings_updated: "Ajustes de Telegram editados",
     telegram_checked: "Telegram verificado",
     telegram_enabled: "Telegram habilitado",

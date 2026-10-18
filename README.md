@@ -22,6 +22,7 @@ language and AI are settings, never code changes. License:
 | **Declarative layouts** for dashboards and PDFs: one `layout` document, written by the Asistente or by a person, rendered by the application's own React SVG chart components on screen and by ReportLab on the server for the PDF | [026](specs/026-declarative-layouts/spec.md) |
 | **Sharing**: expiring read-only dashboard links and dashboards sent by email | [018](specs/018-dashboard-sharing/spec.md) |
 | **Sign in with Telegram**, linked from the user's profile | [007](specs/007-telegram-sign-in/spec.md) |
+| **Sign in with Google**, optional and off by default, for users who already have an account | [027](specs/027-google-sign-in/spec.md) |
 | **English and Spanish** across the interface, API messages and emails | [022](specs/022-i18n-en-es/spec.md) |
 | **Dark mode** | [006](specs/006-dark-mode/spec.md) |
 | **PDF and CSV export**, with PDFs rendered server-side | [005](specs/005-vibe-reporting/spec.md), [026](specs/026-declarative-layouts/spec.md) |
@@ -150,6 +151,7 @@ Requirements, branding, upgrades and backups are in [docs/INSTALL.md](docs/INSTA
 | Site and TLS | `SITE_ADDRESS` (public domain, or `:80` behind another TLS terminator), `CADDY_ALLOWED_HOSTS` (space-separated `Host` allow-list), `HTTP_PORT` (default 8081), `HTTPS_PORT` (default 8443; `443` needs the port free), `TRUSTED_PROXIES`, `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` |
 | Security | `SECURITY_PROFILE` (`private` / `internet` / `auto`), `COOKIE_SECURE`, `BIZVIEW_SECRET_KEY` (encrypts stored credentials; back it up separately), `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` (first start only), `ADMIN_ALLOWED_NETWORKS`, `LOGIN_RATE_LIMIT` |
 | Database | `DATABASE_URL_BI` (always external), `DIRECT_REPORTS_BI`, `DIRECT_BI_ROLE`, `DB_POOL_SIZE` |
+| Sign in with Google (optional) | `GOOGLE_AUTH_ENABLED` (`false` by default), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (this installation's own OAuth client), `GOOGLE_ALLOWED_DOMAINS`, `GOOGLE_REDIRECT_URI` |
 | AI (optional) | `AI_PROVIDER` (`none` by default), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `AI_CHAT_TOKEN_BUDGET`, `AI_VISION` |
 | Mail and sharing | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `EMAIL_ALLOWED_DOMAINS`, `SHARE_LINKS_ENABLED` |
 | Workspace and projects | `WORKSPACE_DIR` (optional customer Git checkout), `PROJECTS_DIR_HOST`, `PROJECT_MAX_MB`, `ATTACHMENTS_DIR_HOST`, `TIMEZONE`, `DEFAULT_LOCALE`, `SOURCE_URL` |

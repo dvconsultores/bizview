@@ -8,6 +8,26 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Sign in with Google** (feature 027): an installation may now offer sign-in with Google as an
+  additional identity for users who already exist. It is off by default (`GOOGLE_AUTH_ENABLED=false`)
+  and configured with that installation's own OAuth client — `GOOGLE_CLIENT_ID`,
+  `GOOGLE_CLIENT_SECRET`, optional `GOOGLE_ALLOWED_DOMAINS` and optional `GOOGLE_REDIRECT_URI` — so
+  no installation depends on a secret held by the vendor. It is invite-only: a Google sign-in
+  succeeds only when the verified email matches an existing, active user, and an unknown email gets
+  the same failure as a wrong password, so the flow never creates or promotes a user and cannot be
+  used to enumerate accounts. The flow is the authorization-code grant for a confidential client
+  (`/api/auth/google/start`, `/api/auth/google/callback`), bound to the `state` cookie the start
+  endpoint sets, with the ID token's claims validated by the
+  backend, and it ends in the same `finish_sign_in()` as every other method — so session shape,
+  lockout, audit and the second factor are not reimplemented. It never bypasses the two-step
+  requirement that the `internet` profile imposes on administrators, who still enter (or enrol)
+  their code. Password sign-in is unchanged and stays available whenever it is today, even with
+  Google enabled, so an installation cannot be locked out through its identity provider; with the
+  setting off, the sign-in screen and both endpoints behave exactly as before. Constitution
+  principle V (**Auth**) is amended to **2.1.0** to list this optional federated identity provider,
+  bounded by the four rules: off by default, per-installation OAuth client, invite-only, and the
+  administrator second factor kept.
+
 - **Shared-server deployment**: the compose file is now `bizview.yml` with the compose project
   name `bizview`, so its containers (`bizview-*`), network and volumes never collide with another
   stack on the same host. The published host ports default to **8081** (HTTP) and **8443**

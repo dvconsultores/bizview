@@ -60,6 +60,8 @@ AUDIT_KINDS = (
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
     # feature 024
     "assistant_attachment_uploaded", "assistant_attachment_deleted",
+    # feature 027
+    "google_sign_in", "google_sign_in_refused", "google_linked",
 )
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
@@ -482,6 +484,24 @@ class TelegramLink(Base):
     display_name: Mapped[str] = mapped_column(Text)
     linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     linked_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+class GoogleLink(Base):
+    """A user's linked Google identity (feature 027), by its immutable subject id."""
+    __tablename__ = "google_link"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_google_link_user"),
+        CheckConstraint("char_length(google_sub) BETWEEN 1 AND 255", name="google_sub_len"),
+        CheckConstraint("char_length(email) BETWEEN 3 AND 254", name="email_len"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"), nullable=False)
+    google_sub: Mapped[str] = mapped_column(Text, unique=True)
+    email: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TelegramRequest(Base):

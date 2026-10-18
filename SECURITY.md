@@ -35,3 +35,9 @@ Security fixes are released for the latest minor version. Installations upgrade 
 - Prefer a database role that owns only the product's tables over a PostgreSQL superuser.
 - AI keys are never returned by the API or written to logs; rotate them at the provider if an
   installation's `.env` is exposed.
+- Google sign-in is optional and off by default (`GOOGLE_AUTH_ENABLED=false`). Enabling it means an
+  authentication round-trip to Google — `/api/auth/google/start`, then `/api/auth/google/callback` —
+  where the installation sends Google the authorization code and the standard OAuth parameters
+  (client id, redirect URI, `state`, PKCE challenge) — no business data and no report data. An
+  installer who must keep the product fully independent of any third party leaves it off; email and
+  password never involve Google.

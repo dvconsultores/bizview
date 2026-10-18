@@ -37,6 +37,7 @@ def public_config():
             "vision_enabled": vision_enabled(s),
             "attachments_max_mb": s.attachments_max_mb,
             "attachments_max_per_message": s.attachments_max_per_message,
+            "google_auth": s.google_enabled_effective,
             **_telegram_config()}
 
 

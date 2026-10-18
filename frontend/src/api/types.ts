@@ -91,6 +91,8 @@ export interface PublicConfig {
   attachments_max_per_message?: number;
   telegram_sign_in: boolean;
   telegram_bot: string | null;
+  /** Feature 027: whether this installation offers Google as an additional sign-in method. */
+  google_auth: boolean;
   default_locale?: Locale;
 }
 

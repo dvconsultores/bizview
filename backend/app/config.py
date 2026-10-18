@@ -94,6 +94,14 @@ class Settings(BaseSettings):
     email_allowed_domains: str = ""   # comma-separated external recipient domains
     share_links_enabled: bool = False
 
+    # Google sign-in (feature 027): an additional identity for accounts that already exist, off
+    # unless the installation configures its own OAuth client. The secret is read only here.
+    google_auth_enabled: bool = False
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_allowed_domains: str | None = None   # comma- or space-separated email domains
+    google_redirect_uri: str | None = None      # default: derived from SITE_ADDRESS
+
     # ---- Direct reports (feature 019) ------------------------------------------------
     # reports may read tables of the BI database directly
     direct_reports_bi: bool = True
@@ -193,7 +201,8 @@ class Settings(BaseSettings):
 
     @field_validator("logo_url", "source_url", "ai_api_key", "ai_model", "ai_base_url",
                      "bizview_secret_key", "bizview_secret_key_previous", "database_url_origin",
-                     "direct_bi_role", mode="before")
+                     "direct_bi_role", "google_client_id", "google_client_secret",
+                     "google_allowed_domains", "google_redirect_uri", mode="before")
     @classmethod
     def _empty_is_none(cls, v):
         return v or None
@@ -274,9 +283,9 @@ class Settings(BaseSettings):
             return 587
         return v
 
-    @field_validator("share_links_enabled", mode="before")
+    @field_validator("share_links_enabled", "google_auth_enabled", mode="before")
     @classmethod
-    def _empty_share_links_to_false(cls, v):
+    def _empty_bool_to_false(cls, v):
         if v is None or (isinstance(v, str) and v.strip() == ""):
             return False
         return v
@@ -420,6 +429,33 @@ class Settings(BaseSettings):
     @property
     def email_enabled(self) -> bool:
         return self.smtp_host is not None and self.smtp_from is not None
+
+    @property
+    def google_enabled_effective(self) -> bool:
+        """Google sign-in acts only with a complete OAuth client (feature 027)."""
+        return bool(self.google_auth_enabled and self.google_client_id
+                    and self.google_client_secret)
+
+    @property
+    def google_redirect_uri_effective(self) -> str:
+        """Fixed from SITE_ADDRESS, never the request Host: a forged header cannot move the code.
+
+        A plain `:port` address is a local installation without TLS, where Google only accepts a
+        loopback redirect.
+        """
+        if self.google_redirect_uri:
+            return self.google_redirect_uri
+        host = self.site_address.strip()
+        if self.site_is_domain:
+            return f"https://{host}/api/auth/google/callback"
+        return f"http://localhost{host}/api/auth/google/callback"
+
+    @property
+    def google_domains(self) -> list[str]:
+        if not self.google_allowed_domains:
+            return []
+        return [d.lower().lstrip("@") for d in re.split(r"[,\s]+", self.google_allowed_domains)
+                if d.lstrip("@")]
 
 
 @lru_cache

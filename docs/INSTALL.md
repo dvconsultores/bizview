@@ -356,6 +356,66 @@ working. Administrators on the `internet` profile still enter their two-step cod
 The credential is encrypted with `BIZVIEW_SECRET_KEY`, never shown again, and re-encrypted by
 `rotate-secret-key`. Changing it turns the option off until the bot is tested again.
 
+### Sign in with Google (optional)
+
+Off by default. When `GOOGLE_AUTH_ENABLED=true`, the sign-in screen shows **Continuar con Google**
+next to the password form; email and password keep working. The browser goes to
+`/api/auth/google/start` and Google returns to `/api/auth/google/callback`, so the authorised
+redirect URI of the client is `https://<your-domain>/api/auth/google/callback`.
+
+The client id and secret belong to **this installation's** Google Cloud project, never to a client
+held by the vendor: no two installations share a credential, and revoking one client affects only
+that installation.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project (or pick an
+   existing one) for this installation.
+2. Configure the **OAuth consent screen**: **Internal** when the users belong to a Google Workspace
+   domain of the customer, or **External** with the people listed as test users while the app is
+   unpublished.
+3. **Credentials** → **Create credentials** → **OAuth client ID**, application type **Web
+   application**. Under **Authorised redirect URIs** add exactly
+   `https://<your-domain>/api/auth/google/callback`, with the domain of `SITE_ADDRESS`.
+4. Copy the client id and the client secret into the installation's `.env`
+   (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), set `GOOGLE_AUTH_ENABLED=true`, and restart:
+   `docker compose up -d`.
+5. Optional: `GOOGLE_ALLOWED_DOMAINS=cliente.com,socio.com` restricts which email domains may sign
+   in (empty = any domain). `GOOGLE_REDIRECT_URI` overrides the redirect URI and is only for
+   unusual proxy setups; empty derives it from `SITE_ADDRESS`.
+
+Two behaviours to understand before enabling it:
+
+- **It does not create accounts.** A Google sign-in succeeds only when the verified Google email
+  belongs to an existing, active user: invite the person (**Administración → Usuarios**) first,
+  then they can use Google. An unknown email gets the same failure as a wrong password, so the flow
+  cannot be used to discover who has an account, and the first successful sign-in links that Google
+  identity to the user. Never create or promote a user through it.
+- **An invited user still sets a password on first sign-in.** Every account keeps a usable password,
+  so it keeps a way in that does not depend on Google: a new user signs in for the first time (with
+  Google or with the temporary password) and the product asks them to set their own password before
+  they continue. From then on Google is an alternative, never a replacement.
+- **Administrators keep their second factor.** Google proves *who* the person is; it does not
+  replace the two-step code that the `internet` profile requires of administrators. Both methods
+  end in the same sign-in, so an administrator still enters (or enrols) their code.
+
+The client secret is read only by the backend: it is never returned by an API response, never
+written to the logs and never sent to the browser. It lives in `.env`, so it is covered by that
+file's permissions and not by the product's encrypted settings.
+
+Troubleshooting:
+
+- **Use your own client.** A client copied from another installation fails at the callback, because
+  the redirect URI does not belong to it; and one leaked secret would then expose every
+  installation sharing it.
+- **`redirect_uri_mismatch`** means the console entry is not character-for-character
+  `https://<your-domain>/api/auth/google/callback`: HTTPS, no trailing slash, the domain of
+  `SITE_ADDRESS`. Fix the entry (or `GOOGLE_REDIRECT_URI`) and restart.
+- **`access blocked`** means the consent screen is **External** and the person is not listed as a
+  test user, or the app is unpublished. Add them as a test user, or use an **Internal** consent
+  screen in the customer's Workspace domain.
+- **Nobody is locked out.** Password sign-in works in every one of those cases — and with
+  `GOOGLE_AUTH_ENABLED=false` — so the super user can still enter with email and password and fix
+  the settings (see §11 to recover the super user).
+
 ### Email and shared links (optional)
 
 Both are off by default. Email lets users send a dashboard PDF from the dashboard and lets

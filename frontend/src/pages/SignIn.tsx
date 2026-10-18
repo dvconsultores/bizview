@@ -12,18 +12,37 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { Logo } from "../components/Logo";
 import { PasswordField } from "../components/PasswordField";
 import { useBranding } from "../config/BrandingContext";
-import { useT } from "../i18n";
+import { useT, type Catalogue } from "../i18n";
 import { SourceFooter } from "../components/SourceFooter";
 import { TelegramSignInPanel } from "../components/TelegramSignInPanel";
 
 type FieldErrors = { email?: string; password?: string };
 
+/** Feature 027: the callback's closed set of outcomes, mapped to plain user language. */
+function googleErrorMessage(code: string, t: Catalogue): string {
+  switch (code) {
+    case "denied":
+      return t.google.errors.cancelled;
+    case "unknown_identity":
+      return t.google.errors.notRegistered;
+    case "inactive":
+      return t.google.errors.inactive;
+    case "domain":
+      return t.google.errors.domain;
+    default:
+      // disabled, state, provider, and any code we do not know: the generic failure.
+      return t.google.errors.failed;
+  }
+}
+
 export function SignIn() {
   const t = useT();
   const { user, loading, login, completeMfa, refresh, setUser } = useAuth();
-  const { product_name, organization_name, telegram_sign_in } = useBranding();
+  const { product_name, organization_name, telegram_sign_in, google_auth } = useBranding();
   const [searchParams] = useSearchParams();
   const next = searchParams.get("next");
+  const googleErrorCode = searchParams.get("google_error");
+  const googleError = googleErrorCode ? googleErrorMessage(googleErrorCode, t) : null;
   const navigate = useNavigate();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -32,7 +51,11 @@ export function SignIn() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<{ tone: "error" | "warning"; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState<"password" | "code" | "telegram">("password");
+  // The Google callback that still owes the second factor comes back with ?mfa=1 and a pending
+  // session: the existing code prompt takes over, exactly as after a password sign-in returning "mfa".
+  const [step, setStep] = useState<"password" | "code" | "telegram">(
+    searchParams.get("mfa") === "1" ? "code" : "password",
+  );
 
   useEffect(() => {
     if (!loading && !user) emailRef.current?.focus();
@@ -112,6 +135,11 @@ export function SignIn() {
               <Alert tone="info">{t.signIn.sessionEnded}</Alert>
             </div>
           ) : null}
+          {googleError && !formError ? (
+            <div className="mb-4">
+              <Alert tone="error">{googleError}</Alert>
+            </div>
+          ) : null}
           {formError ? (
             <div className="mb-4">
               <Alert tone={formError.tone}>{formError.text}</Alert>
@@ -166,17 +194,34 @@ export function SignIn() {
               {submitting ? t.signIn.submitting : t.signIn.submit}
             </Button>
           </form>
-          {telegram_sign_in ? (
+          {telegram_sign_in || google_auth ? (
             <>
               <div className="my-4 flex items-center" aria-hidden>
                 <span className="h-px flex-1 bg-line" />
-                <span className="px-3 text-sm text-ink-soft">{t.telegram.or}</span>
+                <span className="px-3 text-sm text-ink-soft">{t.signIn.or}</span>
                 <span className="h-px flex-1 bg-line" />
               </div>
-              <Button variant="secondary" block icon={<Send className="h-5 w-5" aria-hidden />}
-                onClick={() => { setFormError(null); setStep("telegram"); }}>
-                {t.telegram.signIn}
-              </Button>
+              <div className="space-y-3">
+                {google_auth ? (
+                  <Button
+                    variant="secondary"
+                    block
+                    onClick={() => {
+                      setFormError(null);
+                      // A normal navigation: the endpoint sets the state cookie and 302s to Google.
+                      window.location.assign("/api/auth/google/start");
+                    }}
+                  >
+                    {t.google.signIn}
+                  </Button>
+                ) : null}
+                {telegram_sign_in ? (
+                  <Button variant="secondary" block icon={<Send className="h-5 w-5" aria-hidden />}
+                    onClick={() => { setFormError(null); setStep("telegram"); }}>
+                    {t.telegram.signIn}
+                  </Button>
+                ) : null}
+              </div>
             </>
           ) : null}
           </>

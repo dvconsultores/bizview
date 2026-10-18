@@ -12,6 +12,7 @@ const DEFAULT: PublicConfig = {
   ai_enabled: false,
   telegram_sign_in: false,
   telegram_bot: null,
+  google_auth: false,
 };
 const BrandingContext = createContext<PublicConfig>(DEFAULT);
 

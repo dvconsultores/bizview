@@ -58,6 +58,17 @@ export const en: Catalogue = {
     forgot: "Forgot your password? Ask your administrator to reset it.",
     sessionEnded: "Your session ended. Sign in again.",
     heroTagline: "Your metrics, clear and at hand.",
+    or: "or",
+  },
+  google: {
+    signIn: "Continue with Google",
+    errors: {
+      failed: "Couldn't sign in with Google. Try again.",
+      cancelled: "You cancelled the sign-in.",
+      notRegistered: "That Google account isn't registered on this installation.",
+      inactive: "Your account is deactivated.",
+      domain: "That account doesn't belong to the allowed domain.",
+    },
   },
   password: {
     title: "Change password",
@@ -470,6 +481,9 @@ export const en: Catalogue = {
     token_created: "Token created",
     token_revoked: "Token revoked",
     source_described: "Source described",
+    google_sign_in: "Google sign-in",
+    google_sign_in_refused: "Google sign-in refused",
+    google_linked: "Google account linked",
     telegram_settings_updated: "Telegram settings updated",
     telegram_checked: "Telegram checked",
     telegram_enabled: "Telegram enabled",

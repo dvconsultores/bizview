@@ -1,4 +1,22 @@
 <!--
+Sync Impact Report (amendment 2026-10-18)
+- Version change: 2.0.1 → 2.1.0 (MINOR: principle V materially expanded — no principle removed or
+  redefined incompatibly, so not MAJOR)
+- Modified principles:
+  - V. Fixed Technology Stack, **Auth**: adds an optional federated identity provider (Google
+    sign-in, feature 027) as an *additional* identity for existing users. Bounded by four rules in
+    the principle itself: off by default, per-installation OAuth client, invite-only (never creates
+    or promotes a user), and the `internet` profile's second factor still applies. Password sign-in
+    must remain available exactly where it is today.
+- Added constraints: none.
+- Removed constraints: none.
+- Why not a new stack component: the flow uses `httpx` (already listed) against Google's token
+  endpoint in the authorization-code flow for a confidential client, so no JWT library and no new
+  dependency is introduced (feature 027, specs/027-google-sign-in/spec.md, Assumptions).
+- Trigger: owner request 2026-10-18 ("it is possible login with google?").
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-10-09)
 - Version change: 2.0.0 → 2.0.1 (PATCH: wording) — principle V: "report aggregation and rollups
   stay in PostgreSQL SQL" (whole-mode Polars transforms may aggregate inside an integration;
@@ -234,7 +252,13 @@ API route quickly (see Success Criteria).
   database for the product and a separate external test database for the suites; no database
   container.
 - **Auth:** email + password, Argon2id password hashes, server-side sessions stored in
-  PostgreSQL and carried by an HttpOnly cookie.
+  PostgreSQL and carried by an HttpOnly cookie. An installation MAY also enable sign-in with
+  Google as an **additional** identity for users who already exist (feature 027): it is off by
+  default, configured per installation with that installation's own OAuth client, invite-only
+  (it never creates or promotes a user), opt-in per attempt by the person signing in, and it never
+  substitutes for the second factor that the `internet` profile requires of administrators.
+  Password sign-in MUST remain available whenever it is today, so an installation can never be
+  locked out through its identity provider.
 
 - **AI:** optional provider layer in the backend — Claude through the official `anthropic` SDK
   (default), or any OpenAI-compatible endpoint (including local models) over `httpx`.
@@ -356,4 +380,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 2.0.1 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-09
+**Version**: 2.1.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-18
