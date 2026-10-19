@@ -601,6 +601,12 @@ Migrations run automatically. Going back to an older version is not supported on
 has migrated the database: restore a backup instead (next section). Read the release notes
 before upgrading.
 
+**Never run `alembic upgrade` from a workstation against an installation's database.** It stamps the
+database with a revision the installed images may not contain, and every container then fails at
+start with `Can't locate revision identified by '…'` (the entrypoint explains it now). The container
+migrates on its own; if the database is already ahead, upgrade to the release that migrated it, or
+restore a backup taken before that upgrade.
+
 The stack also runs **`watchtower`** (container `bizview-watchtower`): every
 `WATCHTOWER_POLL_INTERVAL` seconds (default 300) it pulls a newer image of the tag in
 `BIZVIEW_VERSION` and recreates only the containers of this installation, one service at a time,
