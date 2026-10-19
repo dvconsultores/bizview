@@ -58,7 +58,7 @@ REGISTRY: dict[str, CommandDef] = dict([
     # A quick fix: correct an artifact that already exists without writing a new spec (the
     # product's own validation and preview still gate it, and nothing new can be created).
     _def("fix", False, True, True, True, {"edit_draft", "check_query", "run_preview"},
-         ["existing_artifacts"], ["constitution"] + list(_ALL_DOCS), []),
+         ["existing_artifacts"], ["constitution", *_ALL_DOCS], []),
     _def("speckit-implement", True, False, True, True,
          {"propose_draft", "edit_draft", "check_query", "run_preview"},
          ["kind_artifacts", "tasks_ticks", "status_implemented"], _ALL_DOCS, ["tasks"]),

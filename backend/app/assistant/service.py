@@ -182,8 +182,8 @@ contexto indica la spec y el estado; cuando el trabajo del comando termina llama
 `finish_command` con un resumen de una línea; cuando necesitas una respuesta del usuario,
 pregunta y termina tu turno sin `finish_command`. Si el usuario pide una ejecución autónoma
 ("sin preguntar", "modo autónomo"), decide con el criterio más razonable, anota cada suposición en
-el documento que escribes y detente solo ante algo irreversible o que afecte privacidad, credenciales
-o alcance. En mensajes sin comando puedes inspeccionar
+el documento que escribes y detente solo ante algo irreversible o que afecte privacidad,
+credenciales o alcance. En mensajes sin comando puedes inspeccionar
 (list_sources, describe_source, profile_source, read_draft, get_authoring_guide, get_workspace)
 y responder, pero nunca escribir archivos: propón el comando adecuado con `suggest_command`, cuyos
 `arguments` son un resumen de 160 caracteres como máximo (un brief, una lista de columnas o una
@@ -1893,8 +1893,8 @@ def _next_step(session: AssistantSession, last) -> dict | None:
     spec = last.spec or session.current_spec
     command = _NEXT_AFTER.get(last.command)
     if command and command in ("/speckit-plan", "/speckit-tasks") and spec:
-        from app.projects import fs as project_fs
         from app.assistant.overview import NEEDS
+        from app.projects import fs as project_fs
 
         ref = _project_ref(session)
         if ref:
@@ -1920,7 +1920,8 @@ def _command_json(db, session: AssistantSession) -> dict:
             "id": current_run.id, "command": current_run.command, "spec": current_run.spec,
             "status": current_run.status, "pending": current_run.pending},
         "command_runs": [_run_json(r) for r in recent],
-        "next_step": None if current_run is not None else _next_step(session, recent[0] if recent else None),
+        "next_step": (None if current_run is not None
+                      else _next_step(session, recent[0] if recent else None)),
     }
 
 

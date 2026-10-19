@@ -740,7 +740,8 @@ def _edited_integration():
 def test_suggest_command_keeps_the_button_short():
     """A full brief in `arguments` makes an unreadable button: the detail belongs in the reply."""
     class Session:
-        working_state: dict = {}
+        def __init__(self) -> None:
+            self.working_state: dict = {}
 
     limit = tools.MAX_SUGGESTION_ARGUMENTS
     result, _ = tools._suggest_command(Session(), {"command": "speckit-specify",
@@ -754,7 +755,8 @@ def test_suggest_command_keeps_the_button_short():
 def test_suggesting_the_same_command_twice_is_rejected():
     """The button is already on screen; repeating the call only looped the turn."""
     class Session:
-        working_state: dict = {}
+        def __init__(self) -> None:
+            self.working_state: dict = {}
 
     session = Session()
     tools._suggest_command(session, {"command": "speckit-specify", "arguments": "Facturación"})

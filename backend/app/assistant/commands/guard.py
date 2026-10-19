@@ -253,7 +253,8 @@ class _Checker:
                 out.append(f"specs/{spec}/checklists/<nombre>.md")
             elif rule == "existing_artifacts":
                 out.append("integrations/<id>/integration.yaml|queries/*.sql|requests/*.yaml, "
-                           "reports/<id>/report.yaml, distributions/<id>.yaml (solo los que ya existen)")
+                           "reports/<id>/report.yaml, distributions/<id>.yaml "
+                           "(solo los que ya existen)")
             elif rule == "kind_artifacts" and ctx.kind in _KIND_HINTS:
                 out.append(_KIND_HINTS[ctx.kind].format(ids="|".join(sorted(self.ids))))
         return list(dict.fromkeys(out))
