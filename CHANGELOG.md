@@ -441,6 +441,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Stable container names**: `backend`, `worker` and `caddy` now declare `container_name`
+  (`bizview-backend`, `bizview-worker`, `bizview-caddy`), so they no longer carry Compose's `-1`
+  replica suffix. `bizview-watchtower` already had one.
+
 - **Validation problems can be put aside, and re-checked on demand**: the problems panel gained a
   **Volver a comprobar** action that recomputes validation without waiting for a file change, and
   each problem has a dismiss button. A dismissed problem is hidden for that project in this browser

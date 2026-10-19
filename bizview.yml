@@ -9,6 +9,7 @@ name: bizview
 
 services:
   backend:
+    container_name: bizview-backend
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
@@ -26,7 +27,8 @@ services:
       - ${PROJECTS_DIR_HOST:-./projects}:/app/data/projects     # BI projects (feature 020), read-write, backend only
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # chat image briefs (feature 024)
 
-  worker:                      # integration runs (feature 005): same image, other entry point
+  worker:
+    container_name: bizview-worker                      # integration runs (feature 005): same image, other entry point
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-backend:${BIZVIEW_VERSION:-latest}
@@ -48,6 +50,7 @@ services:
         condition: service_healthy
 
   caddy:
+    container_name: bizview-caddy
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     image: ${BIZVIEW_IMAGE_PREFIX:-dvconsultores}/bizview-web:${BIZVIEW_VERSION:-latest}

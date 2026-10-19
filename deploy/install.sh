@@ -350,6 +350,7 @@ cat >"$DIR/bizview.yml" <<'EOF'
 name: bizview
 services:
   backend:
+    container_name: bizview-backend
     image: ${BIZVIEW_IMAGE_PREFIX}-backend:${BIZVIEW_VERSION}
     labels:
       com.centurylinklabs.watchtower.enable: "true"
@@ -363,6 +364,7 @@ services:
       - ./attachments:/app/data/attachments
 
   worker:
+    container_name: bizview-worker
     image: ${BIZVIEW_IMAGE_PREFIX}-backend:${BIZVIEW_VERSION}
     labels:
       com.centurylinklabs.watchtower.enable: "true"
@@ -380,6 +382,7 @@ services:
         condition: service_healthy
 
   web:
+    container_name: bizview-web
     image: ${BIZVIEW_IMAGE_PREFIX}-web:${BIZVIEW_VERSION}
     labels:
       com.centurylinklabs.watchtower.enable: "true"
