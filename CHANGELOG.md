@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **"Ampliar presupuesto" in the chat**: the endpoint `POST /api/assistant/sessions/{id}/budget`
+  existed but nothing called it, so a conversation that reached the budget was stuck with a warning
+  and no way forward. The banner now offers the action while `token_budget < AI_CHAT_BUDGET_MAX`,
+  and once the configured ceiling is reached it says so instead (raise `AI_CHAT_BUDGET_MAX`, up to
+  5 000 000, or start a new conversation).
+
 - **One `/speckit-specify` run can draft several specs**: a brief that covers an integration *and*
   its report produced only the first spec and then waited for a second request. The write scope now
   accepts the reserved number and the two after it (up to three specs per run, each with its

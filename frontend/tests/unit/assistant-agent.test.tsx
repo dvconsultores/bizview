@@ -369,6 +369,18 @@ describe("BudgetNotice through AssistantChat (automatic budget, T051)", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it("offers to extend while the budget can still grow", async () => {
+    vi.mocked(api.post).mockResolvedValue(makeSession({ tokens_used: 850, token_budget: 1000,
+                                                        budget_max: 2000, budget_warning: true }));
+    await renderChat(
+      makeSession({ tokens_used: 850, token_budget: 1000, budget_max: 2000, budget_warning: true }),
+    );
+    const extend = container.querySelector<HTMLButtonElement>("[data-extend-budget]");
+    expect(extend).not.toBeNull();
+    await act(async () => extend!.click());
+    expect(api.post).toHaveBeenCalledWith("/api/assistant/sessions/7/budget");
+  });
+
   it("shows nothing without warning", async () => {
     await renderChat(makeSession({}));
 
