@@ -26,7 +26,7 @@ vi.mock("../../src/config/BrandingContext", () => ({
 }));
 
 import { api, ApiError } from "../../src/api/client";
-import type { AssistantSession, CommandDef } from "../../src/api/types";
+import type { AssistantSession, CommandDef, CommandRun } from "../../src/api/types";
 import { AssistantChat } from "../../src/components/assistant/AssistantChat";
 import { __resetCommandsCache } from "../../src/components/assistant/useCommands";
 import { t } from "../../src/i18n/es";
@@ -100,6 +100,51 @@ async function click(el: Element | undefined | null) {
 }
 const buttonWith = (text: string) =>
   Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(text));
+
+describe("opt-in pipeline", () => {
+  const run = (command: string, status: CommandRun["status"]) => ({
+    id: 1, message_id: 1, command, spec: null, status, files: [], tokens: 0,
+    started_at: "2026-10-11T10:00:00Z", ended_at: null,
+  });
+
+  async function startPipeline(status: CommandRun["status"]) {
+    vi.mocked(api.post).mockImplementation(async (path: string, body?: unknown) => {
+      if (path.endsWith("/messages")) {
+        const sent = String((body as { text?: string })?.text ?? "").trim();
+        const command = sent.split(/\s+/)[0].replace(/^\//, "") || "speckit-specify";
+        return { messages: [], session: { ...base, command_runs: [run(command, status)] } };
+      }
+      return { items: commands };
+    });
+    await renderChat();
+    await type("/speckit-specify dashboard de facturación");
+    await click(buttonWith(t.assistant.pipeline));
+  }
+
+  it("walks specify → plan → tasks → implement when each run completes", async () => {
+    await startPipeline("completed");
+    const sent = vi.mocked(api.post).mock.calls
+      .filter((c) => String(c[0]).endsWith("/messages"))
+      .map((c) => String((c[1] as { text?: string })?.text ?? "").trim());
+    expect(sent).toHaveLength(4);
+    expect(sent[0]).toBe("/speckit-specify dashboard de facturación");
+    expect([sent[1], sent[2], sent[3]]).toEqual(["/speckit-plan", "/speckit-tasks", "/speckit-implement"]);
+  });
+
+  it("stops when a run waits for an answer", async () => {
+    await startPipeline("waiting");
+    expect(vi.mocked(api.post)).toHaveBeenCalledTimes(1);
+  });
+
+  it("is offered only for a brief that starts with /speckit-specify", async () => {
+    await renderChat();
+    expect(buttonWith(t.assistant.pipeline)).toBeUndefined();
+    await type("un reporte de ventas");
+    expect(buttonWith(t.assistant.pipeline)).toBeUndefined();
+    await type("/speckit-specify algo");
+    expect(buttonWith(t.assistant.pipeline)).toBeDefined();
+  });
+});
 
 describe("command menu in the composer", () => {
   it("opens on /, moves with the keys and inserts without sending", async () => {

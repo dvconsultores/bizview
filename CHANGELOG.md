@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Opt-in pipeline for a brief**: when the composer holds a `/speckit-specify` message, a
+  **Pipeline** button appears next to Send. One press sends the brief and then `/speckit-plan`,
+  `/speckit-tasks` and `/speckit-implement`, each only after the previous run reports `completed`,
+  so a brief is taken from specification to *Listo para aplicar* without typing four messages. It
+  is never automatic: it needs the button, the progress strip shows `Pipeline n/4`, **Detener**
+  cancels the rest, and it stops by itself when a run waits for an answer, fails or is interrupted.
+
 - **Automatic image updates**: the compose file runs `containrrr/watchtower:1.7.1` as
   `bizview-watchtower`. Every `WATCHTOWER_POLL_INTERVAL` seconds (default 300) it pulls a newer
   image of the `BIZVIEW_VERSION` tag and recreates the affected container with rolling restarts, so

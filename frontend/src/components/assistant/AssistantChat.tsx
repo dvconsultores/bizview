@@ -17,10 +17,12 @@ import {
   FilePen,
   FileSearch,
   Paperclip,
+  ListChecks,
   Loader2,
   NotebookPen,
   ShieldCheck,
   Sparkles,
+  Square,
   Wrench,
   X,
 } from "lucide-react";
@@ -138,6 +140,12 @@ export function AssistantChat(props: {
   const [picker, setPicker] = useState<{ command: string; specs: SpecChoice[]; text: string } | null>(null);
   const [unknown, setUnknown] = useState<string[] | null>(null);
   const [activeConflict, setActiveConflict] = useState(false);
+  /**
+   * Opt-in pipeline (never automatic): one press sends `/speckit-specify` with the composer text
+   * and then plan → tasks → implement, each only after the previous run is `completed`. It stops
+   * on the first run that waits for an answer, fails or is interrupted, and "Detener" cancels it.
+   */
+  const [pipeline, setPipeline] = useState<{ steps: string[]; next: number } | null>(null);
   const [finishing, setFinishing] = useState(false);
   const query = ai_enabled && commands && !menuClosed ? menuQuery(text, caret) : null;
   const menuItems = query !== null && commands ? filterCommands(commands, query) : [];
@@ -187,6 +195,40 @@ export function AssistantChat(props: {
       setFinishing(false);
     }
   };
+
+  /** The composer holds a brief for /speckit-specify: offer to run the whole pipeline. */
+  const pipelineAvailable =
+    ai_enabled && !sending && !busy && images.length === 0 && session?.status !== "archived"
+    && text.trim().startsWith("/speckit-specify");
+
+  const startPipeline = () => {
+    const brief = text.trim();
+    if (!brief) return;
+    const steps = [brief, "/speckit-plan", "/speckit-tasks", "/speckit-implement"];
+    setPipeline({ steps, next: 1 });
+    void send(brief);
+  };
+
+  const commandName = (value: string) => value.trim().split(/\s+/)[0].replace(/^\//, "");
+
+  useEffect(() => {
+    if (!pipeline || sending || busy || !session) return;
+    if (pipeline.next >= pipeline.steps.length) { setPipeline(null); return; }
+    const previous = commandName(pipeline.steps[pipeline.next - 1]);
+    const runs = session.command_runs ?? [];
+    const last = [...runs].reverse().find((run) => run.command === previous);
+    if (!last || last.status === "running") return;         // still being created: wait
+    if (last.status !== "completed") {                       // it asked, failed or was stopped
+      setPipeline(null);
+      if (last.status !== "waiting") {
+        setError(t.assistant.pipelineStopped(previous));
+      }
+      return;
+    }
+    const value = pipeline.steps[pipeline.next];
+    setPipeline({ ...pipeline, next: pipeline.next + 1 });
+    void send(value);
+  }, [busy, sending, session, pipeline, t]);
 
   const runsByMessage = new Map<number, CommandRun[]>();
   for (const run of [...(session?.command_runs ?? [])].reverse()) {
@@ -621,6 +663,24 @@ export function AssistantChat(props: {
         </div>
       ) : null}
 
+      {pipeline ? (
+        <div className="flex flex-wrap items-center gap-2 px-3 pt-2 sm:px-4">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs text-accent">
+            <ListChecks className="h-3.5 w-3.5" aria-hidden />
+            {t.assistant.pipelineStep(Math.min(pipeline.next, pipeline.steps.length - 1),
+                                      pipeline.steps.length - 1)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPipeline(null)}
+            className="inline-flex min-h-tap items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs text-ink hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <Square className="h-3 w-3" aria-hidden />
+            {t.assistant.stop}
+          </button>
+        </div>
+      ) : null}
+
       {picker && session ? (
         <div className="px-3 pt-2 sm:px-4">
           <SpecPicker
@@ -835,6 +895,17 @@ export function AssistantChat(props: {
                   </span>
                 ) : null}
               </div>
+              {pipelineAvailable && (
+                <button
+                  type="button"
+                  onClick={startPipeline}
+                  title={t.assistant.pipelineHint}
+                  className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  <ListChecks className="h-4 w-4" aria-hidden />
+                  {t.assistant.pipeline}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void send()}
