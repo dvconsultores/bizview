@@ -480,6 +480,8 @@ export function AssistantChat(props: {
     }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
+      // A command placed by a button is not sent by a stray Enter: the user clicks Send.
+      if (inserted) return;
       void send();
     }
   };
@@ -861,6 +863,7 @@ export function AssistantChat(props: {
               }
               onChange={(e) => {
                 setText(e.target.value);
+                setInserted(false);          // the user typed: Enter sends again
                 setCaret(e.target.selectionStart ?? e.target.value.length);
                 setActiveIndex(0);
                 setMenuClosed(false);

@@ -464,6 +464,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **An inserted command is sent only with the Send button**: Enter in the composer used to submit
+  whatever it held, so clicking a suggestion (or the new "Siguiente" chip) and then pressing Enter
+  put the command in the chat without an explicit send. Enter is now ignored while the text came
+  from a button; typing anything — or clicking Send — restores the usual behaviour.
+
 - **Stable container names**: `backend`, `worker` and `caddy` now declare `container_name`
   (`bizview-backend`, `bizview-worker`, `bizview-caddy`), so they no longer carry Compose's `-1`
   replica suffix. `bizview-watchtower` already had one.

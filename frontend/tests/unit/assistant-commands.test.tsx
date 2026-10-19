@@ -321,6 +321,23 @@ describe("chips and suggestions", () => {
     expect(container.textContent).toContain(t.assistant.insertedHint);
   });
 
+  it("Enter does not send a command that a button inserted", async () => {
+    await renderChat(withRun);
+    await click(container.querySelector("[data-command-suggestion]"));
+    expect(textarea().value).toBe("/speckit-plan ");
+    await act(async () => {
+      textarea().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    expect(api.post).not.toHaveBeenCalled();               // the Send button is the way in
+    // Typing makes Enter send again, as usual.
+    await type("/speckit-plan otra");
+    await act(async () => {
+      textarea().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    await act(async () => new Promise((r) => setTimeout(r, 0)));
+    expect(api.post).toHaveBeenCalled();
+  });
+
   it("pressing Enter outside the composer does not send the inserted command", async () => {
     await renderChat(withRun);
     const suggestion = container.querySelector<HTMLButtonElement>("[data-command-suggestion]")!;

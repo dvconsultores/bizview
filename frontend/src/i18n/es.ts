@@ -1129,7 +1129,7 @@ export const es = {
     pipelineConfirm: "Se enviarán 4 mensajes: specify → plan → tasks → implement. ¿Ejecutar?",
     pipelineRun: "Ejecutar pipeline",
     pipelineWaiting: "Pipeline en pausa: esperando tu respuesta. Al contestar continúa solo.",
-    insertedHint: "Insertado en el compositor: nada se ha enviado todavía. Pulsa Enviar (o Intro) para ejecutarlo.",
+    insertedHint: "Insertado en el compositor: nada se ha enviado todavía. Pulsa Enviar para ejecutarlo.",
     deleteSession: "Eliminar conversación",
     deleteConfirm: (title: string) => `¿Eliminar «${title}»? Se borran sus mensajes y archivos adjuntos; no se puede deshacer.`,
     pipelineHint: "Ejecuta este brief de principio a fin: specify → plan → tasks → implement, deteniéndose si necesita una respuesta.",
