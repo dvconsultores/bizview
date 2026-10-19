@@ -581,6 +581,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A leftover folder no longer breaks a new project**: the database and the project folders live on
+  different hosts, so deleting a project's rows while its tree stays on disk (or reusing a database
+  with a fresh server) made the next project with the same slug adopt the old files — the editor then
+  reported `project.yaml cambió desde que lo abriste (external…)` for files the new project never
+  wrote. Creating a project whose folder already holds files is now refused with a message naming
+  the folder, and nothing is touched.
+
 - **A suggestion cannot carry a whole brief any more**: `suggest_command` rejected nothing, so the
   model packed the entire specification into `arguments`. The chat then showed an unreadable
   paragraph ("Sugirió /speckit-specify Integración de facturación…" with dozens of columns) and the

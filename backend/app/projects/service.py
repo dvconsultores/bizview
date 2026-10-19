@@ -72,6 +72,12 @@ def create(db: Session, actor: AppUser, name: str, slug: str | None = None,
 
     root = fs.project_root(slug)
     existed = root.exists()
+    if existed and any(root.iterdir()):
+        # The database and the folders are not the same host: an installation whose database was
+        # reused (or whose project row was deleted) still has the old tree here. Adopting it would
+        # mix a previous project's specs and reports into the new one and surface them as
+        # "changed externally", so the creation is refused until the folder is gone.
+        raise ApiError(409, "folder_exists", M("projects.folder_exists", slug=slug))
     project = Project(slug=slug, name=name, description=description, created_by=actor.id)
     db.add(project)
     db.commit()

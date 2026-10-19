@@ -52,6 +52,19 @@ def test_slug_suggestion_and_uniqueness(env, superuser):
         "nandu-2024")
 
 
+def test_leftover_folder_is_refused(env, superuser):
+    """DB and folders live on different hosts: an old tree must not be adopted silently."""
+    c = signed_in("root@example.com")
+    stale = env / "artemisa"
+    stale.mkdir(parents=True)
+    (stale / "project.yaml").write_text("name: artemisa\n")
+    (stale / "specs").mkdir()
+    r = c.post("/api/projects", json={"name": "artemisa"})
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "folder_exists"
+    assert (stale / "project.yaml").read_text() == "name: artemisa\n"     # nothing touched
+
+
 def test_rename_name_vs_slug_lock(env, superuser):
     c = signed_in("root@example.com")
     slug = c.post("/api/projects", json={"name": "Uno"}).json()["slug"]
