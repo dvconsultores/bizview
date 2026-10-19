@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Autonomous runs can be requested in the brief**: saying "modo autónomo", "sin preguntar" or
+  "decide tú y anota las suposiciones" now tells the assistant to choose the most reasonable
+  default, record each assumption in the document it writes, and stop only for something
+  irreversible or about privacy, credentials or scope. Documented in `docs/VIBE-REPORTING.md`,
+  together with the two things that remain explicit user actions (commands never start each other;
+  the Pipeline button asks once, and an unrequested personal column is never included silently).
+
 - **Delete a conversation**: until now a chat could only be archived, so test conversations piled up
   in the history popover forever. The active list now has a delete button (with a confirmation),
   backed by `DELETE /api/assistant/sessions/{id}`, which removes the session, its messages, command

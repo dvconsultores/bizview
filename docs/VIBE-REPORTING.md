@@ -328,6 +328,21 @@ not `Approved` (your "sí" approves it) or when a checklist has unchecked items.
 for your answer can be closed with **Terminar**; an interrupted run continues where it stopped
 when you run the same command again. Applying the project is always your action (Aplicar).
 
+### Asking for an autonomous run
+
+Say it in the brief and the run stops asking: *"modo autónomo"*, *"sin preguntar"* or
+*"decide tú y anota las suposiciones"*. The assistant then picks the most reasonable default,
+writes each assumption into the document it is producing, and only stops for something
+irreversible or about privacy, credentials or scope. A brief that names the decisions it would
+otherwise ask about (for example *"estatus pagada = paid"*) removes those questions entirely.
+
+Two things stay in your hands, by design:
+
+- **Commands do not start each other.** One message runs one command; the **Pipeline** button
+  chains `specify → plan → tasks → implement` and asks once before it sends the four messages.
+- **A personal column** that you did not explicitly ask for is never included silently: either the
+  brief excludes it ("sin columnas personales") or the assistant names it and waits.
+
 The chat only handles reports, integrations, ETL, data sources and the use of BizView. Clearly
 off-topic requests get a fixed answer without calling the AI; documents and tool results are
 passed to the model as data, never as instructions.
