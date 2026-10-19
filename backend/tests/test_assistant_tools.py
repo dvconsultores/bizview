@@ -750,3 +750,15 @@ def test_suggest_command_keeps_the_button_short():
     with pytest.raises(tools.ToolError):
         tools._suggest_command(Session(), {"command": "speckit-specify",
                                            "arguments": "x" * (limit + 1)})
+
+def test_suggesting_the_same_command_twice_is_rejected():
+    """The button is already on screen; repeating the call only looped the turn."""
+    class Session:
+        working_state: dict = {}
+
+    session = Session()
+    tools._suggest_command(session, {"command": "speckit-specify", "arguments": "Facturación"})
+    with pytest.raises(tools.ToolError):
+        tools._suggest_command(session, {"command": "speckit-specify", "arguments": "otra cosa"})
+    # A different command is still allowed (up to three distinct ones).
+    tools._suggest_command(session, {"command": "speckit-plan", "arguments": "plan"})

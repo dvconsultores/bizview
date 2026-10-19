@@ -866,6 +866,11 @@ def _suggest_command(session: Any, args: dict[str, Any]) -> tuple[dict[str, Any]
                         + ", ".join(n for n in REGISTRY if REGISTRY[n].provider))
     arguments = args.get("arguments")
     arguments = arguments.strip() if isinstance(arguments, str) else ""
+    prior = (session.working_state or {}).get(SUGGESTIONS_KEY) or []
+    if any(s.get("command") == name for s in prior):
+        # The button is already on screen: another call adds nothing and used to loop the turn.
+        raise ToolError(f"Ya sugeriste /{name} en esta respuesta; no la repitas, termina tu "
+                        "respuesta con el resumen.")
     if len(arguments) > MAX_SUGGESTION_ARGUMENTS:
         # A button with a brief inside is unreadable: the button names the command, the reply text
         # carries the detail. Reject instead of silently truncating so the model fixes its call.
@@ -873,7 +878,7 @@ def _suggest_command(session: Any, args: dict[str, Any]) -> tuple[dict[str, Any]
                         f"{MAX_SUGGESTION_ARGUMENTS} caracteres o menos; escribe el detalle en tu "
                         "respuesta.")
     working = dict(session.working_state or {})
-    suggestions = [s for s in (working.get(SUGGESTIONS_KEY) or []) if s.get("command") != name]
+    suggestions = list(working.get(SUGGESTIONS_KEY) or [])
     if len(suggestions) >= MAX_SUGGESTIONS:
         raise ToolError(f"Máximo {MAX_SUGGESTIONS} sugerencias por respuesta.")
     suggestions.append({"command": name, "arguments": arguments})

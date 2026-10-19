@@ -554,7 +554,9 @@ All notable changes to this project are documented here. The format follows
   turn was spent repeating the same suggestion. Arguments are now capped at 160 characters — the
   tool refuses more instead of truncating silently — the prompt says the detail belongs in the reply
   text and that one suggestion per answer is enough, and the activity pill and the insert button
-  clamp to a single line with the full text on hover.
+  clamp to a single line with the full text on hover. Suggesting the **same** command twice in one
+  answer is now refused: the button is already on screen, and repeating the call only kept the turn
+  spinning until the user pressed Detener.
 
 - **The shipped templates could not start an internet installation**: `.env.example` and the
   installer both set `SECURITY_PROFILE=internet` while leaving `DIRECT_REPORTS_BI` at its default
