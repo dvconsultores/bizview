@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The next command is offered when a run finishes**: a suggestion used to depend on the model
+  calling `suggest_command`, so a finished command could leave the user with nowhere to go. The
+  session payload now carries `next_step`, computed by the product from the finished run and the
+  spec's stage (specify → plan → tasks → implement, plus clarify first when `spec.md` still has open
+  clarifications), and the composer shows a **Siguiente: /speckit-…** chip that fills it. It only
+  appears when idle with an empty composer, so it never competes with the Pipeline.
+
 - **Autonomous runs can be requested in the brief**: saying "modo autónomo", "sin preguntar" or
   "decide tú y anota las suposiciones" now tells the assistant to choose the most reasonable
   default, record each assumption in the document it writes, and stop only for something

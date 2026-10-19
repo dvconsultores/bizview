@@ -1124,6 +1124,7 @@ export const es = {
     subtitle: "Crea integraciones y reportes como especificaciones conversando con la IA.",
     newConversation: "Nueva conversación",
     send: "Enviar",
+    nextStep: "Siguiente:",
     pipeline: "Pipeline",
     pipelineConfirm: "Se enviarán 4 mensajes: specify → plan → tasks → implement. ¿Ejecutar?",
     pipelineRun: "Ejecutar pipeline",

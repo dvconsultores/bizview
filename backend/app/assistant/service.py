@@ -1870,10 +1870,49 @@ def _run_json(run) -> dict:
             "ended_at": run.ended_at.isoformat() if run.ended_at else None}
 
 
+_NEXT_AFTER = {
+    "speckit-specify": "/speckit-plan",
+    "speckit-clarify": "/speckit-plan",
+    "speckit-plan": "/speckit-tasks",
+    "speckit-tasks": "/speckit-implement",
+    "speckit-checklist": "/speckit-implement",
+    "speckit-analyze": "/speckit-implement",
+    "speckit-implement": "/speckit-converge",
+}
+
+
+def _next_step(session: AssistantSession, last) -> dict | None:
+    """The command that follows a finished run (deterministic, not the model's choice).
+
+    Suggestions from the model need a tool call that it does not always make, so a finished
+    command would leave the user with nowhere to go. This is the plan §7 order, with one
+    adjustment: a spec that still has open clarifications goes to /speckit-clarify first.
+    """
+    if last is None or last.status != "completed":
+        return None
+    spec = last.spec or session.current_spec
+    command = _NEXT_AFTER.get(last.command)
+    if command and command in ("/speckit-plan", "/speckit-tasks") and spec:
+        from app.projects import fs as project_fs
+        from app.assistant.overview import NEEDS
+
+        ref = _project_ref(session)
+        if ref:
+            try:
+                text = project_fs.read_text(ref["slug"], f"{spec}/spec.md")
+            except (OSError, project_fs.ProjectPathError, ValueError):
+                text = ""
+            if text.count(NEEDS) > 0:
+                command = "/speckit-clarify"
+    if not command:
+        return None
+    return {"command": command, "spec": spec}
+
+
 def _command_json(db, session: AssistantSession) -> dict:
     """`active_command` and the last command runs of the conversation (feature 021)."""
     if db is None:
-        return {"active_command": None, "command_runs": []}
+        return {"active_command": None, "command_runs": [], "next_step": None}
     recent = runs.recent(db, session.id)
     current_run = next((r for r in recent if r.status in runs.ACTIVE), None)
     return {
@@ -1881,6 +1920,7 @@ def _command_json(db, session: AssistantSession) -> dict:
             "id": current_run.id, "command": current_run.command, "spec": current_run.spec,
             "status": current_run.status, "pending": current_run.pending},
         "command_runs": [_run_json(r) for r in recent],
+        "next_step": None if current_run is not None else _next_step(session, recent[0] if recent else None),
     }
 
 

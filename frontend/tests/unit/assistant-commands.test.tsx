@@ -101,6 +101,24 @@ async function click(el: Element | undefined | null) {
 const buttonWith = (text: string) =>
   Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(text));
 
+describe("next step after a finished command", () => {
+  it("offers the following command and only fills the composer", async () => {
+    await renderChat({
+      ...base,
+      command_runs: [{ id: 9, message_id: 1, command: "speckit-specify", spec: "001-ventas",
+                       status: "completed", files: [], tokens: 0,
+                       started_at: "2026-10-11T10:00:00Z", ended_at: null }],
+      next_step: { command: "/speckit-plan", spec: "001-ventas" },
+    });
+    const chip = container.querySelector<HTMLButtonElement>("[data-next-step]");
+    expect(chip).not.toBeNull();
+    expect(chip!.textContent).toContain("/speckit-plan");
+    await click(chip);
+    expect(textarea().value).toBe("/speckit-plan 001-ventas ");
+    expect(api.post).not.toHaveBeenCalled();
+  });
+});
+
 describe("opt-in pipeline", () => {
   let runId = 0;   // real runs have distinct ids; the guard relies on it
   const run = (command: string, status: CommandRun["status"]) => ({

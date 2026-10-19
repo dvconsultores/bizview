@@ -1140,6 +1140,7 @@ export const en: Catalogue = {
     subtitle: "Create integrations and reports as specifications by conversing with AI.",
     newConversation: "New conversation",
     send: "Send",
+    nextStep: "Next:",
     pipeline: "Pipeline",
     pipelineConfirm: "This will send 4 messages: specify → plan → tasks → implement. Run it?",
     pipelineRun: "Run pipeline",

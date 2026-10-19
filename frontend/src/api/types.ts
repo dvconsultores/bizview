@@ -877,6 +877,8 @@ export interface AssistantSession {
   /** Feature 021: the command in progress and the last command runs. */
   active_command?: ActiveCommand | null;
   command_runs?: CommandRun[];
+  /** The command that follows the last finished run, computed by the product. */
+  next_step?: { command: string; spec: string | null } | null;
 }
 
 export type AssistantRunStatus = "running" | "done" | "stopped" | "error" | "budget" | "limit" | "ready";

@@ -218,6 +218,9 @@ export function AssistantChat(props: {
 
   const commandName = (value: string) => value.trim().split(/\s+/)[0].replace(/^\//, "");
 
+  /** A finished command leaves the next one within reach even when the model suggested nothing. */
+  const nextStep = session?.next_step ?? null;
+
   useEffect(() => {
     if (!pipeline || sending || busy || !session) return;
     if (pipeline.next >= pipeline.steps.length) { setPipeline(null); return; }
@@ -674,6 +677,22 @@ export function AssistantChat(props: {
             className="inline-flex min-h-tap items-center rounded-lg border border-line px-3 text-sm text-ink hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
           >
             {t.assistant.commands.finish}
+          </button>
+        </div>
+      ) : null}
+
+      {nextStep && !pipeline && !pipelineAsk && !text.trim() && !busy ? (
+        <div className="px-3 pt-2 sm:px-4">
+          <button
+            type="button"
+            data-next-step=""
+            onClick={() => insertCommand(`${nextStep.command}${nextStep.spec ? ` ${nextStep.spec}` : ""} `)}
+            className="inline-flex min-h-tap min-w-0 max-w-full items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <span className="shrink-0">{t.assistant.nextStep}</span>
+            <code className="min-w-0 truncate font-mono">
+              {nextStep.command} {nextStep.spec ?? ""}
+            </code>
           </button>
         </div>
       ) : null}
