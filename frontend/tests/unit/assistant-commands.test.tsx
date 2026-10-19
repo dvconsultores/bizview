@@ -226,4 +226,12 @@ describe("chips and suggestions", () => {
     expect(textarea().value).toBe("/speckit-plan ");
     expect(api.post).not.toHaveBeenCalled();
   });
+
+  it("a filled suggestion does not take focus, so a stray Enter cannot send it", async () => {
+    await renderChat(withRun);
+    await click(container.querySelector("[data-command-suggestion]"));
+    expect(textarea().value).toBe("/speckit-plan ");
+    expect(document.activeElement).not.toBe(textarea());
+    expect(api.post).not.toHaveBeenCalled();
+  });
 });

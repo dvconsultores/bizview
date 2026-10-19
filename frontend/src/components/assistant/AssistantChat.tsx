@@ -125,10 +125,7 @@ export function AssistantChat(props: {
   useEffect(() => {
     if (!panel?.draft) return;
     const pending = panel.takeDraft();
-    if (pending) {
-      setText(pending);
-      requestAnimationFrame(() => textareaRef.current?.focus());
-    }
+    if (pending) setText(pending);   // placed, never sent: the user sends it (no auto-focus either)
   }, [panel]);
   const commands = useCommands(
     text.startsWith("/") ||
@@ -152,8 +149,9 @@ export function AssistantChat(props: {
     setCaret(position);
     requestAnimationFrame(() => {
       const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
+      // Never pull focus: a composer filled by a button must not swallow the keystroke or the
+      // Enter that the click was meant to consume, which sent commands the user never wrote.
+      if (!el || document.activeElement !== el) return;
       el.setSelectionRange(position, position);
     });
     void value;
