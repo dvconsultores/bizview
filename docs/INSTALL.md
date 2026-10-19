@@ -612,6 +612,11 @@ consequences:
 - with a fixed tag such as `0.1.0`, nothing happens until you change the tag, which keeps an
   upgrade a deliberate act (the recommended setting for a customer).
 
+Never mix the two flows: a local `up -d --build` replaces the container but not the registry image,
+so the next poll can swap it back to whatever `:latest` holds. Publish with `deploy.sh` (then let
+Watchtower apply it) or build locally and keep Watchtower out of the way (a fixed version tag, or
+delete the service while developing).
+
 To check immediately instead of waiting: `docker compose -f bizview.yml run --rm watchtower
 --run-once`. It needs the Docker socket, which can control every container on the host; remove the
 `watchtower` service from the compose file if that is not acceptable, and upgrade with the commands
