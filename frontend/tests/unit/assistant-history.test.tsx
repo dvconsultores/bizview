@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("../../src/api/client", () => ({
-  api: { get: vi.fn(), post: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), del: vi.fn() },
   ApiError: class ApiError extends Error {
     constructor(public status: number, public code: string, message: string) {
       super(message);
@@ -16,6 +16,7 @@ vi.mock("../../src/api/client", () => ({
 import { api } from "../../src/api/client";
 import { AssistantHistory, relativeTime } from "../../src/components/assistant/AssistantHistory";
 import { activate } from "../../src/i18n/live";
+import { t } from "../../src/i18n/es";
 
 describe("relativeTime", () => {
   const now = new Date("2026-10-03T12:00:00Z").getTime();
@@ -45,6 +46,7 @@ describe("AssistantHistory", () => {
     root = createRoot(container);
     vi.mocked(api.get).mockReset();
     vi.mocked(api.post).mockReset();
+    vi.mocked(api.del).mockReset();
   });
 
   afterEach(() => {
@@ -90,5 +92,32 @@ describe("AssistantHistory", () => {
     await act(async () => row.click());
     expect(onSelect).toHaveBeenCalledWith(3);
     expect(container.querySelector("#assistant-history-popover")).toBeNull();
+  });
+
+  it("deletes a conversation, active or archived, after confirming", async () => {
+    const iso = new Date().toISOString();
+    vi.mocked(api.get).mockResolvedValue({ sessions: [
+      { id: 2, title: "Ventas", status: "open", updated_at: iso, tokens_used: 1, token_budget: 9 },
+      { id: 4, title: "Viejo", status: "archived", updated_at: iso, tokens_used: 1, token_budget: 9 },
+    ] } as any);
+    vi.mocked(api.del).mockResolvedValue(undefined as never);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await act(async () => {
+      root.render(<AssistantHistory currentId={2} onSelect={vi.fn()} onNew={vi.fn()} />);
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Conversaciones"]')!.click();
+    });
+    const trash = (title: string) =>
+      container.querySelector<HTMLButtonElement>(`li button[aria-label="${t.assistant.deleteSession} ${title}"]`);
+    expect(trash("Ventas")).not.toBeNull();                 // active row
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((b) => b.textContent?.includes("Conversaciones archivadas"))!.click();
+    });
+    expect(trash("Viejo")).not.toBeNull();                  // archived row, the ones that pile up
+    await act(async () => trash("Viejo")!.click());
+    expect(api.del).toHaveBeenCalledWith("/api/assistant/sessions/4");
+    confirm.mockRestore();
   });
 });

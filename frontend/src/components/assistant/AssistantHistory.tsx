@@ -249,7 +249,7 @@ export function AssistantHistory({
                     {archivedOpen ? (
                       <ul className="mt-1">
                         {shownArchived.map((s) => (
-                          <li key={s.id} className="flex">
+                          <li key={s.id} className="flex items-center gap-1">
                             <EditableTitle
                               sessionId={s.id}
                               title={s.title}
@@ -259,6 +259,17 @@ export function AssistantHistory({
                             >
                               {row(s)}
                             </EditableTitle>
+                            {/* Archived chats are the ones that pile up: they must be removable. */}
+                            <button
+                              type="button"
+                              className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-50`}
+                              aria-label={`${t.assistant.deleteSession} ${s.title}`}
+                              title={t.assistant.deleteSession}
+                              disabled={s.busy}
+                              onClick={() => void remove(s)}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                            </button>
                           </li>
                         ))}
                       </ul>

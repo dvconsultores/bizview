@@ -496,6 +496,7 @@ export const en: Catalogue = {
     integration_run_stopped: "Integration run stopped",
     assistant_draft_applied: "Assistant draft applied",
     assistant_session_archived: "Assistant session archived",
+    assistant_session_deleted: "Assistant session deleted",
     assistant_budget_extended: "Assistant budget extended",
     assistant_attachment_uploaded: "Brief attached to a conversation",
     assistant_attachment_deleted: "Attached brief deleted",

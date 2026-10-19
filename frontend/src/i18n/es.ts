@@ -476,6 +476,7 @@ export const es = {
     integration_run_stopped: "Ejecución de integración detenida",
     assistant_draft_applied: "Borrador del asistente aplicado",
     assistant_session_archived: "Sesión del asistente archivada",
+    assistant_session_deleted: "Sesión del asistente eliminada",
     assistant_budget_extended: "Presupuesto del asistente ampliado",
     assistant_attachment_uploaded: "Boceto adjuntado a una conversación",
     assistant_attachment_deleted: "Boceto adjunto eliminado",
