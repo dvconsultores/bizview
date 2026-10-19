@@ -1125,6 +1125,8 @@ export const es = {
     newConversation: "Nueva conversación",
     send: "Enviar",
     pipeline: "Pipeline",
+    pipelineConfirm: "Se enviarán 4 mensajes: specify → plan → tasks → implement. ¿Ejecutar?",
+    pipelineRun: "Ejecutar pipeline",
     insertedHint: "Insertado en el compositor: nada se ha enviado todavía. Pulsa Enviar (o Intro) para ejecutarlo.",
     deleteSession: "Eliminar conversación",
     deleteConfirm: (title: string) => `¿Eliminar «${title}»? Se borran sus mensajes y archivos adjuntos; no se puede deshacer.`,

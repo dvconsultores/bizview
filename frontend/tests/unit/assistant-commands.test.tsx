@@ -119,6 +119,7 @@ describe("opt-in pipeline", () => {
     await renderChat();
     await type("/speckit-specify dashboard de facturación");
     await click(buttonWith(t.assistant.pipeline));
+    await click(buttonWith(t.assistant.pipelineRun));   // the pipeline asks before sending
   }
 
   it("walks specify → plan → tasks → implement when each run completes", async () => {
@@ -129,6 +130,17 @@ describe("opt-in pipeline", () => {
     expect(sent).toHaveLength(4);
     expect(sent[0]).toBe("/speckit-specify dashboard de facturación");
     expect([sent[1], sent[2], sent[3]]).toEqual(["/speckit-plan", "/speckit-tasks", "/speckit-implement"]);
+  });
+
+  it("asks before sending, and cancelling sends nothing", async () => {
+    await renderChat();
+    await type("/speckit-specify un brief");
+    await click(buttonWith(t.assistant.pipeline));
+    expect(api.post).not.toHaveBeenCalled();                     // nothing sent yet
+    expect(container.textContent).toContain(t.assistant.pipelineConfirm);
+    await click(buttonWith(t.common.cancel));
+    expect(api.post).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain(t.assistant.pipelineConfirm);
   });
 
   it("stops when a run waits for an answer", async () => {

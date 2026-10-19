@@ -148,6 +148,8 @@ export function AssistantChat(props: {
   const [pipeline, setPipeline] = useState<{ steps: string[]; next: number } | null>(null);
   /** True right after a button filled the composer, so the UI says nothing was sent yet. */
   const [inserted, setInserted] = useState(false);
+  /** The pipeline asks before it sends: a single tap must never post four messages. */
+  const [pipelineAsk, setPipelineAsk] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const query = ai_enabled && commands && !menuClosed ? menuQuery(text, caret) : null;
   const menuItems = query !== null && commands ? filterCommands(commands, query) : [];
@@ -207,6 +209,7 @@ export function AssistantChat(props: {
   const startPipeline = () => {
     const brief = text.trim();
     if (!brief) return;
+    setPipelineAsk(false);
     const steps = [brief, "/speckit-plan", "/speckit-tasks", "/speckit-implement"];
     setPipeline({ steps, next: 1 });
     void send(brief);
@@ -668,6 +671,26 @@ export function AssistantChat(props: {
         </div>
       ) : null}
 
+      {pipelineAsk ? (
+        <div className="flex flex-wrap items-center gap-2 px-3 pt-2 sm:px-4">
+          <span className="text-sm text-ink-2">{t.assistant.pipelineConfirm}</span>
+          <button
+            type="button"
+            onClick={startPipeline}
+            className="inline-flex min-h-tap items-center rounded-lg bg-primary px-3 text-sm text-on-primary hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            {t.assistant.pipelineRun}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPipelineAsk(false)}
+            className="inline-flex min-h-tap items-center rounded-lg border border-line px-3 text-sm text-ink hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            {t.common.cancel}
+          </button>
+        </div>
+      ) : null}
+
       {pipeline ? (
         <div className="flex flex-wrap items-center gap-2 px-3 pt-2 sm:px-4">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs text-accent">
@@ -903,7 +926,7 @@ export function AssistantChat(props: {
               {pipelineAvailable && (
                 <button
                   type="button"
-                  onClick={startPipeline}
+                  onClick={() => setPipelineAsk(true)}
                   title={t.assistant.pipelineHint}
                   className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
