@@ -428,6 +428,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Validation problems can be put aside, and re-checked on demand**: the problems panel gained a
+  **Volver a comprobar** action that recomputes validation without waiting for a file change, and
+  each problem has a dismiss button. A dismissed problem is hidden for that project in this browser
+  and listed as "N descartados" with **Mostrar** to bring them back; nothing is deleted and the
+  server still refuses to apply a project whose validation fails, so dismissing cannot bypass the
+  checks.
+
 - **The installer writes the same shape as the repository**: `deploy/install.sh` now generates
   `bizview.yml` (with `COMPOSE_FILE=bizview.yml` in `.env`, so plain `docker compose up -d` works)
   and no longer creates or mounts `branding/` or `workspace/` — the logo ships inside the image,

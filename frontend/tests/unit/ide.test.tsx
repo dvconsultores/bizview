@@ -32,6 +32,10 @@ const key = async (el: Element, k: string) =>
   act(async () => { el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); });
 const button = (text: string) =>
   Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.trim() === text);
+/** Icon-only buttons carry their label on aria-label. */
+const labelled = (label: string) =>
+  Array.from(container.querySelectorAll("button"))
+    .find((b) => b.getAttribute("aria-label") === label) as HTMLButtonElement | undefined;
 
 const tree: ProjectTree = {
   files: [
@@ -152,10 +156,31 @@ describe("problems, status bar and conflicts", () => {
     await render(<ProblemsPanel validation={validation} slug="demo" onOpen={onOpen} />);
     expect(container.textContent).toContain(t.projects.problemsCount(2));
     expect(container.textContent).toContain(t.projects.otherProject("otro"));
-    const own = Array.from(container.querySelectorAll("button"));
+    const own = Array.from(container.querySelectorAll("button"))
+      .filter((b) => !b.getAttribute("aria-label"));   // the open link, not the dismiss one
     expect(own).toHaveLength(1);   // the other project's problem is not a link
     await act(async () => own[0].click());
     expect(onOpen).toHaveBeenCalledWith("reports/r/report.yaml", 3);
+  });
+
+  it("a problem can be dismissed and brought back", async () => {
+    localStorage.clear();
+    await render(<ProblemsPanel validation={validation} slug="demo" onOpen={vi.fn()} />);
+    expect(container.textContent).toContain(t.projects.problemsCount(2));
+    const dismiss = labelled(t.projects.dismissProblem)!;
+    await act(async () => dismiss.click());
+    expect(container.textContent).toContain(t.projects.problemsCount(1));
+    expect(container.textContent).toContain(t.projects.dismissedCount(1));
+    await act(async () => button(t.projects.showDismissed)!.click());
+    expect(container.textContent).toContain(t.projects.problemsCount(2));
+  });
+
+  it("re-checks on demand", async () => {
+    const onRevalidate = vi.fn();
+    await render(<ProblemsPanel validation={validation} slug="demo" onOpen={vi.fn()}
+                                onRevalidate={onRevalidate} />);
+    await act(async () => button(t.projects.recheck)!.click());
+    expect(onRevalidate).toHaveBeenCalledTimes(1);
   });
 
   it("status bar states", async () => {

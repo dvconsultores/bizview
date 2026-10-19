@@ -1085,6 +1085,11 @@ export const en: Catalogue = {
     problemsPanel: "Problems",
     problemsCount: (n: number) => (n === 1 ? "1 problem" : `${n} problems`),
     warningsCount: (n: number) => (n === 1 ? "1 warning" : `${n} warnings`),
+    recheck: "Check again",
+    dismissProblem: "Dismiss this problem",
+    dismissedCount: (n: number) => (n === 1 ? "1 dismissed" : `${n} dismissed`),
+    showDismissed: "Show",
+
     otherProject: (slug: string) => `in project ${slug}`,
     fix: "How to fix",
     expected: "Expected",

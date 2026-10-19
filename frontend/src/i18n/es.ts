@@ -1067,6 +1067,11 @@ export const es = {
     problemsPanel: "Problemas",
     problemsCount: (n: number) => (n === 1 ? "1 problema" : `${n} problemas`),
     warningsCount: (n: number) => (n === 1 ? "1 advertencia" : `${n} advertencias`),
+    recheck: "Volver a comprobar",
+    dismissProblem: "Descartar este problema",
+    dismissedCount: (n: number) => (n === 1 ? "1 descartado" : `${n} descartados`),
+    showDismissed: "Mostrar",
+
     otherProject: (slug: string) => `del proyecto ${slug}`,
     fix: "Cómo corregir",
     expected: "Esperado",

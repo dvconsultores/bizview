@@ -157,11 +157,15 @@ export function ProjectWorkspace() {
     setTree(files);
   }, [slug]);
 
+  const [checking, setChecking] = useState(false);
   const revalidate = useCallback(async () => {
+    setChecking(true);
     try {
       setCheck(await projectsApi.validate(slug));
     } catch {
       /* the problems panel keeps the last result */
+    } finally {
+      setChecking(false);
     }
   }, [slug]);
 
@@ -488,7 +492,8 @@ export function ProjectWorkspace() {
       </div>
       <div className="max-h-[45%] min-h-[8rem] border-t border-line">
         <ProblemsPanel validation={check?.validation ?? null} slug={slug}
-                       onOpen={(file, line) => void openFile(file, line)} />
+                       onOpen={(file, line) => void openFile(file, line)}
+                       onRevalidate={() => void revalidate()} checking={checking} />
       </div>
     </div>
   );
