@@ -618,6 +618,17 @@ consequences:
 - with a fixed tag such as `0.1.0`, nothing happens until you change the tag, which keeps an
   upgrade a deliberate act (the recommended setting for a customer).
 
+A release that renames containers (0.1.0 → the services are now `bizview-backend`,
+`bizview-worker`, `bizview-caddy` instead of `bizview-*-1`) or adds a service leaves the old
+containers running beside the new ones, still holding their ports. Apply it once with:
+
+```bash
+docker compose -f bizview.yml up -d --build --remove-orphans
+```
+
+There is no need to `down`: `up -d` already recreates only what changed, and the backend runs the
+migrations by itself at start.
+
 Never mix the two flows: a local `up -d --build` replaces the container but not the registry image,
 so the next poll can swap it back to whatever `:latest` holds. Publish with `deploy.sh` (then let
 Watchtower apply it) or build locally and keep Watchtower out of the way (a fixed version tag, or
