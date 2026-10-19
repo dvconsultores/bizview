@@ -574,7 +574,9 @@ All notable changes to this project are documented here. The format follows
   clamp to a single line with the full text on hover. Suggesting the **same** command twice in one
   answer is now refused: the button is already on screen, and repeating the call only kept the turn
   spinning until the user pressed Detener. The **Pipeline** button now asks first ("Se enviarán 4
-  mensajes… ¿Ejecutar?"), so it is impossible to launch four commands with one stray tap.
+  mensajes… ¿Ejecutar?"), so it is impossible to launch four commands with one stray tap, and it
+  survives a question: when a command stops to ask, the chain pauses instead of dying and continues
+  by itself once the answer makes that command finish.
 
 - **The shipped templates could not start an internet installation**: `.env.example` and the
   installer both set `SECURITY_PROFILE=internet` while leaving `DIRECT_REPORTS_BI` at its default

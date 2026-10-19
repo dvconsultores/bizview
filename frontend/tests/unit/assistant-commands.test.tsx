@@ -102,8 +102,9 @@ const buttonWith = (text: string) =>
   Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(text));
 
 describe("opt-in pipeline", () => {
+  let runId = 0;   // real runs have distinct ids; the guard relies on it
   const run = (command: string, status: CommandRun["status"]) => ({
-    id: 1, message_id: 1, command, spec: null, status, files: [], tokens: 0,
+    id: ++runId, message_id: 1, command, spec: null, status, files: [], tokens: 0,
     started_at: "2026-10-11T10:00:00Z", ended_at: null,
   });
 
@@ -143,9 +144,17 @@ describe("opt-in pipeline", () => {
     expect(container.textContent).not.toContain(t.assistant.pipelineConfirm);
   });
 
-  it("stops when a run waits for an answer", async () => {
+  it("waits without sending while a run asks, then continues after the answer", async () => {
     await startPipeline("waiting");
+    const sent = () => vi.mocked(api.post).mock.calls.filter((c) => String(c[0]).endsWith("/messages"));
+    expect(sent()).toHaveLength(1);                       // nothing sent while it waits
+    expect(container.textContent).toContain(t.assistant.pipelineWaiting);
+  });
+
+  it("stops for good when a run fails", async () => {
+    await startPipeline("failed");
     expect(vi.mocked(api.post)).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain(t.assistant.pipelineStopped("speckit-specify"));
   });
 
   it("is offered only for a brief that starts with /speckit-specify", async () => {

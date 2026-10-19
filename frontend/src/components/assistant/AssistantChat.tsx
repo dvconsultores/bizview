@@ -145,7 +145,8 @@ export function AssistantChat(props: {
    * and then plan → tasks → implement, each only after the previous run is `completed`. It stops
    * on the first run that waits for an answer, fails or is interrupted, and "Detener" cancels it.
    */
-  const [pipeline, setPipeline] = useState<{ steps: string[]; next: number } | null>(null);
+  type PipelineState = { steps: string[]; next: number; seenId?: number; seenStatus?: string };
+  const [pipeline, setPipeline] = useState<PipelineState | null>(null);
   /** True right after a button filled the composer, so the UI says nothing was sent yet. */
   const [inserted, setInserted] = useState(false);
   /** The pipeline asks before it sends: a single tap must never post four messages. */
@@ -224,15 +225,21 @@ export function AssistantChat(props: {
     const runs = session.command_runs ?? [];
     const last = [...runs].reverse().find((run) => run.command === previous);
     if (!last || last.status === "running") return;         // still being created: wait
-    if (last.status !== "completed") {                       // it asked, failed or was stopped
+    // Only react to a run we have not already judged, so a stale `completed` cannot advance twice.
+    if (last.id === pipeline.seenId && last.status === pipeline.seenStatus) return;
+    if (last.status === "waiting") {
+      // It asked a question: the chain survives. Answering it makes the run finish and the
+      // pipeline continues by itself — nothing is sent while the user has not answered.
+      setPipeline({ ...pipeline, seenId: last.id, seenStatus: "waiting" });
+      return;
+    }
+    if (last.status !== "completed") {                       // failed or interrupted
       setPipeline(null);
-      if (last.status !== "waiting") {
-        setError(t.assistant.pipelineStopped(previous));
-      }
+      setError(t.assistant.pipelineStopped(previous));
       return;
     }
     const value = pipeline.steps[pipeline.next];
-    setPipeline({ ...pipeline, next: pipeline.next + 1 });
+    setPipeline({ ...pipeline, next: pipeline.next + 1, seenId: last.id, seenStatus: "completed" });
     void send(value);
   }, [busy, sending, session, pipeline, t]);
 
@@ -695,8 +702,10 @@ export function AssistantChat(props: {
         <div className="flex flex-wrap items-center gap-2 px-3 pt-2 sm:px-4">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs text-accent">
             <ListChecks className="h-3.5 w-3.5" aria-hidden />
-            {t.assistant.pipelineStep(Math.min(pipeline.next, pipeline.steps.length - 1),
-                                      pipeline.steps.length - 1)}
+            {pipeline.seenStatus === "waiting"
+              ? t.assistant.pipelineWaiting
+              : t.assistant.pipelineStep(Math.min(pipeline.next, pipeline.steps.length - 1),
+                                          pipeline.steps.length - 1)}
           </span>
           <button
             type="button"

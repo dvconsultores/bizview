@@ -1143,6 +1143,7 @@ export const en: Catalogue = {
     pipeline: "Pipeline",
     pipelineConfirm: "This will send 4 messages: specify → plan → tasks → implement. Run it?",
     pipelineRun: "Run pipeline",
+    pipelineWaiting: "Pipeline paused: waiting for your answer. It continues once you reply.",
     insertedHint: "Inserted into the composer: nothing has been sent yet. Press Send (or Enter) to run it.",
     deleteSession: "Delete conversation",
     deleteConfirm: (title: string) => `Delete “${title}”? Its messages and attachments go with it; this cannot be undone.`,
