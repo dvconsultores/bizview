@@ -431,13 +431,16 @@ TOOL_SPECS: list[dict[str, Any]] = [
                             "enum": [n for n in REGISTRY if REGISTRY[n].provider],
                             "description": "Nombre del comando, p. ej. speckit-plan."},
                 "arguments": {"type": ["string", "null"],
-                              "description": "Texto sugerido después del comando."},
+                              "description": "Resumen corto (máximo 160 caracteres) de lo que el "
+                                             "comando hará, no el brief completo: el detalle va en "
+                                             "el texto de tu respuesta."},
             },
         },
     },
 ]
 
 MAX_SUGGESTIONS = 3
+MAX_SUGGESTION_ARGUMENTS = 160
 # Offered even after the discovery limit (023: the guide is never discovery).
 ALWAYS_OFFERED = frozenset({"finish_command", "suggest_command", "get_app_guide"})
 SUGGESTIONS_KEY = "turn_suggestions"
@@ -862,7 +865,13 @@ def _suggest_command(session: Any, args: dict[str, Any]) -> tuple[dict[str, Any]
         raise ToolError("Comando desconocido; usa uno de: "
                         + ", ".join(n for n in REGISTRY if REGISTRY[n].provider))
     arguments = args.get("arguments")
-    arguments = arguments.strip()[:400] if isinstance(arguments, str) else ""
+    arguments = arguments.strip() if isinstance(arguments, str) else ""
+    if len(arguments) > MAX_SUGGESTION_ARGUMENTS:
+        # A button with a brief inside is unreadable: the button names the command, the reply text
+        # carries the detail. Reject instead of silently truncating so the model fixes its call.
+        raise ToolError(f"Los argumentos de la sugerencia deben resumir en "
+                        f"{MAX_SUGGESTION_ARGUMENTS} caracteres o menos; escribe el detalle en tu "
+                        "respuesta.")
     working = dict(session.working_state or {})
     suggestions = [s for s in (working.get(SUGGESTIONS_KEY) or []) if s.get("command") != name]
     if len(suggestions) >= MAX_SUGGESTIONS:

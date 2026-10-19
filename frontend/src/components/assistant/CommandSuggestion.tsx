@@ -39,10 +39,10 @@ export function CommandSuggestions(props: {
             data-command-suggestion=""
             onClick={() => props.onInsert(`${text} `)}
             aria-label={t.assistant.commands.insertLabel.replace("{command}", text)}
-            className="inline-flex min-h-tap max-w-full items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="inline-flex min-h-tap min-w-0 max-w-full items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            <span>{t.assistant.commands.insert}</span>
-            <code className="truncate font-mono">{text}</code>
+            <span className="shrink-0">{t.assistant.commands.insert}</span>
+            <code className="min-w-0 truncate font-mono" title={text}>{text}</code>
           </button>
         );
       })}

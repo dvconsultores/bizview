@@ -548,6 +548,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A suggestion cannot carry a whole brief any more**: `suggest_command` rejected nothing, so the
+  model packed the entire specification into `arguments`. The chat then showed an unreadable
+  paragraph ("Sugirió /speckit-specify Integración de facturación…" with dozens of columns) and the
+  turn was spent repeating the same suggestion. Arguments are now capped at 160 characters — the
+  tool refuses more instead of truncating silently — the prompt says the detail belongs in the reply
+  text and that one suggestion per answer is enough, and the activity pill and the insert button
+  clamp to a single line with the full text on hover.
+
 - **The shipped templates could not start an internet installation**: `.env.example` and the
   installer both set `SECURITY_PROFILE=internet` while leaving `DIRECT_REPORTS_BI` at its default
   `true` with no `DIRECT_BI_ROLE`, which the startup guard refuses — the backend exits with

@@ -496,14 +496,15 @@ export function AssistantChat(props: {
                 ? TOOL_ICONS[m.tool_name] ?? Wrench
                 : Wrench;
               return (
-                <div key={m.id} className="flex">
+                <div key={m.id} className="flex min-w-0">
                   <span
-                    className="inline-flex items-center gap-1.5 rounded-full bg-subtle px-3 py-1 text-sm text-ink-2"
-                    title={label}
+                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full bg-subtle px-3 py-1 text-sm text-ink-2"
+                    title={m.content || label}
                     data-tool={m.tool_name}
                   >
-                    <Icon className="h-3.5 w-3.5" aria-hidden />
-                    <span>{m.content || label}</span>
+                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    {/* One line: a tool that echoes a long argument must not reshape the chat. */}
+                    <span className="truncate">{m.content || label}</span>
                   </span>
                 </div>
               );

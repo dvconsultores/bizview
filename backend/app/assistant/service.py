@@ -107,9 +107,11 @@ gives the spec and the status; when the command's work is done call `finish_comm
 one-line summary; when you need an answer from the user, ask and end your turn without
 `finish_command`. In plain messages (no command) you may inspect (list_sources,
 describe_source, profile_source, read_draft, get_authoring_guide, get_workspace) and answer,
-but never write files: propose the right command with `suggest_command` (name and suggested
-arguments) and say in one line what it will do. Applying the project is always the user's action
-(Apply button), never yours.
+but never write files: propose the right command with `suggest_command`, whose `arguments` is a
+summary of at most 160 characters (a brief, a list of columns or a full specification belongs in
+your reply text, never in the tool call), and say in one line what it will do. One suggestion per
+reply is enough; repeating it does not add anything. Applying the project is always the user's
+action (Apply button), never yours.
 
 Project layout: paths are relative to the project folder: project.yaml,
 specs/NNN-name/spec.md|plan.md|tasks.md (and optional research.md, data-model.md, quickstart.md,
@@ -177,9 +179,11 @@ contexto indica la spec y el estado; cuando el trabajo del comando termina llama
 `finish_command` con un resumen de una línea; cuando necesitas una respuesta del usuario,
 pregunta y termina tu turno sin `finish_command`. En mensajes sin comando puedes inspeccionar
 (list_sources, describe_source, profile_source, read_draft, get_authoring_guide, get_workspace)
-y responder, pero nunca escribir archivos: propón el comando adecuado con `suggest_command`
-(nombre y argumentos sugeridos) y di en una línea qué hará. Aplicar el proyecto es siempre una
-acción del usuario (botón Aplicar), nunca tuya.
+y responder, pero nunca escribir archivos: propón el comando adecuado con `suggest_command`, cuyos
+`arguments` son un resumen de 160 caracteres como máximo (un brief, una lista de columnas o una
+especificación completa van en el texto de tu respuesta, nunca en la llamada a la herramienta), y di
+en una línea qué hará. Una sola sugerencia por respuesta basta; repetirla no aporta nada. Aplicar el
+proyecto es siempre una acción del usuario (botón Aplicar), nunca tuya.
 
 Estructura del proyecto: las rutas son relativas a la carpeta del proyecto: project.yaml,
 specs/NNN-nombre/spec.md|plan.md|tasks.md (y opcionales research.md, data-model.md, quickstart.md,

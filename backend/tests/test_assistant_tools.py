@@ -736,3 +736,17 @@ def _edited_integration():
     doc = yaml.safe_load(textwrap.dedent(integration_yaml()).lstrip())
     doc["datasets"]["products"]["checks"] = [{"type": "row_count", "min": 1}]
     return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
+
+def test_suggest_command_keeps_the_button_short():
+    """A full brief in `arguments` makes an unreadable button: the detail belongs in the reply."""
+    class Session:
+        working_state: dict = {}
+
+    limit = tools.MAX_SUGGESTION_ARGUMENTS
+    result, _ = tools._suggest_command(Session(), {"command": "speckit-specify",
+                                                   "arguments": "x" * limit})
+    assert result["suggested"] == f"/speckit-specify {'x' * limit}"
+
+    with pytest.raises(tools.ToolError):
+        tools._suggest_command(Session(), {"command": "speckit-specify",
+                                           "arguments": "x" * (limit + 1)})
