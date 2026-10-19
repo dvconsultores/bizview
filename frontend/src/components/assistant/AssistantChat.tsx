@@ -146,6 +146,8 @@ export function AssistantChat(props: {
    * on the first run that waits for an answer, fails or is interrupted, and "Detener" cancels it.
    */
   const [pipeline, setPipeline] = useState<{ steps: string[]; next: number } | null>(null);
+  /** True right after a button filled the composer, so the UI says nothing was sent yet. */
+  const [inserted, setInserted] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const query = ai_enabled && commands && !menuClosed ? menuQuery(text, caret) : null;
   const menuItems = query !== null && commands ? filterCommands(commands, query) : [];
@@ -170,6 +172,7 @@ export function AssistantChat(props: {
     setText(value);
     setMenuClosed(true);
     setUnknown(null);
+    setInserted(true);
     placeCaret(value, value.length);
   };
 
@@ -367,6 +370,7 @@ export function AssistantChat(props: {
       return;
     }
     setText("");
+    setInserted(false);
     setHint(null);
     setPicker(null);
     setUnknown(null);
@@ -924,6 +928,11 @@ export function AssistantChat(props: {
               </button>
             </div>
           </div>
+          {inserted && text.trim() ? (
+            <p className="mt-2 text-sm text-ink-2" role="status">
+              {t.assistant.insertedHint}
+            </p>
+          ) : null}
           {hint && hint.argument_hint && text.startsWith(`/${hint.name}`) ? (
             <p className="mt-2 text-sm text-ink-muted">
               {t.assistant.commands.argumentHint.replace("{hint}", hint.argument_hint)}

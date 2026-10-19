@@ -278,5 +278,20 @@ describe("chips and suggestions", () => {
     expect(textarea().value).toBe("/speckit-plan ");
     expect(document.activeElement).not.toBe(textarea());
     expect(api.post).not.toHaveBeenCalled();
+    // The UI says out loud that nothing was sent yet.
+    expect(container.textContent).toContain(t.assistant.insertedHint);
+  });
+
+  it("pressing Enter outside the composer does not send the inserted command", async () => {
+    await renderChat(withRun);
+    const suggestion = container.querySelector<HTMLButtonElement>("[data-command-suggestion]")!;
+    await click(suggestion);
+    // Enter on the focused button re-activates it (browser default) — it must insert, never send.
+    await act(async () => {
+      suggestion.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      suggestion.click();
+    });
+    await act(async () => new Promise((r) => setTimeout(r, 0)));
+    expect(api.post).not.toHaveBeenCalled();
   });
 });

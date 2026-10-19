@@ -1141,6 +1141,7 @@ export const en: Catalogue = {
     newConversation: "New conversation",
     send: "Send",
     pipeline: "Pipeline",
+    insertedHint: "Inserted into the composer: nothing has been sent yet. Press Send (or Enter) to run it.",
     deleteSession: "Delete conversation",
     deleteConfirm: (title: string) => `Delete “${title}”? Its messages and attachments go with it; this cannot be undone.`,
     pipelineHint: "Run this brief end to end: specify → plan → tasks → implement, stopping if it needs an answer.",
