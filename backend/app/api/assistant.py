@@ -282,6 +282,16 @@ def archive_session(session_id: int, request: Request,
     return {"status": "archived"}
 
 
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: int, request: Request,
+                   actor: AppUser = Depends(require_superuser),
+                   _: Auth = Depends(recent_reauth), db: Session = DB):
+    """Delete a conversation for good; its messages, runs and attachments go with it."""
+    session = _own_session(db, session_id, actor)
+    service.delete_session(db, actor, session, client_ip(request))
+    return Response(status_code=204)
+
+
 @router.post("/sessions/{session_id}/apply")
 def apply_session(session_id: int, request: Request,
                   actor: AppUser = Depends(require_superuser),

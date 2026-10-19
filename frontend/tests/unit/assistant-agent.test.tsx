@@ -408,7 +408,8 @@ describe("Tool chips", () => {
     ]);
     const chip = container.querySelector('[data-tool="run_preview"]');
     expect(chip).not.toBeNull();
-    expect(chip!.getAttribute("title")).toBe("Ejecutó una vista previa");
+    // The row clamps to one line, so the tooltip carries the full text.
+    expect(chip!.getAttribute("title")).toBe("Ejecutó una vista previa (correcta).");
     expect(chip!.textContent).toContain("Ejecutó una vista previa (correcta).");
   });
 
@@ -423,7 +424,7 @@ describe("Tool chips", () => {
     await renderChat([{ id: 3, role: "tool", tool_name: "mystery", content: "Hizo algo.", created_at: ts }]);
     const chip = container.querySelector('[data-tool="mystery"]');
     expect(chip).not.toBeNull();
-    expect(chip!.getAttribute("title")).toBe("Herramienta");
+    expect(chip!.getAttribute("title")).toBe("Hizo algo.");
   });
 });
 

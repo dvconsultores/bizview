@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Delete a conversation**: until now a chat could only be archived, so test conversations piled up
+  in the history popover forever. The active list now has a delete button (with a confirmation),
+  backed by `DELETE /api/assistant/sessions/{id}`, which removes the session, its messages, command
+  runs, preview requests and attachment files, records an `assistant_session_deleted` audit event,
+  and refuses while the conversation is working. Migration `0022` adds that audit kind.
+
 - **Opt-in pipeline for a brief**: when the composer holds a `/speckit-specify` message, a
   **Pipeline** button appears next to Send. One press sends the brief and then `/speckit-plan`,
   `/speckit-tasks` and `/speckit-implement`, each only after the previous run reports `completed`,

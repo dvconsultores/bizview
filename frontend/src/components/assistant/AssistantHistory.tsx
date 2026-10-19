@@ -1,4 +1,4 @@
-import { Archive, ChevronRight, History, Loader2, Search } from "lucide-react";
+import { Archive, ChevronRight, History, Loader2, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { api } from "../../api/client";
 import type { AssistantSession, AssistantSessionSummary } from "../../api/types";
@@ -111,6 +111,16 @@ export function AssistantHistory({
     onRenamed?.(updated);
   };
 
+  const remove = async (s: AssistantSessionSummary) => {
+    if (!window.confirm(t.assistant.deleteConfirm(s.title))) return;
+    try {
+      await api.del(`/api/assistant/sessions/${s.id}`);
+      if (s.id === currentId) onNew();
+    } finally {
+      await load();
+    }
+  };
+
   const archive = async (s: AssistantSessionSummary) => {
     try {
       await api.post(`/api/assistant/sessions/${s.id}/archive`);
@@ -205,6 +215,16 @@ export function AssistantHistory({
                           onClick={() => void archive(s)}
                         >
                           <Archive className="h-4 w-4" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-50`}
+                          aria-label={`${t.assistant.deleteSession} ${s.title}`}
+                          title={t.assistant.deleteSession}
+                          disabled={s.busy}
+                          onClick={() => void remove(s)}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden />
                         </button>
                       </li>
                     ))}

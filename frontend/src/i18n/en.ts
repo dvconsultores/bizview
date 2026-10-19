@@ -1140,6 +1140,8 @@ export const en: Catalogue = {
     newConversation: "New conversation",
     send: "Send",
     pipeline: "Pipeline",
+    deleteSession: "Delete conversation",
+    deleteConfirm: (title: string) => `Delete “${title}”? Its messages and attachments go with it; this cannot be undone.`,
     pipelineHint: "Run this brief end to end: specify → plan → tasks → implement, stopping if it needs an answer.",
     pipelineStep: (n: number, total: number) => `Pipeline ${n}/${total}`,
     pipelineStopped: (command: string) => `Pipeline stopped: /${command} did not finish.`,

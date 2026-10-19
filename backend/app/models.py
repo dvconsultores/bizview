@@ -45,7 +45,7 @@ AUDIT_KINDS = (
     "integration_paused", "integration_resumed", "integration_schedule_changed",
     "integration_run_stopped",
     # feature 014
-    "assistant_draft_applied", "assistant_session_archived",
+    "assistant_draft_applied", "assistant_session_archived", "assistant_session_deleted",
     # feature 017
     "assistant_budget_extended",
     # feature 018

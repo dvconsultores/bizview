@@ -1995,6 +1995,32 @@ def archive(db, actor, session: AssistantSession, ip) -> None:
     db.flush()
 
 
+def delete_session(db, actor, session: AssistantSession, ip: str | None) -> None:
+    """Delete a conversation and everything tied to it (messages, runs, previews, attachments).
+
+    Only for a conversation that is not working: an in-flight turn would keep writing into rows
+    that no longer exist.
+    """
+    from app.assistant import attachments
+    from app.assistant.commands import runs as command_runs
+
+    running = command_runs.active(db, session.id)
+    if running is not None:
+        raise ApiError(409, "command_active", M("commands.active", command=running.command),
+                       extra={"command": running.command, "spec": running.spec})
+    if session.busy_since is not None:
+        raise ApiError(409, "assistant_busy", M("assistant.busy"))
+
+    title, session_id = session.title, session.id
+    if session.preview is not None:
+        drop_preview(db, session.id)
+    attachments.forget_session(db, session.id)     # files on disk; rows go with the session
+    audit_record(db, "assistant_session_deleted", actor_id=actor.id, ip=ip,
+                 detail={"session": session_id, "title": title})
+    db.delete(session)                             # children cascade (messages, runs, previews)
+    db.flush()
+
+
 def drop_preview(db, session_id: int) -> None:
     """Drops the session's preview schemas (feature 014 preview)."""
     from app.assistant import preview

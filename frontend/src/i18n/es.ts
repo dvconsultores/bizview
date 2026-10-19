@@ -1124,6 +1124,8 @@ export const es = {
     newConversation: "Nueva conversación",
     send: "Enviar",
     pipeline: "Pipeline",
+    deleteSession: "Eliminar conversación",
+    deleteConfirm: (title: string) => `¿Eliminar «${title}»? Se borran sus mensajes y archivos adjuntos; no se puede deshacer.`,
     pipelineHint: "Ejecuta este brief de principio a fin: specify → plan → tasks → implement, deteniéndose si necesita una respuesta.",
     pipelineStep: (n: number, total: number) => `Pipeline ${n}/${total}`,
     pipelineStopped: (command: string) => `Pipeline detenido: /${command} no terminó.`,
