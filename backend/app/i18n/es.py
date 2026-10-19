@@ -552,9 +552,6 @@ MESSAGES: dict[str, str] = {
     "projects.spec_number": "la nueva carpeta de spec debe usar el número {number}",
     "projects.slug_locked": "el slug no se puede cambiar después de aplicar el proyecto",
     "projects.slug_taken": "ya existe un proyecto con el slug {slug}",
-    "projects.folder_exists": (
-        "ya existe la carpeta «{slug}» en el servidor con archivos de un proyecto anterior. Nada\n        se ha tocado: borra esa carpeta (o usa otro identificador) y vuelve a crear el proyecto."
-    ),
     "projects.project_applied": "el proyecto está aplicado; retíralo del espacio primero",
     "projects.read_only": "esta conversación es de solo lectura",
     "projects.managed_by_project": "lo gestiona el proyecto {project}; cámbialo en sus archivos",

@@ -52,17 +52,21 @@ def test_slug_suggestion_and_uniqueness(env, superuser):
         "nandu-2024")
 
 
-def test_leftover_folder_is_refused(env, superuser):
-    """DB and folders live on different hosts: an old tree must not be adopted silently."""
+def test_leftover_folder_goes_to_trash(env, superuser):
+    """DB and folders live on different hosts: an old tree is moved aside, never adopted."""
     c = signed_in("root@example.com")
     stale = env / "artemisa"
     stale.mkdir(parents=True)
     (stale / "project.yaml").write_text("name: artemisa\n")
     (stale / "specs").mkdir()
     r = c.post("/api/projects", json={"name": "artemisa"})
-    assert r.status_code == 409
-    assert r.json()["error"]["code"] == "folder_exists"
-    assert (stale / "project.yaml").read_text() == "name: artemisa\n"     # nothing touched
+    assert r.status_code == 201
+    # The previous tree is preserved in the trash, and the new project starts clean.
+    trash = list((env / ".papelera").glob("artemisa--*"))
+    assert len(trash) == 1 and (trash[0] / "project.yaml").read_text() == "name: artemisa\n"
+    fresh = (env / "artemisa" / "project.yaml").read_text()
+    specs = env / "artemisa" / "specs"
+    assert 'name: "artemisa"' in fresh and not any(specs.iterdir())   # empty, none inherited
 
 
 def test_rename_name_vs_slug_lock(env, superuser):

@@ -71,13 +71,17 @@ def create(db: Session, actor: AppUser, name: str, slug: str | None = None,
         raise ApiError(503, "not_writable", M("projects.not_writable"))
 
     root = fs.project_root(slug)
+    # The database and the folders are not the same host: an installation whose database was reused
+    # (or whose project row was deleted elsewhere) still has the old tree here. Adopting it would
+    # mix a previous project's specs and reports into the new one and surface them as "changed
+    # externally", so it is moved to `.papelera` first — reversible, and nothing is lost.
+    trashed = None
+    if root.exists() and any(root.iterdir()):
+        trash = fs.projects_dir() / fs.TRASH
+        trash.mkdir(parents=True, exist_ok=True)
+        trashed = trash / _trash_name(slug, datetime.now(UTC))
+        root.rename(trashed)
     existed = root.exists()
-    if existed and any(root.iterdir()):
-        # The database and the folders are not the same host: an installation whose database was
-        # reused (or whose project row was deleted) still has the old tree here. Adopting it would
-        # mix a previous project's specs and reports into the new one and surface them as
-        # "changed externally", so the creation is refused until the folder is gone.
-        raise ApiError(409, "folder_exists", M("projects.folder_exists", slug=slug))
     project = Project(slug=slug, name=name, description=description, created_by=actor.id)
     db.add(project)
     db.commit()
@@ -104,8 +108,10 @@ def create(db: Session, actor: AppUser, name: str, slug: str | None = None,
         raise
 
     # audit_event.target_id references app_user: the project goes in the detail.
-    audit(db, "project_created", actor_id=actor.id, ip=ip,
-          detail={"project_id": project.id, "slug": slug, "name": name})
+    detail = {"project_id": project.id, "slug": slug, "name": name}
+    if trashed is not None:
+        detail["previous_folder_trashed"] = trashed.name
+    audit(db, "project_created", actor_id=actor.id, ip=ip, detail=detail)
     db.commit()
     db.refresh(project)
     return project
