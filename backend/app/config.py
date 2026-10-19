@@ -30,8 +30,11 @@ def _file_version() -> str:
 
 
 class Settings(BaseSettings):
+    # Tests set BIZVIEW_NO_ENV_FILE so a developer's .env (a larger budget, a real provider) cannot
+    # leak into them; deployments never set it.
     model_config = SettingsConfigDict(
-        env_file=ROOT_ENV if ROOT_ENV.exists() else None,
+        env_file=(ROOT_ENV
+                  if ROOT_ENV.exists() and not os.environ.get("BIZVIEW_NO_ENV_FILE") else None),
         extra="ignore",
         hide_input_in_errors=True,
     )

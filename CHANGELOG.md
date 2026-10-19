@@ -470,6 +470,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A command no longer stops early to hand over a half-built draft**: the state block told the model
+  "presupuesto ≥ 80 %: cierra un borrador válido y listo para aplicar antes de seguir explorando",
+  and it obeyed literally — your invoice brief ended with an unplanned report and the advice to
+  apply. Both languages now say the opposite: the product extends the budget itself up to
+  `AI_CHAT_BUDGET_MAX`, so the command must be finished, and spending is reduced by grouping reads
+  instead of stopping.
+- **The backend suites no longer read the developer's `.env`**: a local `AI_CHAT_BUDGET_MAX` changed
+  what the budget tests exercised (they failed at 5 000 000 against an expected 2 000 000). The
+  suite now takes only `DATABASE_URL_BI` from the file and runs with `BIZVIEW_NO_ENV_FILE=1`.
+
 - **An inserted command is sent only with the Send button**: Enter in the composer used to submit
   whatever it held, so clicking a suggestion (or the new "Siguiente" chip) and then pressing Enter
   put the command in the chat without an explicit send. Enter is now ignored while the text came

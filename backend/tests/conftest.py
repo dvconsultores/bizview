@@ -15,8 +15,29 @@ from tests.safety import assert_test_schema
 ROOT = Path(__file__).resolve().parents[2]
 TEST_SCHEMA = assert_test_schema(f"app_test_{secrets.token_hex(4)}")
 
+# The suites need the database URL, which lives in the developer's .env, but nothing else from it:
+# a local AI budget or provider used to change what the tests exercised. Read the one value here
+# and tell Settings to ignore the file (BIZVIEW_NO_ENV_FILE), so the rest is the test's own.
+def _database_url() -> str:
+    from dotenv import dotenv_values
+
+    env_file = ROOT / ".env"
+    value = os.environ.get("DATABASE_URL_BI") or (
+        dotenv_values(env_file).get("DATABASE_URL_BI") if env_file.exists() else None)
+    if not value:
+        raise RuntimeError(
+            "DATABASE_URL_BI is required to run the backend tests (define it in .env)")
+    return value
+
+
+DATABASE_URL_BI = _database_url()
+
 # Settings are read at import time of the app modules. DATABASE_URL_BI comes from .env as usual.
 os.environ.update({
+    # Ignore the developer's .env entirely: every setting below is the test's own. Without this a
+    # local .env (a larger AI budget, a real provider) changed what the suites exercised.
+    "BIZVIEW_NO_ENV_FILE": "1",
+    "DATABASE_URL_BI": DATABASE_URL_BI,
     "DB_SCHEMA": TEST_SCHEMA,
     # Feature 020: project folders of the run live in a throwaway directory, never in the repo
     # (tests that need their own folder override it per test).
@@ -43,6 +64,10 @@ os.environ.update({
     "AI_MODEL": "",
     "AI_BASE_URL": "",
     "AI_TIMEOUT_SECONDS": "30",
+    # The budget knobs too: a developer .env with a larger ceiling made the budget tests read it.
+    "AI_CHAT_TOKEN_BUDGET": "400000",
+    "AI_CHAT_BUDGET_STEP": "100000",
+    "AI_CHAT_BUDGET_MAX": "2000000",
     # Tests change versions behind the API (TRUNCATE, SQL): no in-memory active version.
     "ACTIVE_VERSION_CACHE_SECONDS": "0",
     "DB_POOL_WARM": "0",
