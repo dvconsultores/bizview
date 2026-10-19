@@ -107,12 +107,15 @@ def _artifact_ids(ctx: Context) -> set[str]:
     return ids
 
 
+MAX_NEW_SPECS = 3          # one /speckit-specify may cover a brief with several pieces
+
+
 class _Checker:
-    """One call's state: the spec folder a /speckit-specify write establishes."""
+    """One call's state: the spec folders a /speckit-specify run establishes."""
 
     def __init__(self, ctx: Context) -> None:
         self.ctx = ctx
-        self.new_folder: str | None = ctx.spec
+        self.new_folders: list[str] = [ctx.spec] if ctx.spec else []
         self.ids = _artifact_ids(ctx)
 
     def _doc(self, name: str) -> str | None:
@@ -125,17 +128,26 @@ class _Checker:
         return bool(block) and protected_block(op["content"]) == block
 
     def new_spec(self, op: dict) -> bool:
+        """A brief may describe several pieces (an integration and its report), so one run can
+        create up to MAX_NEW_SPECS specs: the reserved number and the ones that follow it."""
         m = _NEW_SPEC.match(op["path"])
         if op["op"] != "write" or not m or len(m.group("short")) > 40:
             return False
-        if self.ctx.reserved_number is None or int(m.group("num")) != self.ctx.reserved_number:
+        if self.ctx.reserved_number is None:
+            return False
+        num = int(m.group("num"))
+        last = self.ctx.reserved_number + MAX_NEW_SPECS - 1
+        if not self.ctx.reserved_number <= num <= last:
             return False
         folder = f"{m.group('num')}-{m.group('short')}"
-        if self.new_folder is not None:      # fixed by an earlier write of this run or call
-            return folder == self.new_folder
-        if any(p.startswith(f"specs/{folder}/") for p in self.ctx.files):
+        if folder in self.new_folders:        # already established by this run
+            return True
+        if len(self.new_folders) >= MAX_NEW_SPECS - (1 if self.ctx.spec else 0):
+            return False
+        if any(p.startswith(f"specs/{folder}/") or p.startswith(f"specs/{m.group('num')}-")
+               for p in self.ctx.files):
             return False                     # the folder must be new
-        self.new_folder = folder
+        self.new_folders.append(folder)
         return True
 
     def spec_doc(self, op: dict) -> bool:
@@ -170,6 +182,18 @@ class _Checker:
             return False
         old = self.ctx.files.get(op["path"])
         return old is None or op["content"].startswith(old)
+
+    def existing_artifacts(self, op: dict) -> bool:
+        """A quick fix touches artifacts that already exist; it never creates specs or artifacts."""
+        if op["op"] != "write":
+            return False
+        path = op["path"]
+        if path not in self.ctx.files:
+            return False
+        for pattern in _KIND_PATHS.values():
+            if re.fullmatch(pattern, path):
+                return True
+        return False
 
     def kind_artifacts(self, op: dict) -> bool:
         pattern = _KIND_PATHS.get(self.ctx.kind or "")
@@ -227,6 +251,9 @@ class _Checker:
                 out.append(f"specs/{spec}/tasks.md")
             elif rule == "custom_checklist":
                 out.append(f"specs/{spec}/checklists/<nombre>.md")
+            elif rule == "existing_artifacts":
+                out.append("integrations/<id>/integration.yaml|queries/*.sql|requests/*.yaml, "
+                           "reports/<id>/report.yaml, distributions/<id>.yaml (solo los que ya existen)")
             elif rule == "kind_artifacts" and ctx.kind in _KIND_HINTS:
                 out.append(_KIND_HINTS[ctx.kind].format(ids="|".join(sorted(self.ids))))
         return list(dict.fromkeys(out))
@@ -245,4 +272,6 @@ def check_ops(ctx: Context, ops: list[dict]) -> str | None:
                 {"path": op.get("path", ""), "command": ctx.definition.name, "allowed": hints},
                 M("commands.path_not_allowed", command=ctx.definition.name,
                   path=op.get("path", ""), allowed=", ".join(hints)))
-    return checker.new_folder if checker.new_folder != ctx.spec else None
+    # The first folder this run created (the caller stores it as the run's spec).
+    created = [f for f in checker.new_folders if f != ctx.spec]
+    return created[0] if created else None

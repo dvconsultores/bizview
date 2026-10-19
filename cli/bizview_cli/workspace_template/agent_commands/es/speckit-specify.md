@@ -32,7 +32,10 @@ Responde breve y en el idioma del usuario; escribe la spec en español.
      hace falta).
    - `reporte`: métricas, dimensiones y filtros sobre datasets o una fuente directa.
    - `distribucion`: envíos programados de un reporte a roles (admin/user) y política de enlaces.
-   Si la descripción mezcla tipos, escribe el principal y recomienda specs separadas. Usa
+   Si la descripción mezcla tipos (p. ej. «integración y reporte»), escribe **una spec por pieza en
+   esta misma ejecución**: la reservada y las dos siguientes (`<n>`, `<n+1>`, `<n+2>`, hasta 3), con
+   su `spec.md` y su `checklists/requirements.md`. Así un brief completo queda esbozado de una vez y
+   no hace falta volver a pedirlo; al terminar indica cuál sigue con `/speckit-plan`. Usa
    `list_sources`/`describe_source` solo para nombrar fuentes y tablas reales.
 3. La spec sigue esta plantilla, con el mismo orden de secciones y títulos, reemplazando los
    marcadores por detalles concretos y conservando `**Status**: Draft`:

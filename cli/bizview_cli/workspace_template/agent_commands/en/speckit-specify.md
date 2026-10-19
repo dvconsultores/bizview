@@ -31,8 +31,11 @@ Reply briefly in the user's language; write the spec in English.
    - `integration`: scheduled extraction into datasets (incremental window, transform when needed).
    - `report`: metrics, dimensions and filters over datasets or a direct source.
    - `distribution`: scheduled sends of a report to roles (admin/user) and the share-link policy.
-   If the description mixes kinds, write the main one and recommend separate specs. Use
-   `list_sources`/`describe_source` only to name real sources and tables.
+   If the description mixes kinds (e.g. "integration and report"), write **one spec per piece in
+   this same run**: the reserved number and the two after it (`<n>`, `<n+1>`, `<n+2>`, up to 3),
+   each with its `spec.md` and `checklists/requirements.md`. A complete brief is thus drafted in one
+   go instead of needing a second request; finish by naming which one goes next with
+   `/speckit-plan`. Use `list_sources`/`describe_source` only to name real sources and tables.
 3. The spec follows this template, with the same section order and headings, replacing the
    placeholders with concrete details and keeping `**Status**: Draft`:
 

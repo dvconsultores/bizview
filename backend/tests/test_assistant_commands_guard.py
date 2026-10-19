@@ -71,21 +71,32 @@ def test_constitution_keeps_the_installation_template_block():
     refused(no_template, w(CONSTITUTION, "# Proyecto\n"))
 
 
-def test_specify_new_folder_only():
+def test_specify_new_folders():
+    """A brief may cover several pieces: one run creates up to three new specs."""
     c = ctx("speckit-specify", spec=None, reserved=4, files={"specs/003-old/spec.md": "x"})
     assert check_ops(c, [w("specs/004-ventas/spec.md"),
                          w("specs/004-ventas/checklists/requirements.md")]) == "004-ventas"
-    refused(c, w("specs/005-x/spec.md"))
-    refused(c, w("specs/004-ventas/spec.md"), w("specs/004-clientes/spec.md"))
-    refused(c, w("specs/004-a-b-c-d-e-f-g/spec.md"))
-    refused(c, w("specs/004-ventas/plan.md"))
+    # The brief asks for an integration and its report: both in the same run.
+    assert check_ops(c, [w("specs/004-ventas/spec.md"),
+                         w("specs/005-ventas-reporte/spec.md")]) in ("004-ventas", None)
+    refused(c, w("specs/007-x/spec.md"))              # beyond reserved + 2
+    refused(c, w("specs/004-a-b-c-d-e-f-g/spec.md"))  # short name too long
+    refused(c, w("specs/004-ventas/plan.md"))         # plan belongs to /speckit-plan
     taken = ctx("speckit-specify", spec=None, reserved=4, files={"specs/004-ventas/spec.md": "x"})
     refused(taken, w("specs/004-ventas/spec.md"))
     # Later calls of the same run: the folder exists and is the run's spec.
     later = ctx("speckit-specify", spec="004-ventas", reserved=4,
                 files={"specs/004-ventas/spec.md": "x"})
     assert check_ops(later, [w("specs/004-ventas/spec.md", "y")]) is None
-    refused(later, w("specs/004-otra/spec.md"))
+    assert check_ops(later, [w("specs/005-ventas-reporte/spec.md")]) == "005-ventas-reporte"
+    refused(later, w("specs/008-otra/spec.md"))
+
+
+def test_specify_stops_after_three_new_specs():
+    full = ctx("speckit-specify", spec="004-ventas", reserved=4,
+               files={"specs/004-ventas/spec.md": "x", "specs/005-a/spec.md": "x",
+                      "specs/006-b/spec.md": "x"})
+    refused(full, w("specs/006-c/spec.md"))           # a fourth is too many for one brief
 
 
 def test_clarify_spec_and_checklist_toggles():
@@ -155,3 +166,17 @@ def test_refusal_names_the_path_and_the_allowed_patterns():
     assert err.params["command"] == "speckit-clarify"
     assert "specs/003-ventas/spec.md" in err.params["allowed"]
     assert "specs/003-ventas/plan.md" in str(err)
+
+def test_fix_only_edits_existing_artifacts():
+    """/fix is the shortcut for small changes: no new artifacts, no new specs."""
+    files = {"integrations/ventas/integration.yaml": "x",
+             "reports/ventas/report.yaml": "x",
+             "specs/001-ventas/spec.md": "x"}
+    c = ctx("fix", spec=None, files=files)
+    assert check_ops(c, [w("reports/ventas/report.yaml", "y")]) is None
+    assert check_ops(c, [w("integrations/ventas/integration.yaml", "y")]) is None
+    refused(c, w("reports/otro/report.yaml"))            # it does not exist yet
+    refused(c, w("specs/001-ventas/spec.md", "y"))       # specs are not touched here
+    refused(c, w("specs/002-otra/spec.md"))              # and none can be created
+    check_tool(REGISTRY["fix"], "edit_draft")
+    assert "run_preview" in allowed_tools(REGISTRY["fix"])

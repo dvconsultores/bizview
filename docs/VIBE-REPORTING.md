@@ -316,6 +316,7 @@ composer to pick a command:
 | `/speckit-checklist <topic>` | a new or extended `checklists/<topic>.md` |
 | `/speckit-implement` | the spec's artifacts, task ticks and `**Status**: Implemented` |
 | `/speckit-converge` | appends a convergence phase to `tasks.md` |
+| `/fix <what to change>` | an artifact that **already exists** — no new spec, no plan (small adjustments) |
 
 In a project the chat lives in the docked panel (the **Asistente** button in the project header,
 or the sparkles button in the top bar); on phones and tablets, where the panel has no room, it is
@@ -327,6 +328,18 @@ an **Insertar** button with the command to run. `/speckit-implement` asks first 
 not `Approved` (your "sí" approves it) or when a checklist has unchecked items. A run that waits
 for your answer can be closed with **Terminar**; an interrupted run continues where it stopped
 when you run the same command again. Applying the project is always your action (Aplicar).
+
+### Spec-driven and quick changes
+
+Not every change deserves a spec. `/speckit-specify` is for a new piece (a source, an integration,
+a report, a distribution) and gives you plan, tasks and traceability. For a small, precise change to
+something that already exists — a title, a column added to a dataset, a filter, a broken SQL — use
+**`/fix`**: it edits an existing `integration.yaml`, `report.yaml`, query or request, runs the
+checks and the preview, and stops there. The product still validates every write, so the speed does
+not come from removing the guard, only from removing the paperwork.
+
+A brief that covers several pieces (an integration **and** its report) now produces **all** of their
+specs in one `/speckit-specify` run — up to three — instead of asking you to repeat the request.
 
 ### Asking for an autonomous run
 

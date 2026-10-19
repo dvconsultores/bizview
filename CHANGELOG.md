@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **One `/speckit-specify` run can draft several specs**: a brief that covers an integration *and*
+  its report produced only the first spec and then waited for a second request. The write scope now
+  accepts the reserved number and the two after it (up to three specs per run, each with its
+  `spec.md` and checklist), and the command prompt says to draft every piece of the brief in one go.
+- **`/fix`: quick changes without a spec**: small, precise edits to an artifact that already exists
+  (an `integration.yaml`, `report.yaml`, query or request) with the same validation, `check_query`
+  and `run_preview` as the rest, but no spec, plan or tasks. It cannot create artifacts or specs and
+  never touches the constitution.
+
 - **The next command is offered when a run finishes**: a suggestion used to depend on the model
   calling `suggest_command`, so a finished command could leave the user with nowhere to go. The
   session payload now carries `next_step`, computed by the product from the finished run and the

@@ -61,7 +61,7 @@ def test_registry_and_menu(commands_dir):
     assert next(iter(registry.REGISTRY)) == "speckit-constitution"
     assert list(registry.REGISTRY)[-1] == "ayuda"
     menu = registry.list_commands("en")
-    assert len(menu) == 10
+    assert len(menu) == 11          # the ten spec-kit ones plus /fix
     plan = next(c for c in menu if c["name"] == "speckit-plan")
     assert plan == {"name": "speckit-plan", "description": "Desc speckit-plan",
                     "argument_hint": "<texto>", "needs_spec": True, "needs_args": False}
