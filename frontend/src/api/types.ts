@@ -724,6 +724,9 @@ export interface AssistantSessionSummary {
   tokens_used: number;
   token_budget: number;
   busy?: boolean;
+  /** Feature 028: the mode pill of the conversation list. */
+  mode?: AssistantMode;
+  contract_status?: AssistantContractStatus;
 }
 
 export interface AssistantMessage {
@@ -898,6 +901,52 @@ export interface AssistantSession {
   command_runs?: CommandRun[];
   /** The command that follows the last finished run, computed by the product. */
   next_step?: { command: string; spec: string | null } | null;
+  /** Feature 028: the composer selector and the run contract. */
+  mode?: AssistantMode;
+  contract?: AssistantAutoRun | null;
+  contract_status?: AssistantContractStatus;
+}
+
+/** Feature 028: mode of a conversation (FR-000). */
+export type AssistantMode = "ask" | "edit" | "auto";
+export type AssistantContractStatus =
+  | "none" | "confirmed" | "running" | "applied" | "stopped" | "failed";
+
+export interface ContractSource { name: string; tables?: string[] }
+
+export interface RunContract {
+  goal: string;
+  sources?: ContractSource[];
+  stages: Array<"draft" | "preview" | "apply">;
+  limits: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
+  modify_existing?: boolean;
+  auto_rollback?: boolean;
+  visible_to?: Array<"admin" | "user">;
+  profile_id?: number | null;
+}
+
+export interface AssistantAutoRun {
+  id: number;
+  status: "confirmed" | "running" | "applied" | "stopped" | "failed";
+  stop_reason: string | null;
+  stage: string | null;
+  limits: RunContract["limits"] | Record<string, never>;
+  used: { tokens: number; previews: number; applies: number; elapsed_seconds: number };
+  stages: Array<"draft" | "preview" | "apply">;
+  sources: ContractSource[];
+  modify_existing: boolean;
+  auto_rollback: boolean;
+  visible_to: Array<"admin" | "user">;
+  version_id: number | null;
+  summary: Record<string, unknown> | null;
+  watch_state: string | null;
+}
+
+export interface RunProfile {
+  id: number;
+  name: string;
+  contract: Partial<RunContract>;
+  updated_at: string;
 }
 
 export type AssistantRunStatus = "running" | "done" | "stopped" | "error" | "budget" | "limit" | "ready";

@@ -66,9 +66,59 @@ export function RunStatus({
     }
   };
 
+  // Feature 028 (FR-006): the contract's stage, spend and elapsed time, live while the run lasts.
+  const contract = session.contract;
+  const liveContract =
+    session.mode === "auto" && contract && (contract.status === "running" ||
+      contract.status === "confirmed");
+
   if (busy) {
     return (
       <div className="flex flex-col gap-2">
+        {liveContract ? (
+          <dl
+            data-run-status=""
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted"
+          >
+            {contract.stage ? (
+              <div className="flex items-center gap-1">
+                <dt className="sr-only">{t.assistant.runStatus.stage}</dt>
+                <dd className="inline-flex items-center rounded-full border border-line bg-surface px-2 py-0.5 font-medium text-ink-2">
+                  {contract.stage}
+                </dd>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-1">
+              <dt>{t.assistant.runStatus.tokens}</dt>
+              <dd>
+                {contract.used.tokens} / {contract.limits.tokens}
+              </dd>
+            </div>
+            <div className="flex items-center gap-1">
+              <dt>{t.assistant.runStatus.previews}</dt>
+              <dd>
+                {contract.used.previews} / {contract.limits.previews}
+              </dd>
+            </div>
+            <div className="flex items-center gap-1">
+              <dt>{t.assistant.runStatus.applies}</dt>
+              <dd>
+                {contract.used.applies} / {contract.limits.applies}
+              </dd>
+            </div>
+            <div className="flex items-center gap-1">
+              <dt>{t.assistant.runStatus.elapsed}</dt>
+              <dd>
+                {t.assistant.runStatus.elapsedValue
+                  .replace("{used}", String(Math.floor(contract.used.elapsed_seconds / 60)))
+                  .replace(
+                    "{total}",
+                    String(Math.round(contract.limits.wall_clock_seconds / 60)),
+                  )}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div role="status" className="flex items-center gap-2 text-sm text-ink-muted">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -91,6 +141,19 @@ export function RunStatus({
         </p>
         {error ? <Alert tone="error">{error}</Alert> : null}
       </div>
+    );
+  }
+
+  // A contract that ended by itself says why (limit, blocked stage, revoked role).
+  const stopReason = session.contract?.stop_reason;
+  if (session.mode === "auto" && stopReason) {
+    const limit = stopReason.startsWith("limit:") ? stopReason.slice(6) : null;
+    return (
+      <p role="status" data-contract-stop="" className="text-sm text-ink-muted">
+        {limit
+          ? t.assistant.runStatus.stoppedByLimit.replace("{limit}", limit)
+          : t.assistant.pill.stopped}
+      </p>
     );
   }
 

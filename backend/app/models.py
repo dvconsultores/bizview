@@ -62,6 +62,10 @@ AUDIT_KINDS = (
     "assistant_attachment_uploaded", "assistant_attachment_deleted",
     # feature 027
     "google_sign_in", "google_sign_in_refused", "google_linked",
+    # feature 028
+    "assistant_mode_changed", "assistant_contract_confirmed", "assistant_run_started",
+    "assistant_run_applied", "assistant_run_stopped", "assistant_run_rolled_back",
+    "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
 )
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
@@ -77,6 +81,12 @@ TELEGRAM_PURPOSES = ("sign_in", "link")
 TELEGRAM_STATUSES = ("pending", "started", "approved", "refused", "expired", "consumed")
 ASSISTANT_STATUSES = ("open", "applied", "archived")
 ASSISTANT_ROLES = ("user", "assistant", "tool")
+# Feature 028: the composer selector and the run contract of one autonomous run.
+ASSISTANT_MODES = ("ask", "edit", "auto")
+AUTO_RUN_STATUSES = ("confirmed", "running", "applied", "stopped", "failed")
+AUTO_RUN_STAGES = ("discover", "specify", "clarify", "plan", "tasks", "implement", "converge",
+                   "preview", "apply")
+AUTO_WATCH_STATES = ("pending", "ok", "failed", "rolled_back")
 # Feature 024: media types decided by magic bytes (app/assistant/attachments.py).
 ATTACHMENT_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
 EMAIL_SEND_STATUSES = ("queued", "sending", "sent", "partial", "failed")
@@ -629,6 +639,7 @@ class AssistantSession(Base):
         Index("ix_assistant_session_updated_at", text("updated_at DESC")),
         CheckConstraint("current_spec IS NULL OR current_spec ~ '" + SPEC_FOLDER_PATTERN + "'",
                         name="current_spec"),
+        CheckConstraint(_in("mode", ASSISTANT_MODES), name="mode"),
         Index("ix_assistant_session_project", "project_id", text("updated_at DESC")),
     )
 
@@ -646,6 +657,9 @@ class AssistantSession(Base):
                                             ForeignKey("project.id", ondelete="CASCADE"))
     current_spec: Mapped[str | None] = mapped_column(Text)
     read_only: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # Feature 028: the composer selector (ask | edit | auto). The run contract is the newest
+    # `assistant_auto_run` row of this conversation (no FK back: it would be a table cycle).
+    mode: Mapped[str] = mapped_column(Text, server_default=text("'edit'"))
     applied_version_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("workspace_version.id"))
     tokens_used: Mapped[int] = mapped_column(Integer, server_default=text("0"))
@@ -942,3 +956,74 @@ class AssistantCommandRun(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+
+class AssistantAutoRun(Base):
+    """One autonomous run: the confirmed contract and its outcome (feature 028)."""
+
+    __tablename__ = "assistant_auto_run"
+    __table_args__ = (
+        CheckConstraint(_in("status", AUTO_RUN_STATUSES), name="status"),
+        CheckConstraint("stop_reason IS NULL OR char_length(stop_reason) <= 120",
+                        name="stop_reason_len"),
+        CheckConstraint("stage IS NULL OR " + _in("stage", AUTO_RUN_STAGES), name="stage"),
+        CheckConstraint("previews >= 0", name="previews"),
+        CheckConstraint("applies >= 0", name="applies"),
+        CheckConstraint("tokens >= 0", name="tokens"),
+        CheckConstraint(
+            "watch_state IS NULL OR " + _in("watch_state", AUTO_WATCH_STATES),
+            name="watch_state"),
+        CheckConstraint("status <> 'applied' OR version_id IS NOT NULL",
+                        name="applied_has_version"),
+        Index("ux_auto_run_active", "session_id", unique=True,
+              postgresql_where=text("status IN ('confirmed', 'running')")),
+        Index("ix_auto_run_session", "session_id", text("started_at DESC")),
+        Index("ix_auto_run_watch", "watch_state",
+              postgresql_where=text("watch_state = 'pending'")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"))
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("project.id", ondelete="CASCADE"))
+    contract: Mapped[dict] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(Text, server_default=text("'confirmed'"))
+    stop_reason: Mapped[str | None] = mapped_column(Text)
+    stage: Mapped[str | None] = mapped_column(Text)
+    previews: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    applies: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    version_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("workspace_version.id"))
+    summary: Mapped[dict | None] = mapped_column(JSONB)
+    watch_integration: Mapped[str | None] = mapped_column(Text)
+    watch_state: Mapped[str | None] = mapped_column(Text)
+    confirmed_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    confirmed_ip: Mapped[str | None] = mapped_column(INET)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AssistantRunProfile(Base):
+    """A saved run contract, reused as a form prefill (feature 028, US5)."""
+
+    __tablename__ = "assistant_run_profile"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 60", name="name_len"),
+        Index("ux_run_profile_name", "name", unique=True,
+              postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    contract: Mapped[dict] = mapped_column(JSONB)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

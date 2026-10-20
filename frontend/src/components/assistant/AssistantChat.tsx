@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { api, ApiError } from "../../api/client";
+import { projectsApi } from "../../api/projects";
 import {
   acceptAttachmentsNotice,
   deleteAttachment,
@@ -50,6 +51,8 @@ import { ChatText } from "./ChatText";
 import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { CommandMenu, filterCommands, menuQuery } from "./CommandMenu";
 import { CommandRunChip } from "./CommandRunChip";
+import { ModePill, ModeSelector } from "./ModeSelector";
+import { RunContractDialog } from "./RunContractDialog";
 import { CommandSuggestions, inlineSuggestions } from "./CommandSuggestion";
 import { SpecPicker } from "./SpecPicker";
 import { useCommands } from "./useCommands";
@@ -115,6 +118,8 @@ export function AssistantChat(props: {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeAccepted, setNoticeAccepted] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Feature 028: the run contract dialog opened by the mode selector (or the "Pasar a Auto" chip).
+  const [contractOpen, setContractOpen] = useState(false);
   const filesRef = useRef<HTMLInputElement | null>(null);
   const maxImages = attachments_max_per_message ?? 4;
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +127,22 @@ export function AssistantChat(props: {
   const composerId = useId();
   const menuId = useId();
   const { busy, markBusy, release } = useAssistantBusy(session, onSession);
+  const mode = session?.mode ?? "edit";
+  const askMode = mode === "ask";
+
+  /** Feature 028: switch the mode. Auto only becomes active once its contract is confirmed. */
+  const changeMode = async (next: "ask" | "edit" | "auto") => {
+    if (!session) return;
+    try {
+      onSession(await projectsApi.setMode(session.id, next));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.common.unexpected);
+    }
+  };
+  const openContract = () => {
+    if (!session) return;
+    setContractOpen(true);
+  };
   // Feature 021: the `/` menu, command chips, suggestions and the inline spec picker.
   // 023: the Ayuda page opens the panel with `/ayuda <tema>` ready in the composer.
   const panel = useAssistantPanelOptional();
@@ -643,6 +664,18 @@ export function AssistantChat(props: {
         {mapOverlay}
       </div>
 
+      {contractOpen && session ? (
+        <RunContractDialog
+          session={session}
+          goal={text}
+          onClose={() => setContractOpen(false)}
+          onConfirmed={(next) => {
+            setContractOpen(false);
+            onSession(next);
+          }}
+        />
+      ) : null}
+
       {notice ? (
         <div className="px-3 sm:px-4">
           <Alert tone="warning">{notice}</Alert>
@@ -834,6 +867,17 @@ export function AssistantChat(props: {
               />
             </div>
           ) : null}
+          {session ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <ModeSelector
+                session={session}
+                disabled={!ai_enabled}
+                onSelect={(next) => void changeMode(next)}
+                onRequestAuto={openContract}
+              />
+              <ModePill session={session} />
+            </div>
+          ) : null}
           <div
             className={`rounded-2xl border border-line bg-surface shadow-sm focus-within:ring-2 focus-within:ring-field-focus ${
               !ai_enabled || busy ? "opacity-60" : ""
@@ -894,7 +938,9 @@ export function AssistantChat(props: {
               onFocus={() => setMenuClosed(false)}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
-              placeholder={t.assistant.composerPlaceholder}
+              placeholder={
+                askMode ? t.assistant.modes.askHint : t.assistant.composerPlaceholder
+              }
               className="block max-h-[40vh] min-h-[3.5rem] w-full resize-none overflow-y-auto border-0 bg-transparent px-4 pt-3 text-base leading-relaxed text-ink placeholder:text-ink-muted focus:outline-none focus:ring-0"
             />
             <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-1">

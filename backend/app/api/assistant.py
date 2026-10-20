@@ -1,5 +1,5 @@
 """Vibe-reporting assistant (feature 014): super user only."""
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from bizview_cli import layout
@@ -11,18 +11,29 @@ from sqlalchemy.orm import Session
 from app.ai import vision_enabled
 from app.assistant import activity as assistant_activity
 from app.assistant import attachments as _attachments
+from app.assistant import auto as assistant_auto
 from app.assistant import preview as assistant_preview
 from app.assistant import service
 from app.assistant.commands import registry as commands_registry
-from app.auth.deps import Auth, client_ip, recent_reauth, require_superuser
+from app.auth import passwords, sessions
+from app.auth.deps import Auth, client_ip, current_auth, recent_reauth, require_superuser
 from app.config import get_settings
 from app.db import DB
 from app.errors import ApiError, not_found, validation
 from app.i18n import M, current, t
-from app.models import AppUser, AssistantAttachment, AssistantMessage, AssistantSession, Project
+from app.models import (
+    AppUser,
+    AssistantAttachment,
+    AssistantMessage,
+    AssistantRunProfile,
+    AssistantSession,
+    Project,
+)
 from app.projects import fs
 from app.projects import service as projects_service
 from app.reports import pdf
+from app.security import crypto, mfa, profile, throttle
+from app.services import users
 from app.services.audit import record as audit_record
 from app.workspace import service as workspace_service
 
@@ -51,6 +62,27 @@ class SessionSpec(BaseModel):
     """The current spec of a conversation (a normal POST, no step-up)."""
     model_config = ConfigDict(extra="forbid")
     spec: str
+
+
+class SessionMode(BaseModel):
+    """The composer selector of a conversation (feature 028)."""
+    model_config = ConfigDict(extra="forbid")
+    mode: str
+
+
+class ContractIn(BaseModel):
+    """A run contract plus its step-up (feature 028, FR-001)."""
+    model_config = ConfigDict(extra="forbid")
+    contract: dict
+    password: str = Field(max_length=128)
+    code: str | None = Field(default=None, max_length=16)
+    profile_id: int | None = None
+
+
+class RunProfileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=60)
+    contract: dict
 
 
 def require_ai_enabled() -> None:
@@ -125,6 +157,9 @@ def list_sessions(project: str | None = None, actor: AppUser = Depends(require_s
                 "project_id": s.project_id,
                 "read_only": s.read_only,
                 "current_spec": s.current_spec,
+                # Feature 028: the mode pill of the conversation list.
+                "mode": s.mode or "edit",
+                "contract_status": service.latest_contract_status(db, s),
             }
             for s in sessions
         ]
@@ -192,6 +227,195 @@ def set_current_spec(session_id: int, body: SessionSpec,
             raise validation({"spec": "unknown"}, M("projects.spec_unknown", folder=folder))
     session.current_spec = folder
     return service.session_json(session, _messages(db, session))
+
+
+def _step_up(db: Session, actor: AppUser, auth: Auth, body: ContractIn, ip: str | None) -> None:
+    """Password (+ TOTP on the `internet` profile), exactly like `/api/auth/reauth` (FR-002)."""
+    throttle.check(db, ip, get_settings())
+    if users.is_locked(actor):
+        raise users.locked_error(actor)
+    settings = get_settings()
+    ok = passwords.verify_password(actor.password_hash, body.password)
+    if ok and profile.mfa_required_for(actor.role, settings):
+        ok = bool(body.code) and mfa.verify_code(actor, body.code or "", crypto.get_keyring())
+    if not ok:
+        audit_record(db, "reauth_failed", actor_id=actor.id, target_id=actor.id, ip=ip)
+        lock = users.register_failure(db, actor, ip)
+        if lock:
+            sessions.delete_all(db, actor.id)
+        # The failed attempt and its throttle count must survive the rollback of the 4xx.
+        db.commit()
+        raise lock or ApiError(401, "step_up_failed", M("auth.password_incorrect"),
+                               fields={"password": "invalid"})
+    actor.failed_attempts = 0
+    auth.session.reauth_at = sessions.now()
+    audit_record(db, "reauth_ok", actor_id=actor.id, target_id=actor.id, ip=ip)
+
+
+@router.post("/sessions/{session_id}/mode")
+def set_session_mode(session_id: int, body: SessionMode,
+                     actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """The composer selector: ask | edit | auto. Switching down brakes a running run (FR-007)."""
+    from app.models import ASSISTANT_MODES
+
+    session = _own_session(db, session_id, actor)
+    mode = (body.mode or "").strip().lower()
+    if mode not in ASSISTANT_MODES:
+        raise ApiError(422, "mode_invalid", M("assistant.contract.invalid"),
+                       fields={"mode": "unknown"})
+    previous = session.mode or "edit"
+    if mode != previous:
+        stopped = False
+        if mode != "auto" and service.is_busy(session, get_settings()):
+            try:
+                service.stop(db, session, get_settings(), reason="stopped:mode")
+                stopped = True
+            except ApiError:
+                stopped = False
+        if mode != "auto":
+            service.finish_auto_run(db, session, kind="stopped", reason="stopped:mode")
+        session.mode = mode
+        audit_record(db, "assistant_mode_changed", actor_id=actor.id,
+                     detail={"session": session.id, "from": previous, "to": mode,
+                             "stopped_run": stopped})
+    return service.session_json(session, _messages(db, session))
+
+
+@router.post("/sessions/{session_id}/contract", status_code=201)
+def confirm_contract(session_id: int, body: ContractIn, request: Request,
+                     actor: AppUser = Depends(require_superuser),
+                     auth: Auth = Depends(current_auth), db: Session = DB):
+    """Confirm the run contract: the single authorisation of every apply inside the run.
+
+    Step-up here is the password (+ TOTP on `internet`) of this request, not a recent one: the
+    contract is the authorisation, so it is confirmed in the same breath (FR-002).
+    """
+    session = _own_session(db, session_id, actor)
+    if session.status == "archived":
+        raise ApiError(409, "conflict", M("assistant.archived"))
+    if service.live_auto_run(db, session) is not None:
+        raise ApiError(409, "contract_active", M("assistant.contract.active"))
+    project = db.get(Project, session.project_id) if session.project_id else None
+    if project is None:
+        raise not_found(M("projects.not_found"))
+    try:
+        contract = assistant_auto.parse_contract(body.contract)
+    except assistant_auto.ContractError as exc:
+        raise ApiError(422, "contract_invalid", M("assistant.contract.invalid"),
+                       fields=getattr(exc, "fields", {}) or {"contract": "invalid"}) from exc
+    _verify_sources(db, contract)
+    ip = client_ip(request)
+    _step_up(db, actor, auth, body, ip)
+    run = service.create_contract(db, session, project, contract, actor, ip,
+                                  profile_id=body.profile_id)
+    audit_record(db, "assistant_contract_confirmed", actor_id=actor.id,
+                 detail={"run": run.id, "session": session.id, "stages": list(contract.stages),
+                         "limits": contract.limits.model_dump(),
+                         "sources": [item.name for item in contract.sources]})
+    db.flush()
+    return {"run": assistant_auto.run_json(run, contract),
+            "session": service.session_json(session, _messages(db, session))}
+
+
+@router.post("/sessions/{session_id}/contract/cancel", status_code=204)
+def cancel_contract(session_id: int, actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """Close the contract dialog: nothing is written and the mode is left where it was."""
+    _own_session(db, session_id, actor)
+    return Response(status_code=204)
+
+
+def _verify_sources(db: Session, contract) -> None:
+    """Every allowed source must exist; an unknown name is a field error, not a silent ignore."""
+    if not contract.sources:
+        return
+    from app.sources.service import list_all
+
+    known = {src.name.strip().casefold() for src in list_all(db)}
+    unknown = [item.name for item in contract.sources
+               if item.name.strip().casefold() not in known]
+    if unknown:
+        raise ApiError(422, "contract_invalid",
+                       M("assistant.contract.source_not_allowed", source=unknown[0]),
+                       fields={"sources": "unknown"})
+
+
+def _profile_json(row: AssistantRunProfile) -> dict:
+    return {"id": row.id, "name": row.name, "contract": row.contract,
+            "updated_at": row.updated_at.isoformat()}
+
+
+@router.get("/run-profiles")
+def list_run_profiles(actor: AppUser = Depends(require_superuser), db: Session = DB):
+    rows = db.scalars(select(AssistantRunProfile)
+                      .where(AssistantRunProfile.deleted_at.is_(None))
+                      .order_by(AssistantRunProfile.name)).all()
+    return {"items": [_profile_json(row) for row in rows]}
+
+
+@router.post("/run-profiles", status_code=201)
+def create_run_profile(body: RunProfileIn, actor: AppUser = Depends(require_superuser),
+                       db: Session = DB):
+    name = (body.name or "").strip()
+    if not name:
+        raise validation({"name": "empty"}, M("assistant.profile.name_taken"))
+    _profile_contract(body.contract)
+    if db.scalar(select(AssistantRunProfile.id).where(
+            AssistantRunProfile.name == name,
+            AssistantRunProfile.deleted_at.is_(None))):
+        raise ApiError(422, "name_taken", M("assistant.profile.name_taken"),
+                       fields={"name": "taken"})
+    row = AssistantRunProfile(name=name, contract=body.contract, created_by=actor.id)
+    db.add(row)
+    db.flush()
+    audit_record(db, "assistant_profile_created", actor_id=actor.id,
+                 detail={"profile": row.id, "name": name})
+    return _profile_json(row)
+
+
+@router.patch("/run-profiles/{profile_id}")
+def update_run_profile(profile_id: int, body: RunProfileIn,
+                       actor: AppUser = Depends(require_superuser), db: Session = DB):
+    row = db.get(AssistantRunProfile, profile_id)
+    if row is None or row.deleted_at is not None:
+        raise not_found(M("assistant.profile.not_found"))
+    name = (body.name or "").strip()
+    if not name:
+        raise validation({"name": "empty"}, M("assistant.profile.name_taken"))
+    _profile_contract(body.contract)
+    clash = db.scalar(select(AssistantRunProfile.id).where(
+        AssistantRunProfile.name == name, AssistantRunProfile.id != row.id,
+        AssistantRunProfile.deleted_at.is_(None)))
+    if clash:
+        raise ApiError(422, "name_taken", M("assistant.profile.name_taken"),
+                       fields={"name": "taken"})
+    row.name, row.contract = name, body.contract
+    audit_record(db, "assistant_profile_edited", actor_id=actor.id,
+                 detail={"profile": row.id, "name": name})
+    db.flush()
+    return _profile_json(row)
+
+
+@router.delete("/run-profiles/{profile_id}", status_code=204)
+def delete_run_profile(profile_id: int, actor: AppUser = Depends(require_superuser),
+                       db: Session = DB):
+    row = db.get(AssistantRunProfile, profile_id)
+    if row is None or row.deleted_at is not None:
+        raise not_found(M("assistant.profile.not_found"))
+    row.deleted_at = datetime.now(UTC)
+    audit_record(db, "assistant_profile_deleted", actor_id=actor.id,
+                 detail={"profile": row.id, "name": row.name})
+    return Response(status_code=204)
+
+
+def _profile_contract(payload: dict) -> None:
+    """A profile stores the contract without a goal: the goal is always the request (US5)."""
+    body = {key: value for key, value in (payload or {}).items() if key != "goal"}
+    body.setdefault("goal", "-")
+    try:
+        assistant_auto.parse_contract(body)
+    except assistant_auto.ContractError as exc:
+        raise ApiError(422, "contract_invalid", M("assistant.contract.invalid"),
+                       fields=getattr(exc, "fields", {}) or {"contract": "invalid"}) from exc
 
 
 @router.post("/sessions/{session_id}/messages", dependencies=[Depends(require_ai_enabled)],

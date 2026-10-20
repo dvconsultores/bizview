@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     # Discovery tool calls per run before the assistant must propose a draft.
     ai_agent_discovery_limit: int = Field(default=15, ge=3, le=100)
 
+    # Feature 028: the run contract of one autonomous run. A contract stores the numbers it was
+    # confirmed with, so changing these never alters a run already under way.
+    ai_auto_max_rounds: int = Field(default=200, ge=1, le=500)
+    ai_auto_max_applies: int = Field(default=1, ge=0, le=5)
+    ai_auto_run_max_seconds: int = Field(default=1800, ge=60, le=7200)
+    # None: the contract may use as many previews as the conversation allows (AI_CHAT_MAX_PREVIEWS).
+    ai_auto_max_previews: int | None = Field(default=None, ge=0, le=20)
+
     # Email and share links (feature 018, amendment 2026-10-07): installation environment only,
     # like the AI settings; nothing about the SMTP server is stored in the database.
     smtp_host: str | None = None
@@ -364,6 +372,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AI_CHAT_BUSY_STALE_SECONDS must exceed 2 x "
                 "AI_CHAT_TIMEOUT_SECONDS + AI_TOOL_TIMEOUT_SECONDS"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _auto_previews_do_not_exceed_chat(self) -> "Settings":
+        if (self.ai_auto_max_previews is not None
+                and self.ai_auto_max_previews > self.ai_chat_max_previews):
+            raise ValueError(
+                "AI_AUTO_MAX_PREVIEWS cannot exceed AI_CHAT_MAX_PREVIEWS"
             )
         return self
 

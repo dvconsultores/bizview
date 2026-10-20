@@ -371,6 +371,20 @@ topics:
       es: ["ia", "proveedor", "modelo", "clave de api", "probar conexión"]
       en: ["ai", "provider", "model", "api key", "test connection"]
     related: [privacidad-y-ia, chat-del-agente, alcance-del-agente]
+  - id: perfiles-de-ejecucion
+    section: administracion
+    title: {es: "Perfiles de ejecución", en: "Run profiles"}
+    summary:
+      es: "Cómo guardar un contrato de run autónomo y reutilizarlo para repetir un run con un clic."
+      en: "How to save an autonomous run contract and reuse it to repeat a run in one click."
+    roles: [superuser]
+    routes: ["/admin/ia/perfiles"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["perfiles de ejecución", "perfil de run", "contrato guardado", "modo auto"]
+      en: ["run profiles", "run profile", "saved contract", "auto mode"]
+    related: [ia, chat-del-agente]
   - id: tokens
     section: administracion
     title: {es: "Tokens de acceso", en: "Access tokens"}

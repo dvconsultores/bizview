@@ -379,6 +379,33 @@ not come from removing the guard, only from removing the paperwork.
 A brief that covers several pieces (an integration **and** its report) now produces **all** of their
 specs in one `/speckit-specify` run — up to three — instead of asking you to repeat the request.
 
+### Modes: Preguntar, Editar and Auto
+
+The composer has a mode selector next to the message box; it belongs to the conversation.
+
+| Mode | What it may do without asking | What still needs you |
+|---|---|---|
+| **Preguntar** / Ask | Read sources structure, profiles, the workspace, specs and guides; answer, explain, propose. | Everything that writes. |
+| **Editar** / Edit (default) | Write and correct drafts and specs, validate, `check_query`, run one `/speckit-…` at a time. | **Vista previa** and **Aplicar** buttons. |
+| **Auto** | Everything in Edit, plus chaining the stages itself, previewing, fixing and **applying** — inside a run contract. | One confirmation of the contract, with step-up. |
+
+In **Auto** the run does not stop to ask anything: choosing Auto opens the **run contract** — the goal,
+the sources and tables it may read, how far it may go (draft / up to preview / up to apply), the
+limits (tokens, previews, applies, minutes), whether it may modify existing artifacts, whether a
+failing first scheduled run rolls back, and who sees the dashboard. Confirming it with your password
+(and the two-step code on `internet`) authorises every apply of that run. One contract covers one
+run: the mode stays Auto and the next request needs a new contract, or a saved profile from
+**Administración → IA → Perfiles de ejecución**.
+
+The limits are enforced by the product, not by the model: reaching one stops the run with the reason,
+the draft and the working state intact, and nothing is applied afterwards. **Detener**, or switching
+the mode down, brakes the run the same way. Writing "modo autónomo" in a message never switches the
+mode: the assistant offers the "Pasar a Auto" chip instead.
+
+After an autonomous apply the first scheduled run of the new integration is watched: a failure shows
+up in the conversation and, with rollback on, the previous version comes back. The applied dashboard
+is not granted to any user until a human decides so (the contract may name roles).
+
 ### Asking for an autonomous run
 
 Say it in the brief and the run stops asking: *"modo autónomo"*, *"sin preguntar"* or

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bizview.local/schemas/run-contract.schema.json",
+  "title": "Run contract",
+  "description": "Authorisation of one autonomous run of the Asistente (feature 028, FR-001). Validated in product code by backend/app/assistant/auto.py (RunContract); the model never edits it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["goal", "stages", "limits"],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "The user's request, verbatim, shown in the contract line of the transcript."
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 20,
+      "default": [],
+      "description": "Empty means no restriction on source tools. A listed source name restricts list_sources/describe_source/profile_source/check_query to those names; a listed table restricts the table argument.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "tables": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "enum": ["draft", "preview", "apply"] },
+      "description": "hasta el borrador = [draft]; hasta vista previa = [draft, preview]; hasta aplicar = [draft, preview, apply]."
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokens", "previews", "applies", "wall_clock_seconds"],
+      "properties": {
+        "tokens": { "type": "integer", "minimum": 10000, "maximum": 5000000, "default": 400000 },
+        "previews": { "type": "integer", "minimum": 0, "maximum": 20, "default": 5 },
+        "applies": { "type": "integer", "minimum": 0, "maximum": 5, "default": 1 },
+        "wall_clock_seconds": { "type": "integer", "minimum": 60, "maximum": 7200, "default": 1800 }
+      }
+    },
+    "modify_existing": {
+      "type": "boolean",
+      "default": false,
+      "description": "When false the agent creates new integration/report ids and never alters an existing artifact (US4/AC2)."
+    },
+    "auto_rollback": {
+      "type": "boolean",
+      "default": true,
+      "description": "Restore the previous workspace version if the first scheduled run after apply fails (FR-008)."
+    },
+    "visible_to": {
+      "type": "array",
+      "uniqueItems": true,
+      "default": [],
+      "items": { "enum": ["admin", "user"] },
+      "description": "Empty means no dashboard_access grants: no user-role account sees the applied dashboard. 'user' grants access to the active user-role accounts; 'admin' changes nothing because administrators already see every non-hidden dashboard."
+    },
+    "profile_id": {
+      "type": ["integer", "null"],
+      "default": null,
+      "description": "Saved profile the form was prefilled from (US5). Never an authorisation by itself."
+    }
+  }
+}

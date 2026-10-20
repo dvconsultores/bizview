@@ -5,6 +5,7 @@ import type { AssistantSession, AssistantSessionSummary } from "../../api/types"
 import { t as live, useT } from "../../i18n";
 import { dateTimeFormat } from "../../lib/intl";
 import { Badge } from "../Badge";
+import { ModePill } from "./ModeSelector";
 import { EditableTitle } from "./EditableTitle";
 
 const ICON_BUTTON =
@@ -139,6 +140,9 @@ export function AssistantHistory({
     <button type="button" className={rowClass(s.id === currentId)} onClick={() => select(s.id)}
       aria-current={s.id === currentId ? "true" : undefined}>
       <span className="min-w-0 flex-1 truncate">{s.title}</span>
+      {s.mode === "auto" ? (
+        <ModePill session={s} className="shrink-0" />
+      ) : null}
       {s.busy ? (
         <Badge tone="accent" icon={<Loader2 className="h-3 w-3 animate-spin" aria-hidden />} className="shrink-0">
           {t.assistant.busyBadge}

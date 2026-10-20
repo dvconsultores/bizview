@@ -20,7 +20,8 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "assistant_session", "assistant_message", "assistant_preview_request",
               "share_link", "email_send", "email_delivery", "email_subscription",
               "direct_read_log", "report_rollup", "project", "project_file_revision",
-              "assistant_command_run", "assistant_attachment", "google_link"}
+              "assistant_command_run", "assistant_attachment", "google_link",
+              "assistant_auto_run", "assistant_run_profile"}
 
 
 def schema_tables():

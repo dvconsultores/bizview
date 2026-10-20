@@ -8,6 +8,38 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Agent modes and autonomous runs (feature 028)**: the Asistente composer gets a mode selector —
+  **Preguntar / Ask**, **Editar / Edit** (the default, today's behaviour) and **Auto**. In Auto the
+  agent runs the whole pipeline on its own: it chains the Spec Kit stages (`run_command`), writes the
+  specs and artifacts, validates, runs the preview, fixes and **applies** the new workspace version,
+  and reports at the end instead of stopping for "Vista previa" and "Aplicar".
+  - The single authorisation is a **run contract** confirmed with step-up (password, and the two-step
+    code on the `internet` profile): goal, allowed sources and tables, stages (draft / preview /
+    apply), limits (tokens, previews, applies, wall-clock minutes), `modify_existing`,
+    `auto_rollback` and `visible_to`. One contract covers one run; the mode stays Auto and the next
+    run needs a new contract.
+  - Everything is enforced in product code, never by the prompt: in **Ask** only reads succeed
+    (`list_sources`, `describe_source`, `profile_source`, `get_authoring_guide`, `get_workspace`,
+    `get_app_guide`, `get_project_overview`, `read_draft`, and `check_query` without a draft path);
+    `run_preview`/`apply_draft`/`run_command` need a live contract and the stage it allows; a source
+    outside the contract is refused with a chip in the transcript.
+  - A run never ends by telling the human what to press: if it cannot proceed it stops with
+    `blocked:<reason>` and a summary (version, ids, schedule, decisions taken, preview rows, tokens).
+    "Detener" and switching the mode down brake the run cooperatively and nothing is applied after.
+  - After an autonomous apply the first scheduled run of the integration is watched; a failure is
+    reported in the conversation and, with `auto_rollback`, the previous version is restored.
+    Autonomously applied dashboards get no access grants (no `user`-role account sees them) unless
+    the contract names roles.
+  - **Perfiles de ejecución** (Administración → IA → Perfiles de ejecución) save a contract as a
+    prefill; using one still requires the step-up of every run.
+  - New settings: `AI_AUTO_MAX_ROUNDS` (200), `AI_AUTO_MAX_APPLIES` (1), `AI_AUTO_RUN_MAX_SECONDS`
+    (1800) and `AI_AUTO_MAX_PREVIEWS` (the conversation's own preview limit by default).
+  - Migration `0024_autonomous_mode`: `assistant_session.mode`, `assistant_auto_run` and
+    `assistant_run_profile`.
+  - 014 FR-006 changes for an Auto run: the step-up is per **run** (one confirmation up front)
+    instead of per apply. Validation, readiness, the workspace lock, audit and rollback are
+    unchanged.
+
 - **"Ampliar presupuesto" in the chat**: the endpoint `POST /api/assistant/sessions/{id}/budget`
   existed but nothing called it, so a conversation that reached the budget was stuck with a warning
   and no way forward. The banner now offers the action while `token_budget < AI_CHAT_BUDGET_MAX`,

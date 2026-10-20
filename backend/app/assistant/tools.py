@@ -10,8 +10,8 @@ import yaml
 from bizview_cli import authoring, layout, sqlsafety
 from sqlalchemy.orm import Session
 
-from app.assistant import origin, preview, readiness
-from app.assistant.commands import guard, runs
+from app.assistant import auto, origin, preview, readiness
+from app.assistant.commands import guard, registry, resolve, runs
 from app.assistant.commands.registry import REGISTRY
 from app.engine import direct
 from app.i18n import t
@@ -25,6 +25,14 @@ from app.workspace.service import active
 
 log = logging.getLogger(__name__)
 
+_STAGE_OF_COMMAND = {
+    "speckit-specify": "specify",
+    "speckit-clarify": "clarify",
+    "speckit-plan": "plan",
+    "speckit-tasks": "tasks",
+    "speckit-implement": "implement",
+    "speckit-converge": "converge",
+}
 MAX_TOOL_RESULT_CHARS = 60_000
 _MAX_STRING_CHARS = 200
 _MAX_LIST_ITEMS = 500
@@ -372,6 +380,47 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "run_command",
+        "description": (
+            "Avanza este run a una etapa de Spec Kit sobre una spec del proyecto: cierra la "
+            "etapa anterior y abre la nueva con la misma ejecución auditada que /speckit-…. "
+            "Después sigue trabajando con las herramientas de esa etapa. Úsala para encadenar "
+            "specify → plan → tasks → implement; nunca pidas al usuario ejecutar el comando ni "
+            "elegir la spec."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "enum": ["speckit-specify", "speckit-clarify", "speckit-plan",
+                             "speckit-tasks", "speckit-implement", "speckit-converge"],
+                    "description": "Comando de la etapa a abrir.",
+                },
+                "spec": {
+                    "type": ["string", "null"],
+                    "description": "Carpeta NNN-nombre; nula solo cuando la etapa la crea "
+                                   "(/speckit-specify).",
+                },
+                "arguments": {
+                    "type": "string",
+                    "description": "Resto de argumentos del comando (el objetivo o el tema).",
+                },
+            },
+            "required": ["command"],
+        },
+    },
+    {
+        "name": "apply_draft",
+        "description": (
+            "Aplica el proyecto de la conversación como una versión nueva del workspace: la "
+            "misma validación, comprobaciones, bloqueo y auditoría que el botón Aplicar. Solo "
+            "existe con un contrato vigente que permita aplicar, y como máximo las veces que el "
+            "contrato indica."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    {
         "name": "update_notes",
         "description": (
             "Guarda tus notas de trabajo de esta conversación: objetivo, decisiones, "
@@ -600,8 +649,14 @@ def _localized(spec: dict[str, Any]) -> dict[str, Any]:
 
 
 def offered_tool_specs(session: Any, app_settings: Any) -> tuple[list[dict[str, Any]], bool]:
-    """Devuelve las tool specs ofrecidas y si están restringidas a la fase de borrador."""
-    allowed = guard.allowed_tools(command_def(session))
+    """Devuelve las tool specs ofrecidas y si están restringidas a la fase de borrador.
+
+    Feature 028: el modo de la conversación y el contrato vigente deciden el conjunto (FR-000,
+    FR-003); `edit` conserva exactamente el comportamiento anterior.
+    """
+    base = guard.allowed_tools(command_def(session))
+    contract = auto.contract_of(session)
+    allowed = auto.offered_names(auto.mode_of(session), contract, frozenset(base))
     offered = [_localized(spec) for spec in TOOL_SPECS if spec["name"] in allowed]
     if (not has_draft(session)
             and discovery_count(session) >= int(app_settings.ai_agent_discovery_limit)):
@@ -727,6 +782,63 @@ def _check_query_deps(session: Any, path: str) -> str:
     return f"{query_sha}|{spec_sha}"
 
 
+def _allowed_tools(session: Any) -> frozenset[str]:
+    """The command guard's set, widened by the Auto tools when a contract is live (feature 028)."""
+    base = frozenset(guard.allowed_tools(command_def(session)))
+    return auto.offered_names(auto.mode_of(session), auto.contract_of(session), base)
+
+
+def _guard_check(session: Any, name: str) -> None:
+    """Feature 021's server-side limit, with the Auto tools of a live contract added."""
+    if name in _allowed_tools(session):
+        return
+    try:
+        guard.check_tool(command_def(session), name)
+    except guard.GuardError as err:
+        raise ToolError(str(err)) from err
+
+
+def _authorisation_revoked(db: Session, run: Any) -> bool:
+    """Feature 028 (edge): the super user that confirmed the contract lost the role mid-run."""
+    from app.models import AppUser
+
+    actor = db.get(AppUser, run.confirmed_by) if run.confirmed_by else None
+    return actor is None or not actor.is_active or not actor.is_superuser
+
+
+def _mode_check(db: Session, session: Any, name: str, args: dict[str, Any],
+                app_settings: Any) -> None:
+    """Feature 028: refusa la llamada si el modo o el contrato no la permiten (FR-000, FR-003).
+
+    Se ejecuta antes del memo y del despacho, así que ninguna llamada fuera del contrato toca el
+    proyecto, la fuente ni el proveedor. La denegación es un resultado de herramienta, no un error
+    del turno: el modelo puede adaptarse o cerrar el run con `blocked:<reason>`.
+    """
+    contract = auto.contract_of(session)
+    refusal = auto.mode_gate(session, name, args, contract)
+    if refusal is not None:
+        raise ToolError(refusal.message)
+    run = auto.live_contract(session)
+    if contract is None or run is None:
+        return
+    if _authorisation_revoked(db, run):
+        raise ToolError(t("assistant.run.revoked_role"))
+    if name in ("describe_source", "profile_source", "check_query"):
+        refusal = auto.source_refusal(contract, args.get("name") or args.get("source"),
+                                      args.get("table"))
+        if refusal is not None:
+            raise ToolError(refusal.message)
+    if name not in ("run_preview", "apply_draft", "run_command"):
+        return
+    limits = auto.limit_refusal(
+        contract, run,
+        previews=int(run.previews or 0) + 1 if name == "run_preview" else None,
+        applies=int(run.applies or 0) + 1 if name == "apply_draft" else None,
+        wall_clock=True, settings=app_settings)
+    if limits is not None:
+        raise ToolError(limits.message)
+
+
 def run_tool(
     db: Session,
     actor: Any,
@@ -737,10 +849,8 @@ def run_tool(
     ip: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Ejecuta una herramienta con guardas de descubrimiento y repetición."""
-    try:
-        guard.check_tool(command_def(session), name)
-    except guard.GuardError as err:
-        raise ToolError(str(err)) from err
+    _mode_check(db, session, name, args, app_settings)
+    _guard_check(session, name)
     if name == "describe_source":
         refresh = args.get("refresh")
         if refresh is not None and not isinstance(refresh, bool):
@@ -805,7 +915,13 @@ def _dispatch(
 ) -> tuple[dict[str, Any], str]:
     """Despacha la herramienta sin guardas de run."""
     if name == "list_sources":
-        return _list_sources(db, app_settings)
+        result, summary = _list_sources(db, app_settings)
+        contract = auto.contract_of(session)
+        if contract is not None and contract.sources:
+            allowed = {item.name.strip().casefold() for item in contract.sources}
+            result = {"sources": [src for src in result["sources"]
+                                  if str(src.get("name", "")).strip().casefold() in allowed]}
+        return result, summary
     if name == "describe_source":
         return _describe_source(db, actor, session, args, app_settings, ip)
     if name == "profile_source":
@@ -836,6 +952,10 @@ def _dispatch(
         return _suggest_command(db, session, args)
     if name == "set_current_spec":
         return _set_current_spec(db, session, args)
+    if name == "run_command":
+        return _run_command(db, session, args)
+    if name == "apply_draft":
+        return _apply_draft(db, actor, session, app_settings, ip)
     raise ToolError("Herramienta desconocida.")
 
 
@@ -966,6 +1086,74 @@ def _set_current_spec(db: Session, session: Any,
     session.current_spec = spec
     summary = t("commands.spec_current", spec=spec)
     return {"spec": spec}, summary
+
+
+def _run_command(db: Session, session: Any,
+                 args: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Feature 028: switch the run to the next Spec Kit stage (never ask the human to run it).
+
+    The stage is a real `assistant_command_run` row: same registry definition, same tool set, same
+    audit and same token ceiling as the composer's `/speckit-…`. The provider loop is not nested;
+    the model keeps working in this turn with the new stage's tools.
+    """
+    name = args.get("command")
+    name = name.strip() if isinstance(name, str) else ""
+    definition = REGISTRY.get(name)
+    if definition is None or not name.startswith("speckit-"):
+        raise ToolError(f"Etapa desconocida: {name or '-'}.")
+    arguments = args.get("arguments")
+    arguments = arguments.strip() if isinstance(arguments, str) else ""
+    requested = args.get("spec")
+    requested = requested.strip() if isinstance(requested, str) else ""
+    target = arguments or requested
+
+    listed = project_specs.list_specs(db, session.project)
+    folders = [item["folder"] for item in listed]
+    resolution = resolve.resolve(listed, target, session.current_spec)
+    spec = resolution.spec if resolution.spec in folders else None
+    if spec is not None and spec != session.current_spec:
+        session.current_spec = spec
+    if definition.needs_spec and spec is None:
+        raise ToolError(t("commands.spec_not_found", spec=target or "-",
+                          specs=", ".join(folders) or "-"))
+
+    current = command_run(session)
+    if current is not None and current.status in ("running", "waiting"):
+        runs.finish(current, "completed")
+    stage = runs.create(
+        db, session_id=session.id, project_id=session.project_id, definition=definition,
+        arguments=arguments, locale=getattr(session, "command_locale", None) or "es",
+        spec=spec, resolved_from=resolution.source or "current",
+        reserved_number=session.next_spec() if name == "speckit-specify" else None)
+    session.command_run = stage
+    auto_run = auto.live_contract(session)
+    if auto_run is not None:
+        auto_run.stage = _STAGE_OF_COMMAND.get(name)
+    summary = t("commands.auto_stage", command=name, spec=spec or "-")
+    return {
+        "stage": name,
+        "spec": spec,
+        "resolved_from": resolution.source,
+        "instruction": registry.prompt_body(name, getattr(session, "command_locale", None) or "es"),
+        "files": sorted(folders),
+    }, summary
+
+
+def _apply_draft(db: Session, actor: Any, session: Any, app_settings: Any,
+                 ip: str | None) -> tuple[dict[str, Any], str]:
+    """Feature 028: the button's apply, authorised by the contract (014 FR-006 as amended)."""
+    from app.assistant import service as assistant_service
+    from app.workspace.service import version_json
+
+    version, revalidated = assistant_service.apply_draft(db, actor, session, ip)
+    auto_run = auto.live_contract(session)
+    if auto_run is not None:
+        auto_run.applies = int(auto_run.applies or 0) + 1
+        auto_run.version_id = version.id
+        assistant_service.arm_auto_watch(db, session, auto_run, version)
+    payload = version_json(version) or {}
+    payload["revalidated"] = bool(revalidated)
+    return payload, t("assistant.summary.applied", version=version.id)
 
 
 def _list_sources(db: Session, app_settings: Any) -> tuple[dict[str, Any], str]:

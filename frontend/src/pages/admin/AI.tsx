@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Cpu, Info, KeyRound, Power, Server, ShieldCheck, Sparkles, Timer, Zap } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { api, ApiError } from "../../api/client";
 import type { AIStatus, AITestResult } from "../../api/types";
 import { Alert } from "../../components/Alert";
@@ -203,7 +204,18 @@ export function AI() {
   return (
     <div className="space-y-5">
       <Breadcrumbs back="/admin" items={[{ label: t.nav.admin, to: "/admin" }, { label: t.ai.title }]} />
-      <PageHeader title={t.ai.title} subtitle={t.ai.subtitle} />
+      <PageHeader
+        title={t.ai.title}
+        subtitle={t.ai.subtitle}
+        actions={
+          <Link
+            to="/admin/ia/perfiles"
+            className="inline-flex min-h-tap items-center rounded-lg border border-line bg-surface px-3 text-sm text-ink-2 hover:border-line-strong hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            {t.assistant.runProfiles.title}
+          </Link>
+        }
+      />
       {body}
     </div>
   );

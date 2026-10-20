@@ -31,7 +31,11 @@ from app.i18n import M, to_stored
 from app.mail import sends as mail_sends
 from app.mail import subscriptions as mail_subscriptions
 from app.models import (
+    AppUser,
+    AssistantAutoRun,
+    AssistantMessage,
     AssistantPreviewRequest,
+    AssistantSession,
     IntegrationControl,
     IntegrationRun,
     IntegrationRunRequest,
@@ -65,6 +69,27 @@ def controls_fingerprint(db) -> tuple:
     """Ordered (integration_id, updated_at) tuple; used to detect control changes."""
     rows = db.scalars(select(IntegrationControl)).all()
     return tuple(sorted((c.integration_id, c.updated_at) for c in rows))
+
+
+def _failed_checks(run) -> bool:
+    """A run whose checks did not pass is a failure for the watch even if it loaded rows."""
+    checks = getattr(run, "checks", None) or []
+    return any(not item.get("ok", True) for item in checks if isinstance(item, dict))
+
+
+def _notify_session(db, watch, reason) -> None:
+    """A system message in the conversation that authorised the run (FR-008)."""
+    from app.i18n import t
+
+    session = db.get(AssistantSession, watch.session_id)
+    if session is None:
+        return
+    detail = t("assistant.watch.failed", integration=watch.watch_integration or "-",
+               reason=str(reason)[:200])
+    if watch.watch_state == "rolled_back":
+        detail += "\n" + t("assistant.watch.rolled_back")
+    db.add(AssistantMessage(session_id=session.id, role="assistant", content=detail))
+    session.updated_at = datetime.now(UTC)
 
 
 class Worker:
@@ -110,6 +135,44 @@ class Worker:
         run = runner.run_integration(item["definition"], item["files"], version_id=version_id,
                                      kind=kind)
         log.info("run %s %s %s: %s", run.id, integration_id, kind, run.status)
+        if run.status in ("failed", "stopped") or _failed_checks(run):
+            self._resolve_auto_watch(run, version_id, integration_id)
+
+    def _resolve_auto_watch(self, run, version_id: int, integration_id: str) -> None:
+        """Feature 028 (FR-008): the first scheduled run of an autonomous apply failed.
+
+        The super user is told in the conversation and, with `auto_rollback`, the previous version
+        comes back. A normal version switch: the scheduler reloads on its next loop.
+        """
+        from app.workspace import service as workspace_service
+
+        with get_sessionmaker()() as db:
+            watch = db.scalar(select(AssistantAutoRun).where(
+                AssistantAutoRun.watch_state == "pending",
+                AssistantAutoRun.version_id == version_id))
+            if watch is None:
+                return
+            if watch.watch_integration and integration_id not in watch.watch_integration.split(","):
+                return
+            contract = watch.contract or {}
+            rollback = bool(contract.get("auto_rollback", True))
+            actor = db.get(AppUser, watch.confirmed_by)
+            reason = run.message or run.status
+            if rollback and actor is not None:
+                try:
+                    previous = workspace_service.rollback(db, actor, None)
+                except Exception:  # a rollback that cannot run must not kill the worker
+                    log.exception("auto rollback of version %s failed", version_id)
+                    watch.watch_state = "failed"
+                else:
+                    watch.watch_state = "rolled_back"
+                    watch.stop_reason = f"rolled_back:{run.id}"
+                    log.warning("version %s rolled back to %s after run %s",
+                                version_id, previous.id, run.id)
+            else:
+                watch.watch_state = "failed"
+            _notify_session(db, watch, reason)
+            db.commit()
 
     def reload(self) -> None:
         with get_sessionmaker()() as db:

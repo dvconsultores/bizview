@@ -2,6 +2,7 @@
 import { api, ApiError, askReauth, qs } from "./client";
 import { currentLocale, t } from "../i18n/live";
 import type {
+  AssistantMode,
   AssistantSession,
   HistoryItem,
   ProjectChanges,
@@ -14,6 +15,8 @@ import type {
   ProjectSummary,
   ProjectTree,
   Revision,
+  RunContract,
+  RunProfile,
   RevisionGroup,
   SaveResult,
   SpecTimeline,
@@ -71,6 +74,24 @@ export const projectsApi = {
     api.post<AssistantSession>(`/api/assistant/sessions/${sessionId}/spec`, { spec }),
   proposal: (text: string) =>
     api.post<{ name: string; slug: string }>("/api/assistant/project-proposal", { text }),
+  /** Feature 028: the composer selector (ask | edit | auto). */
+  setMode: (sessionId: number, mode: AssistantMode) =>
+    api.post<AssistantSession>(`/api/assistant/sessions/${sessionId}/mode`, { mode }),
+  /** Feature 028: confirm the run contract with its single step-up. */
+  confirmContract: (sessionId: number,
+                    body: { contract: RunContract; password: string; code?: string | null;
+                            profile_id?: number | null }) =>
+    api.post<{ run: AssistantSession["contract"]; session: AssistantSession }>(
+      `/api/assistant/sessions/${sessionId}/contract`, body),
+  cancelContract: (sessionId: number) =>
+    api.post<void>(`/api/assistant/sessions/${sessionId}/contract/cancel`, {}),
+  runProfiles: () =>
+    api.get<{ items: RunProfile[] }>("/api/assistant/run-profiles").then((r) => r.items),
+  saveRunProfile: (body: { name: string; contract: Partial<RunContract> }) =>
+    api.post<RunProfile>("/api/assistant/run-profiles", body),
+  updateRunProfile: (id: number, body: { name: string; contract: Partial<RunContract> }) =>
+    api.patch<RunProfile>(`/api/assistant/run-profiles/${id}`, body),
+  removeRunProfile: (id: number) => api.del<void>(`/api/assistant/run-profiles/${id}`),
 };
 
 /** Raw zip upload (the JSON client only sends JSON); same step-up retry as `api`. */

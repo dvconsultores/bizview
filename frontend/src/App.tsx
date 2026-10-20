@@ -8,6 +8,7 @@ import { ReauthProvider } from "./components/ReauthDialog";
 import { ViewHost } from "./components/ViewHost";
 import { AdminHome } from "./pages/admin/AdminHome";
 import { AI } from "./pages/admin/AI";
+import { RunProfiles } from "./pages/admin/RunProfiles";
 import { Security } from "./pages/admin/Security";
 import { SourceForm } from "./pages/admin/SourceForm";
 import { Sources } from "./pages/admin/Sources";
@@ -70,6 +71,7 @@ export function App() {
                     <Route path="admin/usuarios/:id" element={<RequireAdmin><UserDetail /></RequireAdmin>} />
                     <Route path="admin/auditoria" element={<RequireSuperuser><Audit /></RequireSuperuser>} />
                     <Route path="admin/ia" element={<RequireSuperuser><AI /></RequireSuperuser>} />
+                    <Route path="admin/ia/perfiles" element={<RequireSuperuser><RunProfiles /></RequireSuperuser>} />
                     <Route path="admin" element={<RequireAdmin><AdminHome /></RequireAdmin>} />
                     <Route path="admin/fuentes" element={<RequireSuperuser><Sources /></RequireSuperuser>} />
                     <Route path="admin/fuentes/nueva" element={<RequireSuperuser><SourceForm /></RequireSuperuser>} />

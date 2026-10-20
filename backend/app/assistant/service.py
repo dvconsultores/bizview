@@ -3,9 +3,11 @@ import dataclasses
 import functools
 import json
 import logging
+import re
 import threading
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import psycopg.errors
 import yaml
@@ -26,7 +28,7 @@ from app.ai import (
     get_provider,
     vision_enabled,
 )
-from app.assistant import activity, origin, readiness
+from app.assistant import activity, auto, origin, readiness
 from app.assistant import attachments as _attachments
 from app.assistant import tools as _tools
 from app.assistant.commands import registry, resolve, runs, scope
@@ -40,6 +42,7 @@ from app.i18n import M, current, t, use_locale
 from app.models import (
     AppUser,
     AssistantAttachment,
+    AssistantAutoRun,
     AssistantMessage,
     AssistantSession,
     DataSource,
@@ -289,6 +292,34 @@ def _owner_locale(user) -> str:
     return get_settings().default_locale
 
 
+def live_auto_run(db, session: AssistantSession) -> AssistantAutoRun | None:
+    """The conversation's running contract: its newest row while it is confirmed/running."""
+    row = db.scalar(
+        select(AssistantAutoRun)
+        .where(AssistantAutoRun.session_id == session.id,
+               AssistantAutoRun.status.in_(auto.LIVE_STATUSES))
+        .order_by(AssistantAutoRun.started_at.desc(), AssistantAutoRun.id.desc())
+        .limit(1))
+    return row
+
+
+def last_auto_run(db, session: AssistantSession) -> AssistantAutoRun | None:
+    return db.scalar(
+        select(AssistantAutoRun)
+        .where(AssistantAutoRun.session_id == session.id)
+        .order_by(AssistantAutoRun.started_at.desc(), AssistantAutoRun.id.desc())
+        .limit(1))
+
+
+def attach_auto_run(db, session: AssistantSession) -> AssistantAutoRun | None:
+    """Expose the live contract to the tools (`session.auto_run`) and return it."""
+    run = live_auto_run(db, session)
+    session.auto_run = run
+    if run is not None and run.status == "confirmed":
+        run.status = "running"
+    return run
+
+
 def budget_limit(session: AssistantSession, settings) -> int:
     return max(session.token_budget, settings.ai_chat_budget_max)
 
@@ -297,7 +328,7 @@ def budget_warning(session: AssistantSession, settings) -> bool:
     return session.tokens_used >= BUDGET_WARNING_RATIO * budget_limit(session, settings)
 
 
-def _count_usage(session: AssistantSession, usage: ChatUsage, settings) -> None:
+def _count_usage(session: AssistantSession, usage: ChatUsage, settings) -> int:
     """Accumulate weighted budget cost and raw token counters on the session."""
     weighted = usage.weighted(settings.ai_chat_cached_token_weight)
     session.tokens_used += weighted
@@ -307,6 +338,7 @@ def _count_usage(session: AssistantSession, usage: ChatUsage, settings) -> None:
     stats["cached_tokens"] = int(stats.get("cached_tokens") or 0) + usage.cached
     stats["output_tokens"] = int(stats.get("output_tokens") or 0) + usage.output
     session.stats = stats
+    return weighted
 
 
 def _clip(text: str, limit: int) -> str:
@@ -546,6 +578,46 @@ def _project_header(session) -> str:
             f"{session.next_spec():03d} · spec actual: {session.current_spec or 'ninguna'}")
 
 
+MODE_TEXT = {
+    "ask": ("Modo: Preguntar. Solo puedes leer (estructura de fuentes, perfiles, espacio de "
+            "trabajo, specs, guías) y responder. No escribas archivos, no ejecutes vistas "
+            "previas ni apliques; si el usuario pide un cambio, explica qué harías y ofrece "
+            "cambiar a Editar."),
+    "edit": ("Modo: Editar. Puedes escribir y corregir el borrador y las specs del proyecto, "
+             "validar y consultar la fuente; «Vista previa» y «Aplicar» los pulsa el usuario."),
+}
+MODE_AUTO_TEXT = (
+    "Modo: Auto, con un contrato vigente. Ejecuta el run completo sin preguntar: encadena las "
+    "etapas con run_command, escribe las specs y los artefactos, valida, ejecuta run_preview, "
+    "corrige y aplica con apply_draft si el contrato lo permite. Nunca termines pidiendo al "
+    "usuario elegir una spec, ejecutar un comando ni pulsar Aplicar: si algo te bloquea, para y "
+    "explica el motivo. Cuando una decisión no está en el pedido, usa el valor por defecto "
+    "documentado y anótalo en «Decisiones tomadas» de la spec y en tus notas."
+)
+def mode_block(session: AssistantSession, settings) -> list[str]:
+    """Feature 028 (FR-000b): what the current mode allows, before the work state."""
+    mode = getattr(session, "mode", None) or "edit"
+    if mode != "auto":
+        return ["## Modo", MODE_TEXT.get(mode, MODE_TEXT["edit"]), ""]
+    contract = auto.contract_of(session)
+    run = getattr(session, "auto_run", None)
+    lines = ["## Modo", MODE_AUTO_TEXT]
+    if contract is not None:
+        stages = " → ".join(contract.stages)
+        lines.append(f"Contrato: etapas {stages}; hasta {contract.limits.applies} aplicaciones; "
+                     f"{contract.limits.previews} vistas previas; "
+                     f"{max(1, round(contract.limits.wall_clock_seconds / 60))} minutos.")
+        if contract.sources:
+            allowed = ", ".join(item.name for item in contract.sources)
+            lines.append(f"Fuentes permitidas: {allowed}.")
+        if not contract.modify_existing:
+            lines.append("No modifiques integraciones ni reportes existentes: crea ids nuevos.")
+    elif run is None:
+        lines.append("No hay contrato vigente: este run no puede aplicar nada.")
+    lines.append("")
+    return lines
+
+
 def state_text(session: AssistantSession, settings, user_texts: list[str] | None = None) -> str:
     from app.assistant.preview import outcome_lines  # import here: preview imports this module
 
@@ -609,20 +681,28 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
     def _join(bs: list[list[str]]) -> str:
         return "\n".join(line for b in bs for line in b)
 
-    full = _join(ordered_blocks)
-    limit = STATE_MAX_CHARS - len(TRUNCATED_MARKER) - 1
+    mode_text = "\n".join(mode_block(session, settings))
+    full = f"{mode_text}\n{_join(ordered_blocks)}" if mode_text else _join(ordered_blocks)
+    limit = STATE_MAX_CHARS - len(TRUNCATED_MARKER) - 1 - len(mode_text)
+
+    def joined_of(blocks: list[list[str]]) -> str:
+        body = _join(blocks)
+        return f"{mode_text}\n{body}" if mode_text else body
+
+    def joined() -> str:
+        return joined_of(ordered_blocks)
 
     if len(full) > STATE_MAX_CHARS:
         ordered_blocks[4] = []
-        full = _join(ordered_blocks)
+        full = joined()
 
         if len(full) > limit and inspected_lines:
             ordered_blocks[1] = _skip_inspected_heading()
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit:
             ordered_blocks[2] = _personal_lines(working, compact=True)
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit:
             ordered_blocks[5] = _validation_lines(
@@ -631,7 +711,7 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
                 max_problems=STATE_TRIM_PROBLEMS,
                 max_pending=STATE_TRIM_PENDING,
             )
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit:
             trimmed_outcome = outcome[:STATE_TRIM_OUTCOME]
@@ -640,7 +720,7 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
                     f"- … y {len(outcome) - STATE_TRIM_OUTCOME} más"
                 )
             ordered_blocks[6] = trimmed_outcome
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit:
             trimmed_notes = notes_block[:1]
@@ -648,12 +728,12 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
                 [_clip(line, STATE_TRIM_NOTE_CHARS) for line in notes_block[1:]]
             )
             ordered_blocks[0] = trimmed_notes
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit and len(draft_lines) > 2:
             header_lines = [_clip(draft_lines[0], NOTE_LINE_CHARS), "Archivos:"]
             ordered_blocks[3] = header_lines
-            full = _join(ordered_blocks)
+            full = joined()
             for line in draft_lines[2:]:
                 remaining = len(draft_lines) - 2 - len(ordered_blocks[3]) + 2
                 candidate = ordered_blocks[3] + [line]
@@ -663,7 +743,7 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
                     )
                 test_blocks = list(ordered_blocks)
                 test_blocks[3] = candidate
-                if len(_join(test_blocks)) > limit:
+                if len(joined_of(test_blocks)) > limit:
                     break
                 ordered_blocks[3].append(line)
             kept_count = len(ordered_blocks[3]) - 2
@@ -672,7 +752,7 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
                 ordered_blocks[3].append(
                     f"- … y {total_files - kept_count} archivos más (usa read_draft)"
                 )
-            full = _join(ordered_blocks)
+            full = joined()
 
         if len(full) > limit:
             full = full[:limit]
@@ -1054,6 +1134,181 @@ def _composed_progress(working: dict | None, turn_summaries: list[str], headline
         f"{t('assistant.progress.done')} {done_text}\n"
         f"{t('assistant.progress.next')} {next_step}"
     )
+
+
+_HUMAN_INSTRUCTION = (
+    re.compile(r"(?:selecciona|elige|escoge|elige la)\s+(?:la\s+)?spec", re.IGNORECASE),
+    re.compile(r"(?:pulsa|presiona|usa el bot[oó]n|haz clic en)\s+(?:el\s+bot[oó]n\s+)?"
+               r"«?aplicar", re.IGNORECASE),
+    re.compile(r"\b(?:select|choose|pick)\s+(?:the\s+)?spec\b", re.IGNORECASE),
+    re.compile(r"(?:press|click)\s+(?:the\s+)?[«\"]?apply", re.IGNORECASE),
+)
+
+_AUTO_END = {
+    "done": ("applied", "completed"),
+    "ready": ("applied", "completed"),
+    "ready_preview": ("stopped", "completed"),
+    "budget": ("stopped", "limit:tokens"),
+    "limit": ("stopped", "limit:rounds"),
+    "stopped": ("stopped", "stopped:user"),
+    "error": ("failed", None),
+}
+
+
+def auto_blocked_reason(text: str | None) -> str | None:
+    """Feature 028 (FR-004b): an Auto run must never end by telling the human what to press."""
+    if not text:
+        return None
+    for pattern in _HUMAN_INSTRUCTION:
+        match = pattern.search(text)
+        if match:
+            return f"blocked:{match.group(0).strip().casefold()[:80]}"
+    return None
+
+
+def _preview_rows(session: AssistantSession) -> str:
+    preview = session.preview or {}
+    parts = [f"{name}={data.get('rows')}"
+             for item in (preview.get("integrations") or {}).values()
+             for name, data in (item.get("datasets") or {}).items()]
+    return ", ".join(parts)
+
+
+def _auto_summary(db, session: AssistantSession, run: AssistantAutoRun) -> dict:
+    """FR-004/US1 AC4: version, ids, schedule, decisions taken, preview rows and tokens."""
+    from app.models import WorkspaceVersion
+
+    contract = None
+    try:
+        contract = auto.RunContract.model_validate(run.contract or {})
+    except Exception:
+        contract = None
+    version = db.get(WorkspaceVersion, run.version_id) if run.version_id else None
+    working = session.working_state or {}
+    decisions = [str(item) for item in (working.get("decisions") or [])]
+    return {
+        "version_id": run.version_id,
+        "version": version.id if version is not None else None,
+        "integrations": sorted((version.artifacts or {}).get("integrations", {}))
+        if version is not None else [],
+        "reports": sorted((version.artifacts or {}).get("reports", {}))
+        if version is not None else [],
+        "schedule": sorted({str(item.get("schedule"))
+                            for item in ((version.artifacts or {}).get("integrations") or {})
+                            .values() if item.get("schedule")})
+        if version is not None else [],
+        "decisions": decisions,
+        "preview_rows": _preview_rows(session),
+        "tokens": session.tokens_used,
+        "stage": run.stage,
+        "stages": list(contract.stages) if contract else [],
+        "goal": contract.goal if contract else None,
+        "status": run.status,
+        "stop_reason": run.stop_reason,
+    }
+
+
+def _summary_text(summary: dict, reason: str | None) -> str:
+    lines = [t("assistant.summary.title")]
+    if summary.get("version") is not None:
+        lines.append(t("assistant.summary.version", version=summary["version"]))
+    if summary.get("integrations") or summary.get("reports"):
+        lines.append(t("assistant.summary.ids",
+                       integrations=", ".join(summary.get("integrations") or []) or "-",
+                       reports=", ".join(summary.get("reports") or []) or "-"))
+    if summary.get("schedule"):
+        lines.append(t("assistant.summary.schedule", schedule=", ".join(summary["schedule"])))
+    if summary.get("decisions"):
+        lines.append(t("assistant.summary.decisions", decisions="; ".join(summary["decisions"])))
+    if summary.get("preview_rows"):
+        lines.append(t("assistant.summary.preview_rows", rows=summary["preview_rows"]))
+    lines.append(t("assistant.summary.tokens", tokens=summary.get("tokens", 0)))
+    if reason:
+        lines.append(t("assistant.summary.stop", reason=reason))
+    return "\n".join(lines)
+
+
+def create_contract(db, session: AssistantSession, project: Project, contract, actor,
+                    ip: str | None, *, profile_id: int | None = None) -> AssistantAutoRun:
+    """Persist a confirmed contract, activate the mode and announce it (FR-001)."""
+    payload = contract.model_dump(mode="json")
+    if profile_id is not None:
+        payload["profile_id"] = profile_id
+    run = AssistantAutoRun(
+        session_id=session.id, project_id=project.id, contract=payload,
+        status="confirmed", confirmed_by=actor.id, confirmed_ip=ip)
+    db.add(run)
+    db.flush()
+    session.mode = "auto"
+    session.auto_run = run
+    _add(db, session, role="assistant", content=contract.summary(),
+         tool_payload={"contract": auto.run_json(run, contract)})
+    return run
+
+
+def arm_auto_watch(db, session: AssistantSession, run: AssistantAutoRun,
+                   version: Any) -> None:
+    """FR-008/FR-009: watch the first scheduled run and gate the new dashboards' visibility."""
+    contract = auto.contract_of(session)
+    integrations = sorted((version.artifacts or {}).get("integrations", {}))
+    run.watch_integration = ",".join(integrations) or None
+    run.watch_state = "pending" if integrations else None
+    if contract is not None and "user" in contract.visible_to:
+        _grant_dashboards(db, version, session, run)
+    db.flush()
+
+
+def _grant_dashboards(db, version: Any, session: AssistantSession,
+                      run: AssistantAutoRun) -> None:
+    """Access grants for the active `user`-role accounts, audited with the run (FR-009)."""
+    from app.models import Dashboard, DashboardAccess
+
+    reports = sorted((version.artifacts or {}).get("reports", {}))
+    if not reports:
+        return
+    dashboards = list(db.scalars(select(Dashboard).where(Dashboard.report_id.in_(reports))))
+    people = list(db.scalars(select(AppUser).where(AppUser.role == "user",
+                                                  AppUser.is_active.is_(True))))
+    for dashboard in dashboards:
+        for person in people:
+            exists = db.scalar(select(DashboardAccess.user_id).where(
+                DashboardAccess.user_id == person.id,
+                DashboardAccess.dashboard_id == dashboard.id))
+            if exists:
+                continue
+            db.add(DashboardAccess(user_id=person.id, dashboard_id=dashboard.id,
+                                   granted_by=run.confirmed_by))
+            audit_record(db, "dashboard_granted", actor_id=run.confirmed_by,
+                         target_id=person.id,
+                         detail={"dashboard": dashboard.code, "session": session.id,
+                                 "auto_run": run.id})
+
+
+def finish_auto_run(db, session: AssistantSession, *, kind: str, reason: str | None = None):
+    """Close the live contract of this turn and store its summary (FR-010, SC-002).
+
+    `kind` is one of `applied`, `stopped`, `failed`; the audit kind follows it. Returns the
+    summary (or None when there is no live contract).
+    """
+    run = getattr(session, "auto_run", None) or live_auto_run(db, session)
+    if run is None or run.status not in auto.LIVE_STATUSES:
+        return None
+    if kind == "applied" and run.version_id is None:
+        kind = "stopped"                     # nothing was applied: never claim otherwise
+        reason = reason or "stopped:no_version"
+    run.status = kind
+    run.stop_reason = (reason or None) and reason[:auto.MAX_STOP_REASON]
+    run.ended_at = datetime.now(UTC)
+    summary = _auto_summary(db, session, run)
+    run.summary = summary
+    audit_record(db, "assistant_run_applied" if kind == "applied" else "assistant_run_stopped",
+                 actor_id=getattr(getattr(session, "created_by", None), "id", None),
+                 detail={"run": run.id, "session": session.id, "status": kind,
+                         "stop_reason": run.stop_reason, "version": run.version_id,
+                         "source": f"chat:{session.id}:auto",
+                         "budget_used": session.tokens_used})
+    db.flush()
+    return summary
 
 
 def _budget_stop(db, session: AssistantSession, turn_summaries: list[str]) -> AssistantMessage:
@@ -1614,8 +1869,9 @@ def _thread_runner(session_id: int, actor_id: int, ip: str | None, claimed_at: d
 RUNNER: Callable[[int, int, str | None, datetime], None] = _thread_runner
 
 
-def stop(db, session: AssistantSession, settings) -> AssistantMessage:
-    """Stop a currently running assistant turn."""
+def stop(db, session: AssistantSession, settings, reason: str = "stopped:user"
+         ) -> AssistantMessage:
+    """Stop a currently running assistant turn (feature 017 `Detener`, feature 028 FR-007)."""
     row = db.execute(
         sql_text(
             """
@@ -1632,6 +1888,7 @@ def stop(db, session: AssistantSession, settings) -> AssistantMessage:
     set_committed_value(session, "busy_since", None)
     db.refresh(session, attribute_names=["working_state", "stats"])
     activity.end_run(session, "stopped")
+    summary = finish_auto_run(db, session, kind="stopped", reason=reason)
     running = runs.active(db, session.id)
     if running is not None and running.status != "running":
         running = None
@@ -1642,6 +1899,9 @@ def stop(db, session: AssistantSession, settings) -> AssistantMessage:
                             f"{t('commands.interrupted_resume', command=running.command)}"))
     else:
         msg = _add(db, session, role="assistant", content=t(_STOPPED_TEXT))
+    if summary is not None:
+        msg = _add(db, session, role="assistant",
+                   content=f"{msg.content}\n\n{_summary_text(summary, reason)}")
     session.updated_at = datetime.now(UTC)
     db.flush()
     return msg
@@ -1672,6 +1932,7 @@ def _attach_suggestions(session: AssistantSession, new_messages: list[AssistantM
 def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
           claim: _TurnClaim) -> list[AssistantMessage]:
     new_messages: list[AssistantMessage] = []
+    auto_run = attach_auto_run(db, session)          # feature 028: the live contract, if any
     run = runs.active(db, session.id)
     if run is not None and run.status != "running":
         run = None
@@ -1688,6 +1949,17 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _attach_suggestions(session, new_messages)
         activity.end_run(session, status)
         runs.end_from_activity(run, status, definition, finished=finished, error=error)
+        if auto_run is not None and status in _AUTO_END:
+            kind, reason = _AUTO_END[status]
+            blocked = auto_blocked_reason(
+                next((m.content for m in reversed(new_messages)
+                      if m.role == "assistant" and m.content), None))
+            if blocked:
+                reason = blocked
+            summary = finish_auto_run(db, session, kind=kind, reason=reason)
+            if summary is not None:
+                new_messages.append(_add(db, session, role="assistant",
+                                         content=_summary_text(summary, reason)))
         if run is not None and run.status == "interrupted":
             new_messages.append(_add(
                 db, session, role="assistant",
@@ -1710,7 +1982,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         new_messages.append(_add(db, session, role="assistant",
                                  content=t("commands.spec_current", spec=run.spec)))
     images = _turn_images(db, session, app_settings)
-    max_rounds = app_settings.ai_chat_max_rounds
+    max_rounds = (app_settings.ai_auto_max_rounds if auto_run is not None
+                  else app_settings.ai_chat_max_rounds)
     turn_summaries: list[str] = []
     invalid_rounds = 0
     context_retried = False
@@ -1722,6 +1995,20 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     while rounds < max_rounds:
         _bump(session, "rounds")
+        if auto_run is not None and auto_run.status in auto.LIVE_STATUSES:
+            refusal = auto.limit_refusal(auto.contract_of(session), auto_run,
+                                         tokens=int(auto_run.tokens or 0), wall_clock=True,
+                                         settings=app_settings)
+            if refusal is not None:
+                reason = f"limit:{refusal.limit}"
+                summary = finish_auto_run(db, session, kind="stopped", reason=reason)
+                if summary is not None:
+                    new_messages.append(_add(db, session, role="assistant",
+                                             content=_summary_text(summary, reason)))
+                session.updated_at = datetime.now(UTC)
+                db.flush()
+                end("limit")
+                return new_messages
         specs, restricted = _tools.offered_tool_specs(view, app_settings)
         tools = [ToolSpec(**t) for t in specs]
         offered = {t.name for t in tools}
@@ -1792,7 +2079,9 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
         rounds += 1
         activity.begin_round(session, rounds)
-        _count_usage(session, reply.usage, app_settings)
+        spent = _count_usage(session, reply.usage, app_settings)
+        if auto_run is not None:
+            auto_run.tokens = int(auto_run.tokens or 0) + int(spent)
         if run is not None:
             runs.add_tokens(run, reply.usage.input + reply.usage.output)
         ceiling = app_settings.ai_command_token_ceiling
@@ -1976,9 +2265,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             return new_messages
         was_ready = now_ready
 
-    new_messages.append(
-        _progress(db, view, provider, app_settings, text, turn_summaries, max_rounds)
-    )
+    if auto_run is None:
+        new_messages.append(
+            _progress(db, view, provider, app_settings, text, turn_summaries, max_rounds)
+        )
     end("limit")
     return new_messages
 
@@ -1994,7 +2284,7 @@ def message_json(m: AssistantMessage) -> dict:
         data["tool_name"] = m.tool_name
     payload = m.tool_payload if isinstance(m.tool_payload, dict) else {}
     if m.role == "assistant":
-        for key in ("suggestions", "scope"):    # feature 021 plan §5 and §7
+        for key in ("suggestions", "scope", "contract"):   # 021 §5/§7, 028 FR-006
             if payload.get(key):
                 data[key] = payload[key]
     return data
@@ -2134,6 +2424,8 @@ def session_json(session: AssistantSession, messages: list[AssistantMessage], *,
         "project": _project_ref(session),
         "current_spec": session.current_spec,
         "read_only": session.read_only,
+        "mode": session.mode or "edit",
+        **_contract_json(db, session),
         "working_state": session.working_state or {},
         "readiness": readiness.compute(view, user_texts),
         "stats": session.stats or {},
@@ -2150,6 +2442,25 @@ def session_json(session: AssistantSession, messages: list[AssistantMessage], *,
         "messages": messages_json(db, session.id, messages),
         **_command_json(db, session),
     }
+
+
+def latest_contract_status(db, session: AssistantSession) -> str:
+    """The pill of the conversation list without loading every run (feature 028)."""
+    status = db.scalar(
+        select(AssistantAutoRun.status)
+        .where(AssistantAutoRun.session_id == session.id)
+        .order_by(AssistantAutoRun.started_at.desc(), AssistantAutoRun.id.desc())
+        .limit(1))
+    return status or "none"
+
+
+def _contract_json(db, session: AssistantSession) -> dict:
+    """The mode pill and the contract of `session_json` (feature 028, contracts §5)."""
+    run = getattr(session, "auto_run", None)
+    if run is None and db is not None and session.id is not None:
+        run = last_auto_run(db, session)
+    session.auto_run = run
+    return {"contract": auto.run_json(run), "contract_status": auto.pill(session)}
 
 
 def _spec_choices(db, session: AssistantSession) -> list[dict]:
