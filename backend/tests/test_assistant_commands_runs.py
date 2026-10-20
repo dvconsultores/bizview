@@ -11,7 +11,7 @@ SPEC = "003-x"
 
 def _run(**kwargs):
     fields = {"status": "running", "pending": {"x": 1}, "error": None, "ended_at": None,
-              "tokens": 0, "files": [], "resumed_from": None}
+              "tokens": 0, "files": [], "result": None, "resumed_from": None}
     fields.update(kwargs)
     return SimpleNamespace(**fields)
 
@@ -19,7 +19,7 @@ def _run(**kwargs):
 def test_end_from_activity_mapping():
     plan, clarify = REGISTRY["speckit-plan"], REGISTRY["speckit-clarify"]
     for activity, expected in (("ready", "completed"), ("done", "completed"),
-                               ("stopped", "interrupted"), ("budget", "interrupted"),
+                               ("stopped", "interrupted"), ("budget", "budget"),
                                ("limit", "interrupted")):
         run = _run()
         runs.end_from_activity(run, activity, plan)

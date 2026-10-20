@@ -890,7 +890,10 @@ class EmailDelivery(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-COMMAND_RUN_STATUSES = ("running", "waiting", "completed", "interrupted", "failed")
+COMMAND_RUN_STATUSES = (
+    "running", "waiting", "completed", "misrouted", "budget", "interrupted", "failed",
+)
+RESOLVE_SOURCES = ("argument", "number", "title", "current")
 
 
 class AssistantCommandRun(Base):
@@ -903,6 +906,8 @@ class AssistantCommandRun(Base):
         CheckConstraint("spec IS NULL OR spec ~ '^[0-9]{3}-[a-z0-9-]{1,60}$'", name="spec"),
         CheckConstraint("locale IN ('es', 'en')", name="locale"),
         CheckConstraint(_in("status", COMMAND_RUN_STATUSES), name="status"),
+        CheckConstraint("resolved_from IS NULL OR " + _in("resolved_from", RESOLVE_SOURCES),
+                        name="resolved_from"),
         CheckConstraint("tokens >= 0", name="tokens"),
         Index("ux_command_run_active", "session_id", unique=True,
               postgresql_where=text("status IN ('running', 'waiting')")),
@@ -920,6 +925,8 @@ class AssistantCommandRun(Base):
     command: Mapped[str] = mapped_column(Text)
     arguments: Mapped[str] = mapped_column(Text, server_default=text("''"))
     spec: Mapped[str | None] = mapped_column(Text)
+    resolved_from: Mapped[str | None] = mapped_column(Text)
+    forced: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     reserved_number: Mapped[int | None] = mapped_column(SmallInteger)
     locale: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
@@ -927,6 +934,7 @@ class AssistantCommandRun(Base):
     resumed_from: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("assistant_command_run.id", ondelete="SET NULL"))
     files: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    result: Mapped[dict | None] = mapped_column(JSONB)
     tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     error: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

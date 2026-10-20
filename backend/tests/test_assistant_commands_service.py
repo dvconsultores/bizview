@@ -88,7 +88,8 @@ def test_missing_prerequisite_suggests_the_command(chat, superuser):
     assert r.status_code == 202, r.text
     last = r.json()["messages"][-1]
     assert "plan.md" in last["content"] and "/speckit-plan" in last["content"]
-    assert last["suggestions"] == [{"command": "speckit-plan", "arguments": ""}]
+    assert last["suggestions"] == [{"command": "speckit-plan", "arguments": "",
+                                    "spec": "001-ventas"}]
     assert fake.SHARED.requests == []
     assert _session(c, sid)["active_command"] is None
 
@@ -130,7 +131,8 @@ def test_plain_message_cannot_write_and_may_suggest(chat):
     fake.SHARED.queue(
         _reply("", [_call("edit_draft", {"ops": [
             {"op": "write", "path": "specs/001-ventas/spec.md", "content": SPEC}]}),
-            _call("suggest_command", {"command": "speckit-specify", "arguments": "Ventas"},
+            _call("suggest_command", {"command": "speckit-specify", "arguments": "Ventas",
+                                     "spec": ""},
                   "call-2")]),
         _reply("Usa el comando sugerido."),
     )
@@ -261,7 +263,8 @@ def test_interrupted_implement_resumes_without_losing_files(chat, superuser, mon
     assert [f["path"] for f in first["files"]] == [report]
     last = data["messages"][-1]
     assert "/speckit-implement" in last["content"]
-    assert last["suggestions"] == [{"command": "speckit-implement", "arguments": ""}]
+    assert last["suggestions"] == [{"command": "speckit-implement", "arguments": "",
+                                    "spec": "001-ventas"}]
     assert (fs.project_root(project["slug"]) / report).read_text() == "id: ventas\n"
 
     monkeypatch.setattr(get_settings(), "ai_chat_max_rounds", 4)

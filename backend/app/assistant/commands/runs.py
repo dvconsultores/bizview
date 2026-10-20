@@ -59,14 +59,17 @@ def latest_for(db, session_id: int, command: str,
 
 def create(db, *, session_id: int, project_id: int, definition: CommandDef, arguments: str,
            locale: str, message_id: int | None = None, spec: str | None = None,
+           resolved_from: str | None = None, forced: bool = False,
            reserved_number: int | None = None, status: str = "running",
-           pending: dict | None = None, resumed_from: int | None = None) -> AssistantCommandRun:
+           pending: dict | None = None, resumed_from: int | None = None,
+           result: dict | None = None) -> AssistantCommandRun:
     """Insert a run; a second active run in the conversation is refused (409 command_active)."""
     run = AssistantCommandRun(
         session_id=session_id, project_id=project_id, message_id=message_id,
         command=definition.name, arguments=arguments, spec=spec,
+        resolved_from=resolved_from, forced=forced,
         reserved_number=reserved_number, locale=locale, status=status, pending=pending,
-        resumed_from=resumed_from, files=[], tokens=0)
+        resumed_from=resumed_from, files=[], result=result, tokens=0)
     try:
         with db.begin_nested():
             db.add(run)
@@ -87,19 +90,31 @@ def finish(run, status: str, error: str | None = None) -> None:
     run.ended_at = _now()
 
 
+def _complete(run) -> None:
+    """A run that wrote nothing because its write went to another spec is `misrouted`."""
+    stored = getattr(run, "result", None)
+    result = stored if isinstance(stored, dict) else {}
+    if not run.files and result.get("misrouted_to"):
+        finish(run, "misrouted", result.get("error"))
+    else:
+        finish(run, "completed")
+
+
 def end_from_activity(run, activity_status: str, definition: CommandDef, *,
                       finished: bool = False, error: str | None = None) -> None:
     """End-of-turn status of the running run from the 017 activity status (plan §6)."""
     if run is None or run.status != "running":
         return
     if finished or activity_status == "ready":
-        finish(run, "completed")
+        _complete(run)
     elif activity_status == "done":
         if definition.interactive:
             run.status = "waiting"
         else:
-            finish(run, "completed")
-    elif activity_status in ("stopped", "budget", "limit"):
+            _complete(run)
+    elif activity_status == "budget":
+        finish(run, "budget")
+    elif activity_status in ("stopped", "limit"):
         finish(run, "interrupted")
     elif activity_status == "error":
         finish(run, "failed", error or "error")

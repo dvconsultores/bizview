@@ -1,0 +1,16 @@
+{
+  "_note": "Anonymized replay of session 18 (project 'artemisa', exported 2026-10-19). The brief wrote two specs and left current_spec on 001; every later command was routed to 001. The 002 plan command must now write specs/002-ventas-facturacion/plan.md on its first attempt.",
+  "project": "artemisa",
+  "current_spec": "001-integracion-facturas",
+  "command": "/speckit-plan Plan del reporte 002-ventas-facturacion sobre el dataset invoices",
+  "files": {
+    "specs/001-integracion-facturas/spec.md": "# Feature Specification: Integración de facturas\n\n**Tipo**: integracion\n**Status**: Implemented\n\nCarga de facturas desde el origen.\n",
+    "specs/001-integracion-facturas/plan.md": "# Plan de 001-integracion-facturas\n\n**Status**: Approved\n\nContexto técnico de la integración.\n",
+    "specs/001-integracion-facturas/tasks.md": "# Tareas\n\n- [X] T001 Contrato del dataset\n- [X] T002 Consulta de extracción\n- [X] T003 Comprobaciones\n",
+    "specs/002-ventas-facturacion/spec.md": "# Feature Specification: Ventas y facturación\n\n**Tipo**: reporte\n**Status**: Draft\n\nReporte de ventas y facturación sobre el dataset invoices.\n"
+  },
+  "writes": {
+    "specs/002-ventas-facturacion/plan.md": "# Plan de 002-ventas-facturacion\n\n**Status**: Draft\n\n## Contexto técnico\n\nReporte directo sobre `integrations/facturas/integration.yaml`.\n"
+  },
+  "expected_spec": "002-ventas-facturacion"
+}

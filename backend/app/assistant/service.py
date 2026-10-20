@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg.errors
 import yaml
 from bizview_cli import authoring
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy import text as sql_text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import object_session
@@ -29,7 +29,7 @@ from app.ai import (
 from app.assistant import activity, origin, readiness
 from app.assistant import attachments as _attachments
 from app.assistant import tools as _tools
-from app.assistant.commands import registry, runs, scope
+from app.assistant.commands import registry, resolve, runs, scope
 from app.assistant.commands.prompt import context_for, system_for
 from app.assistant.personal import query_tables
 from app.assistant.tools import ToolError, _bump, run_tool
@@ -44,6 +44,7 @@ from app.models import (
     AssistantSession,
     DataSource,
     Project,
+    ProjectFileRevision,
 )
 from app.projects import fs
 from app.projects import specs as project_specs
@@ -110,11 +111,12 @@ one-line summary; when you need an answer from the user, ask and end your turn w
 document you are writing, and only stop for something irreversible or about privacy, credentials
 or scope. In plain messages (no command) you may inspect (list_sources,
 describe_source, profile_source, read_draft, get_authoring_guide, get_workspace) and answer,
-but never write files: propose the right command with `suggest_command`, whose `arguments` is a
-summary of at most 160 characters (a brief, a list of columns or a full specification belongs in
-your reply text, never in the tool call), and say in one line what it will do. One suggestion per
-reply is enough; repeating it does not add anything. Applying the project is always the user's
-action (Apply button), never yours.
+but never write files: propose the right command with `suggest_command`, whose `spec` is the
+target spec folder ("" only for /speckit-specify, /speckit-constitution, /fix and /ayuda) and whose
+`arguments` is a summary of at most 160 characters (a brief, a list of columns or a full
+specification belongs in your reply text, never in the tool call), and say in one line what it
+will do. One suggestion per reply is enough; repeating it does not add anything. Applying the
+project is always the user's action (Apply button), never yours.
 
 Project layout: paths are relative to the project folder: project.yaml,
 specs/NNN-name/spec.md|plan.md|tasks.md (and optional research.md, data-model.md, quickstart.md,
@@ -187,11 +189,12 @@ pregunta y termina tu turno sin `finish_command`. Si el usuario pide una ejecuci
 el documento que escribes y detente solo ante algo irreversible o que afecte privacidad,
 credenciales o alcance. En mensajes sin comando puedes inspeccionar
 (list_sources, describe_source, profile_source, read_draft, get_authoring_guide, get_workspace)
-y responder, pero nunca escribir archivos: propón el comando adecuado con `suggest_command`, cuyos
-`arguments` son un resumen de 160 caracteres como máximo (un brief, una lista de columnas o una
-especificación completa van en el texto de tu respuesta, nunca en la llamada a la herramienta), y di
-en una línea qué hará. Una sola sugerencia por respuesta basta; repetirla no aporta nada. Aplicar el
-proyecto es siempre una acción del usuario (botón Aplicar), nunca tuya.
+y responder, pero nunca escribir archivos: propón el comando adecuado con `suggest_command`, cuyo
+`spec` es la carpeta de la spec objetivo ("" solo para /speckit-specify, /speckit-constitution,
+/fix y /ayuda) y cuyos `arguments` son un resumen de 160 caracteres como máximo (un brief, una lista
+de columnas o una especificación completa van en el texto de tu respuesta, nunca en la llamada a la
+herramienta), y di en una línea qué hará. Una sola sugerencia por respuesta basta; repetirla no
+aporta nada. Aplicar el proyecto es siempre una acción del usuario (botón Aplicar), nunca tuya.
 
 Estructura del proyecto: las rutas son relativas a la carpeta del proyecto: project.yaml,
 specs/NNN-nombre/spec.md|plan.md|tasks.md (y opcionales research.md, data-model.md, quickstart.md,
@@ -1327,8 +1330,11 @@ def start(db, actor, session: AssistantSession, text: str, app_settings,
 Reply = tuple[str, dict | None]
 
 
-def _suggestion(command: str, arguments: str = "") -> dict:
-    return {"suggestions": [{"command": command, "arguments": arguments}]}
+def _suggestion(command: str, arguments: str = "", spec: str | None = None) -> dict:
+    item = {"command": command, "arguments": arguments}
+    if spec:
+        item["spec"] = spec
+    return {"suggestions": [item]}
 
 
 def _approve_spec(actor, view: WorkView, run) -> None:
@@ -1361,6 +1367,71 @@ def _scope_refusal(db, session: AssistantSession, text: str) -> Reply | None:
     with use_locale(decision.lang or current()):
         content = f"{t('scope.refusal')}\n\n{t('scope.examples')}"
     return content, {"scope": {"path": "precheck", "rule": decision.rule}}
+
+
+def _spec_rows(db, view) -> list[dict]:
+    """The project's specs with their stage (the resolver's source of truth)."""
+    return project_specs.list_specs(db, view.project)
+
+
+def _spec_names(specs: list[dict]) -> str:
+    return ", ".join(item["folder"] for item in specs)
+
+
+_SNAPSHOT_DOCS = ("spec.md", "plan.md", "tasks.md")
+
+
+def _revision_ids(db, project_id: int, paths: list[str]) -> dict[str, int]:
+    """Latest revision id per path (0 when the file was never revised)."""
+    rows = db.execute(
+        select(ProjectFileRevision.path, func.max(ProjectFileRevision.id))
+        .where(ProjectFileRevision.project_id == project_id,
+               ProjectFileRevision.path.in_(paths))
+        .group_by(ProjectFileRevision.path)
+    ).all()
+    found = {path: int(revision) for path, revision in rows}
+    return {path: found.get(path, 0) for path in paths}
+
+
+def _revisions(db, project_id: int, spec: str) -> dict[str, int]:
+    paths = [f"specs/{spec}/{name}" for name in _SNAPSHOT_DOCS]
+    revisions = _revision_ids(db, project_id, paths)
+    return {name.split(".")[0]: revisions[path] for name, path in zip(_SNAPSHOT_DOCS, paths,
+                                                                      strict=True)}
+
+
+def _idempotence(db, session: AssistantSession, view, definition, spec: str | None,
+                 forced: bool) -> str | None:
+    """Product reply when the command's target is already complete (028 defect fix, section D)."""
+    if forced or not spec:
+        return None
+    files = view.files()
+    paths = {name: f"specs/{spec}/{name}" for name in _SNAPSHOT_DOCS}
+    revisions = _revision_ids(db, view.project.id, list(paths.values()))
+    name = definition.name
+    if name == "speckit-plan":
+        plan, source = paths["plan.md"], paths["spec.md"]
+        if plan in files and revisions[source] <= revisions[plan]:
+            return t("commands.plan_exists", spec=spec)
+    elif name == "speckit-tasks":
+        plan, tasks = paths["plan.md"], paths["tasks.md"]
+        if tasks in files and revisions[plan] <= revisions[tasks]:
+            return t("commands.tasks_exist", spec=spec)
+    elif name == "speckit-implement":
+        tasks_text = files.get(paths["tasks.md"])
+        validated = ((view.validation or {}).get("valid") is True
+                     or readiness.compute(view)["ready"])
+        if (tasks_text is not None and project_specs.open_tasks(tasks_text) == 0
+                and validated):
+            return t("commands.implement_done", spec=spec)
+    elif name == "speckit-converge":
+        current = {doc.split(".")[0]: revisions[path] for doc, path in paths.items()}
+        last = runs.latest_for(db, session.id, name, spec)
+        if last is not None and last.status == "completed":
+            result = last.result if isinstance(last.result, dict) else {}
+            if result.get("gaps") == 0 and result.get("revisions") == current:
+                return t("commands.converge_clean", spec=spec)
+    return None
 
 
 def _command_turn(db, actor, session: AssistantSession, parsed,
@@ -1408,20 +1479,50 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     if refusal:
         return None, [refusal]
     view = for_session(db, session)
-    spec = session.current_spec if definition.needs_spec else None
-    if definition.needs_spec and not spec:
-        listed = [{"folder": item["folder"], "title": item.get("title"),
-                   "kind": item.get("kind"), "stage": item.get("stage")}
-                  for item in project_specs.list_specs(db, view.project)]
-        raise ApiError(409, "needs_spec", M("commands.needs_spec", command=definition.name),
-                       extra={"command": definition.name, "specs": listed})
+    arguments, forced = resolve.strip_force(parsed.args)
+    specs = _spec_rows(db, view)
+    spec = None
+    source = None
+    if definition.needs_spec:
+        resolution = resolve.resolve(specs, arguments, session.current_spec)
+        spec, source = resolution.spec, resolution.source
+        if not spec:
+            if not specs:
+                raise ApiError(409, "needs_spec",
+                               M("commands.needs_spec_none", command=definition.name),
+                               extra={"command": definition.name, "specs": []})
+            example = specs[0]["folder"]
+            raise ApiError(
+                409, "needs_spec",
+                M("commands.needs_spec", command=definition.name, example=example,
+                  specs=_spec_names(specs)),
+                extra={"command": definition.name, "specs": [
+                    {"folder": item["folder"], "title": item.get("title"),
+                     "kind": item.get("kind"), "stage": item.get("stage")}
+                    for item in specs]})
+        if spec != session.current_spec:
+            # The user's command is the stronger signal: it also moves current_spec.
+            session.current_spec = spec
+            spec_line = (t("commands.spec_current", spec=spec), None)
+        else:
+            spec_line = None
+    else:
+        spec_line = None
+    already = _idempotence(db, session, view, definition, spec, forced)
+    if already:
+        return None, [*([spec_line] if spec_line else []),
+                      (already, _suggestion(definition.name, spec=spec))]
     check = runs.preflight(definition, spec, view.files())
     if check.missing:
-        return None, [(check.message, _suggestion(check.command))]
+        return None, [*([spec_line] if spec_line else []),
+                      (check.message, _suggestion(check.command, spec=spec))]
     previous = runs.latest_for(db, session.id, definition.name, spec)
+    result = ({"revisions": _revisions(db, view.project.id, spec)}
+              if definition.name == "speckit-converge" and spec else None)
     run = runs.create(
         db, session_id=session.id, project_id=session.project_id, definition=definition,
-        arguments=parsed.args, locale=current(), spec=spec,
+        arguments=arguments, locale=current(), spec=spec, resolved_from=source,
+        forced=forced, result=result,
         reserved_number=view.next_spec() if definition.name == "speckit-specify" else None,
         status="waiting" if check.pending else "running", pending=check.pending,
         resumed_from=(previous.id if previous is not None and previous.status == "interrupted"
@@ -1579,12 +1680,18 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     def end(status: str, error: str | None = None) -> None:
         """End of the turn: activity run, command run (plan §6) and the turn's suggestions."""
+        if run is not None and run.command == "speckit-converge":
+            result = dict(run.result or {})
+            result["gaps"] = 0 if not run.files else None
+            result["files"] = [entry.get("path") for entry in (run.files or [])]
+            run.result = result
         _attach_suggestions(session, new_messages)
         activity.end_run(session, status)
         runs.end_from_activity(run, status, definition, finished=finished, error=error)
         if run is not None and run.status == "interrupted":
             new_messages.append(_add(
-                db, session, role="assistant", tool_payload=_suggestion(run.command),
+                db, session, role="assistant",
+                tool_payload=_suggestion(run.command, spec=run.spec),
                 content=t("commands.interrupted_resume", command=run.command)))
 
     if _budget_exhausted(db, session, app_settings):
@@ -1598,6 +1705,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     provider = get_provider(app_settings)
     history, summaries = _load_history_with_summaries(db, session.id)
+    if run is not None and run.spec and run.resolved_from not in (None, "current"):
+        # Routing is visible: the user sees which spec the command runs on.
+        new_messages.append(_add(db, session, role="assistant",
+                                 content=t("commands.spec_current", spec=run.spec)))
     images = _turn_images(db, session, app_settings)
     max_rounds = app_settings.ai_chat_max_rounds
     turn_summaries: list[str] = []
@@ -1616,10 +1727,16 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         offered = {t.name for t in tools}
         view.refresh()  # files edited in the editor or by another conversation
         context = _context(view, app_settings)
+        stage = None
         if run is not None:
+            # Only a command reads the spec list (and every project file) before the model: a
+            # plain message must not flush a pending write just before the provider call.
+            listed = project_specs.list_specs(db, view.project)
+            stage = next((item.get("stage") for item in listed
+                          if item["folder"] == run.spec), None)
             context = context_for(
                 project_name=view.project.name, project_slug=view.project.slug,
-                specs=project_specs.list_specs(db, view.project),
+                specs=listed,
                 current_spec=view.current_spec, next_spec=view.next_spec(), run=run,
                 definition=definition, files=view.files(), locale=run.locale,
                 resume=runs.resume_info(db, run, (session.working_state or {}).get("progress")),
@@ -1631,8 +1748,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 _with_images(compact_history(history, summaries),
                              [] if images_dropped else images),
                 tools=tools,
-                system=(system_for(definition, run.locale) if run is not None
-                        else system_prefix()),
+                system=(system_for(definition, run.locale, spec=run.spec, stage=stage)
+                        if run is not None else system_prefix()),
                 context=context,
                 max_tokens=app_settings.ai_chat_max_tokens,
             )
@@ -1678,6 +1795,19 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _count_usage(session, reply.usage, app_settings)
         if run is not None:
             runs.add_tokens(run, reply.usage.input + reply.usage.output)
+        ceiling = app_settings.ai_command_token_ceiling
+        if run is not None and ceiling and (run.tokens or 0) >= ceiling:
+            # Per-command ceiling: stop before touching the project again; the draft stays as is.
+            if reply.text.strip():
+                new_messages.append(_add(db, session, role="assistant", content=reply.text))
+            new_messages.append(_add(
+                db, session, role="assistant",
+                content=t("commands.ceiling", ceiling=ceiling, command=run.command,
+                          spec=run.spec or "-")))
+            session.updated_at = datetime.now(UTC)
+            db.flush()
+            end("budget")
+            return new_messages
 
         if not reply.tool_calls and (reply.stop_reason == "max_tokens" or not reply.text.strip()):
             text_out = (reply.text.rstrip() + "\n\n" + t(_CUT_TEXT)).strip() \
@@ -1871,8 +2001,13 @@ def message_json(m: AssistantMessage) -> dict:
 
 
 def _run_json(run) -> dict:
+    result = run.result if isinstance(run.result, dict) else {}
     return {"id": run.id, "message_id": run.message_id, "command": run.command,
-            "spec": run.spec, "status": run.status, "files": run.files or [],
+            "arguments": run.arguments or "", "spec": run.spec,
+            "resolved_from": run.resolved_from, "forced": bool(run.forced),
+            "status": run.status, "files": run.files or [],
+            "misrouted_to": result.get("misrouted_to"),
+            "ceiling": get_settings().ai_command_token_ceiling,
             "tokens": run.tokens or 0, "started_at": run.started_at.isoformat(),
             "ended_at": run.ended_at.isoformat() if run.ended_at else None}
 
@@ -1980,7 +2115,8 @@ def messages_json(db, session_id: int, messages: list[AssistantMessage]) -> list
     ]
 
 
-def session_json(session: AssistantSession, messages: list[AssistantMessage]) -> dict:
+def session_json(session: AssistantSession, messages: list[AssistantMessage], *,
+                 with_specs: bool = True) -> dict:
     settings = get_settings()
     user_texts = [m.content for m in messages if m.role == "user"]
     db = object_session(session)
@@ -2008,9 +2144,23 @@ def session_json(session: AssistantSession, messages: list[AssistantMessage]) ->
         "model": settings.ai_model_effective,
         "created_at": session.created_at.isoformat(),
         "updated_at": session.updated_at.isoformat(),
+        # The selector's data is read from disk: not on every send response (the chat polls the
+        # GET while a run is busy), only when a screen asks for the whole conversation.
+        "specs": _spec_choices(db, session) if with_specs else [],
         "messages": messages_json(db, session.id, messages),
         **_command_json(db, session),
     }
+
+
+def _spec_choices(db, session: AssistantSession) -> list[dict]:
+    """The project's specs and stages, for the conversation header's current-spec selector."""
+    project = db.get(Project, session.project_id) if db is not None and session.project_id else None
+    if project is None:
+        return []
+    return [{"folder": item["folder"], "number": item.get("number"),
+             "title": item.get("title"), "kind": item.get("kind"),
+             "stage": item.get("stage")}
+            for item in project_specs.list_specs(db, project)]
 
 
 def extend_budget(db, actor, session: AssistantSession, settings, ip) -> None:

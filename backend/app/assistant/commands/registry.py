@@ -15,7 +15,7 @@ from app.i18n import M
 
 INSPECTION_TOOLS = frozenset({
     "list_sources", "describe_source", "profile_source", "get_workspace", "get_authoring_guide",
-    "read_draft", "get_app_guide", "get_project_overview", "update_notes",
+    "read_draft", "get_app_guide", "get_project_overview", "update_notes", "set_current_spec",
 })
 
 
