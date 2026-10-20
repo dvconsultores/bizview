@@ -7,6 +7,7 @@ import type {
   AssistantSession, FileChangedCurrent, ProjectCheck, ProjectDetail, ProjectStatus, ProjectTree,
 } from "../../api/types";
 import { AssistantChat } from "../../components/assistant/AssistantChat";
+import { SpecSelect } from "../../components/assistant/SpecSelect";
 import { BackLink } from "../../components/BackLink";
 import { PreviewReports } from "../../components/assistant/PreviewReports";
 import { Alert } from "../../components/Alert";
@@ -604,14 +605,11 @@ export function ProjectWorkspace() {
           <Button variant="secondary" onClick={() => void newConversation()}>{t.projects.newChat}</Button>
         )}
         {session && project.specs.length > 0 && (
-          <>
-            <label className="sr-only" htmlFor="project-spec">{t.projects.currentSpec}</label>
-            <select id="project-spec" value={session.current_spec ?? ""} onChange={(e) => void setSpec(e.target.value)}
-                    className="min-h-tap rounded-card border border-line bg-surface px-2 text-sm text-ink">
-              <option value="">{t.projects.noCurrentSpec}</option>
-              {project.specs.map((s) => <option key={s.folder} value={s.folder}>{s.folder}</option>)}
-            </select>
-          </>
+          <SpecSelect
+            current={session.current_spec ?? null}
+            specs={project.specs}
+            onChange={(folder) => void setSpec(folder)}
+          />
         )}
       </div>
       {!ai_enabled && <div className="p-2"><Alert tone="info">{t.projects.aiOff}</Alert></div>}

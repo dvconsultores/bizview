@@ -8,6 +8,8 @@ const PILL: Record<CommandRunStatus, string> = {
   running: "bg-accent-soft text-accent",
   waiting: "bg-accent-soft text-accent",
   completed: "bg-success-soft text-success-strong",
+  misrouted: "bg-warning-soft text-warning-strong",
+  budget: "bg-warning-soft text-warning-strong",
   interrupted: "bg-warning-soft text-warning-strong",
   failed: "bg-danger-soft text-danger-strong",
 };
@@ -16,9 +18,20 @@ const ICON: Record<CommandRunStatus, typeof Check> = {
   running: Loader2,
   waiting: Clock,
   completed: Check,
+  misrouted: AlertTriangle,
+  budget: AlertTriangle,
   interrupted: AlertTriangle,
   failed: XCircle,
 };
+
+/** `/${command} ${spec} ${arguments}` with no repeated spec. */
+function rerunText(run: CommandRun, spec: string | null): string {
+  const arguments_ = run.arguments?.trim() ?? "";
+  const parts = [`/${run.command}`];
+  if (spec && !arguments_.includes(spec)) parts.push(spec);
+  if (arguments_) parts.push(arguments_);
+  return `${parts.join(" ")} `;
+}
 
 /** One command run in the transcript (feature 021 plan §6): status, files, Terminar/re-run. */
 export function CommandRunChip(props: {
@@ -33,7 +46,15 @@ export function CommandRunChip(props: {
   const { run, onFinish, finishing, onRerun, onOpenFile } = props;
   const active = run.status === "running" || run.status === "waiting";
   const title = (
-    run.spec ? (active ? c.chipRunning : c.chipDone) : active ? c.chipRunningNoSpec : c.chipDoneNoSpec
+    run.status === "misrouted"
+      ? c.chipMisrouted
+      : run.spec
+        ? active
+          ? c.chipRunning
+          : c.chipDone
+        : active
+          ? c.chipRunningNoSpec
+          : c.chipDoneNoSpec
   )
     .replace("{command}", run.command)
     .replace("{spec}", run.spec ?? "");
@@ -92,11 +113,34 @@ export function CommandRunChip(props: {
           </button>
         </div>
       ) : null}
+      {run.status === "budget" && run.ceiling ? (
+        <p className="mt-2 text-xs text-warning-strong">
+          {c.ceiling.replace("{ceiling}", String(run.ceiling))}
+        </p>
+      ) : null}
+      {run.status === "misrouted" && run.misrouted_to ? (
+        <p className="mt-2 text-xs text-warning-strong" data-misrouted={run.misrouted_to}>
+          {c.misrouted.replace("{spec}", run.misrouted_to)}
+        </p>
+      ) : null}
+      {run.status === "misrouted" && run.misrouted_to && onRerun ? (
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            data-run-on-spec={run.misrouted_to}
+            onClick={() => onRerun(rerunText(run, run.misrouted_to ?? null))}
+            className="inline-flex min-h-tap items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            {c.runOnSpec.replace("{spec}", run.misrouted_to ?? "")}
+          </button>
+        </div>
+      ) : null}
       {run.status === "interrupted" && onRerun ? (
         <div className="mt-3 flex gap-2">
           <button
             type="button"
-            onClick={() => onRerun(`/${run.command} `)}
+            onClick={() => onRerun(rerunText(run, null))}
             className="inline-flex min-h-tap items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink hover:border-line-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <RotateCcw className="h-4 w-4" aria-hidden />

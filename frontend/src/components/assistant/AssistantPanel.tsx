@@ -23,6 +23,7 @@ import { ProblemList } from "./ProblemList";
 import { ProjectProposal } from "./ProjectProposal";
 import { ReadinessPill } from "./Readiness";
 import { SessionIndicator } from "./SessionIndicator";
+import { SpecSelect } from "./SpecSelect";
 
 const ICON_BUTTON =
   "inline-flex min-h-tap min-w-tap items-center justify-center rounded-xl text-ink-muted hover:bg-subtle hover:text-ink";
@@ -144,6 +145,19 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
     setSession((prev) =>
       prev && prev.id === s.id ? { ...prev, title: s.title } : prev,
     );
+  // Changing the current spec is a normal POST (no step-up): the header selector.
+  const changeSpec = async (spec: string) => {
+    if (!session) return;
+    try {
+      const updated = await api.post<AssistantSession>(
+        `/api/assistant/sessions/${session.id}/spec`,
+        { spec },
+      );
+      setSession(updated);
+    } catch {
+      // Keep the previous spec; the next session poll shows the server's value.
+    }
+  };
 
   const content = (
     <>
@@ -167,6 +181,15 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
             {t.assistant.panelTitle}
           </h2>
         )}
+        {session && session.specs && session.specs.length > 0 ? (
+          <div className="order-last w-full pb-2 sm:order-none sm:w-auto sm:shrink-0 sm:pb-0">
+            <SpecSelect
+              current={session.current_spec ?? null}
+              specs={session.specs}
+              onChange={(spec) => void changeSpec(spec)}
+            />
+          </div>
+        ) : null}
         {session ? (
           <div
             className="order-last flex w-full min-w-0 pb-2 sm:order-none sm:mr-1 sm:w-auto sm:shrink sm:pb-0"

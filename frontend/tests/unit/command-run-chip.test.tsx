@@ -72,6 +72,33 @@ describe("CommandRunChip", () => {
     expect(button(t.assistant.commands.finish)).toBeUndefined();
   });
 
+  it("misrouted run shows a warning and re-runs it on the right spec", () => {
+    const onRerun = vi.fn();
+    render(
+      <CommandRunChip
+        run={{
+          ...run,
+          command: "speckit-plan",
+          status: "misrouted",
+          spec: "001-integracion-facturas",
+          misrouted_to: "002-ventas-facturacion",
+          arguments: "Plan del reporte",
+          files: [],
+        }}
+        onRerun={onRerun}
+      />,
+    );
+    expect(container.querySelector('[data-status="misrouted"]')?.textContent).toBe(
+      t.assistant.commands.status.misrouted,
+    );
+    expect(container.querySelector("[data-misrouted]")).not.toBeNull();
+    expect(button(t.assistant.commands.finish)).toBeUndefined();
+    act(() => button(t.assistant.commands.runOnSpec.replace("{spec}", "002-ventas-facturacion"))!.click());
+    expect(onRerun).toHaveBeenCalledWith(
+      "/speckit-plan 002-ventas-facturacion Plan del reporte ",
+    );
+  });
+
   it("interrupted run offers to run it again", () => {
     const onRerun = vi.fn();
     render(

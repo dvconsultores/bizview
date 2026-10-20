@@ -756,15 +756,27 @@ export interface CommandDef {
   needs_spec: boolean;
   needs_args: boolean;
 }
-export type CommandRunStatus = "running" | "waiting" | "completed" | "interrupted" | "failed";
+export type CommandRunStatus =
+  | "running"
+  | "waiting"
+  | "completed"
+  | "misrouted"
+  | "budget"
+  | "interrupted"
+  | "failed";
 export interface CommandRunFile { path: string; action: string; revision_id: number | null; }
 export interface CommandRun {
   id: number;
   message_id: number | null;
   command: string;
+  arguments?: string;
   spec: string | null;
+  resolved_from?: string | null;
+  forced?: boolean;
   status: CommandRunStatus;
   files: CommandRunFile[];
+  misrouted_to?: string | null;
+  ceiling?: number;
   tokens: number;
   started_at: string;
   ended_at: string | null;
@@ -776,8 +788,13 @@ export interface ActiveCommand {
   status: CommandRunStatus;
   pending: { gate: string } | null;
 }
-export interface CommandSuggestionItem { command: string; arguments: string; }
-export interface SpecChoice { folder: string; title: string | null; kind: string | null; stage: string | null; }
+export interface CommandSuggestionItem { command: string; arguments: string; spec?: string | null; }
+export interface SpecChoice {
+  folder: string;
+  title?: string | null;
+  kind?: string | null;
+  stage?: string | null;
+}
 
 export interface AssistantDraft {
   files: Record<string, string>;
@@ -870,6 +887,8 @@ export interface AssistantSession {
   budget_max?: number;
   busy?: boolean;
   model?: string | null;
+  /** The project's specs and stages (conversation header selector). */
+  specs?: SpecChoice[];
   /** Feature 020: every conversation belongs to a BI project. */
   project?: ProjectRef | null;
   current_spec?: string | null;

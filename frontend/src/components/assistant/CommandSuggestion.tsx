@@ -31,7 +31,10 @@ export function CommandSuggestions(props: {
   return (
     <div className="flex flex-wrap gap-2">
       {props.items.map((item) => {
-        const text = `/${item.command} ${item.arguments}`.trim();
+        const parts = [`/${item.command}`];
+        if (item.spec && !item.arguments.includes(item.spec)) parts.push(item.spec);
+        if (item.arguments) parts.push(item.arguments);
+        const text = parts.join(" ").trim();
         return (
           <button
             key={text}

@@ -69,6 +69,7 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
   propose_draft: FilePen,
   read_draft: FileSearch,
   profile_source: BarChart3,
+  set_current_spec: ListChecks,
 };
 
 /** Transcript + composer shared by the docked panel and the full Asistente page (feature 014). */

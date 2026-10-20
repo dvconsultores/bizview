@@ -67,8 +67,8 @@ export const projectsApi = {
       .then((r) => r.sessions),
   createSession: (project: string, title?: string) =>
     api.post<AssistantSession>("/api/assistant/sessions", { project, ...(title ? { title } : {}) }),
-  setCurrentSpec: (sessionId: number, current_spec: string) =>
-    api.patch<AssistantSession>(`/api/assistant/sessions/${sessionId}`, { current_spec }),
+  setCurrentSpec: (sessionId: number, spec: string) =>
+    api.post<AssistantSession>(`/api/assistant/sessions/${sessionId}/spec`, { spec }),
   proposal: (text: string) =>
     api.post<{ name: string; slug: string }>("/api/assistant/project-proposal", { text }),
 };

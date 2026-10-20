@@ -32,6 +32,7 @@ import {
 } from "../../components/assistant/AgentMap";
 import { EditableTitle } from "../../components/assistant/EditableTitle";
 import { isAssistantBusy, useAssistantBusy } from "../../components/assistant/useAssistantBusy";
+import { SpecSelect } from "../../components/assistant/SpecSelect";
 import { downloadPdf } from "../../lib/download";
 import { t, useT } from "../../i18n";
 import {
@@ -324,6 +325,19 @@ export function AssistantSession() {
         ? t.assistant.statusApplied
         : t.assistant.statusArchived;
 
+  const changeSpec = async (spec: string) => {
+    if (!session) return;
+    try {
+      setSession(
+        await api.post<AssistantSession>(`/api/assistant/sessions/${session.id}/spec`, {
+          spec,
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t.common.unexpected);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-8" role="status">
@@ -374,6 +388,13 @@ export function AssistantSession() {
             <Badge tone={statusTone(session.status)}>
               {statusLabel(session.status)}
             </Badge>
+            {session.specs && session.specs.length > 0 ? (
+              <SpecSelect
+                current={session.current_spec ?? null}
+                specs={session.specs}
+                onChange={(spec) => void changeSpec(spec)}
+              />
+            ) : null}
             <SessionIndicator session={session} working={busy} onOpen={map.toggle} />
           </>
         }
