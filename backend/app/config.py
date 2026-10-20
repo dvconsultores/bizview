@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     ai_chat_max_tokens: int = Field(default=16_000, ge=1_024, le=64_000)
     # Tool rounds per autonomous run before the assistant posts a progress message.
     ai_chat_max_rounds: int = Field(default=60, ge=1, le=200)
+    # Hard ceiling of one /speckit-… command run (separate from the conversation budget).
+    ai_command_token_ceiling: int = Field(default=400_000, ge=10_000, le=5_000_000)
     # The budget extends itself by the step during a run up to the max (only the max stops a run).
     ai_chat_budget_step: int = Field(default=100_000, ge=10_000, le=5_000_000)
     ai_chat_budget_max: int = Field(default=2_000_000, ge=10_000, le=5_000_000)

@@ -34,6 +34,45 @@ _KIND_HINTS = {
     "reporte": "reports/<{ids}>/report.yaml",
     "distribucion": "distributions/<{ids}>.yaml",
 }
+_SPEC_FOLDER = re.compile(r"^specs/(?P<spec>\d{3}-[a-z0-9-]+)/")
+_ARTIFACT_REF = re.compile(
+    r"(?:integrations/(?P<integration>[a-z0-9][a-z0-9-]*)/"
+    r"|reports/(?P<report>[a-z0-9][a-z0-9-]*)/"
+    r"|distributions/(?P<distribution>[a-z0-9][a-z0-9-]*)\.yaml)")
+_SPEC_FIELD = re.compile(r"^\s*spec:\s*(specs/\d{3}-[a-z0-9-]+)\s*$", re.MULTILINE)
+
+
+def _artifact_id(path: str) -> str | None:
+    match = re.match(r"^(?:integrations|reports)/([a-z0-9][a-z0-9-]*)/"
+                     r"|^distributions/([a-z0-9][a-z0-9-]*)\.yaml", path)
+    if not match:
+        return None
+    return match.group(1) or match.group(2)
+
+
+def owner_spec(files: dict[str, str], path: str) -> str | None:
+    """The spec folder that owns `path`, when the project files make it unambiguous."""
+    match = _SPEC_FOLDER.match(path)
+    if match:
+        return match.group("spec")
+    artifact = _artifact_id(path)
+    if artifact is None:
+        return None
+    owners: set[str] = set()
+    for candidate, text in files.items():
+        if candidate == path:                       # the artifact's own `spec:` field
+            declared = _SPEC_FIELD.search(text)
+            if declared:
+                owners.add(declared.group(1).split("/", 1)[1])
+            continue
+        folder = _SPEC_FOLDER.match(candidate)
+        if folder is None or not candidate.endswith("/plan.md"):
+            continue
+        ids = {found for group in _ARTIFACT_REF.finditer(text)
+               for found in group.groups() if found}
+        if artifact in ids:
+            owners.add(folder.group("spec"))
+    return owners.pop() if len(owners) == 1 else None
 
 
 class GuardError(Exception):
@@ -260,6 +299,15 @@ class _Checker:
         return list(dict.fromkeys(out))
 
 
+def created_folders(ctx: Context, ops: list[dict]) -> list[str]:
+    """Every new spec folder the ops establish, in the order they appear (a brief may make N)."""
+    checker = _Checker(ctx)
+    for op in ops:
+        rules = [getattr(checker, rule) for rule in ctx.definition.writes]
+        any(rule(op) for rule in rules)
+    return [folder for folder in checker.new_folders if folder != ctx.spec]
+
+
 def check_ops(ctx: Context, ops: list[dict]) -> str | None:
     """Refuse (GuardError) the first op no enabled rule accepts; return the spec folder a
     /speckit-specify write established (None otherwise)."""
@@ -267,12 +315,23 @@ def check_ops(ctx: Context, ops: list[dict]) -> str | None:
     for op in ops:
         rules = [getattr(checker, rule) for rule in ctx.definition.writes]
         if not any(rule(op) for rule in rules):
+            path = op.get("path", "")
+            owner = owner_spec(ctx.files, path)
+            if (ctx.spec and ctx.reserved_number is None and owner and owner != ctx.spec):
+                # A write meant for another spec: name it and offer the right command instead of
+                # failing with a generic list of paths (028 defect fix, section C).
+                raise GuardError(
+                    "path_other_spec",
+                    {"path": path, "command": ctx.definition.name, "current": ctx.spec,
+                     "owner": owner},
+                    M("commands.path_other_spec", command=ctx.definition.name, path=path,
+                      current=ctx.spec, owner=owner))
             hints = checker.hints()
             raise GuardError(
                 "path_not_allowed",
-                {"path": op.get("path", ""), "command": ctx.definition.name, "allowed": hints},
+                {"path": path, "command": ctx.definition.name, "allowed": hints},
                 M("commands.path_not_allowed", command=ctx.definition.name,
-                  path=op.get("path", ""), allowed=", ".join(hints)))
+                  path=path, allowed=", ".join(hints)))
     # The first folder this run created (the caller stores it as the run's spec).
     created = [f for f in checker.new_folders if f != ctx.spec]
     return created[0] if created else None

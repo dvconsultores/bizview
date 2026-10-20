@@ -47,6 +47,12 @@ class MessageCreate(BaseModel):
     attachments: list[int] = []
 
 
+class SessionSpec(BaseModel):
+    """The current spec of a conversation (a normal POST, no step-up)."""
+    model_config = ConfigDict(extra="forbid")
+    spec: str
+
+
 def require_ai_enabled() -> None:
     if not get_settings().ai_enabled:
         raise ApiError(409, "ai_not_configured", t("assistant.ai_not_configured"))
@@ -173,6 +179,21 @@ def rename_session(session_id: int, body: SessionRename,
     return service.session_json(session, _messages(db, session))
 
 
+@router.post("/sessions/{session_id}/spec")
+def set_current_spec(session_id: int, body: SessionSpec,
+                     actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """Change the conversation's current spec (the header selector)."""
+    session = _own_session(db, session_id, actor)
+    folder = body.spec.strip() or None
+    if folder is not None:
+        project = db.get(Project, session.project_id)
+        if (project is None or not layout.SPEC_FOLDER_RE.match(folder)
+                or not (fs.project_root(project.slug) / "specs" / folder).is_dir()):
+            raise validation({"spec": "unknown"}, M("projects.spec_unknown", folder=folder))
+    session.current_spec = folder
+    return service.session_json(session, _messages(db, session))
+
+
 @router.post("/sessions/{session_id}/messages", dependencies=[Depends(require_ai_enabled)],
              status_code=202)
 def send_message(session_id: int, body: MessageCreate, request: Request,
@@ -188,7 +209,7 @@ def send_message(session_id: int, body: MessageCreate, request: Request,
     return {
         "messages": [m for m in service.messages_json(db, session.id, messages)
                      if m["id"] >= first],
-        "session": service.session_json(session, messages),
+        "session": service.session_json(session, messages, with_specs=False),
     }
 
 

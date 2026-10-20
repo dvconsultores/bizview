@@ -744,13 +744,23 @@ def test_suggest_command_keeps_the_button_short():
             self.working_state: dict = {}
 
     limit = tools.MAX_SUGGESTION_ARGUMENTS
-    result, _ = tools._suggest_command(Session(), {"command": "speckit-specify",
-                                                   "arguments": "x" * limit})
+    result, _ = tools._suggest_command(None, Session(), {"command": "speckit-specify",
+                                                         "arguments": "x" * limit})
     assert result["suggested"] == f"/speckit-specify {'x' * limit}"
 
     with pytest.raises(tools.ToolError):
-        tools._suggest_command(Session(), {"command": "speckit-specify",
-                                           "arguments": "x" * (limit + 1)})
+        tools._suggest_command(None, Session(), {"command": "speckit-specify",
+                                                     "arguments": "x" * (limit + 1)})
+
+def test_suggest_command_requires_the_target_spec():
+    """A plan button without its spec would re-run on whatever current_spec says."""
+    class Session:
+        def __init__(self) -> None:
+            self.working_state: dict = {}
+
+    with pytest.raises(tools.ToolError):
+        tools._suggest_command(None, Session(), {"command": "speckit-plan", "arguments": "plan"})
+
 
 def test_suggesting_the_same_command_twice_is_rejected():
     """The button is already on screen; repeating the call only looped the turn."""
@@ -759,8 +769,11 @@ def test_suggesting_the_same_command_twice_is_rejected():
             self.working_state: dict = {}
 
     session = Session()
-    tools._suggest_command(session, {"command": "speckit-specify", "arguments": "Facturación"})
+    tools._suggest_command(None, session, {"command": "speckit-specify",
+                                               "arguments": "Facturación", "spec": ""})
     with pytest.raises(tools.ToolError):
-        tools._suggest_command(session, {"command": "speckit-specify", "arguments": "otra cosa"})
+        tools._suggest_command(None, session, {"command": "speckit-specify",
+                                               "arguments": "otra cosa", "spec": ""})
     # A different command is still allowed (up to three distinct ones).
-    tools._suggest_command(session, {"command": "speckit-plan", "arguments": "plan"})
+    tools._suggest_command(None, session,
+                           {"command": "speckit-plan", "arguments": "plan", "spec": "003-x"})

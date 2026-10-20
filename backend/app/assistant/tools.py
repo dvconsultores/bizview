@@ -16,6 +16,7 @@ from app.assistant.commands.registry import REGISTRY
 from app.engine import direct
 from app.i18n import t
 from app.projects import compose, fs, history
+from app.projects import specs as project_specs
 from app.projects.workview import real
 from app.services.audit import record
 from app.sources.describe import describe
@@ -246,6 +247,22 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "set_current_spec",
+        "description": (
+            "Cambia la spec actual de la conversación a `spec_id` (una carpeta existente del "
+            "proyecto). Úsala cuando el usuario pida trabajar sobre otra spec; nunca le pidas "
+            "que la seleccione a mano. Queda registrada en la transcripción."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "spec_id": {"type": "string",
+                            "description": "Carpeta de la spec, p. ej. 002-ventas-facturacion."},
+            },
+            "required": ["spec_id"],
+        },
+    },
+    {
         "name": "get_authoring_guide",
         "description": (
             "Consulta la guía de autoría de Bizview. Temas disponibles: "
@@ -425,11 +442,15 @@ TOOL_SPECS: list[dict[str, Any]] = [
         ),
         "parameters": {
             "type": "object",
-            "required": ["command"],
+            "required": ["command", "spec"],
             "properties": {
                 "command": {"type": "string",
                             "enum": [n for n in REGISTRY if REGISTRY[n].provider],
                             "description": "Nombre del comando, p. ej. speckit-plan."},
+                "spec": {"type": "string",
+                         "description": "Carpeta de la spec sobre la que corre el comando, "
+                                        "p. ej. 002-ventas-facturacion. Cadena vacía para "
+                                        "/speckit-specify, /speckit-constitution, /fix y /ayuda."},
                 "arguments": {"type": ["string", "null"],
                               "description": "Resumen corto (máximo 160 caracteres) de lo que el "
                                              "comando hará, no el brief completo: el detalle va en "
@@ -459,6 +480,7 @@ def command_def(session: Any) -> Any:
 DISCOVERY_TOOLS = frozenset(
     {"list_sources", "describe_source", "profile_source", "get_authoring_guide", "get_workspace"}
 )
+RUN_READS_KEY = "run_reads"
 MEMO_TOOLS = frozenset({"describe_source", "profile_source", "get_authoring_guide", "check_query"})
 DRAFT_TOOLS = ("propose_draft", "edit_draft", "read_draft", "update_notes")
 REPEAT_NOTE = (
@@ -544,10 +566,11 @@ def _source_kind(db: Session, name: str, args: dict[str, Any]) -> str | None:
 def reset_run(session: Any) -> None:
     """Limpia los contadores del run actual en working_state (solo reasigna si existen)."""
     state = session.working_state or {}
-    if RUN_CALLS_KEY in state or RUN_DISCOVERY_KEY in state:
+    if RUN_CALLS_KEY in state or RUN_DISCOVERY_KEY in state or RUN_READS_KEY in state:
         state = dict(state)
         state.pop(RUN_CALLS_KEY, None)
         state.pop(RUN_DISCOVERY_KEY, None)
+        state.pop(RUN_READS_KEY, None)
         session.working_state = state
 
 
@@ -650,7 +673,11 @@ def _repeat_result(
         }
         summary = t("assistant.summary.used_cached_structure", name=args['name'])
     elif name == "get_authoring_guide":
-        result = dict(authoring.guide(args.get("topic")))
+        # At most once per topic per run: later calls get the pointer, never the full guide again.
+        result = {"ya_consultado": True, "topic": args.get("topic") or "index",
+                  "summary": entry.get("summary") or "",
+                  "note": t("assistant.summary.repeated_guide",
+                            topic=args.get("topic") or "index")}
         summary = t("assistant.summary.repeated_guide", topic=args.get('topic') or 'index')
     else:
         result = {"anterior": entry.get("brief") or entry.get("summary")}
@@ -800,13 +827,15 @@ def _dispatch(
     if name == "update_notes":
         return _update_notes(db, session, args)
     if name == "finish_command":
-        return _finish_command(args)
+        return _finish_command(db, session, args)
     if name == "get_app_guide":
         return _get_app_guide(args)
     if name == "get_project_overview":
         return _get_project_overview(db, session)
     if name == "suggest_command":
-        return _suggest_command(session, args)
+        return _suggest_command(db, session, args)
+    if name == "set_current_spec":
+        return _set_current_spec(db, session, args)
     raise ToolError("Herramienta desconocida.")
 
 
@@ -850,20 +879,47 @@ def _get_project_overview(db: Session, session: Any) -> tuple[dict[str, Any], st
     return overview.build(db, project), t("assistant.summary.project_overview")
 
 
-def _finish_command(args: dict[str, Any]) -> tuple[dict[str, Any], str]:
+def _finish_command(db: Session, session: Any,
+                    args: dict[str, Any]) -> tuple[dict[str, Any], str]:
     summary = args.get("summary")
     if not isinstance(summary, str) or not summary.strip():
         raise ToolError("summary debe ser un texto de una línea.")
     summary = summary.strip().splitlines()[0][:300]
+    run = command_run(session)
+    if run is not None and run.command == "speckit-specify":
+        # A brief may establish several specs: name every one, with its stage.
+        folders: list[str] = []
+        for entry in run.files or []:
+            match = re.match(r"^specs/(\d{3}-[a-z0-9-]+)/spec\.md$", entry.get("path") or "")
+            if match and match.group(1) not in folders:
+                folders.append(match.group(1))
+        stages = {item["folder"]: item.get("stage") for item in
+                  project_specs.list_specs(db, session.project)}
+        if folders:
+            listed = ", ".join(f"{folder} ({stages.get(folder) or '-'})" for folder in folders)
+            summary = t("commands.specify_summary", summary=summary[:180], specs=listed)[:300]
     return {"finished": True, "summary": summary}, summary
 
 
-def _suggest_command(session: Any, args: dict[str, Any]) -> tuple[dict[str, Any], str]:
+def _suggest_command(db: Session, session: Any,
+                     args: dict[str, Any]) -> tuple[dict[str, Any], str]:
     name = args.get("command")
     name = name.strip().lstrip("/").replace(".", "-").lower() if isinstance(name, str) else ""
     if name not in REGISTRY or not REGISTRY[name].provider:
         raise ToolError("Comando desconocido; usa uno de: "
                         + ", ".join(n for n in REGISTRY if REGISTRY[n].provider))
+    spec = args.get("spec")
+    spec = spec.strip() if isinstance(spec, str) else ""
+    folders: list[str] = []
+    if db is not None and getattr(session, "project", None) is not None:
+        folders = [item["folder"] for item in project_specs.list_specs(db, session.project)]
+    if REGISTRY[name].needs_spec:
+        if not spec:
+            raise ToolError("Indica la spec de la sugerencia en `spec` (una de: "
+                            + (", ".join(folders) or "el proyecto no tiene specs") + ").")
+        if folders and spec not in folders:
+            raise ToolError(t("commands.spec_not_found", spec=spec,
+                              specs=", ".join(folders)))
     arguments = args.get("arguments")
     arguments = arguments.strip() if isinstance(arguments, str) else ""
     prior = (session.working_state or {}).get(SUGGESTIONS_KEY) or []
@@ -881,11 +937,35 @@ def _suggest_command(session: Any, args: dict[str, Any]) -> tuple[dict[str, Any]
     suggestions = list(working.get(SUGGESTIONS_KEY) or [])
     if len(suggestions) >= MAX_SUGGESTIONS:
         raise ToolError(f"Máximo {MAX_SUGGESTIONS} sugerencias por respuesta.")
-    suggestions.append({"command": name, "arguments": arguments})
+    item: dict[str, Any] = {"command": name, "arguments": arguments}
+    if spec:
+        item["spec"] = spec
+    suggestions.append(item)
     working[SUGGESTIONS_KEY] = suggestions
     session.working_state = working
-    text = f"/{name} {arguments}".strip()
-    return {"suggested": text}, t("assistant.summary.suggested_command", command=text)
+    # The command text carries the spec explicitly, so the button re-runs on the right one.
+    parts = [f"/{name}"]
+    if spec and spec not in arguments:
+        parts.append(spec)
+    if arguments:
+        parts.append(arguments)
+    text = " ".join(parts)
+    return {"suggested": text, "spec": spec or None}, t(
+        "assistant.summary.suggested_command", command=text)
+
+
+def _set_current_spec(db: Session, session: Any,
+                      args: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """The agent's way to change the conversation's spec (never ask the user to pick it)."""
+    spec = args.get("spec_id")
+    spec = spec.strip() if isinstance(spec, str) else ""
+    folders = [item["folder"] for item in project_specs.list_specs(db, session.project)]
+    if spec not in folders:
+        raise ToolError(t("commands.spec_not_found", spec=spec or "-",
+                          specs=", ".join(folders) or "-"))
+    session.current_spec = spec
+    summary = t("commands.spec_current", spec=spec)
+    return {"spec": spec}, summary
 
 
 def _list_sources(db: Session, app_settings: Any) -> tuple[dict[str, Any], str]:
@@ -1238,7 +1318,16 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
         folder = guard.check_ops(ctx, [{"op": op["op"], "path": op["path"],
                                         "content": op.get("content", "")} for op in ops])
     except guard.GuardError as err:
+        if err.code == "path_other_spec":
+            # The run stays inspectable: the product can offer to re-run it on that spec.
+            run.result = {**(run.result or {}), "misrouted_to": err.params.get("owner"),
+                          "error": str(err)}
         raise ToolError(str(err)) from err
+    if definition.name == "speckit-specify":
+        # A brief may establish several specs: the last one written becomes the current spec.
+        created = guard.created_folders(ctx, ops)
+        if created:
+            folder = created[-1]
     if folder:
         run.spec = folder
         session.current_spec = folder
@@ -1437,7 +1526,10 @@ def _read_draft(
     if not files:
         raise ToolError("El proyecto está vacío; usa propose_draft primero.")
 
+    state = dict(session.working_state or {})
+    reads = dict(state.get(RUN_READS_KEY) or {})
     result_files: dict[str, str] = {}
+    unchanged: dict[str, str] = {}
     missing: list[str] = []
     truncated: list[str] = []
     total = 0
@@ -1446,9 +1538,15 @@ def _read_draft(
             missing.append(path)
             continue
         content = files[path]
+        digest = history.sha(content)
+        if reads.get(path) == digest:
+            # The file did not change since this run read it: the hash is enough.
+            unchanged[path] = digest
+            continue
         if total + len(content) <= MAX_TOOL_RESULT_CHARS:
             result_files[path] = content
             total += len(content)
+            reads[path] = digest          # only a full read counts as cached
         else:
             remaining = MAX_TOOL_RESULT_CHARS - total
             if remaining > 0:
@@ -1456,15 +1554,26 @@ def _read_draft(
                 total += remaining
             truncated.append(path)
 
+    state[RUN_READS_KEY] = reads
+    session.working_state = state
     _remember(session, {path: history.sha(files[path]) for path in result_files})
+    note = None
+    if unchanged:
+        note = "sin cambios desde la lectura anterior"
+    summary = f"Leyó {len(result_files)} archivos del proyecto."
+    if unchanged:
+        hashes = ", ".join(f"{path}: {digest[:12]}" for path, digest in unchanged.items())
+        summary = f"{note} ({hashes})."
     return (
         {
             "files": result_files,
+            "unchanged": unchanged,
+            "note": note,
             "missing": missing,
             "truncated": truncated,
             "available": sorted(files),
         },
-        f"Leyó {len(result_files)} archivos del proyecto.",
+        summary,
     )
 
 
