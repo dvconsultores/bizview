@@ -329,6 +329,44 @@ not `Approved` (your "sí" approves it) or when a checklist has unchecked items.
 for your answer can be closed with **Terminar**; an interrupted run continues where it stopped
 when you run the same command again. Applying the project is always your action (Aplicar).
 
+### Which spec a command works on
+
+Every command that writes to a spec resolves its target **before the model runs**, in this order:
+
+1. an explicit folder in the message — `/speckit-plan 002-ventas-facturacion`;
+2. a number — `/speckit-plan 002`, `la 002`, `reporte 002`;
+3. a title or folder slug unique in the project — `/speckit-plan Ventas y facturación`;
+4. the conversation's **Spec actual** (the selector in the conversation header).
+
+The resolved spec becomes the conversation's current one, and the transcript shows
+`Spec actual: 002-ventas-facturacion`; `set_current_spec` lets the assistant do the same instead
+of asking you to pick it by hand, and a suggested command carries its spec in the button text.
+When the message names no spec and the conversation has none, the command stops with
+*Indica la spec: /speckit-plan 002-ventas-facturacion* and the project's spec list. A brief that
+creates several specs leaves the **last** one as current and lists all of them with their stage.
+
+If the model tries to write outside the resolved spec (or the artifact folders that spec owns),
+the tool answers with the routing error
+*Este comando corre sobre 001-… Para escribir en specs/002-… ejecuta /speckit-plan 002-…*. A run
+that ends without writing a file and only produced those errors is shown as **mal enrutado**, not
+as completed, with an **Ejecutar sobre 002-…** button that re-runs the same command on the right
+spec.
+
+### Repeated work and cost guards
+
+A command whose target is already complete does not run again: `/speckit-plan` when `plan.md`
+exists and `spec.md` did not change since it was written, `/speckit-tasks` when `tasks.md` exists
+and the plan did not change, `/speckit-implement` when every task is `[X]` and the artifacts are
+validated, and `/speckit-converge` when its last run found no gaps on the same revisions. The
+reply says so and shows the command to use; append **`--force`** to bypass the guard
+(`/speckit-plan 002-ventas-facturacion --force`), which is recorded in the run.
+
+Two more limits keep a run cheap: `read_draft` answers *sin cambios desde la lectura anterior* with
+the file's hash when the same run already sent that revision, `get_authoring_guide` returns a
+pointer after the first use of a topic in a run, and `AI_COMMAND_TOKEN_CEILING` (default 400 000)
+stops one command with status **techo de tokens** and the draft intact — continue with `--force`,
+split the work, or raise the setting.
+
 ### Spec-driven and quick changes
 
 Not every change deserves a spec. `/speckit-specify` is for a new piece (a source, an integration,

@@ -401,6 +401,7 @@ AI_MODEL=deepseek-chat
 AI_CHAT_TOKEN_BUDGET=400000
 AI_CHAT_CACHED_TOKEN_WEIGHT=0.1
 AI_CHAT_MAX_ROUNDS=60
+AI_COMMAND_TOKEN_CEILING=400000
 AI_CHAT_MAX_TOKENS=16000
 AI_CHAT_BUDGET_STEP=100000
 AI_CHAT_BUDGET_MAX=2000000
@@ -418,7 +419,9 @@ the agent asks a business question or reports, the draft is "Listo para aplicar"
 `AI_CHAT_BUDGET_MAX`. The budget grows by `AI_CHAT_BUDGET_STEP` automatically (audited as
 automatic); "Detener" stops a run keeping the rounds already saved; at most
 `AI_AGENT_MAX_CONCURRENT` runs work at once per backend process; applying stays a human action
-with password confirmation. Each round's answer is limited to `AI_CHAT_MAX_TOKENS` tokens
+with password confirmation. Each `/speckit-…` command also has its own ceiling,
+`AI_COMMAND_TOKEN_CEILING` (default 400 000): reaching it stops that run with status **techo de
+tokens** and keeps the draft, without spending the rest of the conversation's budget. Each round's answer is limited to `AI_CHAT_MAX_TOKENS` tokens
 (default 16000, 1024–64000; a complete draft with specs, YAML and SQL needs several thousand, so
 lower it only for small models). Each chat call of the assistant waits up to `AI_CHAT_TIMEOUT_SECONDS`
 (default 180; `AI_TIMEOUT_SECONDS` keeps governing narratives and the connection test); a timeout

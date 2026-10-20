@@ -62,12 +62,41 @@ def _labels(locale: str) -> dict[str, str]:
     return _LABELS["en"] if locale == "en" else _LABELS["es"]
 
 
-def system_for(definition: CommandDef, locale: str) -> str:
+_RULES = {
+    "es": """\
+## Routing de la spec
+La spec objetivo de este comando es `{spec}` (etapa: {stage}). Solo puedes escribir bajo
+`specs/{spec}/` y las carpetas de artefactos que esa spec posee. Si lo que pide el usuario es
+otra spec, llama a `set_current_spec` y a `suggest_command` con esa spec; nunca pidas al usuario
+que la seleccione a mano.
+Si la etapa de la spec objetivo ya satisface este comando, dilo en una línea y termina; no
+vuelvas a verificar trabajo ya completado.
+No vuelvas a leer un archivo cuyo hash ya está en `working_state.seen` salvo que vayas a
+editarlo.""",
+    "en": """\
+## Spec routing
+The target spec of this command is `{spec}` (stage: {stage}). You may only write under
+`specs/{spec}/` and the artifact folders that spec owns. If the user's request is about another
+spec, call `set_current_spec` and `suggest_command` with that spec; never ask the user to select
+it by hand.
+If the target spec's stage already satisfies this command, say so in one line and finish; do not
+re-verify completed work.
+Do not re-read files whose hash is already in `working_state.seen` unless you intend to edit
+them.""",
+}
+
+
+def system_for(definition: CommandDef, locale: str, *, spec: str | None = None,
+               stage: str | None = None) -> str:
     """Stable system prompt of a command: base prefix + `## /<name>` + the prompt file."""
     from app.assistant.service import system_prefix  # service imports this module
 
+    rules = ""
+    if spec:
+        rules = "\n\n" + _RULES["en" if locale == "en" else "es"].format(
+            spec=spec, stage=stage or "especificada")
     return (f"{system_prefix(locale)}\n\n## /{definition.name}\n"
-            f"{prompt_body(definition.name, locale)}")
+            f"{prompt_body(definition.name, locale)}{rules}")
 
 
 def doc_path(key: str, spec: str | None) -> str | None:

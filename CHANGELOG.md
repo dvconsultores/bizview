@@ -602,6 +602,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Asistente: los comandos /speckit-* resuelven la spec desde el argumento; selector de spec
+  actual; comandos mal enrutados ya no cuentan como completados; guardas de idempotencia y techo de
+  tokens por comando.** A `/speckit-specify` run that wrote two specs left `current_spec` on the
+  first one, and every later command (including `suggest_command` buttons) re-ran on it: the model
+  detected the wrong target, refused to overwrite the implemented spec and asked the user to
+  "select 002", an action the UI did not have — the report spec never got `plan.md`, `tasks.md` or
+  its artifacts. Commands now resolve their spec from the argument (explicit `NNN-name`, a number
+  such as `002`/`la 002`, or a title) and only fall back to `current_spec`; the run stores
+  `resolved_from` and `--force`, and a resolved spec becomes the conversation's current one.
+  `/speckit-specify` sets the last spec it wrote and lists them all with their stage. A write aimed
+  at another spec returns a routing error naming both specs and the exact command to run, a run
+  that only produced such errors ends `misrouted` (with a **Ejecutar sobre 002-…** button) instead
+  of `completed`, repeated plan/tasks/implement/converge work is answered from the stored result,
+  `--force` regenerates it, `read_draft` returns a hash instead of content it already sent,
+  `get_authoring_guide` gives a pointer per topic, and `AI_COMMAND_TOKEN_CEILING` (default 400 000)
+  stops one run with status `budget` and the draft intact. Migration `0023` adds the columns and
+  the two statuses. Documented in `docs/VIBE-REPORTING.md`.
+
 - **A leftover folder no longer poisons a new project**: the database and the project folders live on
   different hosts, so deleting a project's rows while its tree stays on disk (or reusing a database
   with a fresh server) made the next project with the same slug adopt the old files — the editor then
