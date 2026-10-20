@@ -143,7 +143,8 @@ def contract_of(session: Any) -> RunContract | None:
 
 
 def mode_of(session: Any) -> str:
-    return getattr(session, "mode", None) or "edit"
+    """The mode of the conversation: `ask`, `auto`, or the legacy `edit`."""
+    return getattr(session, "mode", None) or "auto"
 
 
 @dataclass(frozen=True)

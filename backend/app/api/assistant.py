@@ -158,7 +158,7 @@ def list_sessions(project: str | None = None, actor: AppUser = Depends(require_s
                 "read_only": s.read_only,
                 "current_spec": s.current_spec,
                 # Feature 028: the mode pill of the conversation list.
-                "mode": s.mode or "edit",
+                "mode": s.mode or "auto",
                 "contract_status": service.latest_contract_status(db, s),
             }
             for s in sessions
@@ -263,7 +263,7 @@ def set_session_mode(session_id: int, body: SessionMode,
     if mode not in ASSISTANT_MODES:
         raise ApiError(422, "mode_invalid", M("assistant.contract.invalid"),
                        fields={"mode": "unknown"})
-    previous = session.mode or "edit"
+    previous = session.mode or "auto"
     if mode != previous:
         stopped = False
         if mode != "auto" and service.is_busy(session, get_settings()):

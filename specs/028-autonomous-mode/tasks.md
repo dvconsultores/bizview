@@ -226,6 +226,25 @@ assertions (SC-002, SC-003, SC-004, SC-007, SC-008) close their story.
 4. **Complete**: US6 (Ask) and US5 (profiles).
 5. **Close**: suites, e2e, quickstart, security review, status update.
 
+## Phase 9: Simplification (owner request 2026-10-20)
+
+- [X] T052 Two modes in the composer: one compact button with a short menu — **Preguntar** and
+  **Auto**, each with a name and one line — replacing the three-way segmented control
+  (`frontend/src/components/assistant/ModeSelector.tsx`); `Auto` is the default for a new
+  conversation (`assistant_session.mode` default, service/API fallbacks, migration 0024)
+- [X] T053 Authorising a run is one line, not a form: `RunContractDialog.tsx` asks for the password
+  (and the two-step code on `internet`) and sends the documented defaults; the composer offers
+  **Autorizar run** while the mode is Auto and no contract is live
+- [X] T054 A finished stage no longer ends the Auto run (`service.py`: `finish_command` closes the
+  command run, the loop continues with "Etapa … terminada" and the model opens the next stage);
+  stage gates are answered by the contract (`tools._approve_without_asking`) instead of a question
+  — the reported "still asks to implement / I have to click and send" defect
+- [X] T055 Tests updated and green: `assistant-mode.test.tsx` (menu, two entries, Escape, pill),
+  `assistant-contract.test.tsx` (one-line confirmation, defaults, error stays open),
+  `e2e/assistant-auto.spec.ts` (two modes + one password; **12/12** across Chromium, Firefox and
+  WebKit at 320/375 px), `test_assistant_auto_loop.py` gains the plan → tasks → summary replay with
+  no user message, `test_assistant_auto_contract.py` asserts Auto as the default
+
 ## Security review (2026-10-20, T050)
 
 Read line by line: `backend/app/assistant/auto.py` (`RunContract`, `mode_gate`, `source_refusal`,

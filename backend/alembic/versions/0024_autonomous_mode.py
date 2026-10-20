@@ -139,7 +139,7 @@ def upgrade() -> None:
                     postgresql_where=sa.text("deleted_at IS NULL"))
 
     op.add_column("assistant_session",
-                  sa.Column("mode", sa.Text(), nullable=False, server_default=sa.text("'edit'")))
+                  sa.Column("mode", sa.Text(), nullable=False, server_default=sa.text("'auto'")))
 
     op.create_check_constraint(op.f("ck_assistant_session_mode"), "assistant_session",
                                f"mode IN {_in(MODES)}")

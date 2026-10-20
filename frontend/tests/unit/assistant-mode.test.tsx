@@ -26,7 +26,7 @@ const base = {
   id: 7,
   title: "Prueba",
   status: "open",
-  mode: "edit",
+  mode: "auto",
   contract_status: "none",
   busy: false,
   tokens_used: 10,
@@ -54,117 +54,116 @@ afterEach(() => {
   container.remove();
 });
 
-function buttons() {
-  return Array.from(container.querySelectorAll("[data-mode]")) as HTMLButtonElement[];
+function options() {
+  return Array.from(container.querySelectorAll("[data-mode-option]")) as HTMLButtonElement[];
 }
 
-describe("ModeSelector (feature 028, FR-000)", () => {
-  it("renders the three modes as a radiogroup with the current one checked", async () => {
+function trigger() {
+  return container.querySelector("[data-mode-selector] button") as HTMLButtonElement;
+}
+
+describe("ModeSelector (feature 028, two modes)", () => {
+  it("shows the current mode and opens a two-entry menu", async () => {
     await act(async () => {
-      root.render(
-        <ModeSelector session={base} onSelect={() => {}} onRequestAuto={() => {}} />,
-      );
+      root.render(<ModeSelector session={base} onSelect={() => {}} onRequestAuto={() => {}} />);
     });
-    const group = container.querySelector('[role="radiogroup"]')!;
-    expect(group.getAttribute("aria-label")).toBe("Modo del asistente");
-    const items = buttons();
-    expect(items.map((b) => b.textContent)).toEqual(["Preguntar", "Editar", "Auto"]);
-    expect(items.map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]);
-    // Only the active mode is in the tab order; arrows move between them.
-    expect(items.map((b) => b.tabIndex)).toEqual([-1, 0, -1]);
+    expect(trigger().textContent).toContain("Auto");
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+
+    await act(async () => {
+      trigger().click();
+    });
+    const menu = container.querySelector('[role="menu"]')!;
+    expect(menu.getAttribute("aria-label")).toBe("Modo del asistente");
+    expect(options().map((b) => b.textContent)).toEqual([
+      "PreguntarSolo lee y explica; no escribe ni aplica nada.",
+      "AutoHace todo el run sin preguntar: escribe, previsualiza y aplica.",
+    ]);
+    expect(options().map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "true"]);
   });
 
-  it("switches down immediately and asks for a contract when choosing Auto", async () => {
+  it("switches down at once and asks for the run authorisation for Auto", async () => {
     const selected: string[] = [];
-    let askedForContract = 0;
+    let asked = 0;
     await act(async () => {
       root.render(
         <ModeSelector
           session={base}
           onSelect={(mode) => selected.push(mode)}
           onRequestAuto={() => {
-            askedForContract += 1;
+            asked += 1;
           }}
         />,
       );
     });
     await act(async () => {
-      buttons()[0].click();
+      trigger().click();
+    });
+    await act(async () => {
+      options()[0].click();
     });
     expect(selected).toEqual(["ask"]);
 
     await act(async () => {
-      buttons()[2].click();
+      trigger().click();
     });
-    expect(askedForContract).toBe(1);
-    expect(selected).toEqual(["ask"]);          // Auto only activates with a confirmed contract
-  });
+    await act(async () => {
+      trigger().click();          // Auto is already the mode: nothing happens
+    });
+    expect(asked).toBe(0);
 
-  it("moves with the arrow keys", async () => {
-    const selected: string[] = [];
     await act(async () => {
       root.render(
         <ModeSelector
-          session={base}
+          session={{ ...base, mode: "ask" }}
           onSelect={(mode) => selected.push(mode)}
-          onRequestAuto={() => {}}
+          onRequestAuto={() => {
+            asked += 1;
+          }}
         />,
       );
     });
     await act(async () => {
-      container
-        .querySelector('[role="radiogroup"]')!
-        .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      trigger().click();
     });
+    await act(async () => {
+      options()[1].click();
+    });
+    expect(asked).toBe(1);
     expect(selected).toEqual(["ask"]);
+  });
+
+  it("closes with Escape", async () => {
+    await act(async () => {
+      root.render(<ModeSelector session={base} onSelect={() => {}} onRequestAuto={() => {}} />);
+    });
+    await act(async () => {
+      trigger().click();
+    });
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
   });
 
   it("shows the pill of each state", async () => {
     await act(async () => {
-      root.render(<ModePill session={{ ...base, mode: "edit", contract_status: "none" }} />);
+      root.render(<ModePill session={{ ...base, mode: "ask", contract_status: "none" }} />);
     });
-    expect(container.textContent).toBe("Editar");
-    expect(container.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("muted");
+    expect(container.textContent).toBe("Preguntar");
 
     await act(async () => {
-      root.render(
-        <ModePill session={{ ...base, mode: "auto", contract_status: "none", busy: false }} />,
-      );
+      root.render(<ModePill session={{ ...base, mode: "auto", contract_status: "none" }} />);
     });
     expect(container.textContent).toBe("Auto · sin contrato");
 
     await act(async () => {
       root.render(
-        <ModePill
-          session={{ ...base, mode: "auto", contract_status: "running", busy: true }}
-        />,
+        <ModePill session={{ ...base, mode: "auto", contract_status: "running", busy: true }} />,
       );
     });
     expect(container.textContent).toBe("Auto · ejecutando");
     expect(container.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("auto");
-  });
-
-  it("keeps the composer's mode in the session state across renders", async () => {
-    function Harness() {
-      const [session, setSession] = useState(base);
-      return (
-        <>
-          <ModePill session={session} />
-          <ModeSelector
-            session={session}
-            onSelect={(mode) => setSession({ ...session, mode })}
-            onRequestAuto={() => {}}
-          />
-        </>
-      );
-    }
-    await act(async () => {
-      root.render(<Harness />);
-    });
-    await act(async () => {
-      buttons()[0].click();
-    });
-    expect(container.querySelector("[data-mode-pill]")?.textContent).toBe("Preguntar");
-    expect(buttons()[0].getAttribute("aria-checked")).toBe("true");
   });
 });

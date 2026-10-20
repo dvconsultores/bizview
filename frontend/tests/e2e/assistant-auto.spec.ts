@@ -72,61 +72,68 @@ test.afterEach(async ({ page }) => {
   await resetAssistant(page);
 });
 
-test("the composer offers the three modes and Auto opens the contract panel", async ({ page }) => {
+test("the composer offers two modes and Auto asks for one authorisation", async ({ page }) => {
+  await signIn(page);
   await newChat(page, "Modos");
 
-  // FR-000: the selector is a radiogroup with the three modes, Edit by default.
+  // FR-000 (simplified): one compact trigger that opens Preguntar / Auto.
   const selector = page.locator("[data-mode-selector]");
   await expect(selector).toBeVisible();
-  await expect(selector.getByRole("radio")).toHaveCount(3);
-  await expect(selector.getByRole("radio", { name: "Editar" })).toHaveAttribute(
-    "aria-checked", "true",
-  );
+  await expect(selector.getByRole("button").first()).toContainText("Auto");
   await axe(page);
   await noOverflow(page);
 
-  // Switching to Auto only opens the contract: the mode is not active yet.
-  await selector.getByRole("radio", { name: "Auto" }).click();
-  const contract = page.locator("[data-run-contract]");
-  await expect(contract).toBeVisible();
-  await expect(contract).toContainText("Contrato del run");
-  await expect(contract.getByRole("button", { name: "Autorizar el run" })).toBeDisabled();
+  await selector.getByRole("button").first().click();
+  const menu = page.locator("[data-mode-menu]");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitemradio")).toHaveCount(2);
+  await expect(menu.getByRole("menuitemradio", { name: /Preguntar/ })).toBeVisible();
+  await expect(menu.getByRole("menuitemradio", { name: /Auto/ })).toBeVisible();
   await axe(page);
   await noOverflow(page);
 
-  // Cancelling leaves the mode where it was (the selector says Editar again).
-  await contract.getByRole("button", { name: "Cancelar" }).click();
-  await expect(page.locator("[data-run-contract]")).toHaveCount(0);
-  await expect(selector.getByRole("radio", { name: "Editar" })).toHaveAttribute(
-    "aria-checked", "true",
-  );
-
-  // Switching down to Preguntar is immediate and changes the composer's hint.
-  await selector.getByRole("radio", { name: "Preguntar" }).click();
-  await expect(selector.getByRole("radio", { name: "Preguntar" })).toHaveAttribute(
-    "aria-checked", "true",
-  );
+  // Preguntar is immediate and changes the composer's hint.
+  await menu.getByRole("menuitemradio", { name: /Preguntar/ }).click();
   await expect(page.locator("[data-mode-pill]")).toContainText("Preguntar");
   await expect(page.getByLabel("Mensaje para el asistente")).toHaveAttribute(
     "placeholder", /Solo lee y explica/,
   );
   await axe(page);
+
+  // Auto does not switch by itself: it asks for the one-line authorisation.
+  await selector.getByRole("button").first().click();
+  await page.locator("[data-mode-menu]").getByRole("menuitemradio", { name: /Auto/ }).click();
+  const confirm = page.locator("[data-run-contract]");
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText("Todo el pipeline hasta aplicar");
+  await expect(confirm.getByRole("button", { name: "Autorizar el run" })).toBeDisabled();
+  await axe(page);
+  await noOverflow(page);
+
+  await confirm.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.locator("[data-run-contract]")).toHaveCount(0);
+  await expect(page.locator("[data-mode-pill]")).toContainText("Preguntar");
 });
 
-test("confirming a contract activates Auto and shows the pill", async ({ page }) => {
+test("one password authorises the run and leaves the conversation in Auto", async ({ page }) => {
+  await signIn(page);
   const { sid } = await newChat(page, "Contrato");
 
-  await page.locator("[data-mode-selector]").getByRole("radio", { name: "Auto" }).click();
-  const contract = page.locator("[data-run-contract]");
-  await expect(contract).toContainText("Objetivo");
-  await contract.locator('input[type="password"]').fill(SUPER.password);
-  await contract.getByRole("button", { name: "Autorizar el run" }).click();
+  // The mode is Auto by default and the composer offers the authorisation.
+  await expect(page.locator("[data-mode-pill]")).toContainText("Auto · sin contrato");
+  await page.locator("[data-authorize-run]").click();
+  const confirm = page.locator("[data-run-contract]");
+  await expect(confirm).toBeVisible();
+  await confirm.locator('input[type="password"]').fill(SUPER.password);
+  await confirm.getByRole("button", { name: "Autorizar el run" }).click();
   await expect(page.locator("[data-run-contract]")).toHaveCount(0);
 
   const row = await page.request.get(`/api/assistant/sessions/${sid}`, { headers: FETCH });
   const body = await row.json();
   expect(body.mode).toBe("auto");
   expect(body.contract_status).toBe("confirmed");
+  expect(body.contract.stages).toEqual(["draft", "preview", "apply"]);
+  expect(body.contract.limits.applies).toBe(1);
   await expect(page.locator("[data-mode-pill]")).toContainText("Auto");
   await axe(page);
   await noOverflow(page);

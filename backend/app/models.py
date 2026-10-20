@@ -657,9 +657,10 @@ class AssistantSession(Base):
                                             ForeignKey("project.id", ondelete="CASCADE"))
     current_spec: Mapped[str | None] = mapped_column(Text)
     read_only: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    # Feature 028: the composer selector (ask | edit | auto). The run contract is the newest
-    # `assistant_auto_run` row of this conversation (no FK back: it would be a table cycle).
-    mode: Mapped[str] = mapped_column(Text, server_default=text("'edit'"))
+    # Feature 028: the composer selector (ask | auto; `edit` stays for conversations created
+    # before the simplification). The run contract is the newest `assistant_auto_run` row of this
+    # conversation (no FK back: it would be a table cycle).
+    mode: Mapped[str] = mapped_column(Text, server_default=text("'auto'"))
     applied_version_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("workspace_version.id"))
     tokens_used: Mapped[int] = mapped_column(Integer, server_default=text("0"))

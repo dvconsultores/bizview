@@ -691,4 +691,7 @@ MESSAGES: dict[str, str] = {
 
     "assistant.watch.failed": "The first scheduled run of integration {integration} failed: {reason}.",
     "assistant.watch.rolled_back": "The previous workspace version was restored.",
+
+    "assistant.auto.next_stage": "Stage {done} is done. The contract allows {stages}: open the next one with run_command and continue; do not ask the user to confirm.",
+    "assistant.auto.approved": "The contract authorises approving spec {spec} without asking.",
 }

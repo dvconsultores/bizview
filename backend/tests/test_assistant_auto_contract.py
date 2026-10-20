@@ -38,11 +38,11 @@ def _confirm(client, sid, contract=None, password=PASSWORD, code=None, profile_i
     return client.post(f"/api/assistant/sessions/{sid}/contract", json=body)
 
 
-def test_mode_defaults_to_edit_and_is_changeable(superuser, db):
+def test_mode_defaults_to_auto_and_is_changeable(superuser, db):
     client = signed_in("root@example.com")
     sid = new_chat(client)
     row = client.get(f"/api/assistant/sessions/{sid}").json()
-    assert row["mode"] == "edit"
+    assert row["mode"] == "auto"          # two modes in the UI: Preguntar and Auto
     assert row["contract"] is None and row["contract_status"] == "none"
 
     r = _mode(client, sid, "ask")

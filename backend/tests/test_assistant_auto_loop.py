@@ -118,6 +118,36 @@ def test_run_command_without_a_spec_fails_loudly(chat):
     assert "spec" in tool["content"].lower()
 
 
+def test_auto_chains_the_next_stage_after_finish_command(chat):
+    """FR-004: a finished stage does not end the run — the agent opens the next one itself.
+
+    This is the reported defect: after `/speckit-plan` the conversation waited for another message.
+    """
+    c, project, sid = chat
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC,
+                           "specs/001-ventas/plan.md": "# Plan\n\nPlan de ventas.\n"}, 1)
+    _confirm(c, sid, {"goal": "x", "stages": ["draft", "preview"]})
+
+    fake.SHARED.queue(
+        _reply(calls=[_call("run_command", {"command": "speckit-plan", "spec": "001-ventas"})]),
+        _reply(calls=[_call("finish_command", {"summary": "Plan escrito."})]),
+        _reply(calls=[_call("run_command", {"command": "speckit-tasks", "spec": "001-ventas"})]),
+        _reply(calls=[_call("finish_command", {"summary": "Tareas escritas."})]),
+        _reply("Todo listo."))
+    assert _send(c, sid).status_code == 202
+
+    body = _session(c, sid)
+    runs = sql("SELECT command, status FROM assistant_command_run WHERE session_id = :i "
+               "ORDER BY id", i=sid)
+    assert [row[0] for row in runs] == ["speckit-plan", "speckit-tasks"]
+    assert all(row[1] == "completed" for row in runs)
+    nudges = [m["content"] for m in body["messages"]
+              if m["role"] == "assistant" and m.get("content")
+              and "terminada" in m["content"].lower()]
+    assert len(nudges) == 2                       # one per closed stage, no question to the user
+    assert "Resumen del run" in body["messages"][-1]["content"]
+
+
 def test_auto_blocked_reason_flags_instructions_to_the_human():
     assert service.auto_blocked_reason("Perfecto. Ahora pulsa Aplicar para terminar.") is not None
     assert service.auto_blocked_reason("Selecciona la spec 002 en el encabezado.") is not None

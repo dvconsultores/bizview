@@ -1120,11 +1120,18 @@ def _run_command(db: Session, session: Any,
     current = command_run(session)
     if current is not None and current.status in ("running", "waiting"):
         runs.finish(current, "completed")
+    # Feature 028 (FR-004): in Auto the contract answers the stage's gates; the run never waits
+    # for a "yes" from the human.
+    preflight = runs.preflight(definition, spec, session.files())
+    if preflight.missing:
+        raise ToolError(preflight.message)
     stage = runs.create(
         db, session_id=session.id, project_id=session.project_id, definition=definition,
         arguments=arguments, locale=getattr(session, "command_locale", None) or "es",
         spec=spec, resolved_from=resolution.source or "current",
         reserved_number=session.next_spec() if name == "speckit-specify" else None)
+    if preflight.pending and spec:
+        _approve_without_asking(db, session, stage, spec, preflight.pending)
     session.command_run = stage
     auto_run = auto.live_contract(session)
     if auto_run is not None:
@@ -1137,6 +1144,26 @@ def _run_command(db: Session, session: Any,
         "instruction": registry.prompt_body(name, getattr(session, "command_locale", None) or "es"),
         "files": sorted(folders),
     }, summary
+
+
+def _approve_without_asking(db: Session, session: Any, stage: Any, spec: str,
+                            pending: dict[str, Any]) -> None:
+    """Answer a stage gate with the product's rule instead of asking the super user (FR-004).
+
+    The gates of 021 are confirmations of work already written in the spec (its status, its
+    checklist, its clarifications); the run contract is the authorisation, so Auto approves them
+    and records that it did.
+    """
+    if "approve_spec" in (pending.get("gates") or []):
+        results = fs.apply_ops(session.project.id, runs.approve_ops(spec, session.files()),
+                               {"kind": "system", "user_id": None, "session_id": session.id,
+                                "command": f"/{stage.command}", "command_run_id": stage.id})
+        for item in results:
+            runs.add_file(stage, item["path"], item["op"], item["revision_id"])
+        session.refresh()
+    stage.pending = None
+    stage.status = "running"
+    db.flush()
 
 
 def _apply_draft(db: Session, actor: Any, session: Any, app_settings: Any,

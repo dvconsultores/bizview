@@ -876,6 +876,19 @@ export function AssistantChat(props: {
                 onRequestAuto={openContract}
               />
               <ModePill session={session} />
+              {mode === "auto" && (session.contract_status ?? "none") === "none" ? (
+                <button
+                  type="button"
+                  data-authorize-run=""
+                  onClick={(event) => {
+                    setContractOpen(true);
+                    event.currentTarget.blur();
+                  }}
+                  className="inline-flex min-h-tap items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-3 text-xs font-medium text-accent hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  {t.assistant.contract.authorize}
+                </button>
+              ) : null}
             </div>
           ) : null}
           <div

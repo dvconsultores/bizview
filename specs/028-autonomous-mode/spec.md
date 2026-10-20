@@ -4,12 +4,14 @@
 
 **Created**: 2026-10-19
 
-**Status**: Implemented (2026-10-20), verification in progress: backend lint clean and **44 new
-tests green** (`test_assistant_auto_mode` 14, `test_assistant_auto_contract` 12,
-`test_assistant_auto_loop` 9, `test_assistant_auto_apply` 9), plus migration 0024 up/down (22), the
-021 guard (17), API (35), autonomous/commands (33) and guide (3) suites; frontend `tsc` clean,
-**668 unit tests** (11 of them new), build and `check:compat` OK, and the Playwright suite
-**12/12** (Chromium, Firefox, WebKit × 320/375 px) with axe and no-overflow checks — SC-009.
+**Status**: Implemented (2026-10-20) and simplified the same day at the owner's request (two modes,
+one-line authorisation, stages that chain on their own — Phase 9 of `tasks.md`). Verification:
+backend lint clean and **45 new tests green** (`test_assistant_auto_mode` 14,
+`test_assistant_auto_contract` 12, `test_assistant_auto_loop` 10, `test_assistant_auto_apply` 9),
+plus migration 0024 up/down (22), the 021 guard (17), API (35), autonomous/commands (33), apply +
+preview (24) and guide (3) suites; frontend `tsc` clean, **666 unit tests** (9 new), build and
+`check:compat` OK, and the Playwright suite **12/12** (Chromium, Firefox, WebKit × 320/375 px) with
+axe and no-overflow checks — SC-009.
 Still open: SC-001/SC-008's recorded-provider replay of the session-18 fixture, the quickstart
 walkthrough (T048) and the full backend suite in one run (too slow against this external database:
 it was verified in focused groups).
@@ -43,15 +45,23 @@ line it affects, and can be changed at any time between runs.
 | Mode | Label (es / en) | What the agent may do without asking | What still needs the human |
 |---|---|---|---|
 | **Ask** | Preguntar / Ask | Read: sources structure, profiles, workspace, specs, guides. Answer, explain, propose. | Everything that writes. No drafts, no commands write files. |
-| **Edit** | Editar / Edit | Everything in Ask, plus write and edit drafts and spec files, run validation and `check_query`, run `/speckit-*` commands one at a time. | "Vista previa" and "Aplicar" are buttons the human presses (014 behaviour). This is today's default. |
-| **Auto** | Auto / Auto | Everything in Edit, plus chain the whole pipeline on its own (specify → clarify → plan → tasks → implement → converge), run previews, fix, and apply — within a **run contract**. | One confirmation of the run contract with step-up before the run starts. Nothing else. |
+| **Auto** | Auto / Auto | Read, then — once the run is authorised — chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply**, within the run contract. | One password (plus the two-step code on `internet`) per run. Nothing else. |
+
+**Simplification 2026-10-20 (owner)**: "make it simple, just preguntar and auto, nothing about all
+form option, like second attached pic". The selector is one compact button with a short menu
+(name + one line each), not a three-way segmented control, and authorising a run is a single line
+with the password, not a form: the contract takes the documented defaults (whole pipeline up to
+apply, every configured source, the installation's limits, no modification of existing artifacts,
+automatic rollback, no extra visibility). **Auto is the default for a new conversation**: reads work
+at once and the composer offers "Autorizar run". The `edit` value stays in the API for conversations
+created before the simplification (it behaves as it did).
 
 Rules of the selector:
 
-- Default mode for a new conversation is **Edit**. The last mode used is remembered per super user
-  as a convenience, never as an authorization: choosing **Auto** always leads to a run contract.
-- Switching to **Auto** opens the run contract (below); the mode becomes active only after the
-  contract is confirmed. Cancelling the contract leaves the mode where it was.
+- Default mode for a new conversation is **Auto**. Reads work immediately; anything that writes
+  needs the run authorisation, so choosing Auto always leads to one password, never to a form.
+- Switching to **Auto** asks for the run confirmation (below); the mode becomes active when that is
+  accepted. Cancelling leaves the mode where it was.
 - Switching **down** (Auto → Edit, Edit → Ask) takes effect immediately, even mid-run: an active
   autonomous run is stopped cooperatively (FR-007) and the conversation continues in the new mode.
 - Text in a message never changes the mode ("modo autónomo", "hazlo todo sin preguntarme"). The
@@ -273,9 +283,11 @@ no draft to review and nothing to undo.
 ## Requirements *(mandatory)*
 
 ### Mode selector
-- **FR-000**: Each conversation has a `mode` ∈ {`ask`, `edit`, `auto`} stored on the session
-  (default `edit`), set only through the composer selector (`POST /sessions/{id}/mode`), shown as a
-  pill in the header, the conversation list and the status bar. The tool layer enforces the mode:
+- **FR-000**: Each conversation has a `mode` ∈ {`ask`, `auto`} stored on the session (default
+  `auto`; `edit` is accepted from the API for conversations created before the simplification),
+  set only through the composer's two-entry menu (`POST /sessions/{id}/mode`), shown as a pill in
+  the header, the conversation list and the status bar. In `auto` without a live contract only
+  reads succeed and the composer offers **Autorizar run**. The tool layer enforces the mode:
   in `ask` only reads may be called — `list_sources`, `describe_source`, `profile_source`,
   `get_authoring_guide`, `get_workspace`, `get_app_guide`, `get_project_overview`, `read_draft`, and
   `check_query` without `path` (the existing `is_discovery()` classification) — and every other
@@ -291,23 +303,32 @@ no draft to review and nothing to undo.
   already shipped in `commands/resolve.py`; 028 proves it under Auto with the session-18 replay.
 
 ### Contract and authorisation
-- **FR-001**: An Auto run MUST be started by selecting the **Auto** mode and confirming a **run
-  contract** with step-up. The contract records: goal, allowed sources/tables, allowed stages
+- **FR-001**: An Auto run MUST be started by confirming a **run contract** with step-up. In the
+  composer that confirmation is one line (the documented defaults + the password, and the two-step
+  code on `internet`); the API still accepts the full shape — goal, sources/tables, stages
   (`draft` | `preview` | `apply`), limits (tokens, previews, applies, wall clock), `modify_existing`,
-  `auto_rollback`, `visible_to` roles, and the confirming user and time. It is stored on the session
-  and shown in the transcript.
+  `auto_rollback`, `visible_to` — for run profiles and future screens. The contract records the
+  confirming user and time, is stored on the session and shown in the transcript.
 - **FR-002**: The contract's single step-up authorises every apply within the run (replaces the
   per-apply step-up of 014 FR-006 for that run only). Everything else in 014 FR-006 is unchanged.
 - **FR-003**: Contract limits and allowed stages MUST be enforced in product code (tool layer,
   apply route, worker), never by instructions to the model.
 
 ### Running
-- **FR-004**: In mode Auto the loop (017) does not stop for user input: the per-message round
-  limit becomes the run's limit; `run_preview`, `apply_draft`, `set_current_spec` and
+- **FR-004**: In mode Auto the loop (017) does not stop for user input, and a finished **stage**
+  does not end the run: `finish_command` closes the command run and the loop continues with the
+  next stage (the transcript shows "Etapa /speckit-plan terminada" and the model opens the next one
+  with `run_command`). Stage gates (`approve_spec`, checklists, clarifications) are answered by the
+  contract — approving the spec's status through `approve_ops` — never by the human. The
+  per-message round limit becomes the run's limit; `run_preview`, `apply_draft`, `set_current_spec` and
   `run_command(spec, command)` become callable tools, gated by the contract; `apply_draft` performs
   exactly the 014 apply (re-validation, version, audit) with `source="chat:<id>:auto"`.
   `run_command` executes a `/speckit-*` stage on the given spec with the same runner the composer
   uses, so an Auto run is a chain of ordinary, audited command runs.
+- **FR-004a**: The reported defect that motivated the 2026-10-20 simplification — "still ask
+  permission to implement and I need to click and send" — is closed by FR-004: the chain runs in one
+  turn, so a stage never waits for another message. A test replays plan → tasks → summary with no
+  user message in between.
 - **FR-004b**: The agent MUST NOT end an Auto run with an instruction to the human ("selecciona la
   spec", "pulsa Aplicar"). If a stage cannot proceed, the run stops with a reason code
   (`blocked:<reason>`) and the summary; the fixture from session 18 (report 002 never planned) MUST

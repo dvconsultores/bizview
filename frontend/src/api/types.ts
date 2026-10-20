@@ -918,7 +918,8 @@ export interface RunContract {
   goal: string;
   sources?: ContractSource[];
   stages: Array<"draft" | "preview" | "apply">;
-  limits: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
+  /** Omitted by the composer: the server fills the installation's defaults. */
+  limits?: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
   modify_existing?: boolean;
   auto_rollback?: boolean;
   visible_to?: Array<"admin" | "user">;
@@ -930,7 +931,7 @@ export interface AssistantAutoRun {
   status: "confirmed" | "running" | "applied" | "stopped" | "failed";
   stop_reason: string | null;
   stage: string | null;
-  limits: RunContract["limits"] | Record<string, never>;
+  limits: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
   used: { tokens: number; previews: number; applies: number; elapsed_seconds: number };
   stages: Array<"draft" | "preview" | "apply">;
   sources: ContractSource[];

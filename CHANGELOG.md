@@ -8,16 +8,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Agent modes and autonomous runs (feature 028)**: the Asistente composer gets a mode selector —
-  **Preguntar / Ask**, **Editar / Edit** (the default, today's behaviour) and **Auto**. In Auto the
+- **Agent modes and autonomous runs (feature 028)**: the Asistente composer gets one small mode
+  button with two choices — **Preguntar / Ask** (reads only) and **Auto** (the default). In Auto the
   agent runs the whole pipeline on its own: it chains the Spec Kit stages (`run_command`), writes the
   specs and artifacts, validates, runs the preview, fixes and **applies** the new workspace version,
-  and reports at the end instead of stopping for "Vista previa" and "Aplicar".
-  - The single authorisation is a **run contract** confirmed with step-up (password, and the two-step
-    code on the `internet` profile): goal, allowed sources and tables, stages (draft / preview /
-    apply), limits (tokens, previews, applies, wall-clock minutes), `modify_existing`,
-    `auto_rollback` and `visible_to`. One contract covers one run; the mode stays Auto and the next
-    run needs a new contract.
+  and reports at the end instead of stopping for "Vista previa" and "Aplicar". A finished stage no
+  longer ends the run: plan → tasks → implement follow each other in the same run, and the stage
+  gates (approving a spec, checklists, clarifications) are answered by the contract, so nothing
+  waits for another message.
+  - The authorisation is one line, not a form: **Autorizar run** asks for the password (and the
+    two-step code on `internet`) and takes the documented defaults — the whole pipeline up to apply,
+    every configured source, the installation's limits, nothing existing modified, automatic
+    rollback, no extra visibility. One confirmation covers one run. The API still accepts the full
+    contract (goal, sources/tables, stages, limits, `modify_existing`, `auto_rollback`,
+    `visible_to`) for saved profiles.
   - Everything is enforced in product code, never by the prompt: in **Ask** only reads succeed
     (`list_sources`, `describe_source`, `profile_source`, `get_authoring_guide`, `get_workspace`,
     `get_app_guide`, `get_project_overview`, `read_draft`, and `check_query` without a draft path);

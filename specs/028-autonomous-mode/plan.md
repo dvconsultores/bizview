@@ -216,14 +216,16 @@ the run summary; the summary is also checked by a fixture test (SC-006).
 
 ### 7. Frontend (`frontend/src/components/assistant/`)
 
-- `ModeSelector.tsx` — segmented control (Preguntar / Editar / Auto) above the composer; visible to
-  super users only (the whole Asistente already is); on phones a segmented control, never a dropdown;
-  Tab + arrow keys; `aria-checked`; AA contrast in both themes (feature-010 look, SC-009).
-- `RunContractDialog.tsx` — the checklist of US3: stages, sources/tables, limits, `modify_existing`,
-  `auto_rollback`, `visible_to`, profile picker; password (+ TOTP when the installation is
-  `internet`) and a single "Autorizar el run" button. Prefills from a saved profile. It is an
-  **inline panel above the composer**, not an overlay: `tests/unit/no-modals.test.ts` forbids
-  `role="dialog"`, `aria-modal` and `fixed inset-0` anywhere in `src/`.
+- `ModeSelector.tsx` — **one compact button that opens a two-entry menu** (Preguntar / Auto), as the
+  owner asked on 2026-10-20 ("just preguntar and auto, nothing about all form option"); each entry
+  carries a name and one line; `role="menu"` + `menuitemradio`, arrow keys, Escape, AA contrast in
+  both themes. Auto is the default and the mode only changes when the run is authorised.
+- `RunContractDialog.tsx` — **one line, not a form**: the documented defaults in a sentence plus
+  the password (+ TOTP when the installation is `internet`) and a single "Autorizar el run" button;
+  the API keeps the full contract shape for profiles. It is an **inline panel above the composer**,
+  not an overlay: `tests/unit/no-modals.test.ts` forbids `role="dialog"`, `aria-modal` and
+  `fixed inset-0` anywhere in `src/`. The composer shows **Autorizar run** while the mode is Auto
+  and no contract is live.
 - `SessionIndicator.tsx`/`AssistantHistory.tsx` — the mode pill in the header and in the
   conversation list; "Auto · ejecutando" / "Auto · sin contrato" / "Auto · detenido (límite)".
 - `RunStatus.tsx` grows the Auto status bar: stage, attempts, tokens used, previews/applies used,

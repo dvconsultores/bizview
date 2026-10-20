@@ -64,6 +64,7 @@ beforeEach(() => {
   root = createRoot(container);
   confirmContract.mockReset();
   saveRunProfile.mockReset();
+  onClose.mockReset();
 });
 
 afterEach(() => {
@@ -78,13 +79,15 @@ function setValue(element: HTMLInputElement, value: string) {
   element.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+const onClose = vi.fn();
+
 async function render() {
   await act(async () => {
     root.render(
       <RunContractDialog
         session={session}
         goal="dashboard de facturas"
-        onClose={() => {}}
+        onClose={onClose}
         onConfirmed={() => {}}
       />,
     );
@@ -92,13 +95,15 @@ async function render() {
   await act(async () => {});
 }
 
-describe("RunContractDialog (feature 028, FR-001)", () => {
-  it("shows the goal and the three stages with apply selected by default", async () => {
+describe("RunContractDialog (one-line authorisation, feature 028)", () => {
+  it("explains the defaults instead of showing a form", async () => {
     await render();
-    expect(container.textContent).toContain("dashboard de facturas");
-    const radios = Array.from(container.querySelectorAll('input[name="stage"]')) as HTMLInputElement[];
-    expect(radios.map((r) => r.value)).toEqual(["draft", "preview", "apply"]);
-    expect(radios.filter((r) => r.checked).map((r) => r.value)).toEqual(["apply"]);
+    expect(container.textContent).toContain("Contrato del run");
+    expect(container.textContent).toContain("Todo el pipeline hasta aplicar");
+    // No staging choice, no numeric fields: only the step-up.
+    expect(container.querySelectorAll('input[name="stage"]')).toHaveLength(0);
+    expect(container.querySelectorAll('input[type="number"]')).toHaveLength(0);
+    expect(container.querySelectorAll("select")).toHaveLength(0);
   });
 
   it("cannot authorise without the password", async () => {
@@ -107,7 +112,7 @@ describe("RunContractDialog (feature 028, FR-001)", () => {
     expect(confirm.disabled).toBe(true);
   });
 
-  it("sends the contract with its limits and the step-up", async () => {
+  it("authorises with the defaults and the password", async () => {
     confirmContract.mockResolvedValue({ run: {}, session });
     await render();
     const password = container.querySelector('input[type="password"]') as HTMLInputElement;
@@ -123,36 +128,13 @@ describe("RunContractDialog (feature 028, FR-001)", () => {
     const [sessionId, body] = confirmContract.mock.calls[0];
     expect(sessionId).toBe(7);
     expect(body.password).toBe("Correct-horse-9");
+    expect(body.code).toBeNull();
     expect(body.contract.stages).toEqual(["draft", "preview", "apply"]);
-    expect(body.contract.limits).toEqual({
-      tokens: 400000,
-      previews: 5,
-      applies: 1,
-      wall_clock_seconds: 1800,
-    });
-    expect(body.contract.auto_rollback).toBe(true);
-    expect(body.contract.modify_existing).toBe(false);
-    expect(body.contract.visible_to).toEqual([]);
+    expect(body.contract.limits).toBeUndefined();      // the server fills the installation defaults
+    expect(body.contract.goal).toBe("dashboard de facturas");
   });
 
-  it("choosing 'up to preview' drops the apply stage", async () => {
-    confirmContract.mockResolvedValue({ run: {}, session });
-    await render();
-    const radios = Array.from(container.querySelectorAll('input[name="stage"]')) as HTMLInputElement[];
-    await act(async () => {
-      radios[1].click();
-    });
-    const password = container.querySelector('input[type="password"]') as HTMLInputElement;
-    await act(async () => {
-      setValue(password, "Correct-horse-9");
-    });
-    await act(async () => {
-      (container.querySelector("[data-contract-confirm]") as HTMLButtonElement).click();
-    });
-    expect(confirmContract.mock.calls[0][1].contract.stages).toEqual(["draft", "preview"]);
-  });
-
-  it("shows the server's step-up error", async () => {
+  it("shows the server's step-up error and stays open", async () => {
     const { ApiError } = await import("../../src/api/client");
     confirmContract.mockRejectedValue(new (ApiError as any)(401, "step_up_failed",
       "La contraseña no es correcta.", { password: "invalid" }));
@@ -165,6 +147,7 @@ describe("RunContractDialog (feature 028, FR-001)", () => {
       (container.querySelector("[data-contract-confirm]") as HTMLButtonElement).click();
     });
     expect(container.textContent).toContain("La contraseña no es correcta.");
+    expect(container.querySelector("[data-run-contract]")).not.toBeNull();
   });
 
   it("cancels without authorising", async () => {
@@ -175,11 +158,7 @@ describe("RunContractDialog (feature 028, FR-001)", () => {
     await act(async () => {
       cancel.click();
     });
+    expect(onClose).toHaveBeenCalled();
     expect(confirmContract).not.toHaveBeenCalled();
-    const { api } = await import("../../src/api/client");
-    expect(vi.mocked(api.post)).toHaveBeenCalledWith(
-      "/api/assistant/sessions/7/contract/cancel",
-      {},
-    );
   });
 });

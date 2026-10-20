@@ -596,9 +596,9 @@ MODE_AUTO_TEXT = (
 )
 def mode_block(session: AssistantSession, settings) -> list[str]:
     """Feature 028 (FR-000b): what the current mode allows, before the work state."""
-    mode = getattr(session, "mode", None) or "edit"
+    mode = getattr(session, "mode", None) or "auto"
     if mode != "auto":
-        return ["## Modo", MODE_TEXT.get(mode, MODE_TEXT["edit"]), ""]
+        return ["## Modo", MODE_TEXT.get(mode, MODE_TEXT["ask"]), ""]
     contract = auto.contract_of(session)
     run = getattr(session, "auto_run", None)
     lines = ["## Modo", MODE_AUTO_TEXT]
@@ -1995,6 +1995,12 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     while rounds < max_rounds:
         _bump(session, "rounds")
+        # Feature 028: `run_command` switches the stage mid-turn, so the round re-reads it.
+        fresh = runs.active(db, session.id)
+        if fresh is not None and fresh.status == "running" and fresh is not run:
+            run = fresh
+            definition = registry.REGISTRY.get(run.command)
+            view.command_run = run
         if auto_run is not None and auto_run.status in auto.LIVE_STATUSES:
             refusal = auto.limit_refusal(auto.contract_of(session), auto_run,
                                          tokens=int(auto_run.tokens or 0), wall_clock=True,
@@ -2216,8 +2222,26 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _commit_round(db, session, claim)
 
         if finished:
-            end("done")
-            return new_messages
+            if auto_run is None or auto_run.status not in auto.LIVE_STATUSES:
+                end("done")
+                return new_messages
+            # Feature 028 (FR-004): the stage is done, the run is not. Close it, forget the
+            # command so only inspection tools remain, and tell the model to open the next stage.
+            closed_stage = run.command if run is not None else "-"
+            if run is not None and run.status in ("running", "waiting"):
+                runs.finish(run, "completed")
+            view.command_run = None
+            run = None
+            definition = None
+            finished = False
+            contract_now = auto.contract_of(session)
+            stage_note = t("assistant.auto.next_stage", done=f"/{closed_stage}",
+                           stages=", ".join(contract_now.stages) if contract_now else "-")
+            new_messages.append(_add(db, session, role="assistant", content=stage_note))
+            history.append(ChatMessage(role="user", content=stage_note))
+            session.updated_at = datetime.now(UTC)
+            _commit_round(db, session, claim)
+            continue
 
         if round_invalid:
             invalid_rounds += 1
@@ -2424,7 +2448,7 @@ def session_json(session: AssistantSession, messages: list[AssistantMessage], *,
         "project": _project_ref(session),
         "current_spec": session.current_spec,
         "read_only": session.read_only,
-        "mode": session.mode or "edit",
+        "mode": session.mode or "auto",
         **_contract_json(db, session),
         "working_state": session.working_state or {},
         "readiness": readiness.compute(view, user_texts),
