@@ -632,18 +632,25 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
 
     outcome = outcome_lines(session.preview)
 
+    # An authorised Auto run has no cap (feature 028, owner 2026-10-21): telling the model about
+    # percentages and ceilings makes it stop on its own, which is the defect this replaces.
+    auto_run = auto.live_contract(session)
     budget_lines: list[str] = []
-    limit = budget_limit(session, settings)
-    pct = int(100 * session.tokens_used / limit)
-    budget_lines.append(
-        f"Presupuesto: {pct} % usado ({session.tokens_used} de {limit} tokens)."
-    )
-    if budget_warning(session, settings):
-        budget_lines.append(BUDGET_WARNING_LINE)
-    budget_lines.append(
-        f"Vistas previas usadas: {(session.stats or {}).get('previews', 0)} "
-        f"de {settings.ai_chat_max_previews}."
-    )
+    previews_used = (session.stats or {}).get("previews", 0)
+    if auto_run is not None:
+        budget_lines.append(f"Tokens usados en este run: {session.tokens_used}.")
+        budget_lines.append(f"Vistas previas usadas: {previews_used}.")
+    else:
+        limit = budget_limit(session, settings)
+        pct = int(100 * session.tokens_used / limit)
+        budget_lines.append(
+            f"Presupuesto: {pct} % usado ({session.tokens_used} de {limit} tokens)."
+        )
+        if budget_warning(session, settings):
+            budget_lines.append(BUDGET_WARNING_LINE)
+        budget_lines.append(
+            f"Vistas previas usadas: {previews_used} de {settings.ai_chat_max_previews}."
+        )
 
     ordered_blocks: list[list[str]] = [
         notes_block,
