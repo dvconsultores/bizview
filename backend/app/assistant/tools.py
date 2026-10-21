@@ -1833,8 +1833,10 @@ def _run_preview(db: Session, session: Any, app_settings: Any) -> tuple[dict[str
                         "corrige los errores de validación.")
     if (session.preview or {}).get("status") == "pending":
         raise ToolError("Ya hay una vista previa en curso; espera a que termine.")
-    limit = app_settings.ai_chat_max_previews
-    if int((session.stats or {}).get("previews") or 0) >= limit:
+    # Feature 028: an authorised Auto run fixes and retries without a preview cap (owner: no
+    # limits); a contract that sets `limits.previews` is still enforced by `_guard_check`.
+    limit = None if auto.live_contract(session) is not None else app_settings.ai_chat_max_previews
+    if limit is not None and int((session.stats or {}).get("previews") or 0) >= limit:
         raise ToolError(f"Se alcanzó el máximo de {limit} vistas previas en esta conversación.")
 
     _bump(session, "previews")

@@ -147,7 +147,9 @@ export function RunStatus({
   // A contract that ended by itself says why (limit, blocked stage, revoked role).
   const stopReason = session.contract?.stop_reason;
   if (session.mode === "auto" && stopReason) {
-    const limit = stopReason.startsWith("limit:") ? stopReason.slice(6) : null;
+    const name = stopReason.startsWith("limit:") ? stopReason.slice(6) : null;
+    const names = t.assistant.runStatus.limitNames as Record<string, string>;
+    const limit = name ? (names[name] ?? name) : null;
     return (
       <p role="status" data-contract-stop="" className="text-sm text-ink-muted">
         {limit

@@ -336,15 +336,15 @@ Error codes: `mode_invalid`, `contract_required`, `contract_invalid`, `step_up_r
 | A new table (`assistant_auto_run`) instead of columns on `assistant_session` | Contract, counters, stop reason and summary are per run, and the conversation can start a second run later | JSONB columns on the session would overwrite the previous run's record and leave no auditable history for FR-010/SC-002 |
 | No notification channel for FR-008 | There is none in the product today, and building one is a separate feature with its own consent/consent-to-email rules (018) | Reusing the 018 email pipeline was rejected: it needs a subscription model and consent this feature does not have; the conversation + run history is where the super user already looks |
 
-### Owner decisions taken after the first implementation (2026-10-20)
+### Owner decisions taken after the first implementation (2026-10-20, extended 2026-10-21)
 
-Three of them relax what FR-000/FR-001/FR-003 originally said. They are behaviour of the shipped
+They relax what FR-000/FR-001/FR-003 originally said. They are behaviour of the shipped
 product, so they are recorded here instead of being silently left in the code.
 
 | Original requirement | Shipped behaviour | Why |
 |---|---|---|
 | FR-001: the contract is confirmed **with step-up** (password, plus TOTP on `internet`) | No step-up by default: choosing **Auto** in the composer is the authorisation. The old flow stays behind `AI_AUTO_REQUIRE_STEP_UP=1` for installations that want it | Owner, verbatim: "do not need auth to auto mode". Every other guarantee of FR-002/FR-003 is unchanged — the contract row is still stored, audited and enforced by product code, and the run is still one explicit human action |
-| FR-003/spec §1: limits (tokens, previews, applies, wall clock) are part of the contract | `ContractLimits` fields default to `None` = **no cap**. A run is bounded by "Detener", by switching the mode down, and by the installation ceilings (`AI_CHAT_BUDGET_MAX`, preview limit) | Owner: "Se alcanzó el límite del contrato: tokens … do not limit it". Caps remain expressible in a contract/profile (`limits` is still parsed, validated and enforced when set), so SC-002/SC-003 still hold for any installation that sets them |
+| FR-003/spec §1: limits (tokens, previews, applies, wall clock) are part of the contract | `ContractLimits` fields default to `None` = **no cap**, and an Auto run is exempt from 017's ceilings too: `AI_COMMAND_TOKEN_CEILING` and `AI_CHAT_BUDGET_MAX` do not stop it and `AI_CHAT_MAX_PREVIEWS` does not refuse its previews. It is bounded by "Detener", by switching the mode down and by the round cap | Owner: "Se alcanzó el límite del contrato: tokens … do not limit it" and, after the `/speckit-tasks` stage stopped on the 400k per-command ceiling, "it can not have a token limit … do not limit ever". Caps remain expressible in a contract/profile (`limits` is still parsed, validated and enforced when set), so SC-002/SC-003 still hold for any installation that sets them |
 | The selector offers Ask / Edit / Auto (FR-000) | The composer offers **Preguntar** and **Auto** only; `edit` still exists in the API and in the column's default for legacy clients | Owner: "just preguntar and auto, nothing about all form option". Auto already contains everything Edit did, so a third entry only added a click |
 
 Remaining unchanged: the data boundary, read-only SQL, draft path/size/content limits, "no spec, no

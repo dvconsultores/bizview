@@ -395,7 +395,8 @@ form and no password (an installation can ask for one with `AI_AUTO_REQUIRE_STEP
 
 In Auto the run never stops to ask: a finished stage (plan, tasks…) is followed by the next one on
 its own, and the transcript shows "Etapa /speckit-plan terminada". What the run may do is enforced
-by the product, not by the model, and it has no token or time cap unless a run profile sets one:
+by the product, not by the model, and it has **no token cap** — the contract, the per-command
+ceiling and the conversation budget all leave an Auto run alone (unless a run profile sets a limit):
 **Detener**, or switching to Preguntar, brakes the run with the draft and the working state intact,
 and nothing is applied afterwards. Writing "modo autónomo" in a message never switches the mode.
 

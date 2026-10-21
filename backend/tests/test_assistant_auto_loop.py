@@ -200,6 +200,53 @@ def test_contract_limits_stop_the_run(chat, monkeypatch):
     assert row == [("stopped", "limit:tokens")]
 
 
+def test_auto_run_is_not_stopped_by_the_command_token_ceiling(chat, monkeypatch):
+    """Owner, 2026-10-21: an authorised run has no token ceiling — not even 017's per-command one.
+
+    This is the reported defect: `/speckit-tasks` reached the 400k per-command ceiling and the
+    transcript blamed "el límite del contrato: tokens".
+    """
+    c, project, sid = chat
+    monkeypatch.setattr(get_settings(), "ai_command_token_ceiling", 10_000)
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC}, 1)
+    _confirm(c, sid, {"goal": "x", "stages": ["draft", "preview"]})
+
+    huge = "x" * 80_000
+    fake.SHARED.queue(ChatReply(
+        text="", tool_calls=(_call("edit_draft", {"ops": [
+            {"op": "write", "path": "specs/001-ventas/plan.md", "content": huge}]}),),
+        usage=ChatUsage(), model="fake"))
+    assert _send(c, sid, "/speckit-plan 001-ventas").status_code == 202
+
+    data = _session(c, sid)
+    assert all(run["status"] != "budget" for run in data["command_runs"])
+    assert not any("techo" in m["content"] for m in data["messages"] if m["role"] == "assistant")
+    assert (data["contract"] or {}).get("stop_reason") != "limit:tokens"
+
+
+def test_auto_run_is_not_stopped_by_the_conversation_budget(chat, monkeypatch):
+    """The conversation budget belongs to 017; an Auto run spends what it needs to finish."""
+    c, project, sid = chat
+    monkeypatch.setattr(get_settings(), "ai_chat_budget_max", 1)
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC}, 1)
+    _confirm(c, sid, {"goal": "x", "stages": ["draft", "preview"]})
+    sql("UPDATE assistant_session SET tokens_used = 5000, token_budget = 1 WHERE id = :i", i=sid)
+
+    fake.SHARED.queue(
+        _reply(calls=[_call("read_draft", {"paths": ["specs/001-ventas/spec.md"]})]),
+        _reply("Sigo con el plan."))
+    assert _send(c, sid).status_code == 202
+
+    data = _session(c, sid)
+    assert (data["contract"] or {}).get("stop_reason") != "limit:budget"
+    # The tool call after the budget ran out still happened: the run was not cut short.
+    assert any(m.get("tool_name") == "read_draft" for m in data["messages"])
+
+
+def test_auto_end_reasons_never_blame_the_contract_for_a_conversation_limit():
+    assert service._AUTO_END["budget"] == ("stopped", "limit:budget")
+
+
 def test_limit_refusal_helpers():
     contract = auto.RunContract.model_validate({"goal": "x", "stages": ["draft", "preview"],
                                                 "limits": {"tokens": 10000, "previews": 1,

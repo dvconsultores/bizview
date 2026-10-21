@@ -65,10 +65,13 @@ before the simplification (it behaves as it did).
 límite del contrato: tokens … do not limit it"; "still the insert spec proposed after click i need
 to click send"; "why change everything in every prompt". Therefore FR-001, FR-002 and the limit
 defaults below now ship as: (a) **no step-up** — `AI_AUTO_REQUIRE_STEP_UP=1` brings the password
-(and the two-step code on `internet`) back for installations that want it; (b) **no contract caps**
-— `limits` fields are optional and unset means no cap, so a run ends by applying, by "Detener", by
-switching the mode down or by the installation ceilings (`AI_CHAT_BUDGET_MAX`, preview limit), and a
-saved profile or a hand-written contract can still set them; (c) the agent never proposes a
+(and the two-step code on `internet`) back for installations that want it; (b) **no caps at all**
+— `limits` fields are optional and unset means no cap, and an Auto run is also exempt from 017's
+ceilings: the per-command token ceiling (`AI_COMMAND_TOKEN_CEILING`) and the conversation budget
+(`AI_CHAT_BUDGET_MAX`) do not stop it, and the per-conversation preview cap
+(`AI_CHAT_MAX_PREVIEWS`) does not refuse its previews. A run ends by applying, by "Detener", by
+switching the mode down or by the round cap (a structural safety valve, not a token budget). A saved
+profile or a hand-written contract can still set any limit; (c) the agent never proposes a
 "send this command" chip in Auto — it runs the stage with `run_command` itself; (d) the system
 prompt is not rewritten per mode: `ask` adds nothing (the tools enforce it) and `auto` adds one line.
 The contract row is still stored, audited and enforced by product code either way.

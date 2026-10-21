@@ -284,7 +284,7 @@ tests and the docs were brought in line with them:
 | Owner's words | What changed |
 |---|---|
 | "do not need auth to auto mode" | `POST /contract` no longer asks for a password unless `AI_AUTO_REQUIRE_STEP_UP=1`; the composer creates the contract with one click on **Auto** and `RunContractDialog.tsx` was deleted (T030/T031 superseded). |
-| "Se alcanzó el límite del contrato: tokens … do not limit it" | `ContractLimits` fields are optional and `None` = no cap; `limit_refusal` skips unset caps; `AI_AUTO_MAX_APPLIES`, `AI_AUTO_RUN_MAX_SECONDS` and `AI_AUTO_MAX_PREVIEWS` were removed (T002 revised). |
+| "Se alcanzó el límite del contrato: tokens … do not limit it" (and, after `/speckit-tasks` stopped on the 400k per-command ceiling, "it can not have a token limit … do not limit ever") | `ContractLimits` fields are optional and `None` = no cap; `limit_refusal` skips unset caps; `AI_AUTO_MAX_APPLIES`, `AI_AUTO_RUN_MAX_SECONDS` and `AI_AUTO_MAX_PREVIEWS` were removed (T002 revised). An Auto run is also exempt from 017's ceilings: `AI_COMMAND_TOKEN_CEILING` and `AI_CHAT_BUDGET_MAX` no longer end it and `AI_CHAT_MAX_PREVIEWS` no longer refuses its previews; `limit:tokens` became `limit:budget` and the status bar no longer blames "el contrato" for a limit it does not own. |
 | "still the insert spec proposed after click i need to click send" | `suggest_command` is neither offered nor accepted in Auto (`assistant.auto.use_run_command`); the agent runs the stage itself with `run_command`. |
 | "why change everything in every prompt" | `mode_block` adds a single line, only in Auto; `ask` adds nothing because the tools already enforce it. |
 

@@ -39,9 +39,12 @@ All notable changes to this project are documented here. The format follows
     prefill; a profile is a convenience, never an authorisation — the run still needs its own
     contract (and its own step-up when `AI_AUTO_REQUIRE_STEP_UP=1`).
   - New settings: `AI_AUTO_MAX_ROUNDS` (200, the loop's safety valve) and
-    `AI_AUTO_REQUIRE_STEP_UP` (off: selecting Auto is the authorisation). A run has no token,
-    preview, apply or wall-clock cap unless a profile or a hand-written contract sets one; the
-    conversation's own ceilings (`AI_CHAT_BUDGET_MAX`, `AI_CHAT_MAX_PREVIEWS`) still apply.
+    `AI_AUTO_REQUIRE_STEP_UP` (off: selecting Auto is the authorisation). An Auto run has **no token
+    cap at all**: not in its contract (optional `limits`), not from `AI_COMMAND_TOKEN_CEILING`, not
+    from `AI_CHAT_BUDGET_MAX`, and the per-conversation `AI_CHAT_MAX_PREVIEWS` does not refuse its
+    previews — the owner's rule is "do not limit ever, that is the reason to use the API". It ends
+    by applying, by "Detener", by switching the mode down, or by the round cap. A profile or a
+    hand-written contract can still set any limit, and manual conversations keep every 017 ceiling.
   - Migration `0024_autonomous_mode`: `assistant_session.mode`, `assistant_auto_run` and
     `assistant_run_profile`.
   - 014 FR-006 changes for an Auto run: the human decision is per **run** (selecting Auto, recorded

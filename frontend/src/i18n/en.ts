@@ -1207,7 +1207,15 @@ export const en: Catalogue = {
       elapsed: "Elapsed",
       elapsedValue: "{used} / {total} min",
       stop: "Stop",
-      stoppedByLimit: "Contract limit reached: {limit}.",
+      stoppedByLimit: "The run stopped at the limit: {limit}.",
+      limitNames: {
+        tokens: "tokens",
+        previews: "previews",
+        applies: "applies",
+        wall_clock: "wall clock",
+        rounds: "rounds",
+        budget: "the conversation's budget",
+      },
     },
     refusals: {
       askMode: "Ask mode: switch to Edit to write.",

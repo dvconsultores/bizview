@@ -1190,7 +1190,15 @@ export const es = {
       elapsed: "Tiempo",
       elapsedValue: "{used} / {total} min",
       stop: "Detener",
-      stoppedByLimit: "Se alcanzó el límite del contrato: {limit}.",
+      stoppedByLimit: "El run se detuvo al alcanzar el límite: {limit}.",
+      limitNames: {
+        tokens: "tokens",
+        previews: "vistas previas",
+        applies: "aplicaciones",
+        wall_clock: "tiempo",
+        rounds: "rondas",
+        budget: "presupuesto de la conversación",
+      },
     },
     refusals: {
       askMode: "Modo Preguntar: cambia a Editar para escribir.",

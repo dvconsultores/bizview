@@ -1126,7 +1126,9 @@ _AUTO_END = {
     "done": ("applied", "completed"),
     "ready": ("applied", "completed"),
     "ready_preview": ("stopped", "completed"),
-    "budget": ("stopped", "limit:tokens"),
+    # Only a turn outside an Auto run can stop on tokens (owner: an authorised run is never
+    # capped): the conversation's own budget is what this reason means.
+    "budget": ("stopped", "limit:budget"),
     "limit": ("stopped", "limit:rounds"),
     "stopped": ("stopped", "stopped:user"),
     "error": ("failed", None),
@@ -1944,7 +1946,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 tool_payload=_suggestion(run.command, spec=run.spec),
                 content=t("commands.interrupted_resume", command=run.command)))
 
-    if _budget_exhausted(db, session, app_settings):
+    # Feature 028: an authorised Auto run is never stopped by a token budget (owner, 2026-10-21:
+    # "it can not have a token limit … do not limit ever"). Its bounds are the round cap,
+    # "Detener" and switching the mode down.
+    if auto_run is None and _budget_exhausted(db, session, app_settings):
         new_messages.append(_budget_stop(db, session, []))
         end("budget")
         return new_messages
@@ -2069,7 +2074,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         if run is not None:
             runs.add_tokens(run, reply.usage.input + reply.usage.output)
         ceiling = app_settings.ai_command_token_ceiling
-        if run is not None and ceiling and (run.tokens or 0) >= ceiling:
+        if run is not None and auto_run is None and ceiling and (run.tokens or 0) >= ceiling:
             # Per-command ceiling: stop before touching the project again; the draft stays as is.
             if reply.text.strip():
                 new_messages.append(_add(db, session, role="assistant", content=reply.text))
@@ -2091,7 +2096,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             end("done")
             return new_messages
 
-        if reply.tool_calls and _budget_exhausted(db, session, app_settings):
+        if reply.tool_calls and auto_run is None and _budget_exhausted(db, session, app_settings):
             if reply.text.strip():
                 new_messages.append(_add(db, session, role="assistant", content=reply.text))
             new_messages.append(_budget_stop(db, session, turn_summaries))
