@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.db import get_engine
 from tests.conftest import TEST_SCHEMA, signed_in, sql
 from tests.e2e_schema import seed_reference
@@ -35,8 +35,10 @@ FOLLOW_UP = (
 )
 MAX_FOLLOW_UPS = 3
 MAX_VALIDATIONS = 3
+# The product has no token budget any more (feature 028 revision, 2026-10-21). This figure is the
+# old 017 default, kept only as the yardstick of the eval: the run should be ready well inside it.
+TOKEN_REFERENCE = 400_000
 MAX_BUDGET_RATIO = 0.40
-DEFAULT_BUDGET = Settings.model_fields["ai_chat_token_budget"].default
 
 
 @dataclass(frozen=True)
@@ -58,7 +60,7 @@ class RunReport:
             self.ready
             and self.validations <= MAX_VALIDATIONS
             and self.probes == 0
-            and self.tokens <= MAX_BUDGET_RATIO * DEFAULT_BUDGET
+            and self.tokens <= MAX_BUDGET_RATIO * TOKEN_REFERENCE
         )
 
 
@@ -94,7 +96,7 @@ def _report(run: int, session: dict | None, turns: int, error: str | None = None
     previews = stats.get("previews", 0)
     rounds = stats.get("rounds", 0)
     tokens = session.get("tokens_used", 0)
-    budget_pct = round(100 * tokens / DEFAULT_BUDGET, 1)
+    budget_pct = round(100 * tokens / TOKEN_REFERENCE, 1)
     ready = bool(readiness.get("ready") and not error)
     return RunReport(
         run,
@@ -134,7 +136,7 @@ def _run_once(client: TestClient, run: int) -> RunReport:
             break
         if session.get("status") != "open":
             break
-        if session.get("tokens_used", 0) >= session.get("token_budget", DEFAULT_BUDGET):
+        if session.get("tokens_used", 0) >= TOKEN_REFERENCE:
             break
 
     return _report(run, session, turns)

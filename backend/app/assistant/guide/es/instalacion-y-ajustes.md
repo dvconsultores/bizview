@@ -15,8 +15,8 @@ reinicia la instalación. Por área:
 
 - Marca: `ORGANIZATION_NAME` y `LOGO_URL`.
 - Seguridad: `SECURITY_PROFILE` (`auto`, `private` o `internet`).
-- IA: `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` y los presupuestos del chat
-  (`AI_CHAT_TOKEN_BUDGET`, `AI_CHAT_BUDGET_MAX`).
+- IA: `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` y `AI_BASE_URL`. No hay presupuesto de tokens: el
+  asistente no se detiene por tokens.
 - Idioma y hora: `DEFAULT_LOCALE` (`es` o `en`) y `TIMEZONE`.
 - Proyectos: `PROJECTS_DIR` y `PROJECT_MAX_MB`.
 - Reportes directos y ETL: `DIRECT_REPORTS_BI` y `TRANSFORM_MAX_ROWS`.

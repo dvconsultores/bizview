@@ -15,8 +15,8 @@ installation. By area:
 
 - Branding: `ORGANIZATION_NAME` and `LOGO_URL`.
 - Security: `SECURITY_PROFILE` (`auto`, `private` or `internet`).
-- AI: `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` and the chat budgets
-  (`AI_CHAT_TOKEN_BUDGET`, `AI_CHAT_BUDGET_MAX`).
+- AI: `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` and `AI_BASE_URL`. There is no token budget:
+  the assistant never stops because of tokens.
 - Language and time: `DEFAULT_LOCALE` (`es` or `en`) and `TIMEZONE`.
 - Projects: `PROJECTS_DIR` and `PROJECT_MAX_MB`.
 - Direct reports and ETL: `DIRECT_REPORTS_BI` and `TRANSFORM_MAX_ROWS`.

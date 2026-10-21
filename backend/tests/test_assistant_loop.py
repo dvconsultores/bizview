@@ -11,7 +11,6 @@ from app.assistant import service, tools
 from app.config import get_settings
 from app.i18n import t
 from app.models import AssistantMessage, AssistantSession
-from app.projects.workview import for_session
 from tests.conftest import new_chat, signed_in, sql, v2_files
 from tests.test_assistant_api import (
     _chat_reply,

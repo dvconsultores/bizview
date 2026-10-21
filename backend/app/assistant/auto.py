@@ -46,8 +46,8 @@ class SourceAllow(BaseModel):
 
 class ContractLimits(BaseModel):
     """Optional caps of one run. `None` means "no cap": the owner asked for an Auto run that is not
-    stopped by the contract ("do not limit it"); the installation's own ceilings
-    (`AI_CHAT_BUDGET_MAX`, `AI_CHAT_MAX_PREVIEWS`) and "Detener" still apply.
+    stopped by the contract ("do not limit ever"). With no caps the run ends by applying, by
+    "Detener", by switching the mode down or by the round cap; there is no token budget at all.
     """
 
     model_config = ConfigDict(extra="forbid")

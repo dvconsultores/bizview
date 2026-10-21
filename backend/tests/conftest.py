@@ -64,10 +64,6 @@ os.environ.update({
     "AI_MODEL": "",
     "AI_BASE_URL": "",
     "AI_TIMEOUT_SECONDS": "30",
-    # The budget knobs too: a developer .env with a larger ceiling made the budget tests read it.
-    "AI_CHAT_TOKEN_BUDGET": "400000",
-    "AI_CHAT_BUDGET_STEP": "100000",
-    "AI_CHAT_BUDGET_MAX": "2000000",
     # Tests change versions behind the API (TRUNCATE, SQL): no in-memory active version.
     "ACTIVE_VERSION_CACHE_SECONDS": "0",
     "DB_POOL_WARM": "0",
