@@ -661,7 +661,7 @@ MESSAGES: dict[str, str] = {
     "assistant.contract.source_not_allowed": "El contrato no permite la fuente {source}.",
     "assistant.contract.stage_not_allowed": "El contrato no permite esa etapa.",
     "assistant.contract.limit_reached": "Se alcanzó el límite del contrato: {limit}.",
-    "assistant.contract.confirmed": "Contrato del run autorizado: {stages} hasta {stage} · {previews} vistas previas · {applies} aplicación · {minutes} min.",
+    "assistant.contract.confirmed": "Contrato del run autorizado: {stages}.",
     "assistant.auto.blocked": "El run se detuvo: {reason}.",
     "assistant.run.stopped_user": "Run detenido por el super usuario.",
     "assistant.run.stopped_mode": "Run detenido al cambiar de modo.",
@@ -685,4 +685,5 @@ MESSAGES: dict[str, str] = {
 
     "assistant.auto.next_stage": "Etapa {done} terminada. El contrato permite {stages}: abre la siguiente con run_command y continúa; no pidas confirmación al usuario.",
     "assistant.auto.approved": "El contrato autoriza aprobar la spec {spec} sin preguntar.",
+    "assistant.auto.use_run_command": "En modo Auto ejecuta la etapa tú: usa run_command en vez de sugerir un comando.",
 }

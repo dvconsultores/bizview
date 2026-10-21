@@ -72,11 +72,11 @@ test.afterEach(async ({ page }) => {
   await resetAssistant(page);
 });
 
-test("the composer offers two modes and Auto asks for one authorisation", async ({ page }) => {
+test("the composer offers two modes and Auto switches with one click", async ({ page }) => {
   await signIn(page);
   await newChat(page, "Modos");
 
-  // FR-000 (simplified): one compact trigger that opens Preguntar / Auto.
+  // FR-000 (simplified): a small chip next to the send arrow, two choices, no form.
   const selector = page.locator("[data-mode-selector]");
   await expect(selector).toBeVisible();
   await expect(selector.getByRole("button").first()).toContainText("Auto");
@@ -87,8 +87,6 @@ test("the composer offers two modes and Auto asks for one authorisation", async 
   const menu = page.locator("[data-mode-menu]");
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("menuitemradio")).toHaveCount(2);
-  await expect(menu.getByRole("menuitemradio", { name: /Preguntar/ })).toBeVisible();
-  await expect(menu.getByRole("menuitemradio", { name: /Auto/ })).toBeVisible();
   await axe(page);
   await noOverflow(page);
 
@@ -98,43 +96,44 @@ test("the composer offers two modes and Auto asks for one authorisation", async 
   await expect(page.getByLabel("Mensaje para el asistente")).toHaveAttribute(
     "placeholder", /Solo lee y explica/,
   );
-  await axe(page);
 
-  // Auto does not switch by itself: it asks for the one-line authorisation.
+  // Auto needs no password and shows no panel: one click authorises the run.
   await selector.getByRole("button").first().click();
   await page.locator("[data-mode-menu]").getByRole("menuitemradio", { name: /Auto/ }).click();
-  const confirm = page.locator("[data-run-contract]");
-  await expect(confirm).toBeVisible();
-  await expect(confirm).toContainText("Todo el pipeline hasta aplicar");
-  await expect(confirm.getByRole("button", { name: "Autorizar el run" })).toBeDisabled();
-  await axe(page);
-  await noOverflow(page);
-
-  await confirm.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.locator("[data-mode-pill]")).toContainText("Auto");
   await expect(page.locator("[data-run-contract]")).toHaveCount(0);
-  await expect(page.locator("[data-mode-pill]")).toContainText("Preguntar");
+  const row = await page.request.get("/api/assistant/sessions", { headers: FETCH });
+  const first = (await row.json()).sessions[0];
+  expect(first.mode).toBe("auto");
+  expect(first.contract_status).not.toBe("none");
+  await axe(page);
 });
 
-test("one password authorises the run and leaves the conversation in Auto", async ({ page }) => {
+test("Auto authorises the run without a step-up", async ({ page }) => {
   await signIn(page);
   const { sid } = await newChat(page, "Contrato");
 
-  // The mode is Auto by default and the composer offers the authorisation.
-  await expect(page.locator("[data-mode-pill]")).toContainText("Auto · sin contrato");
-  await page.locator("[data-authorize-run]").click();
-  const confirm = page.locator("[data-run-contract]");
-  await expect(confirm).toBeVisible();
-  await confirm.locator('input[type="password"]').fill(SUPER.password);
-  await confirm.getByRole("button", { name: "Autorizar el run" }).click();
-  await expect(page.locator("[data-run-contract]")).toHaveCount(0);
+  const id = page.locator("[data-mode-selector]").getByRole("button").first();
+  await expect(id).toContainText("Auto");
+  await id.click();
+  await page.locator("[data-mode-menu]").getByRole("menuitemradio", { name: /Preguntar/ }).click();
+  await expect(page.locator("[data-mode-pill]")).toContainText("Preguntar");
 
+  // Back to Auto: the contract is created with the defaults, no password.
+  await id.click();
+  await page.locator("[data-mode-menu]").getByRole("menuitemradio", { name: /Auto/ }).click();
+  await expect
+    .poll(async () => {
+      const res = await page.request.get(`/api/assistant/sessions/${sid}`, { headers: FETCH });
+      return (await res.json()).contract_status;
+    })
+    .toBe("confirmed");
   const row = await page.request.get(`/api/assistant/sessions/${sid}`, { headers: FETCH });
   const body = await row.json();
   expect(body.mode).toBe("auto");
   expect(body.contract_status).toBe("confirmed");
   expect(body.contract.stages).toEqual(["draft", "preview", "apply"]);
-  expect(body.contract.limits.applies).toBe(1);
-  await expect(page.locator("[data-mode-pill]")).toContainText("Auto");
-  await axe(page);
+  expect(body.contract.limits.tokens).toBeNull();       // no contract cap
+  await expect(page.locator("[data-run-contract]")).toHaveCount(0);
   await noOverflow(page);
 });

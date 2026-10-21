@@ -71,10 +71,15 @@ class SessionMode(BaseModel):
 
 
 class ContractIn(BaseModel):
-    """A run contract plus its step-up (feature 028, FR-001)."""
+    """A run contract (feature 028).
+
+    The owner waived the step-up for Auto mode ("do not need auth to auto mode"): selecting the mode
+    is the authorisation. The password fields stay in the payload for installations that re-enable
+    the check with `AI_AUTO_REQUIRE_STEP_UP=1`.
+    """
     model_config = ConfigDict(extra="forbid")
-    contract: dict
-    password: str = Field(max_length=128)
+    contract: dict = Field(default_factory=dict)
+    password: str | None = Field(default=None, max_length=128)
     code: str | None = Field(default=None, max_length=16)
     profile_id: int | None = None
 
@@ -235,7 +240,7 @@ def _step_up(db: Session, actor: AppUser, auth: Auth, body: ContractIn, ip: str 
     if users.is_locked(actor):
         raise users.locked_error(actor)
     settings = get_settings()
-    ok = passwords.verify_password(actor.password_hash, body.password)
+    ok = passwords.verify_password(actor.password_hash, body.password or "")
     if ok and profile.mfa_required_for(actor.role, settings):
         ok = bool(body.code) and mfa.verify_code(actor, body.code or "", crypto.get_keyring())
     if not ok:
@@ -305,13 +310,15 @@ def confirm_contract(session_id: int, body: ContractIn, request: Request,
                        fields=getattr(exc, "fields", {}) or {"contract": "invalid"}) from exc
     _verify_sources(db, contract)
     ip = client_ip(request)
-    _step_up(db, actor, auth, body, ip)
+    if get_settings().ai_auto_require_step_up and body.password:
+        _step_up(db, actor, auth, body, ip)
     run = service.create_contract(db, session, project, contract, actor, ip,
                                   profile_id=body.profile_id)
     audit_record(db, "assistant_contract_confirmed", actor_id=actor.id,
                  detail={"run": run.id, "session": session.id, "stages": list(contract.stages),
                          "limits": contract.limits.model_dump(),
-                         "sources": [item.name for item in contract.sources]})
+                         "sources": [item.name for item in contract.sources],
+                         "step_up": bool(get_settings().ai_auto_require_step_up and body.password)})
     db.flush()
     return {"run": assistant_auto.run_json(run, contract),
             "session": service.session_json(session, _messages(db, session))}

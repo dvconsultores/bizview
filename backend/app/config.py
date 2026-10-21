@@ -89,10 +89,9 @@ class Settings(BaseSettings):
     # Feature 028: the run contract of one autonomous run. A contract stores the numbers it was
     # confirmed with, so changing these never alters a run already under way.
     ai_auto_max_rounds: int = Field(default=200, ge=1, le=500)
-    ai_auto_max_applies: int = Field(default=1, ge=0, le=5)
-    ai_auto_run_max_seconds: int = Field(default=1800, ge=60, le=7200)
-    # None: the contract may use as many previews as the conversation allows (AI_CHAT_MAX_PREVIEWS).
-    ai_auto_max_previews: int | None = Field(default=None, ge=0, le=20)
+    # The owner waived the step-up for Auto ("do not need auth to auto mode"): selecting the mode is
+    # the authorisation. Set to true to ask for the password again when a run is confirmed.
+    ai_auto_require_step_up: bool = False
 
     # Email and share links (feature 018, amendment 2026-10-07): installation environment only,
     # like the AI settings; nothing about the SMTP server is stored in the database.
@@ -372,15 +371,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AI_CHAT_BUSY_STALE_SECONDS must exceed 2 x "
                 "AI_CHAT_TIMEOUT_SECONDS + AI_TOOL_TIMEOUT_SECONDS"
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _auto_previews_do_not_exceed_chat(self) -> "Settings":
-        if (self.ai_auto_max_previews is not None
-                and self.ai_auto_max_previews > self.ai_chat_max_previews):
-            raise ValueError(
-                "AI_AUTO_MAX_PREVIEWS cannot exceed AI_CHAT_MAX_PREVIEWS"
             )
         return self
 

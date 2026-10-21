@@ -578,44 +578,22 @@ def _project_header(session) -> str:
             f"{session.next_spec():03d} · spec actual: {session.current_spec or 'ninguna'}")
 
 
-MODE_TEXT = {
-    "ask": ("Modo: Preguntar. Solo puedes leer (estructura de fuentes, perfiles, espacio de "
-            "trabajo, specs, guías) y responder. No escribas archivos, no ejecutes vistas "
-            "previas ni apliques; si el usuario pide un cambio, explica qué harías y ofrece "
-            "cambiar a Editar."),
-    "edit": ("Modo: Editar. Puedes escribir y corregir el borrador y las specs del proyecto, "
-             "validar y consultar la fuente; «Vista previa» y «Aplicar» los pulsa el usuario."),
-}
-MODE_AUTO_TEXT = (
-    "Modo: Auto, con un contrato vigente. Ejecuta el run completo sin preguntar: encadena las "
-    "etapas con run_command, escribe las specs y los artefactos, valida, ejecuta run_preview, "
-    "corrige y aplica con apply_draft si el contrato lo permite. Nunca termines pidiendo al "
-    "usuario elegir una spec, ejecutar un comando ni pulsar Aplicar: si algo te bloquea, para y "
-    "explica el motivo. Cuando una decisión no está en el pedido, usa el valor por defecto "
-    "documentado y anótalo en «Decisiones tomadas» de la spec y en tus notas."
+MODE_AUTO_LINE = (
+    "Modo Auto: ejecuta el run completo sin preguntar (run_command para encadenar etapas, "
+    "run_preview y apply_draft si el contrato lo permite). No pidas al usuario elegir una spec, "
+    "ejecutar un comando ni pulsar Aplicar."
 )
+
+
 def mode_block(session: AssistantSession, settings) -> list[str]:
-    """Feature 028 (FR-000b): what the current mode allows, before the work state."""
-    mode = getattr(session, "mode", None) or "auto"
-    if mode != "auto":
-        return ["## Modo", MODE_TEXT.get(mode, MODE_TEXT["ask"]), ""]
-    contract = auto.contract_of(session)
-    run = getattr(session, "auto_run", None)
-    lines = ["## Modo", MODE_AUTO_TEXT]
-    if contract is not None:
-        stages = " → ".join(contract.stages)
-        lines.append(f"Contrato: etapas {stages}; hasta {contract.limits.applies} aplicaciones; "
-                     f"{contract.limits.previews} vistas previas; "
-                     f"{max(1, round(contract.limits.wall_clock_seconds / 60))} minutos.")
-        if contract.sources:
-            allowed = ", ".join(item.name for item in contract.sources)
-            lines.append(f"Fuentes permitidas: {allowed}.")
-        if not contract.modify_existing:
-            lines.append("No modifiques integraciones ni reportes existentes: crea ids nuevos.")
-    elif run is None:
-        lines.append("No hay contrato vigente: este run no puede aplicar nada.")
-    lines.append("")
-    return lines
+    """Feature 028 (FR-000b): one line, and only in Auto, so the prompt stays stable.
+
+    The mode is enforced in product code (FR-003); this line only explains it to the model. In
+    `ask` nothing is needed: the tool layer refuses every write with its own message.
+    """
+    if (getattr(session, "mode", None) or "auto") != "auto":
+        return []
+    return [MODE_AUTO_LINE, ""]
 
 
 def state_text(session: AssistantSession, settings, user_texts: list[str] | None = None) -> str:

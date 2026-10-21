@@ -258,12 +258,12 @@ Read line by line: `backend/app/assistant/auto.py` (`RunContract`, `mode_gate`, 
 | Mode enforced in code, not the prompt | Two chokepoints: `offered_tool_specs` (what the model sees) and `run_tool` → `_mode_check` + `_guard_check` (what it may call). `ask` uses an explicit allow-list; `check_query` splits on `path`. |
 | Stage/limit enforcement | `mode_gate` + `limit_refusal` run **before** the tool body and before the memo, so a refused call touches nothing; applies/previews are checked as `current + 1`. |
 | Source allow-list | Checked in code for `describe_source`/`profile_source`/`check_query` (name and table, casefolded) and `list_sources` is filtered; an empty list narrows nothing but never widens the 017 personal-data rule. Injected text in source metadata is data, not an instruction. |
-| Step-up | `POST /contract` verifies the password like `/auth/reauth` (throttle + lockout, `reauth_failed`/`reauth_ok`) and a TOTP code when `mfa_required_for`; the failure path commits its bookkeeping before the 4xx (verified by test). A profile never replaces it. |
+| Step-up | When `AI_AUTO_REQUIRE_STEP_UP=1`, `POST /contract` verifies the password like `/auth/reauth` (throttle + lockout, `reauth_failed`/`reauth_ok`) and a TOTP code when `mfa_required_for`; the failure path commits its bookkeeping before the 4xx (verified by test). A profile never replaces it. The owner waived it by default (see "Revision" below), so the path stays implemented and tested but off. |
 | Replay / reuse | A contract is a row with `status IN ('confirmed','running')`; the partial unique index allows one live contract per conversation; a spent contract refuses `run_preview`/`apply_draft`. Cross-session reuse is impossible: the lookup filters by `session_id`. |
 | Apply after a stop | Stop and mode-down clear `busy_since` → `_ClaimLost` at the next `_commit_round`; the tool path also checks the live contract on entry, so nothing applies after the fact. |
 | Privilege change mid-run | `_authorisation_revoked` re-reads the confirming user before each gated tool and stops with `revoked:role` (test). |
 | Audit | New kinds are allowlisted in `AUDIT_KINDS` and the CHECK; details carry ids, stage names and limits only (no credentials; `tokens` was renamed `budget_used` because the audit guard treats "token" as a secret marker). |
-| Migration | Additive; `assistant_session.mode` defaults to `edit` (no behaviour change for existing conversations); downgrade drops both tables and the column and restores the previous audit CHECK. No FK cycle (the back-reference column was dropped, which also keeps `compare_metadata` meaningful). |
+| Migration | Additive; `assistant_session.mode` defaults to `edit` in 0024 and was changed to `auto` by the owner's "Auto is the default" decision (same migration, edited before any installation ran it); downgrade drops both tables and the column and restores the previous audit CHECK. No FK cycle (the back-reference column was dropped, which also keeps `compare_metadata` meaningful). |
 | Data boundary | No new provider input: the same tools, the same `sanitize()`; the contract can only reduce what is read. |
 
 ## Notes
@@ -275,3 +275,19 @@ Read line by line: `backend/app/assistant/auto.py` (`RunContract`, `mode_gate`, 
 - The contract is immutable once confirmed: limits change only through a new contract (new row).
 - `specs/028-autonomous-mode/contracts/run-contract.schema.json` is the source of truth for the
   contract shape; T004 asserts the pydantic model against it.
+
+## Revision after the owner used it (2026-10-20)
+
+Four behaviours shipped differently from the tasks above, at the owner's request, and the code, the
+tests and the docs were brought in line with them:
+
+| Owner's words | What changed |
+|---|---|
+| "do not need auth to auto mode" | `POST /contract` no longer asks for a password unless `AI_AUTO_REQUIRE_STEP_UP=1`; the composer creates the contract with one click on **Auto** and `RunContractDialog.tsx` was deleted (T030/T031 superseded). |
+| "Se alcanzó el límite del contrato: tokens … do not limit it" | `ContractLimits` fields are optional and `None` = no cap; `limit_refusal` skips unset caps; `AI_AUTO_MAX_APPLIES`, `AI_AUTO_RUN_MAX_SECONDS` and `AI_AUTO_MAX_PREVIEWS` were removed (T002 revised). |
+| "still the insert spec proposed after click i need to click send" | `suggest_command` is neither offered nor accepted in Auto (`assistant.auto.use_run_command`); the agent runs the stage itself with `run_command`. |
+| "why change everything in every prompt" | `mode_block` adds a single line, only in Auto; `ask` adds nothing because the tools already enforce it. |
+
+`test_assistant_auto_mode.py`, `test_assistant_auto_contract.py`, `test_assistant_auto_apply.py` and
+`test_assistant_auto_loop.py` assert the shipped behaviour (46 tests), and
+`frontend/tests/e2e/assistant-auto.spec.ts` proves the one-click path in three engines at 320/375 px.

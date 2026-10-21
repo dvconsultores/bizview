@@ -7,11 +7,14 @@
 **Status**: Implemented (2026-10-20) and simplified the same day at the owner's request (two modes,
 one-line authorisation, stages that chain on their own — Phase 9 of `tasks.md`). Verification:
 backend lint clean and **45 new tests green** (`test_assistant_auto_mode` 14,
-`test_assistant_auto_contract` 12, `test_assistant_auto_loop` 10, `test_assistant_auto_apply` 9),
+`test_assistant_auto_contract` 13, `test_assistant_auto_loop` 10, `test_assistant_auto_apply` 9),
 plus migration 0024 up/down (22), the 021 guard (17), API (35), autonomous/commands (33), apply +
 preview (24) and guide (3) suites; frontend `tsc` clean, **666 unit tests** (9 new), build and
 `check:compat` OK, and the Playwright suite **12/12** (Chromium, Firefox, WebKit × 320/375 px) with
 axe and no-overflow checks — SC-009.
+The shipped behaviour is the one described under "Revision 2026-10-20" below (no step-up, no
+contract caps, two modes); 014 FR-001/FR-002 and the limit defaults in the text are amended by that
+note.
 Still open: SC-001/SC-008's recorded-provider replay of the session-18 fixture, the quickstart
 walkthrough (T048) and the full backend suite in one run (too slow against this external database:
 it was verified in focused groups).
@@ -45,16 +48,30 @@ line it affects, and can be changed at any time between runs.
 | Mode | Label (es / en) | What the agent may do without asking | What still needs the human |
 |---|---|---|---|
 | **Ask** | Preguntar / Ask | Read: sources structure, profiles, workspace, specs, guides. Answer, explain, propose. | Everything that writes. No drafts, no commands write files. |
-| **Auto** | Auto / Auto | Read, then — once the run is authorised — chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply**, within the run contract. | One password (plus the two-step code on `internet`) per run. Nothing else. |
+| **Auto** | Auto / Auto | Read, then chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply**, within the run contract. | Picking Auto for that run. Nothing else. |
 
 **Simplification 2026-10-20 (owner)**: "make it simple, just preguntar and auto, nothing about all
-form option, like second attached pic". The selector is one compact button with a short menu
-(name + one line each), not a three-way segmented control, and authorising a run is a single line
-with the password, not a form: the contract takes the documented defaults (whole pipeline up to
-apply, every configured source, the installation's limits, no modification of existing artifacts,
-automatic rollback, no extra visibility). **Auto is the default for a new conversation**: reads work
-at once and the composer offers "Autorizar run". The `edit` value stays in the API for conversations
-created before the simplification (it behaves as it did).
+form option, like second attached pic" and "put the auto and manual at bottom right next to the
+send chat arrow". The selector is one compact chip **inside the composer's bottom bar, immediately
+left of the send button**, that opens a short menu (name + one line each) — not a three-way
+segmented control above the box. **Auto is the default for a new conversation** and selecting it
+*is* the authorisation: one click creates the run contract with the documented defaults (whole
+pipeline up to apply, every configured source, no modification of existing artifacts, automatic
+rollback, no extra visibility) and it shows as a line in the transcript. There is no form and no
+password — see the revision note below. The `edit` value stays in the API for conversations created
+before the simplification (it behaves as it did).
+
+**Revision 2026-10-20 (owner, after using it)**: "do not need auth to auto mode"; "Se alcanzó el
+límite del contrato: tokens … do not limit it"; "still the insert spec proposed after click i need
+to click send"; "why change everything in every prompt". Therefore FR-001, FR-002 and the limit
+defaults below now ship as: (a) **no step-up** — `AI_AUTO_REQUIRE_STEP_UP=1` brings the password
+(and the two-step code on `internet`) back for installations that want it; (b) **no contract caps**
+— `limits` fields are optional and unset means no cap, so a run ends by applying, by "Detener", by
+switching the mode down or by the installation ceilings (`AI_CHAT_BUDGET_MAX`, preview limit), and a
+saved profile or a hand-written contract can still set them; (c) the agent never proposes a
+"send this command" chip in Auto — it runs the stage with `run_command` itself; (d) the system
+prompt is not rewritten per mode: `ask` adds nothing (the tools enforce it) and `auto` adds one line.
+The contract row is still stored, audited and enforced by product code either way.
 
 Rules of the selector:
 
@@ -303,14 +320,16 @@ no draft to review and nothing to undo.
   already shipped in `commands/resolve.py`; 028 proves it under Auto with the session-18 replay.
 
 ### Contract and authorisation
-- **FR-001**: An Auto run MUST be started by confirming a **run contract** with step-up. In the
-  composer that confirmation is one line (the documented defaults + the password, and the two-step
-  code on `internet`); the API still accepts the full shape — goal, sources/tables, stages
-  (`draft` | `preview` | `apply`), limits (tokens, previews, applies, wall clock), `modify_existing`,
-  `auto_rollback`, `visible_to` — for run profiles and future screens. The contract records the
-  confirming user and time, is stored on the session and shown in the transcript.
-- **FR-002**: The contract's single step-up authorises every apply within the run (replaces the
-  per-apply step-up of 014 FR-006 for that run only). Everything else in 014 FR-006 is unchanged.
+- **FR-001**: An Auto run MUST be started by an explicit **run contract** row. In the composer that
+  is one click on **Auto** (revised 2026-10-20: no step-up by default, no form; `AI_AUTO_REQUIRE_STEP_UP=1`
+  restores the password and the two-step code on `internet`). The API accepts the full shape — goal,
+  sources/tables, stages (`draft` | `preview` | `apply`), limits (tokens, previews, applies, wall
+  clock; unset = no cap), `modify_existing`, `auto_rollback`, `visible_to` — for run profiles. The
+  contract records the confirming user and time, is stored on the session, audited and shown in the
+  transcript.
+- **FR-002**: The contract authorises every apply within the run (replaces the per-apply step-up of
+  014 FR-006 for that run only). Everything else in 014 FR-006 is unchanged, and with
+  `AI_AUTO_REQUIRE_STEP_UP=1` one step-up covers the whole run instead of one per apply.
 - **FR-003**: Contract limits and allowed stages MUST be enforced in product code (tool layer,
   apply route, worker), never by instructions to the model.
 

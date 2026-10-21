@@ -13,8 +13,8 @@ const MODES: AssistantMode[] = ["ask", "auto"];
  * - **Preguntar**: reads and explains, writes nothing.
  * - **Auto**: runs the whole pipeline and applies, once the run is authorised.
  *
- * Choosing Auto does not switch the mode by itself: the parent asks for the run confirmation and
- * the mode changes when that is accepted.
+ * Choosing Auto is the authorisation of the run (owner, 2026-10-20: no form, no password): the
+ * parent switches the mode and creates the run contract in one click.
  */
 export function ModeSelector({
   session,
@@ -84,11 +84,11 @@ export function ModeSelector({
         aria-expanded={open}
         aria-label={`${t.assistant.modes.label}: ${current.name}`}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex min-h-tap items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-medium text-ink-2 hover:border-line-strong hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-ink-muted hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
       >
-        <ModeIcon mode={mode} />
-        {current.name}
-        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+        <ModeIcon mode={mode} className="h-3.5 w-3.5" />
+        <span>{current.name}</span>
+        <ChevronDown className="h-3 w-3" aria-hidden />
       </button>
 
       {open ? (
@@ -96,7 +96,7 @@ export function ModeSelector({
           role="menu"
           aria-label={t.assistant.modes.label}
           data-mode-menu=""
-          className="absolute bottom-full left-0 z-20 mb-2 w-72 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-lg"
+          className="absolute bottom-full right-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-lg"
         >
           {MODES.map((item, index) => {
             const active = item === mode;
@@ -159,20 +159,22 @@ export function ModePill({
   const t = useT();
   const mode = session.mode ?? "auto";
   const status = session.contract_status ?? "none";
-  const label =
-    mode === "ask"
+  const auto = mode !== "ask" && mode !== "edit";
+  const label = !auto
+    ? mode === "ask"
       ? t.assistant.modes.ask
-      : mode === "edit"
-        ? t.assistant.modes.edit
-        : status === "running" && session.busy
-          ? t.assistant.pill.running
-          : status === "applied"
-            ? t.assistant.pill.applied
-            : status === "failed"
-              ? t.assistant.pill.failed
-              : status === "stopped"
-                ? t.assistant.pill.stopped
-                : t.assistant.pill.none;
+      : t.assistant.modes.edit
+    : status === "confirmed"
+      ? t.assistant.pill.ready
+      : status === "running" && session.busy
+        ? t.assistant.pill.running
+        : status === "applied"
+          ? t.assistant.pill.applied
+          : status === "failed"
+            ? t.assistant.pill.failed
+            : status === "stopped"
+              ? t.assistant.pill.stopped
+              : t.assistant.pill.none;
   const live = mode === "auto" && (status === "confirmed" || status === "running");
   return (
     <span

@@ -170,19 +170,21 @@ def test_a_blocked_ending_is_stored_and_never_applied(chat):
     assert "Resumen del run" in messages[-1]["content"]
 
 
-def test_mode_block_is_in_the_turn_context():
-    class S:
+def test_mode_block_is_one_line_and_only_in_auto():
+    """The prompt is not rewritten per mode: `ask` needs nothing (the tools enforce it)."""
+
+    class Ask:
         mode = "ask"
 
-    lines = service.mode_block(S(), get_settings())
-    assert lines[0] == "## Modo" and "Preguntar" in lines[1]
+    assert service.mode_block(Ask(), get_settings()) == []
 
     class Auto:
         mode = "auto"
-        auto_run = None
 
-    text = " ".join(service.mode_block(Auto(), get_settings()))
-    assert "contrato vigente" in text
+    lines = service.mode_block(Auto(), get_settings())
+    text = " ".join(lines)
+    assert "Modo Auto" in text and "run_command" in text
+    assert len([line for line in lines if line.strip()]) == 1
 
 
 def test_contract_limits_stop_the_run(chat, monkeypatch):

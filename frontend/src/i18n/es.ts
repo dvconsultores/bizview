@@ -1175,6 +1175,7 @@ export const es = {
       invalid: "Revisa los campos marcados.",
     },
     pill: {
+      ready: "Auto · listo",
       running: "Auto · ejecutando",
       none: "Auto · sin contrato",
       stopped: "Auto · detenido",

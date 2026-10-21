@@ -670,7 +670,7 @@ MESSAGES: dict[str, str] = {
     "assistant.contract.source_not_allowed": "The contract does not allow the source {source}.",
     "assistant.contract.stage_not_allowed": "The contract does not allow that stage.",
     "assistant.contract.limit_reached": "Contract limit reached: {limit}.",
-    "assistant.contract.confirmed": "Run contract authorised: {stages} up to {stage} · {previews} previews · {applies} apply · {minutes} min.",
+    "assistant.contract.confirmed": "Run contract authorised: {stages}.",
     "assistant.auto.blocked": "The run stopped: {reason}.",
     "assistant.run.stopped_user": "Run stopped by the super user.",
     "assistant.run.stopped_mode": "Run stopped when the mode changed.",
@@ -694,4 +694,5 @@ MESSAGES: dict[str, str] = {
 
     "assistant.auto.next_stage": "Stage {done} is done. The contract allows {stages}: open the next one with run_command and continue; do not ask the user to confirm.",
     "assistant.auto.approved": "The contract authorises approving spec {spec} without asking.",
+    "assistant.auto.use_run_command": "In Auto mode run the stage yourself: use run_command instead of suggesting a command.",
 }

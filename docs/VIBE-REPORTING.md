@@ -386,18 +386,18 @@ The composer has one small mode button next to the message box; it belongs to th
 | Mode | What it may do without asking | What still needs you |
 |---|---|---|
 | **Preguntar** / Ask | Read sources structure, profiles, the workspace, specs and guides; answer, explain, propose. | Everything that writes. |
-| **Auto** | Read at once; then, once the run is authorised, chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply** — and reports at the end. | One password per run (plus the two-step code on `internet`). Nothing else. |
+| **Auto** | Read at once; then chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply** — and reports at the end. | Picking Auto for that run. Nothing else. |
 
-**Auto is the default.** Reads work immediately; when the run needs to write or apply, the composer
-offers **Autorizar run** and a single line asks for your password. That confirmation covers the
-whole run with the documented defaults: the entire pipeline up to apply, every configured source,
-the installation's limits, nothing existing modified, automatic rollback, no extra visibility.
+**Auto is the default.** Selecting it in the chip is the authorisation: it creates the run contract
+with the documented defaults — the entire pipeline up to apply, every configured source, nothing
+existing modified, automatic rollback, no extra visibility — and the transcript shows it. There is no
+form and no password (an installation can ask for one with `AI_AUTO_REQUIRE_STEP_UP=1`).
 
 In Auto the run never stops to ask: a finished stage (plan, tasks…) is followed by the next one on
-its own, and the transcript shows "Etapa /speckit-plan terminada". The limits are enforced by the
-product, not by the model: reaching one stops the run with the reason, the draft and the working
-state intact, and nothing is applied afterwards. **Detener**, or switching to Preguntar, brakes the
-run the same way. Writing "modo autónomo" in a message never switches the mode.
+its own, and the transcript shows "Etapa /speckit-plan terminada". What the run may do is enforced
+by the product, not by the model, and it has no token or time cap unless a run profile sets one:
+**Detener**, or switching to Preguntar, brakes the run with the draft and the working state intact,
+and nothing is applied afterwards. Writing "modo autónomo" in a message never switches the mode.
 
 After an autonomous apply the first scheduled run of the new integration is watched: a failure shows
 up in the conversation and, with rollback on, the previous version comes back. The applied dashboard

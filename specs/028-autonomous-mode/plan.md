@@ -46,7 +46,8 @@ mobile-first web at 320 px, WCAG 2.2 AA, Spanish and English.
 
 **Performance Goals**: no extra provider round per stage (a stage switch is one tool call); the
 contract status bar polls at the existing 1–2 s cadence; apply time unchanged (same
-`projects.apply.apply_project`); a run stays within `AI_AUTO_RUN_MAX_SECONDS` (default 1800).
+`projects.apply.apply_project`); a run stays within the contract's `limits.wall_clock_seconds` when
+one is set (no wall-clock cap by default, revision 2026-10-20).
 
 **Constraints**: AI stays off by default and no new data reaches the provider (VIII); step-up on the
 `internet` profile needs password **and** TOTP; limits and stages are enforced by product code, never
@@ -74,7 +75,9 @@ are untouched (FR-012).
 | Constraints | Credentials untouched; `internet` step-up adds the TOTP code; Alembic 0024; worker idempotent (rollback is a normal version switch). es/en strings for every new text. | PASS |
 
 **Post-design re-check**: see the end of this plan — no new violations, one justified deviation
-(014 FR-006 per-apply → per-run step-up).
+(014 FR-006 per-apply → per-run step-up), plus the three owner decisions taken after the first
+implementation (no step-up in practice, no contract caps, two modes in the composer) recorded at the
+end of Complexity Tracking.
 
 ## Design
 
@@ -184,7 +187,7 @@ call names one), so injected text in source metadata cannot widen it (SC-003, US
 - Limits are checked at the top of every round and before every gated tool: tokens (`_count_usage`
   vs the contract's budget and `AI_CHAT_BUDGET_MAX`), previews (the contract's `limits.previews`,
   capped by `AI_CHAT_MAX_PREVIEWS`), applies,
-  and wall clock (`AI_AUTO_RUN_MAX_SECONDS`, measured from `confirmed_at`). Reaching one calls
+  and wall clock (`limits.wall_clock_seconds`, measured from `confirmed_at`; unset = no cap). Reaching one calls
   `_finish_auto_run(..., 'stopped', 'limit:<name>')`.
 - `service.stop()` and the mode switch-down clear `session.busy_since`, which `_commit_round`
   already turns into `_ClaimLost`; the Auto run also marks the contract `stopped:user` /
@@ -229,7 +232,7 @@ the run summary; the summary is also checked by a fixture test (SC-006).
 - `SessionIndicator.tsx`/`AssistantHistory.tsx` — the mode pill in the header and in the
   conversation list; "Auto · ejecutando" / "Auto · sin contrato" / "Auto · detenido (límite)".
 - `RunStatus.tsx` grows the Auto status bar: stage, attempts, tokens used, previews/applies used,
-  elapsed vs `AI_AUTO_RUN_MAX_SECONDS`, and "Detener" (existing endpoint).
+  elapsed, and "Detener" (existing endpoint).
 - `CommandRunChip.tsx` — the "Auto · /speckit-plan NNN-…" line and the refusal chips.
 - `i18n/es.ts` + `i18n/en.ts` — every new string (constitution constraint), including the mode
   labels and the "Pasar a Auto" chip offered when the user asks for autonomy in text (FR-000b).
@@ -287,13 +290,16 @@ cli/bizview_cli/authoring.py  # the documented defaults of FR-005
 
 | Key | Default | Meaning |
 |---|---|---|
-| `ai_auto_max_rounds` | 200 | rounds allowed inside one Auto run |
-| `ai_auto_max_applies` | 1 | applies allowed inside one contract |
-| `ai_auto_run_max_seconds` | 1800 | wall clock of one contract |
-| `ai_auto_max_previews` | falls back to `AI_CHAT_MAX_PREVIEWS` | previews allowed inside one contract |
+| `ai_auto_max_rounds` | 200 | rounds allowed inside one Auto run (the loop's safety valve) |
+| `ai_auto_require_step_up` | `False` | ask for the password (and the TOTP code on `internet`) when a run is confirmed |
 
-All are validated with the existing `Field(ge=…, le=…)` idiom; the contract stores the numbers it
-was confirmed with, so changing a setting never alters a running contract.
+Revision 2026-10-20 (owner: "do not limit it"): the three cap settings this table first listed
+(`AI_AUTO_MAX_APPLIES`, `AI_AUTO_RUN_MAX_SECONDS`, `AI_AUTO_MAX_PREVIEWS`) were removed. The caps
+live only in the contract's optional `limits` (`None` = no cap), so a run is bounded by "Detener",
+by switching the mode down and by the installation ceilings (`AI_CHAT_BUDGET_MAX`,
+`AI_CHAT_MAX_PREVIEWS`); a profile or a hand-written contract can still set any of them. What
+remains of the "contract stores the numbers it was confirmed with" rule: `assistant_auto_run.contract`
+is a snapshot, so changing a profile never alters a run under way.
 
 ### API (all super user + CSRF, as the rest of `api/assistant.py`)
 
@@ -329,6 +335,21 @@ Error codes: `mode_invalid`, `contract_required`, `contract_invalid`, `step_up_r
 | 014 FR-006 "password confirmation per apply" becomes "per run" when a contract exists | The whole point of Auto is one human decision up front; per-apply step-up makes an unattended run impossible | Keeping step-up per apply was rejected: it either blocks the run mid-flight or silently pretends to be autonomous. Everything else in FR-006 (re-validation, readiness, version row, documents, audit) is unchanged, and the contract limits what the single confirmation covers (stages, sources, applies, time) |
 | A new table (`assistant_auto_run`) instead of columns on `assistant_session` | Contract, counters, stop reason and summary are per run, and the conversation can start a second run later | JSONB columns on the session would overwrite the previous run's record and leave no auditable history for FR-010/SC-002 |
 | No notification channel for FR-008 | There is none in the product today, and building one is a separate feature with its own consent/consent-to-email rules (018) | Reusing the 018 email pipeline was rejected: it needs a subscription model and consent this feature does not have; the conversation + run history is where the super user already looks |
+
+### Owner decisions taken after the first implementation (2026-10-20)
+
+Three of them relax what FR-000/FR-001/FR-003 originally said. They are behaviour of the shipped
+product, so they are recorded here instead of being silently left in the code.
+
+| Original requirement | Shipped behaviour | Why |
+|---|---|---|
+| FR-001: the contract is confirmed **with step-up** (password, plus TOTP on `internet`) | No step-up by default: choosing **Auto** in the composer is the authorisation. The old flow stays behind `AI_AUTO_REQUIRE_STEP_UP=1` for installations that want it | Owner, verbatim: "do not need auth to auto mode". Every other guarantee of FR-002/FR-003 is unchanged — the contract row is still stored, audited and enforced by product code, and the run is still one explicit human action |
+| FR-003/spec §1: limits (tokens, previews, applies, wall clock) are part of the contract | `ContractLimits` fields default to `None` = **no cap**. A run is bounded by "Detener", by switching the mode down, and by the installation ceilings (`AI_CHAT_BUDGET_MAX`, preview limit) | Owner: "Se alcanzó el límite del contrato: tokens … do not limit it". Caps remain expressible in a contract/profile (`limits` is still parsed, validated and enforced when set), so SC-002/SC-003 still hold for any installation that sets them |
+| The selector offers Ask / Edit / Auto (FR-000) | The composer offers **Preguntar** and **Auto** only; `edit` still exists in the API and in the column's default for legacy clients | Owner: "just preguntar and auto, nothing about all form option". Auto already contains everything Edit did, so a third entry only added a click |
+
+Remaining unchanged: the data boundary, read-only SQL, draft path/size/content limits, "no spec, no
+run", personal-data exclusion, the workspace lock, validation/preview before apply, audit and
+rollback. None of them has a contract option.
 
 ## Post-design Constitution re-check
 

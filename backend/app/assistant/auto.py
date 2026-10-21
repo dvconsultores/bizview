@@ -45,12 +45,17 @@ class SourceAllow(BaseModel):
 
 
 class ContractLimits(BaseModel):
+    """Optional caps of one run. `None` means "no cap": the owner asked for an Auto run that is not
+    stopped by the contract ("do not limit it"); the installation's own ceilings
+    (`AI_CHAT_BUDGET_MAX`, `AI_CHAT_MAX_PREVIEWS`) and "Detener" still apply.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    tokens: int = Field(default=400_000, ge=10_000, le=5_000_000)
-    previews: int = Field(default=5, ge=0, le=20)
-    applies: int = Field(default=1, ge=0, le=5)
-    wall_clock_seconds: int = Field(default=1800, ge=60, le=7200)
+    tokens: int | None = Field(default=None, ge=10_000, le=5_000_000)
+    previews: int | None = Field(default=None, ge=0, le=20)
+    applies: int | None = Field(default=None, ge=0, le=5)
+    wall_clock_seconds: int | None = Field(default=None, ge=60, le=7200)
 
 
 class RunContract(BaseModel):
@@ -92,10 +97,7 @@ class RunContract(BaseModel):
 
     def summary(self) -> str:
         """The transcript line of a confirmed contract."""
-        last = {"draft": "draft", "preview": "preview", "apply": "apply"}[self.stages[-1]]
-        return t("assistant.contract.confirmed", stages=", ".join(self.stages), stage=last,
-                 previews=self.limits.previews, applies=self.limits.applies,
-                 minutes=max(1, round(self.limits.wall_clock_seconds / 60)))
+        return t("assistant.contract.confirmed", stages=", ".join(self.stages))
 
 
 def parse_contract(payload: Any) -> RunContract:
@@ -164,6 +166,8 @@ def mode_gate(session: Any, tool: str, args: dict[str, Any],
               contract: RunContract | None = None) -> Refusal | None:
     """What the current mode and contract allow for this tool call, or None when allowed."""
     mode = mode_of(session)
+    if mode == "auto" and tool == "suggest_command":
+        return Refusal("assistant.auto.use_run_command", t("assistant.auto.use_run_command"))
     if mode == "ask":
         allowed = tool in ASK_TOOLS
         if tool == "check_query":
@@ -222,15 +226,15 @@ def limit_refusal(contract: RunContract | None, run: Any, *,
     """Whether a contract limit is already reached (checked before the action, not after)."""
     if contract is None or run is None:
         return None
-    if previews is not None and previews > contract.limits.previews:
+    limits = contract.limits
+    if previews is not None and limits.previews is not None and previews > limits.previews:
         return _limit("previews")
-    if applies is not None and applies > contract.limits.applies:
+    if applies is not None and limits.applies is not None and applies > limits.applies:
         return _limit("applies")
-    if tokens is not None and tokens >= contract.limits.tokens:
+    if tokens is not None and limits.tokens is not None and tokens >= limits.tokens:
         return _limit("tokens")
-    if wall_clock and settings is not None:
-        elapsed = _elapsed_seconds(run)
-        if elapsed >= contract.limits.wall_clock_seconds:
+    if wall_clock and settings is not None and limits.wall_clock_seconds is not None:
+        if _elapsed_seconds(run) >= limits.wall_clock_seconds:
             return _limit("wall_clock")
     return None
 
@@ -300,6 +304,7 @@ def offered_names(mode: str, contract: RunContract | None, base: frozenset[str])
         return frozenset(base & ASK_TOOLS)
     if mode != "auto":
         return base
+    base = base - {"suggest_command"}
     extra = {"run_command", "set_current_spec"}
     if contract is not None and contract.allows_stage("preview"):
         extra.add("run_preview")

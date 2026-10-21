@@ -19,10 +19,11 @@ python starter.py                  # installs, migrates (0024 included), runs ba
 
 ## Scenario 1 — One request, one applied version (US1, SC-001, SC-004, SC-008)
 
-1. Composer selector → **Auto**. The contract dialog appears with stages, limits and `visible_to`.
+1. Composer chip (bottom right, next to the send arrow) → **Auto**. That is the whole authorisation:
+   the run contract is created with the documented defaults (stages up to apply, every configured
+   source, nothing existing modified, `auto_rollback`, no extra visibility).
 2. Write: "dashboard de facturas por día y estado, actualizado cada hora, con PDF".
-3. Confirm with the password (and the TOTP code if the installation is `internet`).
-4. Send the message and do not touch anything else.
+3. Send the message and do not touch anything else.
 
 Expected: the transcript shows the contract line, then `Auto · /speckit-specify …`,
 `/speckit-plan …`, `/speckit-tasks …`, `/speckit-implement …`, the preview and the apply as chips;
@@ -48,9 +49,11 @@ kept, the pill changes immediately, and `assistant_auto_run.stop_reason` is `sto
 
 ## Scenario 4 — Limits (US2/AC2)
 
-Set `AI_AUTO_RUN_MAX_SECONDS=90` (or confirm a contract with `limits.previews = 0`) and run.
-Expected: the run stops with `limit:wall_clock` / `limit:previews`, the summary lists what it
-reached, and the draft is intact.
+A run has no cap by default, so create the contract through the API with an explicit limit, e.g.
+`POST /api/assistant/sessions/{id}/contract` with
+`{"contract": {"goal": "…", "stages": ["draft","preview"], "limits": {"previews": 0}}}`.
+Expected: the run stops with `limit:previews`, the summary lists what it reached, and the draft is
+intact. The same holds for `tokens`, `applies` and `wall_clock_seconds`.
 
 ## Scenario 5 — Ask writes nothing (US6, SC-007)
 
@@ -96,10 +99,12 @@ calls outside the contract succeed (SC-003).
 
 ## Troubleshooting
 
-- **The contract dialog will not confirm** — `step_up_failed` means a wrong password or TOTP; the
-  `/auth/reauth` throttling and lockout apply. `contract_invalid` names the offending field.
+- **The contract is not created** — `contract_invalid` names the offending field. With
+  `AI_AUTO_REQUIRE_STEP_UP=1`, `step_up_failed` means a wrong password or TOTP and the
+  `/auth/reauth` throttling and lockout apply.
 - **`contract_required` from `run_preview`/`apply_draft`** — the contract is spent (a previous run
   used it); confirm a new one, which is the intended one-contract-per-run rule.
 - **The run ends `blocked:spec_not_found`** — the request names no spec and none exists yet; give the
   id/number in the message or expect `/speckit-specify` to create it first.
-- **Nothing applied although preview passed** — check the contract stages and `limits.applies`.
+- **Nothing applied although preview passed** — check the contract stages (`apply` must be allowed)
+  and `limits.applies` if a profile set one.

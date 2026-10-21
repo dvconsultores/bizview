@@ -41,6 +41,7 @@ const base: AssistantSession = {
   id: 7,
   title: "Prueba",
   status: "open",
+  mode: "edit",   // the manual opt-in pipeline only exists outside Auto (feature 028)
   draft: null,
   validation: null,
   preview: null,

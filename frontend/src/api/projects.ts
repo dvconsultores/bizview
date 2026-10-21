@@ -79,7 +79,7 @@ export const projectsApi = {
     api.post<AssistantSession>(`/api/assistant/sessions/${sessionId}/mode`, { mode }),
   /** Feature 028: confirm the run contract with its single step-up. */
   confirmContract: (sessionId: number,
-                    body: { contract: RunContract; password: string; code?: string | null;
+                    body: { contract: RunContract; password?: string; code?: string | null;
                             profile_id?: number | null }) =>
     api.post<{ run: AssistantSession["contract"]; session: AssistantSession }>(
       `/api/assistant/sessions/${sessionId}/contract`, body),

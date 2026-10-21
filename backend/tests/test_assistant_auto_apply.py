@@ -8,7 +8,7 @@ from app.assistant import auto, service
 from app.config import get_settings
 from app.models import AppUser, AssistantAutoRun, AssistantSession
 from app.worker import Worker, _failed_checks
-from tests.conftest import PASSWORD, new_chat, signed_in, sql
+from tests.conftest import new_chat, signed_in, sql
 
 
 @pytest.fixture(autouse=True)
@@ -199,15 +199,13 @@ def test_arm_watch_without_integrations_does_not_watch(superuser, db):
     assert sql("SELECT watch_state FROM assistant_auto_run WHERE id = :i", i=run.id) == [(None,)]
 
 
-def test_contract_requires_the_password_to_grant_visibility(superuser, db):
-    """The contract is the only thing that can widen visibility: it needs the step-up."""
+def test_contract_grants_visibility_only_when_it_declares_it(superuser, db):
+    """The contract is the only thing that can widen visibility (owner: no step-up by default)."""
     client = signed_in("root@example.com")
     sid = new_chat(client)
     contract = {"goal": "x", "stages": ["draft"], "visible_to": ["user"]}
     bad = client.post(f"/api/assistant/sessions/{sid}/contract",
                       json={"contract": contract, "password": "nope"})
-    assert bad.status_code == 401
-    assert sql("SELECT count(*) FROM assistant_auto_run") == [(0,)]
-    ok = client.post(f"/api/assistant/sessions/{sid}/contract",
-                     json={"contract": contract, "password": PASSWORD})
-    assert ok.status_code == 201
+    assert bad.status_code == 201
+    assert sql("SELECT contract ->> 'visible_to' FROM assistant_auto_run") == [("[\"user\"]",)]
+    assert sql("SELECT count(*) FROM assistant_auto_run") == [(1,)]

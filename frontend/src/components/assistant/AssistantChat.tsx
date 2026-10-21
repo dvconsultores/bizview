@@ -52,7 +52,6 @@ import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { CommandMenu, filterCommands, menuQuery } from "./CommandMenu";
 import { CommandRunChip } from "./CommandRunChip";
 import { ModePill, ModeSelector } from "./ModeSelector";
-import { RunContractDialog } from "./RunContractDialog";
 import { CommandSuggestions, inlineSuggestions } from "./CommandSuggestion";
 import { SpecPicker } from "./SpecPicker";
 import { useCommands } from "./useCommands";
@@ -118,8 +117,6 @@ export function AssistantChat(props: {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeAccepted, setNoticeAccepted] = useState(false);
   const [dragging, setDragging] = useState(false);
-  // Feature 028: the run contract dialog opened by the mode selector (or the "Pasar a Auto" chip).
-  const [contractOpen, setContractOpen] = useState(false);
   const filesRef = useRef<HTMLInputElement | null>(null);
   const maxImages = attachments_max_per_message ?? 4;
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -127,10 +124,10 @@ export function AssistantChat(props: {
   const composerId = useId();
   const menuId = useId();
   const { busy, markBusy, release } = useAssistantBusy(session, onSession);
-  const mode = session?.mode ?? "edit";
+  const mode = session?.mode ?? "auto";
   const askMode = mode === "ask";
 
-  /** Feature 028: switch the mode. Auto only becomes active once its contract is confirmed. */
+  /** Feature 028: switch the mode. Auto authorises the run in the same click. */
   const changeMode = async (next: "ask" | "edit" | "auto") => {
     if (!session) return;
     try {
@@ -139,9 +136,20 @@ export function AssistantChat(props: {
       setError(err instanceof ApiError ? err.message : t.common.unexpected);
     }
   };
-  const openContract = () => {
+
+  const openContract = async () => {
     if (!session) return;
-    setContractOpen(true);
+    try {
+      const { session: updated } = await projectsApi.confirmContract(session.id, {
+        contract: {
+          goal: text.trim() || t.assistant.modes.auto,
+          stages: ["draft", "preview", "apply"],
+        },
+      });
+      onSession(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.common.unexpected);
+    }
   };
   // Feature 021: the `/` menu, command chips, suggestions and the inline spec picker.
   // 023: the Ayuda page opens the panel with `/ayuda <tema>` ready in the composer.
@@ -243,7 +251,7 @@ export function AssistantChat(props: {
   /** The composer holds a brief for /speckit-specify: offer to run the whole pipeline. */
   const pipelineAvailable =
     ai_enabled && !sending && !busy && images.length === 0 && session?.status !== "archived"
-    && text.trim().startsWith("/speckit-specify");
+    && mode !== "auto" && text.trim().startsWith("/speckit-specify");
 
   const startPipeline = () => {
     const brief = text.trim();
@@ -664,17 +672,7 @@ export function AssistantChat(props: {
         {mapOverlay}
       </div>
 
-      {contractOpen && session ? (
-        <RunContractDialog
-          session={session}
-          goal={text}
-          onClose={() => setContractOpen(false)}
-          onConfirmed={(next) => {
-            setContractOpen(false);
-            onSession(next);
-          }}
-        />
-      ) : null}
+
 
       {notice ? (
         <div className="px-3 sm:px-4">
@@ -869,26 +867,7 @@ export function AssistantChat(props: {
           ) : null}
           {session ? (
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <ModeSelector
-                session={session}
-                disabled={!ai_enabled}
-                onSelect={(next) => void changeMode(next)}
-                onRequestAuto={openContract}
-              />
               <ModePill session={session} />
-              {mode === "auto" && (session.contract_status ?? "none") === "none" ? (
-                <button
-                  type="button"
-                  data-authorize-run=""
-                  onClick={(event) => {
-                    setContractOpen(true);
-                    event.currentTarget.blur();
-                  }}
-                  className="inline-flex min-h-tap items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-3 text-xs font-medium text-accent hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                >
-                  {t.assistant.contract.authorize}
-                </button>
-              ) : null}
             </div>
           ) : null}
           <div
@@ -956,7 +935,7 @@ export function AssistantChat(props: {
               }
               className="block max-h-[40vh] min-h-[3.5rem] w-full resize-none overflow-y-auto border-0 bg-transparent px-4 pt-3 text-base leading-relaxed text-ink placeholder:text-ink-muted focus:outline-none focus:ring-0"
             />
-            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 pb-3 pt-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
                 <button
                   type="button"
@@ -1034,6 +1013,14 @@ export function AssistantChat(props: {
                   </span>
                 ) : null}
               </div>
+              {session ? (
+                <ModeSelector
+                  session={session}
+                  disabled={!ai_enabled}
+                  onSelect={(next) => void changeMode(next)}
+                  onRequestAuto={openContract}
+                />
+              ) : null}
               {pipelineAvailable && (
                 <button
                   type="button"

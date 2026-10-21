@@ -13,8 +13,7 @@ from tests.conftest import PASSWORD, new_chat, signed_in, sql
 def fake_provider(monkeypatch):
     monkeypatch.setenv("BIZVIEW_TEST_HOOKS", "1")
     monkeypatch.setenv("AI_PROVIDER", "fake")
-    for key in ("AI_AUTO_MAX_ROUNDS", "AI_AUTO_MAX_APPLIES", "AI_AUTO_RUN_MAX_SECONDS",
-                "AI_AUTO_MAX_PREVIEWS"):
+    for key in ("AI_AUTO_MAX_ROUNDS", "AI_AUTO_REQUIRE_STEP_UP"):
         monkeypatch.delenv(key, raising=False)
     get_settings.cache_clear()
     fake.SHARED.reset()
@@ -29,8 +28,11 @@ def _mode(client, sid, mode):
     return client.post(f"/api/assistant/sessions/{sid}/mode", json={"mode": mode})
 
 
-def _confirm(client, sid, contract=None, password=PASSWORD, code=None, profile_id=None):
-    body = {"contract": contract or CONTRACT, "password": password}
+def _confirm(client, sid, contract=None, password=None, code=None, profile_id=None):
+    """Auto no longer needs a step-up (owner, 2026-10-20): the password is optional."""
+    body = {"contract": contract or CONTRACT}
+    if password is not None:
+        body["password"] = password
     if code is not None:
         body["code"] = code
     if profile_id is not None:
@@ -65,7 +67,18 @@ def test_auto_without_a_contract_reports_no_contract(superuser, db):
     assert row["contract"] is None
 
 
-def test_contract_confirmation_requires_the_password(superuser, db):
+def test_contract_needs_no_password_by_default(superuser, db):
+    """Owner: "do not need auth to auto mode"; the step-up is opt-in (AI_AUTO_REQUIRE_STEP_UP)."""
+    client = signed_in("root@example.com")
+    sid = new_chat(client)
+    r = _confirm(client, sid)
+    assert r.status_code == 201, r.text
+    assert r.json()["session"]["contract_status"] == "confirmed"
+
+
+def test_step_up_returns_with_the_setting(superuser, db, monkeypatch):
+    monkeypatch.setenv("AI_AUTO_REQUIRE_STEP_UP", "1")
+    get_settings.cache_clear()
     client = signed_in("root@example.com")
     sid = new_chat(client)
     r = _confirm(client, sid, password="wrong-password")
@@ -112,7 +125,7 @@ def test_contract_rejects_an_unknown_source(superuser, db):
     assert "sources" in r.json()["error"]["fields"]
 
 
-def test_internet_profile_requires_a_two_step_code(superuser, db, monkeypatch):
+def test_internet_profile_requires_a_two_step_code_when_enabled(superuser, db, monkeypatch):
     import pyotp
 
     from tests.conftest import reauth
@@ -123,13 +136,14 @@ def test_internet_profile_requires_a_two_step_code(superuser, db, monkeypatch):
     assert client.post("/api/me/mfa/enable",
                        json={"code": pyotp.TOTP(setup["secret"]).now()}).status_code == 200
     monkeypatch.setenv("SECURITY_PROFILE", "internet")
+    monkeypatch.setenv("AI_AUTO_REQUIRE_STEP_UP", "1")
     get_settings.cache_clear()
 
     sid = new_chat(client)
-    assert _confirm(client, sid).status_code == 401          # password alone is not enough
+    assert _confirm(client, sid, password=PASSWORD).status_code == 401   # the code is missing
     # The enrolment code cannot be replayed (mfa.verify_code rejects a used step): move one step.
     later = pyotp.TOTP(setup["secret"]).at(time.time() + 30)
-    ok = _confirm(client, sid, code=later)
+    ok = _confirm(client, sid, password=PASSWORD, code=later)
     assert ok.status_code == 201, ok.text
 
 
@@ -186,7 +200,6 @@ def test_profile_never_replaces_the_step_up(superuser, db):
     r = client.post("/api/assistant/run-profiles",
                     json={"name": "rápido", "contract": {"stages": ["draft"]}})
     pid = r.json()["id"]
-    assert _confirm(client, sid, password="nope", profile_id=pid).status_code == 401
     assert _confirm(client, sid, profile_id=pid).status_code == 201
 
 

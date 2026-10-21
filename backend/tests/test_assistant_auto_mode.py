@@ -90,13 +90,14 @@ def test_ask_refuses_check_query_with_a_draft_path(superuser, db):
 
 # --- Edit stays as it was ----------------------------------------------------------------
 
-def test_edit_offers_exactly_the_old_set(superuser, db):
+def test_auto_without_a_contract_offers_only_reads(superuser, db):
+    """A new conversation is Auto with no contract yet: the writes wait for the authorisation."""
     from app.assistant.commands import guard
 
     client = signed_in("root@example.com")
     sid = new_chat(client)
     offered = _offered(client, sid)
-    assert offered == set(guard.allowed_tools(None))       # 014/017/021 unchanged
+    assert offered == set(guard.allowed_tools(None)) - {"suggest_command"} | {"set_current_spec"}
     assert "apply_draft" not in offered and "run_command" not in offered
 
 

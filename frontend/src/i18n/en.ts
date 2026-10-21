@@ -1192,6 +1192,7 @@ export const en: Catalogue = {
       invalid: "Check the highlighted fields.",
     },
     pill: {
+      ready: "Auto · ready",
       running: "Auto · running",
       none: "Auto · no contract",
       stopped: "Auto · stopped",
