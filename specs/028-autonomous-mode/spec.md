@@ -76,6 +76,15 @@ profile or a hand-written contract can still set any limit; (c) the agent never 
 prompt is not rewritten per mode: `ask` adds nothing (the tools enforce it) and `auto` adds one line.
 The contract row is still stored, audited and enforced by product code either way.
 
+**Revision 2026-10-21 (owner)**: "this variable do not, make the ai unlimited", pointing at
+`AI_CHAT_TOKEN_BUDGET` / `AI_CHAT_BUDGET_STEP` / `AI_CHAT_BUDGET_MAX`. The conversation budget and
+the per-command ceiling are gone for good, not just for Auto: migration `0025_unlimited_ai` drops
+`assistant_session.token_budget`, the `/budget` route and the "Ampliar presupuesto" button no longer
+exist, and `tokens_used` is kept only as telemetry (the run summary and the status pill report it).
+An Auto run and a manual turn both stop only on the round caps, two identical failing tool calls, a
+provider failure or "Detener". FR-003 therefore reads: *allowed stages* are enforced in product code;
+token limits are no longer part of the product.
+
 Rules of the selector:
 
 - Default mode for a new conversation is **Auto**. Reads work immediately; anything that writes

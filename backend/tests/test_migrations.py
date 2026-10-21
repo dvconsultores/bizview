@@ -135,23 +135,24 @@ def test_assistant_session_defaults_and_checks(database):
     user = make_user("assistant-defaults@example.com")
     pid = _project("test-assistant-session-defaults-and-chec")
     session_id = sql(
-        "INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-        "VALUES (:p, 'Ventas por marca', :u, 200000) RETURNING id", u=user.id, p=pid)[0][0]
+        "INSERT INTO assistant_session (project_id, title, created_by) "
+        "VALUES (:p, 'Ventas por marca', :u) RETURNING id", u=user.id, p=pid)[0][0]
     assert sql("SELECT status, tokens_used FROM assistant_session WHERE id = :s",
                s=session_id) == [("open", 0)]
 
     with pytest.raises(IntegrityError):
-        sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget, status) "
-            "VALUES (:p, 'Bad status', :u, 200000, 'done')", u=user.id, p=pid)
+        sql("INSERT INTO assistant_session (project_id, title, created_by, status) "
+            "VALUES (:p, 'Bad status', :u, 'done')", u=user.id, p=pid)
     with pytest.raises(IntegrityError):
-        sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-            "VALUES (:p, 'No budget', :u, 0)", u=user.id, p=pid)
+        sql("INSERT INTO assistant_session (project_id, title, created_by) "
+            "VALUES (:p, '   ', :u)", u=user.id, p=pid)
     with pytest.raises(IntegrityError):
-        sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-            "VALUES (:p, '   ', :u, 200000)", u=user.id, p=pid)
-    with pytest.raises(IntegrityError):
-        sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget, status) "
-            "VALUES (:p, 'Applied without version', :u, 200000, 'applied')", u=user.id, p=pid)
+        sql("INSERT INTO assistant_session (project_id, title, created_by, status) "
+            "VALUES (:p, 'Applied without version', :u, 'applied')", u=user.id, p=pid)
+    # 0025 retired the budget: the column is gone (feature 028 revision, unlimited AI).
+    assert "token_budget" not in sql(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'assistant_session'")[0]
 
 
 def test_assistant_messages_cascade_with_session(database):
@@ -159,8 +160,8 @@ def test_assistant_messages_cascade_with_session(database):
     user = make_user("assistant-messages@example.com")
     pid = _project("test-assistant-messages-cascade-with-ses")
     session_id = sql(
-        "INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-        "VALUES (:p, 'Msgs', :u, 200000) RETURNING id", u=user.id, p=pid)[0][0]
+        "INSERT INTO assistant_session (project_id, title, created_by) "
+        "VALUES (:p, 'Msgs', :u) RETURNING id", u=user.id, p=pid)[0][0]
     sql("INSERT INTO assistant_message (session_id, role, content) "
         "VALUES (:s, 'user', 'hola')", s=session_id)
     sql("INSERT INTO assistant_message (session_id, role, content, tool_name, tool_payload) "
@@ -186,8 +187,8 @@ def test_downgrade_0008_removes_assistant(database):
     """Feature 014 downgrade: assistant tables and their audit rows removed."""
     user = make_user("assistant-downgrade@example.com")
     pid = _project("principal")  # the 0018 downgrade keeps only principal
-    sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-        "VALUES (:p, 'Downgrade', :u, 200000)", u=user.id, p=pid)
+    sql("INSERT INTO assistant_session (project_id, title, created_by) "
+        "VALUES (:p, 'Downgrade', :u)", u=user.id, p=pid)
     sql("INSERT INTO audit_event (kind) VALUES ('assistant_session_archived')")
 
     assistant = {"assistant_session", "assistant_message", "assistant_preview_request"}
@@ -221,8 +222,8 @@ def test_assistant_session_agent_columns(database):
     """Feature 017: agentic assistant columns exist with correct defaults and types."""
     user = make_user("assistant-agent@example.com")
     pid = _project("test-assistant-session-agent-columns")
-    sql("INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-        "VALUES (:p, 'Agent', :u, 200000)", u=user.id, p=pid)
+    sql("INSERT INTO assistant_session (project_id, title, created_by) "
+        "VALUES (:p, 'Agent', :u)", u=user.id, p=pid)
     assert sql("SELECT stats FROM assistant_session WHERE title = 'Agent'") == [({},)]
     assert sql("SELECT working_state, query_checks FROM assistant_session "
                "WHERE title = 'Agent'") == [(None, None)]
@@ -260,8 +261,8 @@ def test_assistant_busy_column_and_downgrade_0011(database):
     user = make_user("assistant-busy@example.com")
     pid = _project("principal")  # the 0018 downgrade keeps only principal
     session_id = sql(
-        "INSERT INTO assistant_session (project_id, title, created_by, token_budget) "
-        "VALUES (:p, 'Busy claim test', :u, 200000) RETURNING id",
+        "INSERT INTO assistant_session (project_id, title, created_by) "
+        "VALUES (:p, 'Busy claim test', :u) RETURNING id",
         u=user.id, p=pid,
     )[0][0]
 
@@ -556,8 +557,8 @@ def test_0019_command_runs_one_active_per_conversation(database):
     user = make_user("runs@example.com")
     pid = sql("INSERT INTO project (slug, name, origin) VALUES ('p021', 'P', 'app') "
               "RETURNING id")[0][0]
-    sid = sql("INSERT INTO assistant_session (title, created_by, project_id, token_budget) "
-              "VALUES ('t', :u, :p, 200000) RETURNING id", u=user.id, p=pid)[0][0]
+    sid = sql("INSERT INTO assistant_session (title, created_by, project_id) "
+              "VALUES ('t', :u, :p) RETURNING id", u=user.id, p=pid)[0][0]
     insert = ("INSERT INTO assistant_command_run (session_id, project_id, command, locale, status) "
               "VALUES (:s, :p, :c, 'es', :st)")
     sql(insert, s=sid, p=pid, c="speckit-plan", st="running")

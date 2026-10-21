@@ -361,11 +361,10 @@ validated, and `/speckit-converge` when its last run found no gaps on the same r
 reply says so and shows the command to use; append **`--force`** to bypass the guard
 (`/speckit-plan 002-ventas-facturacion --force`), which is recorded in the run.
 
-Two more limits keep a run cheap: `read_draft` answers *sin cambios desde la lectura anterior* with
-the file's hash when the same run already sent that revision, `get_authoring_guide` returns a
-pointer after the first use of a topic in a run, and `AI_COMMAND_TOKEN_CEILING` (default 400 000)
-stops one command with status **techo de tokens** and the draft intact — continue with `--force`,
-split the work, or raise the setting.
+Two more guards keep a run from repeating work: `read_draft` answers *sin cambios desde la lectura
+anterior* with the file's hash when the same run already sent that revision, and
+`get_authoring_guide` returns a pointer after the first use of a topic in a run. There is **no token
+ceiling** on a command any more: the AI is unlimited and tokens are only counted.
 
 ### Spec-driven and quick changes
 

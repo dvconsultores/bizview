@@ -96,57 +96,27 @@ def test_capacity_full_is_refused(superuser, db, monkeypatch):
     slots.release()
 
 
-def test_budget_extends_automatically_and_is_audited(superuser, db):
+def test_no_budget_extension_and_no_stop(superuser, db):
+    """Feature 028 revision (owner, 2026-10-21: "make the ai unlimited").
+
+    The automatic extension and its audit are gone with the budget: a turn past the old numbers
+    keeps going and nothing is written to the audit log about tokens.
+    """
     client = signed_in("root@example.com")
-    s = _stored_session(db, superuser, status="open", tokens_used=199990)
+    s = _stored_session(db, superuser, status="open", tokens_used=9_000_000)
     fake.SHARED.queue(
-        _chat_reply(
-            tool_calls=[_tool_call("list_sources", {}, call_id="c1")],
-            stop_reason="tool_use",
-        ),
+        _chat_reply(tool_calls=[_tool_call("list_sources", {}, call_id="c1")],
+                    stop_reason="tool_use"),
         _chat_reply("Sigo."),
     )
     r = client.post(f"/api/assistant/sessions/{s.id}/messages", json={"text": "Continúa"})
     assert r.status_code == 202
-    rows = sql(
-        "SELECT role, content FROM assistant_message WHERE session_id = :i ORDER BY id", i=s.id
-    )
+    rows = sql("SELECT role, content FROM assistant_message WHERE session_id = :i ORDER BY id",
+               i=s.id)
     assert rows[-1][1] == "Sigo."
-    assert sql("SELECT token_budget FROM assistant_session WHERE id = :i", i=s.id)[0][0] == 300000
-    audit = sql(
-        "SELECT actor_id, ip, detail FROM audit_event WHERE kind = 'assistant_budget_extended'"
-    )
-    assert audit == [(None, None, {"session": s.id, "from": 200000, "to": 300000, "auto": True})]
     assert len(fake.SHARED.requests) == 2
-
-
-def test_hard_budget_max_stops_the_run(superuser, db, monkeypatch):
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "200000")
-    get_settings.cache_clear()
-    client = signed_in("root@example.com")
-    s = _stored_session(db, superuser, status="open", tokens_used=199990)
-    fake.SHARED.queue(
-        _chat_reply(
-            tool_calls=[_tool_call("list_sources", {}, call_id="c1")],
-            stop_reason="tool_use",
-        ),
-        _chat_reply("No debe llegar."),
-    )
-    r = client.post(f"/api/assistant/sessions/{s.id}/messages", json={"text": "Continúa"})
-    assert r.status_code == 202
-    assert len(fake.SHARED.requests) == 1
-    rows = sql(
-        "SELECT role, content FROM assistant_message WHERE session_id = :i ORDER BY id", i=s.id
-    )
-    assert rows[-1][1].startswith(t(service._BUDGET_TEXT))
-    assert t(service._BUDGET_HINT) in rows[-1][1]
-    assert "AI_CHAT_BUDGET_MAX" in rows[-1][1]
-    assert "conversación nueva" in rows[-1][1]
-    audit_count = sql(
-        "SELECT count(*) FROM audit_event WHERE kind = 'assistant_budget_extended'"
-    )[0][0]
-    assert audit_count == 0
-    assert sql("SELECT token_budget FROM assistant_session WHERE id = :i", i=s.id)[0][0] == 200000
+    assert sql("SELECT count(*) FROM audit_event "
+               "WHERE kind = 'assistant_budget_extended'") == [(0,)]
 
 
 def test_stop_releases_claim_and_run_exits_quietly(superuser, db, monkeypatch):

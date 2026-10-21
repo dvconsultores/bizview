@@ -47,7 +47,6 @@ const base: AssistantSession = {
   preview: null,
   applied_version_id: null,
   tokens_used: 0,
-  token_budget: 1000,
   created_at: "2026-10-11T10:00:00Z",
   updated_at: "2026-10-11T10:00:00Z",
   messages: [],

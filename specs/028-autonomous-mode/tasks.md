@@ -288,6 +288,14 @@ tests and the docs were brought in line with them:
 | "still the insert spec proposed after click i need to click send" | `suggest_command` is neither offered nor accepted in Auto (`assistant.auto.use_run_command`); the agent runs the stage itself with `run_command`. |
 | "why change everything in every prompt" | `mode_block` adds a single line, only in Auto; `ask` adds nothing because the tools already enforce it. |
 
+**2026-10-21, second revision**: "this variable do not, make the ai unlimited" — the conversation
+budget (`AI_CHAT_TOKEN_BUDGET`, `AI_CHAT_BUDGET_STEP`, `AI_CHAT_BUDGET_MAX`), the per-command
+ceiling (`AI_COMMAND_TOKEN_CEILING`), the `token_budget` column (migration `0025_unlimited_ai`), the
+"Ampliar presupuesto" button, the `POST /budget` route and the context's budget percentage were all
+removed. `tokens_used` stays as telemetry. T027's budget work (feature 017) is superseded, and the
+017 tests about it were replaced by `test_a_long_turn_is_never_stopped_by_tokens` and
+`test_budget_route_is_gone`.
+
 `test_assistant_auto_mode.py`, `test_assistant_auto_contract.py`, `test_assistant_auto_apply.py` and
 `test_assistant_auto_loop.py` assert the shipped behaviour (46 tests), and
 `frontend/tests/e2e/assistant-auto.spec.ts` proves the one-click path in three engines at 320/375 px.

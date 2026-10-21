@@ -60,18 +60,15 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=30, ge=1, le=300)
     # Per-request timeout of assistant chat() calls (a round writing a full draft is slow).
     ai_chat_timeout_seconds: float = Field(default=180, ge=10, le=600)
-    ai_chat_token_budget: int = Field(default=400_000, ge=10_000, le=5_000_000)
     # Cached prompt tokens cost a fraction of normal tokens (DeepSeek ~10%).
     ai_chat_cached_token_weight: float = Field(default=0.1, ge=0, le=1)
     # Longest answer per round: a full draft (specs, YAML, SQL) needs several thousand tokens.
     ai_chat_max_tokens: int = Field(default=16_000, ge=1_024, le=64_000)
     # Tool rounds per autonomous run before the assistant posts a progress message.
     ai_chat_max_rounds: int = Field(default=60, ge=1, le=200)
-    # Hard ceiling of one /speckit-… command run (separate from the conversation budget).
-    ai_command_token_ceiling: int = Field(default=400_000, ge=10_000, le=5_000_000)
-    # The budget extends itself by the step during a run up to the max (only the max stops a run).
-    ai_chat_budget_step: int = Field(default=100_000, ge=10_000, le=5_000_000)
-    ai_chat_budget_max: int = Field(default=2_000_000, ge=10_000, le=5_000_000)
+    # The owner's rule (2026-10-21): the AI is unlimited. Tokens are counted for the run summary
+    # and the status bar, but nothing stops a turn or a run on them — no conversation budget, no
+    # per-command ceiling. The bounds left are the round caps, the provider timeout and "Detener".
     # Assistant runs working at the same time in this process; more get 409 assistant_capacity.
     ai_agent_max_concurrent: int = Field(default=4, ge=1, le=32)
     # Agent previews per conversation (kept small so preview generation stays cheap).

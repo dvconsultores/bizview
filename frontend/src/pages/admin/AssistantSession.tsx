@@ -22,7 +22,6 @@ import { ReportViews } from "../../components/report/ReportViews";
 import { useOpenAssistant } from "../../components/assistant/useOpenAssistant";
 import { ProblemList } from "../../components/assistant/ProblemList";
 import { ReadinessChecklist, ReadinessPill } from "../../components/assistant/Readiness";
-import { BudgetNotice } from "../../components/assistant/BudgetNotice";
 import { WorkingNotes } from "../../components/assistant/WorkingNotes";
 import { RunStatus } from "../../components/assistant/RunStatus";
 import { SessionIndicator } from "../../components/assistant/SessionIndicator";
@@ -441,7 +440,6 @@ export function AssistantSession() {
       {error && <Alert tone="error">{error}</Alert>}
       {applySuccess && <Alert tone="success">{applySuccess}</Alert>}
       <RunStatus session={session} busy={busy} onSession={setSession} release={release} />
-      <BudgetNotice session={session} />
       {session.applied_version_id != null && (
         <Alert tone="info">
           {t.assistant.producedVersion.replace("{id}", String(session.applied_version_id))}{" "}

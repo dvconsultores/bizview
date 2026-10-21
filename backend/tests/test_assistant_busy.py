@@ -153,23 +153,19 @@ def test_actions_refused_while_busy(superuser):
     client = reauth(signed_in("root@example.com"))
     sid = _new_session(client)
     sql("UPDATE assistant_session SET busy_since = now() WHERE id = :i", i=sid)
-    budget_before = sql("SELECT token_budget FROM assistant_session WHERE id = :i", i=sid)[0][0]
 
     for path in [
         f"/api/assistant/sessions/{sid}/preview",
         f"/api/assistant/sessions/{sid}/apply",
         f"/api/assistant/sessions/{sid}/archive",
-        f"/api/assistant/sessions/{sid}/budget",
     ]:
         r = client.post(path)
         assert r.status_code == 409, (path, r.json())
         assert r.json()["error"]["code"] == "assistant_busy"
 
     assert sql("SELECT status FROM assistant_session WHERE id = :i", i=sid)[0][0] == "open"
-    assert sql("SELECT token_budget FROM assistant_session WHERE id = :i", i=sid)[0][0] == \
-        budget_before
-    assert sql("SELECT count(*) FROM audit_event WHERE kind IN "
-               "('assistant_session_archived', 'assistant_budget_extended')")[0][0] == 0
+    assert sql("SELECT count(*) FROM audit_event WHERE kind = 'assistant_session_archived'"
+               )[0][0] == 0
 
 
 def test_release_only_clears_own_claim(superuser):

@@ -309,10 +309,8 @@ AI_API_KEY=
 AI_MODEL=
 AI_BASE_URL=
 AI_TIMEOUT_SECONDS=30
-# Assistant agent limits (optional; defaults shown)
+# Assistant agent limits (optional; defaults shown). No token budget: the AI is unlimited.
 # AI_CHAT_MAX_ROUNDS=20
-# AI_CHAT_BUDGET_STEP=100000
-# AI_CHAT_BUDGET_MAX=2000000
 # AI_CHAT_MAX_PREVIEWS=5
 # AI_TOOL_TIMEOUT_SECONDS=20
 # AI_CHAT_TIMEOUT_SECONDS=180

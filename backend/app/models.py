@@ -633,7 +633,6 @@ class AssistantSession(Base):
         CheckConstraint("char_length(btrim(title)) BETWEEN 1 AND 120", name="title_len"),
         CheckConstraint(_in("status", ASSISTANT_STATUSES), name="status"),
         CheckConstraint("tokens_used >= 0", name="tokens_used"),
-        CheckConstraint("token_budget > 0", name="token_budget"),
         CheckConstraint("status <> 'applied' OR applied_version_id IS NOT NULL",
                         name="applied_has_version"),
         Index("ix_assistant_session_updated_at", text("updated_at DESC")),
@@ -663,8 +662,8 @@ class AssistantSession(Base):
     mode: Mapped[str] = mapped_column(Text, server_default=text("'auto'"))
     applied_version_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("workspace_version.id"))
+    # Telemetry only (feature 028 revision 2026-10-21: nothing stops on it).
     tokens_used: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    token_budget: Mapped[int] = mapped_column(Integer)
     busy_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

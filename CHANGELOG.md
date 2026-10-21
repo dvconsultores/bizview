@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The AI is unlimited (feature 028 revision, 2026-10-21)**: the conversation token budget and the
+  per-command ceiling are gone — owner's rule, "it can not have a token limit … do not limit ever,
+  that is the reason to use the API". A turn or a run now stops only on the round cap
+  (`AI_CHAT_MAX_ROUNDS` 60, `AI_AUTO_MAX_ROUNDS` 200), on two identical failing tool calls, on a
+  provider failure, or when someone presses **Detener** / switches the mode down.
+  - Removed: `AI_CHAT_TOKEN_BUDGET`, `AI_CHAT_BUDGET_STEP`, `AI_CHAT_BUDGET_MAX`,
+    `AI_COMMAND_TOKEN_CEILING`, the "Ampliar presupuesto" button and banner, the
+    `POST /sessions/{id}/budget` endpoint, the automatic extension and its audit entry, the
+    `assistant_session.token_budget` column (migration `0025_unlimited_ai`), and the per-command
+    **techo de tokens** status.
+  - `tokens_used` stays and is the only token figure left: the status pill of a conversation now
+    shows the tokens spent instead of a percentage of a budget, and the run summary still reports
+    them. The prompt no longer tells the model about a percentage or a ceiling, so it cannot stop
+    on its own for a budget that does not exist.
+
 ### Added
 
 - **Agent modes and autonomous runs (feature 028)**: the Asistente composer gets one small mode

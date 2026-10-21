@@ -150,24 +150,23 @@ def test_propose_draft_and_session_shows_draft(superuser, db, workspace, without
     assert session_data["validation"]["valid"] is True
 
 
-def test_budget_exhausted(superuser, db):
+def test_tokens_never_stop_a_turn(superuser, db):
+    """Feature 028 revision (owner, 2026-10-21: "make the ai unlimited"): no budget, no stop."""
     client = signed_in("root@example.com")
-    resp = chat_response(client)
-    session_id = resp.json()["id"]
-    sql(
-        "UPDATE assistant_session SET token_budget = :budget, tokens_used = :budget "
-        "WHERE id = :id",
-        id=session_id,
-        budget=get_settings().ai_chat_budget_max,
-    )
+    session_id = chat_response(client).json()["id"]
+    sql("UPDATE assistant_session SET tokens_used = 50000000 WHERE id = :id", id=session_id)
     fake.SHARED.reset()
+    fake.SHARED.queue(_chat_reply("Hola."))
+
     resp = client.post(f"/api/assistant/sessions/{session_id}/messages", json={"text": "hola"})
     assert resp.status_code == 202
     msgs = resp.json()["messages"]
     assert [m["role"] for m in msgs] == ["user", "assistant"]
-    assert "presupuesto" in msgs[-1]["content"]
-    assert len(fake.SHARED.payloads()) == 0
-    assert not sql("SELECT 1 FROM audit_event WHERE kind = 'assistant_budget_extended'")
+    assert msgs[-1]["content"] == "Hola."
+    assert len(fake.SHARED.payloads()) == 1
+    assert "presupuesto" not in msgs[-1]["content"].lower()
+    assert sql("SELECT count(*) FROM audit_event "
+               "WHERE kind = 'assistant_budget_extended'") == [(0,)]
 
 
 def test_max_rounds_stop(superuser, db, monkeypatch):
@@ -207,7 +206,7 @@ def test_archived_session_conflict(superuser, db):
 
 
 def _stored_session(db, superuser, **fields) -> AssistantSession:
-    s = AssistantSession(title="t", created_by=superuser.id, token_budget=200000,
+    s = AssistantSession(title="t", created_by=superuser.id,
                          project_id=chat_project_id(db, superuser.id), **fields)
     db.add(s)
     db.commit()
@@ -299,9 +298,9 @@ def test_first_message_names_the_conversation(superuser, db):
 
 
 def test_old_default_titles_show_the_first_message(superuser, db):
+    # created before automatic naming
     s = AssistantSession(title=service.DEFAULT_TITLE, created_by=superuser.id,
-                         project_id=chat_project_id(db, superuser.id),
-                         token_budget=200000)       # created before automatic naming
+                         project_id=chat_project_id(db, superuser.id))
     db.add(s)
     db.commit()
     db.add(AssistantMessage(session_id=s.id, role="user", content="Inventario por bodega"))
@@ -366,7 +365,7 @@ def test_audit_ids_go_in_detail_not_user_target(superuser, db):
     """audit_event.target_id references users: a session id that is no user id must not break."""
     sql("SELECT setval(pg_get_serial_sequence('assistant_session', 'id'), 900000)")
     s = AssistantSession(title="t", created_by=superuser.id,
-                         project_id=chat_project_id(db, superuser.id), token_budget=200000)
+                         project_id=chat_project_id(db, superuser.id))
     db.add(s)
     db.commit()
     resp = signed_in("root@example.com").post(f"/api/assistant/sessions/{s.id}/archive")
@@ -461,6 +460,10 @@ def test_payload_audit_no_secrets_or_rows(superuser, db, workspace, monkeypatch,
     client = signed_in("root@example.com")
     resp = chat_response(client)
     session_id = resp.json()["id"]
+    # mode `edit`: `run_preview`/`apply_draft` are refused in Auto without a run contract, and this
+    # test is about the data boundary, not about modes (feature 028 FR-000).
+    assert client.post(f"/api/assistant/sessions/{session_id}/mode",
+                       json={"mode": "edit"}).status_code == 200
     resp = client.post(f"/api/assistant/sessions/{session_id}/messages",
                        json={"text": "audita"})
     assert resp.status_code == 202
@@ -588,7 +591,6 @@ def test_rename_session_permissions(superuser, db, admin):
 
     other = AssistantSession(
         title="Ajena", created_by=admin.id, project_id=chat_project_id(db, admin.id), status="open",
-        token_budget=1000,
     )
     db.add(other)
     db.commit()

@@ -722,7 +722,6 @@ export interface AssistantSessionSummary {
   status: "open" | "applied" | "archived";
   updated_at: string;
   tokens_used: number;
-  token_budget: number;
   busy?: boolean;
   /** Feature 028: the mode pill of the conversation list. */
   mode?: AssistantMode;
@@ -879,15 +878,12 @@ export interface AssistantSession {
   preview: AssistantPreview | null;
   applied_version_id: number | null;
   tokens_used: number;
-  token_budget: number;
   created_at: string;
   updated_at: string;
   messages: AssistantMessage[];
   working_state?: AssistantWorkingState;
   readiness?: AssistantReadiness;
   stats?: AssistantStats;
-  budget_warning?: boolean;
-  budget_max?: number;
   busy?: boolean;
   model?: string | null;
   /** The project's specs and stages (conversation header selector). */

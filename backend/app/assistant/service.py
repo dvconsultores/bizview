@@ -60,7 +60,6 @@ MAX_USER_TEXT = 8000
 STATE_MAX_PROBLEMS = 30
 STATE_MAX_CHARS = 12000
 TRUNCATED_MARKER = "(estado recortado; usa read_draft o describe_source)"
-BUDGET_WARNING_RATIO = 0.8
 PROGRESS_CHARS = 1000
 RECENT_ROUNDS = 2
 RECENT_FILE_CHARS = 4000
@@ -146,16 +145,15 @@ can find out with the tools.
 
 Use update_notes to save objective, decisions, current step, done and next; the "Estado" section
 comes at the end of the last message (from the user or tools) and is updated each round (notes,
-project index, validation problems, pending items, preview, budget); tool results from previous
-rounds arrive summarized: use the Estado section and read_draft.
+project index, validation problems, pending items, preview, tokens spent); tool results from
+previous rounds arrive summarized: use the Estado section and read_draft.
 
 Reconciliation (reconcile) only with PostgreSQL; for logic with multiple tables in Supabase
 suggest a view.
 
-If the budget exceeds 80%, keep finishing the command's work: the product extends the budget
-automatically up to its ceiling, so never stop early to hand over an incomplete draft and never tell
-the user to apply because of the budget. Spend less by grouping reads and not repeating a query you
-already made. Respond always in English and briefly; write the spec files in English."""
+There is no token budget: never stop early to hand over an incomplete draft and never tell the user
+to apply because of tokens. Spend sensibly — group reads and do not repeat a query you already made.
+Respond always in English and briefly; write the spec files in English."""
 
 SYSTEM_PREFIX = """
 Eres el agente de BI de BizView: ayudas a un usuario super administrador a construir las
@@ -246,8 +244,6 @@ _SYSTEM_TAIL = f"""
 SYSTEM_PREFIX_EN = f"\n{_SYSTEM_EN_BODY}\n"
 
 # User-visible chat texts are catalogue ids rendered in the turn's language (feature 022).
-_BUDGET_TEXT = "assistant.chat.budget"
-_BUDGET_HINT = "assistant.chat.budget_hint"
 _CUT_TEXT = "assistant.chat.cut"
 _EMPTY_TEXT = "assistant.chat.empty"
 _CONTINUE_HINT = "assistant.chat.continue_hint"
@@ -320,16 +316,8 @@ def attach_auto_run(db, session: AssistantSession) -> AssistantAutoRun | None:
     return run
 
 
-def budget_limit(session: AssistantSession, settings) -> int:
-    return max(session.token_budget, settings.ai_chat_budget_max)
-
-
-def budget_warning(session: AssistantSession, settings) -> bool:
-    return session.tokens_used >= BUDGET_WARNING_RATIO * budget_limit(session, settings)
-
-
 def _count_usage(session: AssistantSession, usage: ChatUsage, settings) -> int:
-    """Accumulate weighted budget cost and raw token counters on the session."""
+    """Accumulate the weighted token cost and the raw counters (telemetry, never a cap)."""
     weighted = usage.weighted(settings.ai_chat_cached_token_weight)
     session.tokens_used += weighted
     activity.add_tokens(session, weighted)
@@ -632,25 +620,12 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
 
     outcome = outcome_lines(session.preview)
 
-    # An authorised Auto run has no cap (feature 028, owner 2026-10-21): telling the model about
-    # percentages and ceilings makes it stop on its own, which is the defect this replaces.
-    auto_run = auto.live_contract(session)
-    budget_lines: list[str] = []
-    previews_used = (session.stats or {}).get("previews", 0)
-    if auto_run is not None:
-        budget_lines.append(f"Tokens usados en este run: {session.tokens_used}.")
-        budget_lines.append(f"Vistas previas usadas: {previews_used}.")
-    else:
-        limit = budget_limit(session, settings)
-        pct = int(100 * session.tokens_used / limit)
-        budget_lines.append(
-            f"Presupuesto: {pct} % usado ({session.tokens_used} de {limit} tokens)."
-        )
-        if budget_warning(session, settings):
-            budget_lines.append(BUDGET_WARNING_LINE)
-        budget_lines.append(
-            f"Vistas previas usadas: {previews_used} de {settings.ai_chat_max_previews}."
-        )
+    # Owner, 2026-10-21: "make the ai unlimited". The model is told what it spent, never a
+    # ceiling — a percentage in the prompt makes it stop on its own even when nothing stops it.
+    usage_lines: list[str] = [
+        f"Tokens usados: {session.tokens_used}.",
+        f"Vistas previas usadas: {(session.stats or {}).get('previews', 0)}.",
+    ]
 
     ordered_blocks: list[list[str]] = [
         notes_block,
@@ -660,7 +635,7 @@ def state_text(session: AssistantSession, settings, user_texts: list[str] | None
         recent_lines,
         validation_lines,
         outcome,
-        budget_lines,
+        usage_lines,
     ]
 
     def _join(bs: list[list[str]]) -> str:
@@ -1058,7 +1033,6 @@ def display_title(session: AssistantSession, first_user_text: str | None) -> str
 
 
 def create_session(db, actor, title: str | None = None, *, project_id: int) -> AssistantSession:
-    settings = get_settings()
     project = db.get(Project, project_id)
     if project is None or project.deleted_at is not None:
         raise not_found(M("projects.not_found"))
@@ -1070,7 +1044,6 @@ def create_session(db, actor, title: str | None = None, *, project_id: int) -> A
         created_by=actor.id,
         status="open",
         tokens_used=0,
-        token_budget=settings.ai_chat_token_budget,
         project_id=project.id,
     )
     db.add(session)
@@ -1133,9 +1106,6 @@ _AUTO_END = {
     "done": ("applied", "completed"),
     "ready": ("applied", "completed"),
     "ready_preview": ("stopped", "completed"),
-    # Only a turn outside an Auto run can stop on tokens (owner: an authorised run is never
-    # capped): the conversation's own budget is what this reason means.
-    "budget": ("stopped", "limit:budget"),
     "limit": ("stopped", "limit:rounds"),
     "stopped": ("stopped", "stopped:user"),
     "error": ("failed", None),
@@ -1298,39 +1268,25 @@ def finish_auto_run(db, session: AssistantSession, *, kind: str, reason: str | N
     return summary
 
 
-def _budget_stop(db, session: AssistantSession, turn_summaries: list[str]) -> AssistantMessage:
-    progress = _composed_progress(session.working_state, turn_summaries,
-                                  t("assistant.progress.so_far"))
-    working = dict(session.working_state or {})
-    working["progress"] = progress[:PROGRESS_CHARS]
-    session.working_state = working
-    content = f"{t(_BUDGET_TEXT)}\n\n{progress}\n\n{t(_BUDGET_HINT)}"
-    msg = _add(db, session, role="assistant", content=content)
-    session.updated_at = datetime.now(UTC)
-    db.flush()
-    return msg
-
-
 def _progress(
     db, session, provider, app_settings, user_text, turn_summaries, max_rounds
 ) -> AssistantMessage:
     progress = ""
-    if session.tokens_used < session.token_budget:
-        _bump(session, "rounds")
-        try:
-            reply = provider.chat(
-                [ChatMessage(role="user", content=_progress_prompt(
-                    user_text, turn_summaries, max_rounds
-                ))],
-                tools=(),
-                system=system_prefix(),
-                context=_context(session, app_settings),
-                max_tokens=app_settings.ai_chat_max_tokens,
-            )
-            _count_usage(session, reply.usage, app_settings)
-            progress = reply.text.strip()
-        except AIError:
-            pass
+    _bump(session, "rounds")
+    try:
+        reply = provider.chat(
+            [ChatMessage(role="user", content=_progress_prompt(
+                user_text, turn_summaries, max_rounds
+            ))],
+            tools=(),
+            system=system_prefix(),
+            context=_context(session, app_settings),
+            max_tokens=app_settings.ai_chat_max_tokens,
+        )
+        _count_usage(session, reply.usage, app_settings)
+        progress = reply.text.strip()
+    except AIError:
+        pass
 
     if not progress:
         progress = _composed_progress(
@@ -1360,7 +1316,7 @@ def is_busy(session: AssistantSession, settings) -> bool:
 
 
 def ensure_idle(db, session: AssistantSession, settings) -> None:
-    """Non-blocking guard for preview/apply/archive/budget routes."""
+    """Non-blocking guard for preview/apply/archive routes."""
     try:
         with db.begin_nested():
             value = db.execute(
@@ -1464,26 +1420,6 @@ def _slots(settings=None) -> threading.BoundedSemaphore:
                 (settings or get_settings()).ai_agent_max_concurrent
             )
         return _SLOTS
-
-
-def _budget_exhausted(db, session: AssistantSession, app_settings) -> bool:
-    """Auto-extend the session budget while below the global maximum."""
-    while (
-        session.tokens_used >= session.token_budget
-        and session.token_budget < app_settings.ai_chat_budget_max
-    ):
-        old = session.token_budget
-        new = min(old + app_settings.ai_chat_budget_step, app_settings.ai_chat_budget_max)
-        audit_record(
-            db,
-            "assistant_budget_extended",
-            actor_id=None,
-            ip=None,
-            detail={"session": session.id, "from": old, "to": new, "auto": True},
-        )
-        session.token_budget = new
-    db.flush()
-    return session.tokens_used >= session.token_budget
 
 
 def start(db, actor, session: AssistantSession, text: str, app_settings,
@@ -1953,14 +1889,6 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 tool_payload=_suggestion(run.command, spec=run.spec),
                 content=t("commands.interrupted_resume", command=run.command)))
 
-    # Feature 028: an authorised Auto run is never stopped by a token budget (owner, 2026-10-21:
-    # "it can not have a token limit … do not limit ever"). Its bounds are the round cap,
-    # "Detener" and switching the mode down.
-    if auto_run is None and _budget_exhausted(db, session, app_settings):
-        new_messages.append(_budget_stop(db, session, []))
-        end("budget")
-        return new_messages
-
     _tools.reset_run(session)
     view = for_session(db, session)
     view.command_run = run
@@ -2080,20 +2008,6 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             auto_run.tokens = int(auto_run.tokens or 0) + int(spent)
         if run is not None:
             runs.add_tokens(run, reply.usage.input + reply.usage.output)
-        ceiling = app_settings.ai_command_token_ceiling
-        if run is not None and auto_run is None and ceiling and (run.tokens or 0) >= ceiling:
-            # Per-command ceiling: stop before touching the project again; the draft stays as is.
-            if reply.text.strip():
-                new_messages.append(_add(db, session, role="assistant", content=reply.text))
-            new_messages.append(_add(
-                db, session, role="assistant",
-                content=t("commands.ceiling", ceiling=ceiling, command=run.command,
-                          spec=run.spec or "-")))
-            session.updated_at = datetime.now(UTC)
-            db.flush()
-            end("budget")
-            return new_messages
-
         if not reply.tool_calls and (reply.stop_reason == "max_tokens" or not reply.text.strip()):
             text_out = (reply.text.rstrip() + "\n\n" + t(_CUT_TEXT)).strip() \
                 if reply.stop_reason == "max_tokens" else t(_EMPTY_TEXT)
@@ -2101,13 +2015,6 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             session.updated_at = datetime.now(UTC)
             db.flush()
             end("done")
-            return new_messages
-
-        if reply.tool_calls and auto_run is None and _budget_exhausted(db, session, app_settings):
-            if reply.text.strip():
-                new_messages.append(_add(db, session, role="assistant", content=reply.text))
-            new_messages.append(_budget_stop(db, session, turn_summaries))
-            end("budget")
             return new_messages
 
         calls_payload = None
@@ -2311,7 +2218,6 @@ def _run_json(run) -> dict:
             "resolved_from": run.resolved_from, "forced": bool(run.forced),
             "status": run.status, "files": run.files or [],
             "misrouted_to": result.get("misrouted_to"),
-            "ceiling": get_settings().ai_command_token_ceiling,
             "tokens": run.tokens or 0, "started_at": run.started_at.isoformat(),
             "ended_at": run.ended_at.isoformat() if run.ended_at else None}
 
@@ -2443,10 +2349,7 @@ def session_json(session: AssistantSession, messages: list[AssistantMessage], *,
         "working_state": session.working_state or {},
         "readiness": readiness.compute(view, user_texts),
         "stats": session.stats or {},
-        "budget_warning": budget_warning(session, settings),
-        "budget_max": budget_limit(session, settings),
         "tokens_used": session.tokens_used,
-        "token_budget": session.token_budget,
         "model": settings.ai_model_effective,
         "created_at": session.created_at.isoformat(),
         "updated_at": session.updated_at.isoformat(),
@@ -2486,26 +2389,6 @@ def _spec_choices(db, session: AssistantSession) -> list[dict]:
              "title": item.get("title"), "kind": item.get("kind"),
              "stage": item.get("stage")}
             for item in project_specs.list_specs(db, project)]
-
-
-def extend_budget(db, actor, session: AssistantSession, settings, ip) -> None:
-    if session.status == "archived":
-        raise ApiError(409, "conflict", M("assistant.archived"))
-    if session.token_budget >= settings.ai_chat_budget_max:
-        raise ApiError(409, "budget_max", M("assistant.budget_max"))
-    old = session.token_budget
-    new = min(session.token_budget + settings.ai_chat_budget_step,
-              settings.ai_chat_budget_max)
-    audit_record(
-        db,
-        "assistant_budget_extended",
-        actor_id=actor.id,
-        ip=ip,
-        detail={"session": session.id, "from": old, "to": new},
-    )
-    session.token_budget = new
-    session.updated_at = datetime.now(UTC)
-    db.flush()
 
 
 def archive(db, actor, session: AssistantSession, ip) -> None:

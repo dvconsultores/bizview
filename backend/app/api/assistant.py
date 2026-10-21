@@ -158,7 +158,6 @@ def list_sessions(project: str | None = None, actor: AppUser = Depends(require_s
                 "busy": service.is_busy(s, settings),
                 "updated_at": s.updated_at.isoformat(),
                 "tokens_used": s.tokens_used,
-                "token_budget": s.token_budget,
                 "project_id": s.project_id,
                 "read_only": s.read_only,
                 "current_spec": s.current_spec,
@@ -584,15 +583,6 @@ def get_preview_report_data(session_id: int, report_id: str, request: Request,
     return assistant_preview.report_data(
         db, session, report_id, request.query_params.multi_items(),
         datetime.now(ZoneInfo(settings.timezone)).date(), settings.timezone)
-
-
-@router.post("/sessions/{session_id}/budget")
-def extend_budget(session_id: int, request: Request,
-                  actor: AppUser = Depends(require_superuser), db: Session = DB):
-    session = _own_session(db, session_id, actor)
-    service.ensure_idle(db, session, get_settings())
-    service.extend_budget(db, actor, session, get_settings(), client_ip(request))
-    return service.session_json(session, _messages(db, session))
 
 
 @router.post("/sessions/{session_id}/preview/report/{report_id}/pdf")

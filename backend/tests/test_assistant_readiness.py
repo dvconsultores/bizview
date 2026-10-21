@@ -35,7 +35,6 @@ def _ready_session(files, created_by=1):
     return AssistantSession(
         title="t",
         created_by=created_by,
-        token_budget=1,
         draft={"files": files, "summary": "s"},
         validation={"valid": True},
         preview={"status": "succeeded", "fingerprint": readiness.fingerprint(files)},
@@ -75,7 +74,6 @@ def test_golden_draft_is_ready_when_checked_and_previewed():
     fresh = AssistantSession(
         title="t",
         created_by=1,
-        token_budget=1,
         draft={"files": files, "summary": "s"},
         validation={"valid": True},
     )
@@ -86,7 +84,6 @@ def test_golden_draft_is_ready_when_checked_and_previewed():
     invalid = AssistantSession(
         title="t",
         created_by=1,
-        token_budget=1,
         draft={"files": files, "summary": "s"},
         validation={"valid": False},
         preview={"status": "succeeded", "fingerprint": readiness.fingerprint(files)},
@@ -268,7 +265,7 @@ def test_personal_confirmation_recorded_from_conversation(db, superuser):
 
 
 def test_no_draft_is_not_ready():
-    session = AssistantSession(title="t", created_by=1, token_budget=1, draft=None)
+    session = AssistantSession(title="t", created_by=1, draft=None)
     result = readiness.compute(session, user_texts=[])
     assert result["ready"] is False
     assert result["pending"] == [

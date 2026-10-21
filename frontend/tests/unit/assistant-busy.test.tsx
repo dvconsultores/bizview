@@ -40,7 +40,6 @@ const base = {
   preview: null,
   applied_version_id: null,
   tokens_used: 120,
-  token_budget: 100000,
   created_at: ts,
   updated_at: ts,
   busy: false,
@@ -231,8 +230,8 @@ describe("AssistantSession draft page busy handling", () => {
 describe("AssistantHistory busy badge", () => {
   it("shows the badge and disables archive for busy rows", async () => {
     const sessions = [
-      { id: 1, title: "Abierta", status: "open", updated_at: ts, tokens_used: 0, token_budget: 100000, busy: false },
-      { id: 2, title: "Ventas", status: "open", updated_at: ts, tokens_used: 0, token_budget: 100000, busy: true },
+      { id: 1, title: "Abierta", status: "open", updated_at: ts, tokens_used: 0, busy: false },
+      { id: 2, title: "Ventas", status: "open", updated_at: ts, tokens_used: 0, busy: true },
     ];
     vi.mocked(api.get).mockResolvedValueOnce({ sessions });
 

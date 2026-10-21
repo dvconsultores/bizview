@@ -30,7 +30,6 @@ const base = {
   contract_status: "none",
   busy: false,
   tokens_used: 10,
-  token_budget: 100000,
   created_at: ts,
   updated_at: ts,
   draft: null,

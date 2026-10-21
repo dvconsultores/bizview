@@ -39,7 +39,6 @@ const base = {
   preview: null,
   applied_version_id: null,
   tokens_used: 120,
-  token_budget: 100000,
   created_at: ts,
   updated_at: ts,
   busy: false,
@@ -240,31 +239,12 @@ describe("autonomous runs (T043)", () => {
     expect(stoppedNote()).toBeTruthy();
   });
 
-  it("no manual budget button: the budget extends itself up to the max (FR-019)", async () => {
-    await renderChat({
-      ...base,
-      tokens_used: 100000,
-      token_budget: 100000,
-      budget_max: 400000,
-      budget_warning: false,
-    });
+  it("has no budget at all: no notice, no button, no /budget call (owner: unlimited AI)", async () => {
+    await renderChat({ ...base, tokens_used: 9_000_000 });
 
     expect(buttonByText("Ampliar presupuesto")).toBeUndefined();
-    expect(container.textContent).not.toContain("Se alcanzó el máximo");
-    expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it("at the max says to continue in a new conversation or raise AI_CHAT_BUDGET_MAX", async () => {
-    await renderChat({
-      ...base,
-      tokens_used: 400000,
-      token_budget: 400000,
-      budget_max: 400000,
-      budget_warning: true,
-    });
-
-    expect(container.textContent).toContain("sube AI_CHAT_BUDGET_MAX");
-    expect(buttonByText("Ampliar presupuesto")).toBeUndefined();
+    expect(container.textContent).not.toContain("presupuesto");
+    expect(container.textContent).not.toContain("AI_CHAT_BUDGET_MAX");
     expect(api.post).not.toHaveBeenCalled();
   });
 });

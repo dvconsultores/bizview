@@ -398,13 +398,9 @@ para aplicar". Applying stays a human action with password confirmation. DeepSee
 AI_PROVIDER=openai_compatible
 AI_BASE_URL=https://api.deepseek.com
 AI_MODEL=deepseek-chat
-AI_CHAT_TOKEN_BUDGET=400000
 AI_CHAT_CACHED_TOKEN_WEIGHT=0.1
 AI_CHAT_MAX_ROUNDS=60
-AI_COMMAND_TOKEN_CEILING=400000
 AI_CHAT_MAX_TOKENS=16000
-AI_CHAT_BUDGET_STEP=100000
-AI_CHAT_BUDGET_MAX=2000000
 AI_CHAT_MAX_PREVIEWS=5
 AI_TOOL_TIMEOUT_SECONDS=20
 AI_CHAT_TIMEOUT_SECONDS=180
@@ -415,13 +411,13 @@ AI_AGENT_MAX_CONCURRENT=4
 
 A message starts an autonomous run that keeps working on the server (the page can be closed) until
 the agent asks a business question or reports, the draft is "Listo para aplicar",
-`AI_CHAT_MAX_ROUNDS` rounds, two identical failing tool calls, or the budget reaches
-`AI_CHAT_BUDGET_MAX`. The budget grows by `AI_CHAT_BUDGET_STEP` automatically (audited as
-automatic); "Detener" stops a run keeping the rounds already saved; at most
-`AI_AGENT_MAX_CONCURRENT` runs work at once per backend process; applying stays a human action
-with password confirmation. Each `/speckit-…` command also has its own ceiling,
-`AI_COMMAND_TOKEN_CEILING` (default 400 000): reaching it stops that run with status **techo de
-tokens** and keeps the draft, without spending the rest of the conversation's budget. Each round's answer is limited to `AI_CHAT_MAX_TOKENS` tokens
+`AI_CHAT_MAX_ROUNDS` rounds or two identical failing tool calls. **There is no token budget**: the
+AI is unlimited, tokens are only counted for the run summary and the status bar (the old
+`AI_CHAT_TOKEN_BUDGET` / `AI_CHAT_BUDGET_STEP` / `AI_CHAT_BUDGET_MAX` / `AI_COMMAND_TOKEN_CEILING`
+are ignored, and the "Ampliar presupuesto" button is gone). "Detener" stops a run keeping the
+rounds already saved; at most `AI_AGENT_MAX_CONCURRENT` runs work at once per backend process;
+applying stays a human action with password confirmation (or one Auto-mode run contract).
+Each round's answer is limited to `AI_CHAT_MAX_TOKENS` tokens
 (default 16000, 1024–64000; a complete draft with specs, YAML and SQL needs several thousand, so
 lower it only for small models). Each chat call of the assistant waits up to `AI_CHAT_TIMEOUT_SECONDS`
 (default 180; `AI_TIMEOUT_SECONDS` keeps governing narratives and the connection test); a timeout

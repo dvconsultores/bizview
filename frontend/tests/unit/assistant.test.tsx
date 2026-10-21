@@ -54,7 +54,6 @@ const session = {
   preview: null,
   applied_version_id: null,
   tokens_used: 120,
-  token_budget: 1000,
   created_at: ts,
   updated_at: ts,
   messages: [

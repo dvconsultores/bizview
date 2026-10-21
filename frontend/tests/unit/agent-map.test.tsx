@@ -46,7 +46,6 @@ const base = {
   preview: null,
   applied_version_id: null,
   tokens_used: 0,
-  token_budget: 10000,
   created_at: ts,
   updated_at: ts,
   messages: [] as unknown[],
@@ -674,7 +673,6 @@ describe("Draft review page (T058)", () => {
             busy: false,
             model: "gpt-test",
             tokens_used: 1200,
-            token_budget: 10000,
           }),
         );
       }

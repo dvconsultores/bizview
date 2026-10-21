@@ -69,7 +69,7 @@ def test_ensure_principal_imports_the_applied_workspace(applied, db, projects):
 def test_open_drafts_become_projects(db, superuser, projects):
     session = AssistantSession(
         title="Ventas mensuales", created_by=superuser.id, project_id=_backfilled("app"),
-        read_only=True, status="open", token_budget=100000,
+        read_only=True, status="open",
         draft={"summary": "s", "files": {
             "specs/integrations/003-ventas-m/spec.md":
                 "# V\n\n**Spec type**: integration\n\n**Status**: Draft\n",

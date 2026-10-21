@@ -172,7 +172,7 @@ Requirements, branding, upgrades and backups are in [docs/INSTALL.md](docs/INSTA
 | Security | `SECURITY_PROFILE` (`private` / `internet` / `auto`), `COOKIE_SECURE`, `BIZVIEW_SECRET_KEY` (encrypts stored credentials; back it up separately), `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` (first start only), `ADMIN_ALLOWED_NETWORKS`, `LOGIN_RATE_LIMIT` |
 | Database | `DATABASE_URL_BI` (always external), `DIRECT_REPORTS_BI`, `DIRECT_BI_ROLE`, `DB_POOL_SIZE` |
 | Sign in with Google (optional) | `GOOGLE_AUTH_ENABLED` (`false` by default), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (this installation's own OAuth client), `GOOGLE_ALLOWED_DOMAINS`, `GOOGLE_REDIRECT_URI` |
-| AI (optional) | `AI_PROVIDER` (`none` by default), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `AI_CHAT_TOKEN_BUDGET`, `AI_VISION` |
+| AI (optional) | `AI_PROVIDER` (`none` by default), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `AI_VISION` |
 | Mail and sharing | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `EMAIL_ALLOWED_DOMAINS`, `SHARE_LINKS_ENABLED` |
 | Workspace and projects | `WORKSPACE_DIR` (optional customer Git checkout), `PROJECTS_DIR_HOST`, `PROJECT_MAX_MB`, `ATTACHMENTS_DIR_HOST`, `TIMEZONE`, `DEFAULT_LOCALE`, `SOURCE_URL` |
 

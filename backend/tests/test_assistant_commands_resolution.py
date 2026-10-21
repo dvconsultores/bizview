@@ -264,9 +264,12 @@ def test_read_draft_returns_the_hash_when_the_file_did_not_change(chat):
     assert "sin cambios desde la lectura anterior" in reads[-1]["content"]
 
 
-def test_per_command_ceiling_stops_the_run_and_keeps_the_draft(chat, monkeypatch):
+def test_a_huge_command_run_is_not_stopped_by_tokens(chat):
+    """Feature 028 revision (owner, 2026-10-21: "make the ai unlimited").
+
+    The 400k per-command ceiling is gone: a stage that writes a very large file keeps the work.
+    """
     c, project, sid = chat
-    monkeypatch.setattr(get_settings(), "ai_command_token_ceiling", 10_000)
     huge = "x" * 80_000
     fake.SHARED.queue(ChatReply(
         text="",
@@ -276,11 +279,10 @@ def test_per_command_ceiling_stops_the_run_and_keeps_the_draft(chat, monkeypatch
         usage=ChatUsage(), model="fake"))
     assert _send(c, sid, "/speckit-plan 001-integracion-facturas").status_code == 202
     data = _session(c, sid)
-    run = data["command_runs"][0]
-    assert run["status"] == "budget"
-    assert not (fs.project_root(project["slug"]) /
-                "specs/001-integracion-facturas/plan.md").exists()
-    assert any("techo" in m["content"] for m in data["messages"] if m["role"] == "assistant")
+    assert all(run["status"] != "budget" for run in data["command_runs"])
+    assert (fs.project_root(project["slug"]) /
+            "specs/001-integracion-facturas/plan.md").exists()
+    assert not any("techo" in m["content"] for m in data["messages"] if m["role"] == "assistant")
 
 
 def test_set_current_spec_tool_and_suggestion_carry_the_spec(chat):

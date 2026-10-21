@@ -55,7 +55,6 @@ function makeSession(overrides: Partial<AssistantSessionType> = {}): AssistantSe
     preview: null,
     applied_version_id: null,
     tokens_used: 120,
-    token_budget: 1000,
     created_at: ts,
     updated_at: ts,
     messages: [],
@@ -278,7 +277,7 @@ describe("AssistantSession draft page", () => {
   });
 });
 
-describe("BudgetNotice through AssistantChat (automatic budget, T051)", () => {
+describe("No budget in the composer (feature 028 revision, unlimited AI)", () => {
   let container: HTMLElement;
   let root: Root;
   beforeEach(() => {
@@ -303,89 +302,13 @@ describe("BudgetNotice through AssistantChat (automatic budget, T051)", () => {
     await flush();
   }
 
-  it("shows warning at 85% of max without any button", async () => {
-    await renderChat(
-      makeSession({
-        tokens_used: 850,
-        token_budget: 1000,
-        budget_max: 1000,
-        budget_warning: true,
-      }),
-    );
+  it("never shows a budget notice, however many tokens were spent", async () => {
+    await renderChat(makeSession({ tokens_used: 9_000_000 }));
 
-    expect(container.textContent).toContain("Usaste el 85 %");
-    expect(container.querySelector("[data-budget-notice]")).not.toBeNull();
+    expect(container.querySelector("[data-budget-notice]")).toBeNull();
+    expect(container.textContent).not.toContain("presupuesto");
     expect(buttonByText(container, "Ampliar presupuesto")).toBeUndefined();
     expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it("shows nothing below the max (budget extends itself)", async () => {
-    await renderChat(
-      makeSession({
-        tokens_used: 1000,
-        token_budget: 1000,
-        budget_max: 4000,
-        budget_warning: false,
-      }),
-    );
-
-    expect(container.querySelector("[data-budget-notice]")).toBeNull();
-    expect(container.textContent).not.toContain("Se alcanzó el máximo");
-    expect(container.textContent).not.toContain("Ampliar presupuesto");
-  });
-
-  it("computes warning against the max, not the token budget", async () => {
-    await renderChat(
-      makeSession({
-        tokens_used: 3400,
-        token_budget: 2000,
-        budget_max: 4000,
-        budget_warning: true,
-      }),
-    );
-
-    expect(container.textContent).toContain("Usaste el 85 %");
-    expect(container.textContent).toContain("de 4.000 tokens");
-  });
-
-  it("shows max-reached message at the exceeded max", async () => {
-    await renderChat(
-      makeSession({
-        tokens_used: 4000,
-        token_budget: 4000,
-        budget_max: 4000,
-        budget_warning: true,
-      }),
-    );
-
-    expect(container.querySelector("[data-budget-max]")).not.toBeNull();
-    expect(container.textContent).toContain(
-      "Se alcanzó el máximo de esta conversación; continúa en una nueva o sube AI_CHAT_BUDGET_MAX",
-    );
-    expect(container.textContent).toContain(
-      "El borrador y las notas de trabajo se conservan",
-    );
-    expect(container.textContent).not.toContain("Ampliar presupuesto");
-    expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it("offers to extend while the budget can still grow", async () => {
-    vi.mocked(api.post).mockResolvedValue(makeSession({ tokens_used: 850, token_budget: 1000,
-                                                        budget_max: 2000, budget_warning: true }));
-    await renderChat(
-      makeSession({ tokens_used: 850, token_budget: 1000, budget_max: 2000, budget_warning: true }),
-    );
-    const extend = container.querySelector<HTMLButtonElement>("[data-extend-budget]");
-    expect(extend).not.toBeNull();
-    await act(async () => extend!.click());
-    expect(api.post).toHaveBeenCalledWith("/api/assistant/sessions/7/budget");
-  });
-
-  it("shows nothing without warning", async () => {
-    await renderChat(makeSession({}));
-
-    expect(container.textContent).not.toContain("Usaste el");
-    expect(container.querySelector("[data-budget-notice]")).toBeNull();
   });
 });
 

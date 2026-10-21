@@ -68,7 +68,6 @@ function makeSession(extra: Partial<AssistantSession> = {}): AssistantSession {
     preview: null,
     applied_version_id: null,
     tokens_used: 10,
-    token_budget: 1000,
     created_at: ts,
     updated_at: ts,
     messages: [{ id: 1, role: "user", content: "Un reporte", created_at: ts }],

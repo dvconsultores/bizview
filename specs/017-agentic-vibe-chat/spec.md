@@ -4,7 +4,13 @@
 
 **Created**: 2026-10-03
 
-**Status**: Implemented (closed 2026-10-08, full suites green)
+**Status**: Implemented (closed 2026-10-08, full suites green). **Amended 2026-10-21**: the token
+budget and the per-command ceiling described below were removed by feature 028's revision ("make the
+ai unlimited"): `AI_CHAT_TOKEN_BUDGET`, `AI_CHAT_BUDGET_STEP`, `AI_CHAT_BUDGET_MAX`,
+`AI_COMMAND_TOKEN_CEILING` and the `assistant_session.token_budget` column are gone (migration
+`0025_unlimited_ai`). `tokens_used` is kept as telemetry only. Read every "budget" requirement here
+as historical; the limits in force are the round caps, two identical failing tool calls, a provider
+failure and "Detener".
 
 **Input**: Owner, 2026-10-03: "the chat view gets exhausted; it must work as a chat agent capable of
 creating the workspace, reading the origin, creating the BI table, the ETL integration, scheduling the

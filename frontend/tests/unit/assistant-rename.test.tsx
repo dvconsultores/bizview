@@ -37,7 +37,6 @@ const base = {
   preview: null,
   applied_version_id: null,
   tokens_used: 0,
-  token_budget: 10000,
   created_at: ts,
   updated_at: ts,
   messages: [] as unknown[],
@@ -276,8 +275,8 @@ describe("conversation rename (T047)", () => {
       path === "/api/assistant/sessions"
         ? {
             sessions: [
-              { id: 5, title: "Ventas por marca", status: "open", updated_at: ts, tokens_used: 0, token_budget: 10000 },
-              { id: 6, title: "Inventario", status: "open", updated_at: ts, tokens_used: 0, token_budget: 10000 },
+              { id: 5, title: "Ventas por marca", status: "open", updated_at: ts, tokens_used: 0 },
+              { id: 6, title: "Inventario", status: "open", updated_at: ts, tokens_used: 0 },
             ],
           }
         : { ...base },

@@ -81,7 +81,7 @@ def test_stable_system_prefix_across_rounds_and_sessions(superuser, db):
         assert req["system"] == service.system_prefix("es")
         context = req["context"]
         assert context.startswith("## Estado\n")
-        assert "Presupuesto:" in context
+        assert "Tokens usados:" in context
     assert authoring.summary() in service.system_prefix("es")
     assert "## Estado" not in service.system_prefix("es")
 
@@ -261,41 +261,26 @@ def test_round_limit_progress_follows_an_english_account(superuser, db, monkeypa
     assert "Actions of this message:" in prompt and "«Done:» and «Next:»" in prompt
 
 
-def test_budget_warning_flag(superuser, db, monkeypatch):
+def test_no_budget_anywhere_in_the_context(superuser, db):
+    """Feature 028 revision (owner, 2026-10-21: "make the ai unlimited").
+
+    The context reports the tokens spent and never a ceiling or a percentage, in any mode: a
+    percentage in the prompt makes the model stop on its own even though nothing stops it.
+    """
     client = signed_in("root@example.com")
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "200000")
-    get_settings.cache_clear()
+    s = _stored_session(db, superuser, status="open", tokens_used=9_000_000)
+    body = client.get(f"/api/assistant/sessions/{s.id}").json()
+    assert "budget_warning" not in body and "budget_max" not in body
+    assert "token_budget" not in body
+    assert body["tokens_used"] == 9_000_000
 
-    s = _stored_session(db, superuser, status="open", tokens_used=160000)
-    resp = client.get(f"/api/assistant/sessions/{s.id}")
-    assert resp.json()["budget_warning"] is True
-    assert resp.json()["budget_max"] == 200000
     fake.SHARED.queue(_chat_reply("Sí"))
-    client.post(f"/api/assistant/sessions/{s.id}/messages", json={"text": "hola"})
-    context0 = fake.SHARED.requests[-1]["context"]
-    assert service.BUDGET_WARNING_LINE in context0
-    assert context0.startswith("## Estado")
-    assert "de 200000 tokens" in context0
-
-    monkeypatch.delenv("AI_CHAT_BUDGET_MAX")
-    get_settings.cache_clear()
-
-    s3 = _stored_session(db, superuser, status="open", tokens_used=450000)
-    sql("UPDATE assistant_session SET token_budget = 500000, tokens_used = 450000 "
-        "WHERE id = :i", i=s3.id)
-    resp3 = client.get(f"/api/assistant/sessions/{s3.id}")
-    assert resp3.json()["budget_warning"] is False
-    assert resp3.json()["budget_max"] == 2000000
-    fake.SHARED.queue(_chat_reply("No"))
-    client.post(f"/api/assistant/sessions/{s3.id}/messages", json={"text": "hola"})
-    assert service.BUDGET_WARNING_LINE not in fake.SHARED.requests[-1]["context"]
-
-    s2 = _stored_session(db, superuser, status="open", tokens_used=1000)
-    resp2 = client.get(f"/api/assistant/sessions/{s2.id}")
-    assert resp2.json()["budget_warning"] is False
-    fake.SHARED.queue(_chat_reply("No"))
-    client.post(f"/api/assistant/sessions/{s2.id}/messages", json={"text": "hola"})
-    assert service.BUDGET_WARNING_LINE not in fake.SHARED.requests[-1]["context"]
+    assert client.post(f"/api/assistant/sessions/{s.id}/messages",
+                       json={"text": "hola"}).status_code == 202
+    context = fake.SHARED.requests[-1]["context"]
+    assert "Tokens usados: 9000000." in context
+    assert "Presupuesto" not in context and "%" not in context
+    assert "de 2000000 tokens" not in context
 
 
 def test_session_json_has_agent_fields(superuser, db):
@@ -305,40 +290,18 @@ def test_session_json_has_agent_fields(superuser, db):
     body = resp.json()
     assert body["working_state"] == {}
     assert isinstance(body["stats"], dict)
-    assert body["budget_warning"] is False
     assert body["readiness"]["ready"] is False
     assert body["readiness"]["pending"][0]["code"] == "draft"
 
 
-def test_budget_extension_without_reauth_audits_and_caps(superuser, admin, db):
+def test_budget_route_is_gone(superuser, db):
+    """The conversation budget was retired with its endpoint (feature 028 revision)."""
     client = signed_in("root@example.com")
     s = _stored_session(db, superuser, status="open")
     resp = client.post(f"/api/assistant/sessions/{s.id}/budget")
-    assert resp.status_code == 200
-    assert resp.json()["token_budget"] == 300000
-    rows = sql(
-        "SELECT actor_id, detail->>'session', detail->>'from', detail->>'to' "
-        "FROM audit_event WHERE kind = 'assistant_budget_extended'"
-    )
-    assert rows[0][0] == superuser.id
-    assert (rows[0][1], rows[0][2], rows[0][3]) == (str(s.id), "200000", "300000")
-    assert "auto" not in sql(
-        "SELECT detail FROM audit_event WHERE kind = 'assistant_budget_extended'"
-    )[0][0]
-
-    sql("UPDATE assistant_session SET token_budget = 1950000 WHERE id = :i", i=s.id)
-    db.expire_all()
-    resp = client.post(f"/api/assistant/sessions/{s.id}/budget")
-    assert resp.status_code == 200
-    assert resp.json()["token_budget"] == 2000000
-
-    resp = client.post(f"/api/assistant/sessions/{s.id}/budget")
-    assert resp.status_code == 409
-    assert resp.json()["error"]["code"] == "budget_max"
-
-    admin_client = signed_in("admin@example.com")
-    resp = admin_client.post(f"/api/assistant/sessions/{s.id}/budget")
-    assert resp.status_code == 403
+    assert resp.status_code in (404, 405)
+    assert sql("SELECT count(*) FROM audit_event "
+               "WHERE kind = 'assistant_budget_extended'") == [(0,)]
 
 
 def test_invalid_json_is_repaired_once(superuser, db):
@@ -562,81 +525,6 @@ def test_preview_pdf_route(db, superuser, admin, workspace):
     assert resp.status_code == 403
 
 
-def test_budget_stop_pre_turn_writes_progress(superuser, db, monkeypatch):
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "200000")
-    get_settings.cache_clear()
-    client = signed_in("root@example.com")
-    s = _stored_session(
-        db,
-        superuser,
-        status="open",
-        tokens_used=200000,
-        draft={"files": {"bizview.yaml": "name: demo\n"}, "summary": "s"},
-        working_state={"done": ["describí ventas"], "next": "comprobar la consulta"},
-    )
-
-    resp = _send(client, s.id, "continúa")
-    assert fake.SHARED.requests == []
-
-    msgs = resp["messages"]
-    assert msgs[-1]["role"] == "assistant"
-    content = msgs[-1]["content"]
-    assert content.startswith(t(service._BUDGET_TEXT))
-    assert "Progreso hasta ahora:" in content
-    assert "Hecho: describí ventas" in content
-    assert "Siguiente: comprobar la consulta" in content
-    assert t(service._BUDGET_HINT) in content
-
-    db.expire_all()
-    s = db.get(AssistantSession, s.id)
-    assert s.working_state["progress"].startswith("Progreso hasta ahora:")
-    assert "Hecho: describí ventas" in s.working_state["progress"]
-    assert s.draft["files"]["bizview.yaml"] == "name: demo\n"
-    assert s.working_state["done"] == ["describí ventas"]
-    assert s.working_state["next"] == "comprobar la consulta"
-
-
-def test_budget_stop_mid_turn_writes_progress(superuser, db, monkeypatch):
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "200000")
-    get_settings.cache_clear()
-    client = signed_in("root@example.com")
-    s = _stored_session(
-        db,
-        superuser,
-        status="open",
-        tokens_used=199990,
-        draft={"files": {"bizview.yaml": "name: demo\n"}, "summary": "s"},
-        working_state={"next": "ejecutar la vista previa"},
-    )
-
-    fake.SHARED.queue(
-        _chat_reply(
-            tool_calls=(_tool_call("list_sources", {}, call_id="c1"),),
-            stop_reason="tool_use",
-        ),
-        _chat_reply("No debe llegar."),
-    )
-
-    resp = _send(client, s.id, "sigue")
-    assert len(fake.SHARED.requests) == 1
-    assert not any(m.get("role") == "tool" for m in resp["messages"])
-
-    msgs = resp["messages"]
-    assert msgs[-1]["role"] == "assistant"
-    content = msgs[-1]["content"]
-    assert content.startswith(t(service._BUDGET_TEXT))
-    assert "Progreso hasta ahora:" in content
-    assert "Hecho: nada todavía" in content
-    assert "Siguiente: ejecutar la vista previa" in content
-    assert t(service._BUDGET_HINT) in content
-
-    db.expire_all()
-    s = db.get(AssistantSession, s.id)
-    assert "Siguiente: ejecutar la vista previa" in s.working_state["progress"]
-    assert s.draft["files"]["bizview.yaml"] == "name: demo\n"
-    assert s.tokens_used == 200005
-
-
 def test_recent_files_block_in_state_suffix(superuser, db):
     client = signed_in("root@example.com")
     sid = _new_session(client)
@@ -729,84 +617,46 @@ def test_recent_files_block_is_capped(superuser, db):
     assert "Archivos recientes" not in text_bad
 
 
-def test_budget_stop_mid_turn_then_extend_and_continue(superuser, db, pg_source, monkeypatch):
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "200000")
-    get_settings.cache_clear()
+def test_a_long_turn_is_never_stopped_by_tokens(superuser, db, pg_source):
+    """Feature 028 revision (owner, 2026-10-21: "make the ai unlimited").
+
+    The pre-turn and mid-turn budget stops, and their "amplía el presupuesto" message, are gone:
+    a turn that already spent nine million tokens keeps calling tools and finishes.
+    """
     client = signed_in("root@example.com")
-    s = _stored_session(db, superuser, status="open", tokens_used=199940)
+    s = _stored_session(db, superuser, status="open", tokens_used=9_000_000)
 
     fake.SHARED.queue(
         _chat_reply(
-            tool_calls=[
-                _tool_call(
-                    "update_notes",
-                    {"goal": "Ventas por día", "next": "proponer el borrador"},
-                    call_id="c1",
-                )
-            ],
-            stop_reason="tool_use",
-        ),
+            tool_calls=[_tool_call("update_notes",
+                                   {"goal": "Ventas por día", "next": "proponer el borrador"},
+                                   call_id="c1")],
+            stop_reason="tool_use"),
         _chat_reply(
             tool_calls=[_tool_call("describe_source", {"name": "Origen prueba"}, call_id="c2")],
-            stop_reason="tool_use",
-        ),
+            stop_reason="tool_use"),
         _chat_reply(
-            tool_calls=[
-                _tool_call(
-                    "propose_draft",
-                    {"files": v2_files(_valid_draft_files()), "summary": "Ventas 2"},
-                    call_id="c3",
-                )
-            ],
-            stop_reason="tool_use",
-        ),
-        _chat_reply(
-            tool_calls=[_tool_call("list_sources", {}, call_id="c4")],
-            stop_reason="tool_use",
-        ),
+            tool_calls=[_tool_call("propose_draft",
+                                   {"files": v2_files(_valid_draft_files()), "summary": "Ventas 2"},
+                                   call_id="c3")],
+            stop_reason="tool_use"),
+        _chat_reply("Listo."),
     )
 
     resp = _send(client, s.id, "construye el tablero")
 
     assert len(fake.SHARED.requests) == 4
-    messages = resp["messages"]
-    assert messages[-1]["role"] == "assistant"
-    assert messages[-1]["content"].startswith(t(service._BUDGET_TEXT))
-    assert t(service._BUDGET_HINT) in messages[-1]["content"]
-    tool_messages = [m for m in messages if m["role"] == "tool"]
-    assert len(tool_messages) == 3
-    assert sql("SELECT count(*) FROM audit_event WHERE kind = 'source_described'")[0][0] == 1
-
-    monkeypatch.setenv("AI_CHAT_BUDGET_MAX", "2000000")
-    get_settings.cache_clear()
-
-    resp = client.post(f"/api/assistant/sessions/{s.id}/budget")
-    assert resp.status_code == 200
-    assert resp.json()["token_budget"] == 300000
-
-    fake.SHARED.queue(
-        _chat_reply(
-            tool_calls=[_tool_call("describe_source", {"name": "Origen prueba"}, call_id="c5")],
-            stop_reason="tool_use",
-        ),
-        _chat_reply("Sigo con la consulta."),
-    )
-    resp = _send(client, s.id, "continúa")
-
-    assert sql("SELECT count(*) FROM audit_event WHERE kind = 'source_described'")[0][0] == 1
-    tool_messages = [m for m in resp["messages"] if m["role"] == "tool"]
-    assert tool_messages[-1]["content"] == "Usó la estructura ya consultada de «Origen prueba»."
-    assert resp["messages"][-1]["content"] == "Sigo con la consulta."
-    assert "Fuentes consultadas:" in fake.SHARED.requests[4]["context"]
-    assert "Ventas por día" in fake.SHARED.requests[4]["context"]
-
+    assert resp["messages"][-1]["content"] == "Listo."
+    assert [m.get("tool_name") for m in resp["messages"] if m["role"] == "tool"] == [
+        "update_notes", "describe_source", "propose_draft"]
+    assert sql("SELECT count(*) FROM audit_event "
+               "WHERE kind = 'assistant_budget_extended'") == [(0,)]
     db.expire_all()
     s = db.get(AssistantSession, s.id)
-    files = for_session(db, s).files()          # 020: the draft is the project folder
-    assert {p: files[p] for p in v2_files(_valid_draft_files())} == v2_files(_valid_draft_files())
-    assert s.working_state["goal"] == "Ventas por día"
     assert s.status == "open"
-    assert s.token_budget == 300000
+    body = client.get(f"/api/assistant/sessions/{s.id}").json()
+    assert body["draft"] is not None, [m["content"] for m in body["messages"]
+                                      if m["role"] == "tool"]
 
 
 def test_cached_heavy_round_counts_weighted_tokens(superuser, db):
@@ -991,7 +841,7 @@ def test_state_suffix_hard_cap_with_many_unbounded_blocks(superuser, db):
     assert service.TRUNCATED_MARKER in text
     assert "Archivos:" in text
     assert "Problemas de validación (40):" in text
-    assert "Presupuesto:" in text
+    assert "Tokens usados:" in text
     assert "300 columnas marcadas en 10 fuentes" in text
 
 

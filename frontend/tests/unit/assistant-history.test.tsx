@@ -58,9 +58,9 @@ describe("AssistantHistory", () => {
     const now = Date.now();
     const iso = (ms: number) => new Date(now - ms).toISOString();
     vi.mocked(api.get).mockResolvedValue({ sessions: [
-      { id: 2, title: "Ventas", status: "open", updated_at: iso(3_600_000), tokens_used: 1, token_budget: 9 },
-      { id: 3, title: "Inventario", status: "applied", updated_at: iso(86_400_000), tokens_used: 1, token_budget: 9 },
-      { id: 4, title: "Viejo", status: "archived", updated_at: iso(86_400_000), tokens_used: 1, token_budget: 9 },
+      { id: 2, title: "Ventas", status: "open", updated_at: iso(3_600_000), tokens_used: 1 },
+      { id: 3, title: "Inventario", status: "applied", updated_at: iso(86_400_000), tokens_used: 1 },
+      { id: 4, title: "Viejo", status: "archived", updated_at: iso(86_400_000), tokens_used: 1 },
     ] } as any);
     const onSelect = vi.fn();
     await act(async () => {
@@ -97,8 +97,8 @@ describe("AssistantHistory", () => {
   it("deletes a conversation, active or archived, after confirming", async () => {
     const iso = new Date().toISOString();
     vi.mocked(api.get).mockResolvedValue({ sessions: [
-      { id: 2, title: "Ventas", status: "open", updated_at: iso, tokens_used: 1, token_budget: 9 },
-      { id: 4, title: "Viejo", status: "archived", updated_at: iso, tokens_used: 1, token_budget: 9 },
+      { id: 2, title: "Ventas", status: "open", updated_at: iso, tokens_used: 1 },
+      { id: 4, title: "Viejo", status: "archived", updated_at: iso, tokens_used: 1 },
     ] } as any);
     vi.mocked(api.del).mockResolvedValue(undefined as never);
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);

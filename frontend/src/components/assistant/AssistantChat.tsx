@@ -46,7 +46,6 @@ import { useBranding } from "../../config/BrandingContext";
 import { useOptionalUser } from "../../auth/AuthContext";
 import { useT } from "../../i18n";
 import { Alert } from "../Alert";
-import { BudgetNotice } from "./BudgetNotice";
 import { ChatText } from "./ChatText";
 import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { CommandMenu, filterCommands, menuQuery } from "./CommandMenu";
@@ -181,7 +180,6 @@ export function AssistantChat(props: {
   const [inserted, setInserted] = useState(false);
   /** The pipeline asks before it sends: a single tap must never post four messages. */
   const [pipelineAsk, setPipelineAsk] = useState(false);
-  const [extending, setExtending] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const query = ai_enabled && commands && !menuClosed ? menuQuery(text, caret) : null;
   const menuItems = query !== null && commands ? filterCommands(commands, query) : [];
@@ -217,21 +215,6 @@ export function AssistantChat(props: {
     setHint(cmd);
     setMenuClosed(true);
     placeCaret(value, cmd.name.length + 2);
-  };
-
-  /** Ask the server for another budget step; refused past AI_CHAT_BUDGET_MAX. */
-  const extendBudget = async () => {
-    if (!session || extending) return;
-    setExtending(true);
-    setError(null);
-    try {
-      onSession(await api.post<AssistantSession>(
-        `/api/assistant/sessions/${session.id}/budget`));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : t.assistant.failedToSend);
-    } finally {
-      setExtending(false);
-    }
   };
 
   const finishCommand = async () => {
@@ -808,16 +791,6 @@ export function AssistantChat(props: {
                 setError(err instanceof ApiError ? err.message : t.assistant.failedToSend);
               }
             }}
-          />
-        </div>
-      ) : null}
-
-      {session ? (
-        <div className="px-3 sm:px-4">
-          <BudgetNotice
-            session={session}
-            extending={extending}
-            onExtend={() => void extendBudget()}
           />
         </div>
       ) : null}

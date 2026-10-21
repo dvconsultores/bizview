@@ -29,7 +29,7 @@ import { AssistantToggle } from "../../src/components/assistant/AssistantToggle"
 const ts = "2026-10-03T12:00:00Z";
 const base = {
   id: 5, title: "Nueva conversación", status: "open", draft: null, validation: null, preview: null,
-  applied_version_id: null, tokens_used: 0, token_budget: 10000, created_at: ts, updated_at: ts,
+  applied_version_id: null, tokens_used: 0, created_at: ts, updated_at: ts,
   messages: [] as unknown[],
 };
 

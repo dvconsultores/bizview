@@ -15,7 +15,6 @@ const base: AssistantSession = {
   preview: null,
   applied_version_id: null,
   tokens_used: 42_000,
-  token_budget: 100_000,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   messages: [],
@@ -24,8 +23,8 @@ const base: AssistantSession = {
 } as unknown as AssistantSession;
 
 describe("sessionIndicator", () => {
-  it("working beats no-budget", () => {
-    const r = sessionIndicator({ ...base, busy: true, tokens_used: 200_000 }, false);
+  it("working beats ready", () => {
+    const r = sessionIndicator({ ...base, busy: true, tokens_used: 900_000 }, false);
     expect(r.state).toBe("working");
     expect(r.label).toBe("Trabajando");
   });
@@ -35,115 +34,29 @@ describe("sessionIndicator", () => {
     expect(r.state).toBe("working");
   });
 
-  it("no budget", () => {
-    const r = sessionIndicator({ ...base, busy: false, tokens_used: 100_000 });
-    expect(r.state).toBe("no_budget");
-    expect(r.label).toBe("Sin presupuesto");
-  });
-
-  it("token budget zero means no budget", () => {
-    const r = sessionIndicator({ ...base, busy: false, token_budget: 0, tokens_used: 0 });
-    expect(r.state).toBe("no_budget");
-    expect(r.budgetText).toBe("100 %+");
-  });
-
-  it("ready", () => {
+  it("ready when idle", () => {
     const r = sessionIndicator({ ...base, busy: false, tokens_used: 1 });
     expect(r.state).toBe("ready");
     expect(r.label).toBe("Lista");
   });
 
-  it("budget text", () => {
-    expect(sessionIndicator(base).budgetText).toBe("42 %");
-    expect(sessionIndicator({ ...base, tokens_used: 100_000 }).budgetText).toBe("100 %");
-    expect(sessionIndicator({ ...base, tokens_used: 100_001 }).budgetText).toBe("100 %+");
+  it("reports the tokens spent, never a percentage of a cap", () => {
+    // Owner, 2026-10-21 ("make the ai unlimited"): there is no budget to be a percentage of.
+    expect(sessionIndicator(base).tokensText).toBe("42.000");
+    expect(sessionIndicator({ ...base, tokens_used: 9_000_000 }).tokensText).toBe("9.000.000");
+    expect(sessionIndicator({ ...base, tokens_used: 9_000_000 }).state).toBe("ready");
   });
 
   it("aria label with model", () => {
     const r = sessionIndicator(base);
     expect(r.ariaLabel).toBe(
-      "Estado de la sesión: Lista, modelo deepseek-v4-pro, presupuesto usado 42 %",
+      "Estado de la sesión: Lista, modelo deepseek-v4-pro, 42.000 tokens usados",
     );
   });
 
   it("aria label without model", () => {
     const r = sessionIndicator({ ...base, model: null });
-    expect(r.ariaLabel).toBe("Estado de la sesión: Lista, presupuesto usado 42 %");
-  });
-
-  it("uses budget_max when the original budget is spent", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 100_000,
-      token_budget: 100_000,
-      budget_max: 400_000,
-    });
-
-    expect(result.state).toBe("ready");
-    expect(result.label).toBe("Lista");
-    expect(result.budgetText).toBe("25 %");
-  });
-
-  it("hits no_budget only at the max", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 400_000,
-      token_budget: 400_000,
-      budget_max: 400_000,
-    });
-
-    expect(result.state).toBe("no_budget");
-    expect(result.label).toBe("Sin presupuesto");
-    expect(result.budgetText).toBe("100 %");
-  });
-
-  it("shows over-budget only past the max", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 400_001,
-      token_budget: 400_000,
-      budget_max: 400_000,
-    });
-
-    expect(result.state).toBe("no_budget");
-    expect(result.budgetText).toBe("100 %+");
-  });
-
-  it("ignores a smaller budget_max", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 42_000,
-      token_budget: 100_000,
-      budget_max: 50_000,
-    });
-
-    expect(result.state).toBe("ready");
-    expect(result.budgetText).toBe("42 %");
-  });
-
-  it("supports token_budget 0 with budget_max", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 50_000,
-      token_budget: 0,
-      budget_max: 200_000,
-    });
-
-    expect(result.state).toBe("ready");
-    expect(result.budgetText).toBe("25 %");
-  });
-
-  it("uses max-based percentage in the aria label", () => {
-    const result = sessionIndicator({
-      ...base,
-      tokens_used: 100_000,
-      token_budget: 100_000,
-      budget_max: 400_000,
-    });
-
-    expect(result.ariaLabel).toContain(
-      "Estado de la sesión: Lista, modelo deepseek-v4-pro, presupuesto usado 25 %",
-    );
+    expect(r.ariaLabel).toBe("Estado de la sesión: Lista, 42.000 tokens usados");
   });
 });
 
@@ -166,10 +79,10 @@ describe("SessionIndicator", () => {
     expect(el.getAttribute("role")).toBe("status");
     expect(el.getAttribute("aria-label")).toContain("Trabajando");
     expect(el.getAttribute("aria-label")).toContain("deepseek-v4-pro");
-    expect(el.getAttribute("aria-label")).toContain("42 %");
+    expect(el.getAttribute("aria-label")).toContain("42.000 tokens usados");
     expect(el.textContent).toContain("Trabajando");
     expect(el.textContent).toContain("deepseek-v4-pro");
-    expect(el.textContent).toContain("42 %");
+    expect(el.textContent).toContain("42.000");
     expect(container.querySelector('[class*="animate-ping"]')).not.toBeNull();
     unmount();
     container.remove();
@@ -197,7 +110,7 @@ describe("SessionIndicator", () => {
     expect(modelSpan!.classList.contains("hidden")).toBe(true);
     expect(modelSpan!.classList.contains("sm:inline")).toBe(true);
     expect(container.textContent).toContain("Trabajando");
-    expect(container.textContent).toContain("42 %");
+    expect(container.textContent).toContain("42.000");
     unmount();
     container.remove();
   });

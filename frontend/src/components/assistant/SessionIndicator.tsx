@@ -1,40 +1,39 @@
 import type { AssistantSession } from "../../api/types";
 import { t, useT } from "../../i18n";
+import { formatValue } from "../../lib/numbers";
 
-export type SessionIndicatorState = "working" | "no_budget" | "ready";
+export type SessionIndicatorState = "working" | "ready";
 
+/**
+ * The status pill of a conversation. Feature 028 revision (owner, 2026-10-21: "make the ai
+ * unlimited"): there is no budget, so it reports the tokens spent — never a percentage of a cap.
+ */
 export function sessionIndicator(
-  session: Pick<AssistantSession, "busy" | "tokens_used" | "token_budget" | "budget_max" | "model">,
+  session: Pick<AssistantSession, "busy" | "tokens_used" | "model">,
   workingOverride?: boolean,
 ): {
   state: SessionIndicatorState;
   label: string;
   model: string | null;
-  budgetText: string;
+  tokensText: string;
   ariaLabel: string;
 } {
   const busy = !!session.busy || !!workingOverride;
-  const budget = Math.max(session.token_budget || 0, session.budget_max ?? 0);
-  const over = budget <= 0 || session.tokens_used > budget;
-  const noBudget = budget <= 0 || session.tokens_used >= budget;
-  const state: SessionIndicatorState = busy ? "working" : noBudget ? "no_budget" : "ready";
-  const label =
-    state === "working"
-      ? t.assistant.sessionIndicator.working
-      : state === "no_budget"
-        ? t.assistant.sessionIndicator.noBudget
-        : t.assistant.sessionIndicator.ready;
-  const budgetText = over ? "100 %+" : `${Math.floor((session.tokens_used * 100) / budget)} %`;
+  const state: SessionIndicatorState = busy ? "working" : "ready";
+  const label = state === "working"
+    ? t.assistant.sessionIndicator.working
+    : t.assistant.sessionIndicator.ready;
+  const tokensText = formatValue(session.tokens_used ?? 0, "integer");
   const model = session.model ?? null;
   const ariaLabel = model
     ? t.assistant.sessionIndicator.ariaLabel
         .replace("{label}", label)
         .replace("{model}", model)
-        .replace("{pct}", budgetText)
+        .replace("{tokens}", tokensText)
     : t.assistant.sessionIndicator.ariaLabelNoModel
         .replace("{label}", label)
-        .replace("{pct}", budgetText);
-  return { state, label, model, budgetText, ariaLabel };
+        .replace("{tokens}", tokensText);
+  return { state, label, model, tokensText, ariaLabel };
 }
 
 export function SessionIndicator(props: {
@@ -45,9 +44,8 @@ export function SessionIndicator(props: {
 }) {
   const t = useT();
   const { session, working, className, onOpen } = props;
-  const { state, label, model, budgetText, ariaLabel } = sessionIndicator(session, working);
-  const dotClass =
-    state === "working" ? "bg-accent" : state === "no_budget" ? "bg-warning" : "bg-success";
+  const { state, label, model, tokensText, ariaLabel } = sessionIndicator(session, working);
+  const dotClass = state === "working" ? "bg-accent" : "bg-success";
   const inner = (
     <span
       role="status"
@@ -81,7 +79,9 @@ export function SessionIndicator(props: {
       <span className="text-ink-muted" aria-hidden>
         ·
       </span>
-      <span className="shrink-0">{budgetText}</span>
+      <span className="shrink-0" data-session-tokens="">
+        {tokensText}
+      </span>
     </span>
   );
   if (!onOpen) return inner;
