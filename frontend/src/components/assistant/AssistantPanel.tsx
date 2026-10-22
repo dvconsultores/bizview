@@ -17,6 +17,7 @@ import { useShellChrome } from "../ShellChrome";
 import { AgentMapOverlay, useAgentMapToggle } from "./AgentMap";
 import { AssistantChat } from "./AssistantChat";
 import { AssistantHistory } from "./AssistantHistory";
+import { PanelResizer } from "./PanelResizer";
 import { EditableTitle } from "./EditableTitle";
 import { useAssistantPanel } from "./AssistantPanelContext";
 import { ProblemList } from "./ProblemList";
@@ -35,7 +36,7 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
   const t = useT();
   const navigate = useNavigate();
   const { ai_enabled } = useBranding();
-  const { mode, sessionId, close, setExpanded, setSessionId } =
+  const { mode, sessionId, width, setWidth, close, setExpanded, setSessionId } =
     useAssistantPanel();
   const { hidden: chromeHidden } = useShellChrome();
   const [session, setSession] = useState<AssistantSession | null>(null);
@@ -181,7 +182,7 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
             {t.assistant.panelTitle}
           </h2>
         )}
-        {session && session.specs && session.specs.length > 0 ? (
+        {!docked && session && session.specs && session.specs.length > 0 ? (
           <div className="order-last w-full pb-2 sm:order-none sm:w-auto sm:shrink-0 sm:pb-0">
             <SpecSelect
               current={session.current_spec ?? null}
@@ -385,7 +386,7 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
       // `shadow-raised`, whose halo spilled ~10 px into the page and read as empty space (owner,
       // 2026-10-15: "the space between chat and [the page] is exaggerated — use the same space as
       // between the file explorer and the result view").
-      ? "w-[34rem] pl-1.5 xl:w-[38rem]"
+      ? "pl-1.5"
       : `${chromeHidden ? "left-0" : "left-64"} z-30`;
   return (
     <aside
@@ -394,10 +395,11 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
       aria-label={t.assistant.panelTitle}
       /* The panel owns the full height of its own column (feature 025): starting below the top bar
          left a band of empty canvas above it, because the top bar only spans the content column. */
+      style={dockedInPlace ? { width: `${width}px` } : undefined}
       className={`fixed inset-y-0 right-0 z-40 hidden flex-col bg-surface lg:flex ${place}`}
     >
       {dockedInPlace ? (
-        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-line" />
+        <PanelResizer width={width} onResize={setWidth} label={t.assistant.resizePanel} />
       ) : null}
       {content}
     </aside>

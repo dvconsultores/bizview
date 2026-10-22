@@ -6,6 +6,7 @@ import { t as live, useT } from "../../i18n";
 import { dateTimeFormat } from "../../lib/intl";
 import { Badge } from "../Badge";
 import { ModePill } from "./ModeSelector";
+import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { EditableTitle } from "./EditableTitle";
 
 const ICON_BUTTON =
@@ -43,6 +44,10 @@ export function AssistantHistory({
   onRenamed?: (session: AssistantSession) => void;
 }) {
   const t = useT();
+  const panel = useAssistantPanelOptional();
+  // The list follows the panel's width (it is resizable now): a fixed width either truncates the
+  // title or leaves the list floating in the middle of a wide chat.
+  const popoverWidth = Math.max(340, Math.min((panel?.width ?? 544) - 40, 520));
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [query, setQuery] = useState("");
@@ -170,7 +175,11 @@ export function AssistantHistory({
       {open ? (
         <div
           id={popoverId}
-          className="absolute right-0 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface shadow-raised ring-1 ring-line"
+          /* Wide enough for the title, the mode pill and the time on one line: with the old
+             20 rem the title truncated to nothing (owner, 2026-10-21: "make more room to
+             history"). The width follows the resizable panel. */
+          style={{ width: popoverWidth }}
+          className="absolute right-0 top-full z-50 mt-1 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface shadow-raised ring-1 ring-line"
         >
           <div className="relative border-b border-line p-3">
             <label className="sr-only" htmlFor="assistant-history-search">
@@ -188,7 +197,7 @@ export function AssistantHistory({
             />
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto p-2">
+          <div className="max-h-[min(72vh,34rem)] overflow-y-auto p-2">
             {state.status === "loading" ? (
               <p className="px-3 py-2 text-sm text-ink-muted">{t.common.loading}</p>
             ) : state.status === "error" ? (

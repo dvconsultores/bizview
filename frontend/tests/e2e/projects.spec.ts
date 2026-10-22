@@ -377,8 +377,11 @@ test("one chat on a wide screen: the docked panel, not a second copy", async ({ 
   const mainBox = (await page.locator("#main").boundingBox())!;
   expect(box.x - (mainBox.x + mainBox.width), "the gap between the page and the chat").toBeLessThanOrEqual(1);
   const seam = await panel.evaluate((el) => {
-    const strip = el.querySelector(":scope > span[aria-hidden]")!;
-    const divider = document.querySelector('[role="separator"]')!;
+    // The panel's edge is its resize handle now (owner, 2026-10-21: resizable like VS Code); it
+    // keeps the IDE divider's look: same strip, same colour, no shadow.
+    const strip = el.querySelector("[data-assistant-resizer]")!;
+    const divider = document.querySelector('#main [role="separator"]')
+      ?? document.querySelector('[role="separator"]')!;
     return {
       strip: getComputedStyle(strip).width,
       divider: getComputedStyle(divider).width,
@@ -425,6 +428,69 @@ test("phones keep the chat as a pane (the panel cannot dock)", async ({ page }, 
   await expect(tab).toBeVisible({ timeout: 30_000 });
   await tab.click();
   await expect(page.getByLabel("Mensaje para el asistente")).toBeVisible();
+});
+
+test("the docked chat resizes like an editor's pane", async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signIn(page);
+  await page.request.post("/api/test/assistant/script", { headers: FETCH, data: { steps: [{ text: "Hola" }] } });
+  const created = await page.request.post("/api/projects", { headers: FETCH, data: { name: `Redimension ${Date.now()}` } });
+  expect(created.status()).toBe(201);
+  const slug = ((await created.json()) as { slug: string }).slug;
+  await page.goto(`/proyectos/${slug}`);
+  await expect(page.getByRole("tree", { name: "Explorador de archivos" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Asistente", exact: true }).click();
+  const panel = page.locator("#assistant-panel");
+  await expect(panel).toBeVisible();
+  await settle(page);
+
+  const start = (await panel.boundingBox())!.width;
+  const seam = page.locator("[data-assistant-resizer]");
+  await expect(seam).toHaveAttribute("role", "separator");
+  await expect(seam).toHaveAttribute("aria-orientation", "vertical");
+
+  // Drag the seam 140 px to the left: the chat grows and the page keeps its room.
+  const box = (await seam.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + 240);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 140, box.y + 240, { steps: 10 });
+  await page.mouse.up();
+  await settle(page);
+  const wider = (await panel.boundingBox())!.width;
+  expect(wider, "the panel follows the drag").toBeGreaterThan(start + 100);
+  const overlap = await page.evaluate(() => {
+    const main = document.querySelector("#main")!.getBoundingClientRect();
+    const chat = document.querySelector("#assistant-panel")!.getBoundingClientRect();
+    return Math.round(chat.x - main.right);
+  });
+  expect(overlap, "the page is not under the chat").toBeLessThanOrEqual(1);
+
+  // The choice is remembered for the next visit.
+  const stored = await page.evaluate(() => localStorage.getItem("bizview.assistantPanel.width"));
+  expect(Number(stored)).toBeGreaterThan(start + 100);
+  await page.reload();
+  await expect(page.locator("#assistant-panel")).toBeVisible();
+  await settle(page);
+  expect((await page.locator("#assistant-panel").boundingBox())!.width)
+    .toBeGreaterThan(start + 100);
+
+  // The keyboard works the same seam, and the panel never eats the whole screen.
+  await seam.focus();
+  await page.keyboard.press("End");
+  await settle(page);
+  const widest = (await panel.boundingBox())!.width;
+  expect(widest, "70 % of 1440 px at most").toBeLessThanOrEqual(Math.round(1440 * 0.7) + 1);
+  const canvas = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(canvas, "no horizontal overflow at the widest panel").toBeLessThanOrEqual(0);
+  await page.keyboard.press("Home");
+  await settle(page);
+  expect((await panel.boundingBox())!.width).toBeLessThan(widest);
+  await page.keyboard.press("Enter");
+  await settle(page);
+  await axe(page);
 });
 
 test("the project toolbar is compact and the type scale follows the reference app", async ({ page }, info) => {

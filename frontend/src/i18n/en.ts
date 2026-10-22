@@ -1397,6 +1397,8 @@ export const en: Catalogue = {
     failedToPreview: "Couldn't generate the preview.",
     noDraft: "No draft yet. Ask the assistant for a report or an integration.",
     configureAi: "Configure AI",
+    panelWidth: "Assistant width: {px} px",
+    resizePanel: "Resize the assistant",
     panelTitle: "Assistant",
     history: "Conversations",
     searchSessions: "Search conversations",

@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The docked chat resizes like an editor pane, and its history has room (2026-10-21)**: the seam
+  between the page and the chat is a drag handle (`role="separator"`, arrows, Home/End/Enter,
+  double-click to reset), from 22 rem to 60 rem and never more than 70 % of the screen; the width is
+  remembered per device and the page keeps its own room, so nothing ends up under the chat. The
+  conversation history popover follows that width (it used to be 20 rem, which truncated every
+  title) and grows up to 72 % of the height. The "Spec actual" selector left the docked header (it
+  duplicated the conversation's own title and squeezed the history button); it stays on the
+  Asistente page and in the project's chat tab, and the agent still moves the current spec itself.
+
 - **The AI is unlimited (feature 028 revision, 2026-10-21)**: the conversation token budget and the
   per-command ceiling are gone — owner's rule, "it can not have a token limit … do not limit ever,
   that is the reason to use the API". A turn or a run now stops only on the round cap

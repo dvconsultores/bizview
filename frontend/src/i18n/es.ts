@@ -1380,6 +1380,8 @@ export const es = {
     failedToPreview: "No se pudo generar la vista previa.",
     noDraft: "Aún no hay borrador. Pide al asistente un reporte o una integración.",
     configureAi: "Configurar IA",
+    panelWidth: "Ancho del asistente: {px} px",
+    resizePanel: "Cambiar el ancho del asistente",
     panelTitle: "Asistente",
     history: "Conversaciones",
     searchSessions: "Buscar conversaciones",

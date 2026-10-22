@@ -1,5 +1,8 @@
 import { ChevronsLeft, ChevronsRight, CircleHelp, FolderKanban, Home, LayoutDashboard, LayoutGrid, LogOut, Moon, Sun, User as UserIcon, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+  type CSSProperties, type ReactNode,
+} from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../config/BrandingContext";
@@ -149,12 +152,16 @@ function ShellContent({ hidden, chat, collapsed, children }: {
   collapsed: boolean;
   children: (docked: boolean) => ReactNode;
 }) {
-  const { mode } = useAssistantPanel();
+  const { mode, width } = useAssistantPanel();
   const docked = chat && mode === "docked";
   return (
-    <div className={`${hidden ? "" : collapsed ? "lg:pl-[5rem]" : "lg:pl-64"} ${
-      docked ? "lg:pr-[34rem] xl:pr-[38rem]" : ""
-    }`}>
+    <div
+      style={docked ? ({ "--assistant-width": `${width}px` } as CSSProperties) : undefined}
+      className={`${hidden ? "" : collapsed ? "lg:pl-[5rem]" : "lg:pl-64"} ${
+        docked ? "lg:pr-[var(--assistant-width)]" : ""
+      }`}
+      data-assistant-width={docked ? width : undefined}
+    >
       {children(docked)}
     </div>
   );
