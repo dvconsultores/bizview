@@ -287,6 +287,9 @@ def test_a_huge_command_run_is_not_stopped_by_tokens(chat):
 
 def test_set_current_spec_tool_and_suggestion_carry_the_spec(chat):
     c, _, sid = chat
+    # `suggest_command` only exists outside Auto (feature 028: the agent runs the stage itself).
+    assert c.post(f"/api/assistant/sessions/{sid}/mode",
+                  json={"mode": "edit"}).status_code == 200
     fake.SHARED.queue(
         _reply("Trabajo en el reporte.", [
             _call("set_current_spec", {"spec_id": "002-ventas-facturacion"}),

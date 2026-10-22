@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import threading
+import time
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -14,7 +15,7 @@ import yaml
 from bizview_cli import authoring
 from sqlalchemy import func, select, update
 from sqlalchemy import text as sql_text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.orm import object_session
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -1649,10 +1650,14 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
                           status="completed")
         runs.finish(run, "completed")
         return run, [(reply, None)]
-    if current_run is not None:
-        raise ApiError(409, "command_active", M("commands.active", command=current_run.command),
-                       extra={"command": current_run.command, "spec": current_run.spec,
-                              "status": current_run.status})
+    if current_run is not None and current_run.status in ("running", "waiting"):
+        # `start` claimed the session, so no turn owns this run: it is what a crashed turn or an
+        # unanswered gate leaves behind. A new command replaces it — refusing with 409 here is a
+        # dead end where every following message is refused (reported after a gate asked for a
+        # "si" that never reached the run).
+        runs.finish(current_run, "interrupted")
+        log.info("replaced the %s command run %s left active in session %s",
+                 current_run.status, current_run.id, session.id)
     refusal = _scope_refusal(db, session, parsed.args) if parsed.args else None
     if refusal:
         return None, [refusal]
@@ -1697,54 +1702,124 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     previous = runs.latest_for(db, session.id, definition.name, spec)
     result = ({"revisions": _revisions(db, view.project.id, spec)}
               if definition.name == "speckit-converge" and spec else None)
+    # Feature 028 FR-004: in Auto with a live contract the gates are answered by the contract, also
+    # when the super user typed the command instead of the agent calling `run_command` (the run
+    # used to stop with "¿La apruebo y continúo?"). `session.auto_run` is not attached yet here.
+    auto_run = live_auto_run(db, session)
+    answered = check.pending if auto_run is not None and spec else None
     run = runs.create(
         db, session_id=session.id, project_id=session.project_id, definition=definition,
         arguments=arguments, locale=current(), spec=spec, resolved_from=source,
         forced=forced, result=result,
         reserved_number=view.next_spec() if definition.name == "speckit-specify" else None,
-        status="waiting" if check.pending else "running", pending=check.pending,
+        status="waiting" if check.pending and not answered else "running",
+        pending=None if answered else check.pending,
         resumed_from=(previous.id if previous is not None and previous.status == "interrupted"
                       else None))
+    if answered:
+        _tools._approve_without_asking(db, view, run, spec, answered)
+        auto_run.stage = _tools._STAGE_OF_COMMAND.get(definition.name)
+        return run, [(t("commands.approved_by_run", spec=spec), None)]
     return run, ([(check.message, None)] if check.pending else None)
+
+
+# A dropped connection to the installation's database kills one round, not the run: the database
+# is usually remote and a long turn opens many connections, so the turn is retried a couple of
+# times — never once a version was applied, which is a side effect that must not replay.
+TRANSIENT_ATTEMPTS = 3
+
+
+def _is_transient_db_error(exc: BaseException) -> bool:
+    """A failure of the connection itself, worth another try (never a lock timeout: that is a
+    normal busy signal, and never a data error, which would fail the same way again)."""
+    return (isinstance(exc, (OperationalError, InterfaceError))
+            and not isinstance(getattr(exc, "orig", None), psycopg.errors.LockNotAvailable))
 
 
 def run_turn(session_id: int, actor_id: int, ip: str | None, claimed_at: datetime) -> None:
     """Worker thread for one assistant turn."""
     claim = _TurnClaim(at=claimed_at)
     try:
-        try:
-            with get_sessionmaker()() as db:
-                try:
-                    session = db.get(AssistantSession, session_id)
-                    actor = db.get(AppUser, actor_id)
-                    settings = get_settings()
-                    text = db.scalar(
-                        select(AssistantMessage.content)
-                        .where(
-                            AssistantMessage.session_id == session_id,
-                            AssistantMessage.role == "user",
-                        )
-                        .order_by(AssistantMessage.id.desc())
-                        .limit(1)
-                    ) or ""
-                    with use_locale(_owner_locale(actor)):
-                        _turn(db, actor, session, text, settings, ip, claim)
-                        _commit_round(db, session, claim)
-                except _ClaimLost:
-                    db.rollback()
-                    log.info("assistant claim lost for session %s", session_id)
-                except Exception:
-                    db.rollback()
-                    log.exception("assistant run failed for session %s", session_id)
-                    _post_error(session_id, claim.at)
-        except Exception:
-            log.exception("assistant worker failed for session %s", session_id)
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                retry = _attempt_turn(session_id, actor_id, ip, claim, attempt)
+            except Exception as exc:   # reported to the conversation, never swallowed
+                log.exception("assistant worker failed for session %s", session_id)
+                _post_error(session_id, claim.at, exc)
+                return
+            if not retry:
+                return
     finally:
         _release(session_id, claim.at)
         _slots().release()
 
 
-def _post_error(session_id: int, claimed_at: datetime) -> None:
+def _attempt_turn(session_id: int, actor_id: int, ip: str | None, claim: _TurnClaim,
+                  attempt: int) -> bool:
+    """One try at the turn. True means "retry": a transient database error before any apply."""
+    with get_sessionmaker()() as db:
+        applied_before = None
+        try:
+            session = db.get(AssistantSession, session_id)
+            actor = db.get(AppUser, actor_id)
+            settings = get_settings()
+            applied_before = session.applied_version_id if session is not None else None
+            text = db.scalar(
+                select(AssistantMessage.content)
+                .where(
+                    AssistantMessage.session_id == session_id,
+                    AssistantMessage.role == "user",
+                )
+                .order_by(AssistantMessage.id.desc())
+                .limit(1)
+            ) or ""
+            with use_locale(_owner_locale(actor)):
+                _turn(db, actor, session, text, settings, ip, claim)
+                _commit_round(db, session, claim)
+            return False
+        except _ClaimLost:
+            db.rollback()
+            log.info("assistant claim lost for session %s", session_id)
+            return False
+        except Exception as exc:
+            db.rollback()
+            if (not _is_transient_db_error(exc) or attempt >= TRANSIENT_ATTEMPTS
+                    or _applied_since(db, session_id, applied_before)):
+                raise
+            log.warning("assistant run for session %s: transient database error (%s); retry %s",
+                        session_id, type(exc).__name__, attempt)
+            time.sleep(2 * attempt)
+            return True
+
+
+def _applied_since(db, session_id: int, applied_before: int | None) -> bool:
+    """Whether the turn applied a version before failing: replaying it would apply twice."""
+    try:
+        db.expire_all()
+        row = db.get(AssistantSession, session_id)
+        return row is not None and row.applied_version_id != applied_before
+    except Exception:   # the connection may be gone: doubt is a reason not to replay
+        return True
+
+
+def _error_text(exc: BaseException | None) -> str:
+    """What the conversation says about a failed run: a cause it can act on, never internals.
+
+    A connection failure to the installation's database is by far the most common (remote database,
+    long turns); the rest keep the exception's type only, because its message may carry a host or a
+    credential and this text goes into the provider's history on the next turn. The traceback goes
+    to the server log with the session id.
+    """
+    if exc is None:
+        return t(_UNEXPECTED_TEXT)
+    if isinstance(exc, (OperationalError, psycopg.OperationalError)):
+        return t("assistant.unexpected_db")
+    return f"{t(_UNEXPECTED_TEXT)} ({type(exc).__name__})"
+
+
+def _post_error(session_id: int, claimed_at: datetime, exc: BaseException | None = None) -> None:
     """Store an unexpected-error assistant message while the run still owns the session."""
     try:
         with get_sessionmaker()() as s:
@@ -1764,10 +1839,11 @@ def _post_error(session_id: int, claimed_at: datetime) -> None:
                 return
             session = s.get(AssistantSession, session_id)
             activity.end_run(session, "error")
-            runs.mark_stale_interrupted(s, session_id, status="failed", error="unexpected")
+            runs.mark_stale_interrupted(s, session_id, status="failed",
+                                        error=type(exc).__name__ if exc else "unexpected")
             owner = s.get(AppUser, session.created_by)
             with use_locale(_owner_locale(owner)):
-                _add(s, session, role="assistant", content=t(_UNEXPECTED_TEXT))
+                _add(s, session, role="assistant", content=_error_text(exc))
             session.updated_at = datetime.now(UTC)
             s.commit()
     except Exception:

@@ -237,3 +237,92 @@ def test_limit_refusal_helpers():
     assert auto.limit_refusal(contract, run, applies=1).limit == "applies"
     assert auto.limit_refusal(contract, run, tokens=10000).limit == "tokens"
     assert auto.used_json(run)["previews"] == 1
+
+
+def test_a_typed_command_never_asks_for_spec_approval(chat):
+    """FR-004: the contract answers the gate, also when the super user typed the command.
+
+    Reported defect: `/speckit-implement …` stopped with "La spec no está aprobada (Draft). ¿La
+    apruebo y continúo?" and waited for a "si".
+    """
+    c, project, sid = chat
+    draft = ("# Integración\n\n**Tipo**: integración\n**Status**: Draft\n\nFacturas.\n")
+    _write(project["id"], {"specs/001-ventas/spec.md": draft,
+                           "specs/001-ventas/plan.md": "# Plan\n\nPlan.\n",
+                           "specs/001-ventas/tasks.md": "# Tareas\n\n- [ ] T001 hacer\n"}, 1)
+    _confirm(c, sid, {"goal": "implementa", "stages": ["draft", "preview"]})
+
+    fake.SHARED.queue(_reply("Implemento."))
+    resp = _send(c, sid, "/speckit-implement 001-ventas")
+    assert resp.status_code == 202
+
+    body = _session(c, sid)
+    contents = [m["content"] for m in body["messages"]]
+    assert not any("¿La apruebo" in text for text in contents)
+    assert any("El contrato aprobó la spec" in text for text in contents)
+    run = sql("SELECT status, pending FROM assistant_command_run WHERE session_id = :i "
+              "ORDER BY id DESC", i=sid)[0]
+    assert run[0] in ("running", "completed") and run[1] is None
+    written = (fs.project_root(project["slug"]) / "specs/001-ventas/spec.md").read_text()
+    assert "**Status**: Approved" in written        # the gate wrote the approval on disk
+
+
+def test_an_unexpected_error_says_what_it_was():
+    from sqlalchemy.exc import OperationalError
+
+    generic = service._error_text(ValueError("boom"))
+    assert "ValueError" in generic and "boom" not in generic     # no internals in the history
+    assert service._error_text(None) == service.t(service._UNEXPECTED_TEXT)
+    db_error = OperationalError("SELECT 1", {}, Exception("connection failed"))
+    assert service._error_text(db_error) == service.t("assistant.unexpected_db")
+
+
+def test_a_dropped_connection_retries_the_turn(chat, monkeypatch):
+    """A transient database failure (remote database, long turn) is retried, not fatal."""
+    c, project, sid = chat
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC}, 1)
+    _confirm(c, sid, {"goal": "x", "stages": ["draft", "preview"]})
+
+    real_turn = service._turn
+    calls = {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            from sqlalchemy.exc import OperationalError
+
+            raise OperationalError("BEGIN", {}, Exception("connection to server failed"))
+        return real_turn(*args, **kwargs)
+
+    monkeypatch.setattr(service, "_turn", flaky)
+    fake.SHARED.queue(_reply("Escribo."), _reply("Fin."))
+    assert _send(c, sid).status_code == 202
+
+    body = _session(c, sid)
+    assert calls["n"] == 2
+    assert not any("error inesperado" in m["content"].lower() for m in body["messages"])
+    assert "Resumen del run" in body["messages"][-1]["content"]
+
+
+def test_a_command_left_waiting_does_not_trap_the_conversation(chat):
+    """A run left `waiting` (an unanswered gate) must not answer 409 to every next message.
+
+    Reported: after "¿La apruebo y continúo?" the following `/speckit-implement …` got 409
+    `command_active` and nothing could move forward.
+    """
+    c, project, sid = chat
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC,
+                           "specs/001-ventas/plan.md": "# Plan\n\nPlan.\n"}, 1)
+    stub = sql("INSERT INTO assistant_command_run "
+               "(session_id, project_id, command, locale, status, files, tokens) "
+               "VALUES (:s, :p, 'speckit-implement', 'es', 'waiting', '[]'::jsonb, 0) "
+               "RETURNING id", s=sid, p=project["id"])[0][0]
+
+    fake.SHARED.queue(_reply("Sigo con las tareas."))
+    resp = _send(c, sid, "/speckit-tasks 001-ventas")
+    assert resp.status_code == 202, resp.text
+
+    rows = sql("SELECT id, status FROM assistant_command_run WHERE session_id = :i ORDER BY id",
+               i=sid)
+    assert (stub, "interrupted") in rows
+    assert rows[-1][1] in ("running", "completed")

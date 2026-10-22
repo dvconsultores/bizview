@@ -409,6 +409,7 @@ MESSAGES: dict[str, str] = {
     "assistant.interrupted": "La respuesta anterior se interrumpió; lo hecho hasta la última ronda se guardó. Escribe «continúa».",
     "assistant.stopped": "Detenido por el usuario.",
     "assistant.unexpected": "Ocurrió un error inesperado; lo hecho hasta la última ronda se guardó.",
+    "assistant.unexpected_db": "Se perdió la conexión con la base de datos; lo hecho hasta la última ronda se guardó. Escribe «continúa» para retomar.",
     "assistant.ready": "Listo para aplicar: {summary}. Revisa la vista previa y pulsa «Aplicar» cuando quieras.",
     "assistant.repeated": "Detuve el trabajo: {name} falló dos veces seguidas con los mismos argumentos ({error}).",
     "assistant.archived": "La conversación está archivada.",
@@ -673,6 +674,7 @@ MESSAGES: dict[str, str] = {
     "assistant.profile.name_taken": "Ya existe un perfil con ese nombre.",
     "assistant.profile.not_found": "El perfil no existe.",
 
+    "commands.approved_by_run": "El contrato aprobó la spec {spec} por ti; sigo con la etapa.",
     "commands.auto_stage": "Etapa /{command} sobre {spec}.",
     "assistant.summary.applied": "Aplicó la versión {version}.",
 

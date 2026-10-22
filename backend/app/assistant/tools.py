@@ -1155,7 +1155,14 @@ def _approve_without_asking(db: Session, session: Any, stage: Any, spec: str,
     and records that it did.
     """
     if "approve_spec" in (pending.get("gates") or []):
-        results = fs.apply_ops(session.project.id, runs.approve_ops(spec, session.files()),
+        # `fs.apply_ops` writes from its own session, so the stage row has to be visible outside
+        # this transaction: the revision's `command_run_id` is a foreign key to it. Without this
+        # commit the approval raised a ForeignKeyViolation and the turn ended with "Ocurrió un
+        # error inesperado" (reported with /speckit-tasks over a Draft spec).
+        db.commit()
+        # `project_id`, not `session.project`: the composer's path starts the run before the
+        # relationship is loaded.
+        results = fs.apply_ops(session.project_id, runs.approve_ops(spec, session.files()),
                                {"kind": "system", "user_id": None, "session_id": session.id,
                                 "command": f"/{stage.command}", "command_run_id": stage.id})
         for item in results:
