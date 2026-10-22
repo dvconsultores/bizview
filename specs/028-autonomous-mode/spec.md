@@ -76,6 +76,16 @@ profile or a hand-written contract can still set any limit; (c) the agent never 
 prompt is not rewritten per mode: `ask` adds nothing (the tools enforce it) and `auto` adds one line.
 The contract row is still stored, audited and enforced by product code either way.
 
+**Revision 2026-10-22 (owner, after an Auto run handed the last clicks back)**: "esta sesión solo me
+da herramientas de lectura … pulsa vista previa y aplicar". FR-000/FR-003 now read: in `auto` the
+execution channel (`run_command`, `run_preview`, `apply_draft`, `set_current_spec`) is **always**
+offered, because selecting Auto is the authorisation; the run contract is created by the first of
+those calls (audited, `auto: true`) and, while one is live, it still narrows the stages a profile
+allows. A contract spent by a previous run no longer degrades the conversation. The apply path was
+also fixed to exclude the applying conversation from the project's idle guard (it runs inside its
+own turn) and to return product refusals as tool results instead of failing the turn, and an
+authorised run no longer stops at "Listo para aplicar".
+
 **Revision 2026-10-21 (owner)**: "this variable do not, make the ai unlimited", pointing at
 `AI_CHAT_TOKEN_BUDGET` / `AI_CHAT_BUDGET_STEP` / `AI_CHAT_BUDGET_MAX`. The conversation budget and
 the per-command ceiling are gone for good, not just for Auto: migration `0025_unlimited_ai` drops

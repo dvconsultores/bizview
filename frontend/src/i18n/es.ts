@@ -1177,7 +1177,7 @@ export const es = {
     pill: {
       ready: "Auto · listo",
       running: "Auto · ejecutando",
-      none: "Auto · sin contrato",
+      none: "Auto",
       stopped: "Auto · detenido",
       applied: "Auto · aplicado",
       failed: "Auto · con error",

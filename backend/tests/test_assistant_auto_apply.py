@@ -3,12 +3,15 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.ai import fake
+from app.ai import ChatReply, ChatUsage, ToolCall, fake  # noqa: F401  (kept for the fixtures)
 from app.assistant import auto, service
 from app.config import get_settings
 from app.models import AppUser, AssistantAutoRun, AssistantSession
 from app.worker import Worker, _failed_checks
 from tests.conftest import new_chat, signed_in, sql
+from tests.test_runner import origin as origin  # fixture
+from tests.test_runner import pg_source as pg_source  # fixture
+from tests.test_vibe_reporting import workspace as workspace  # fixture
 
 
 @pytest.fixture(autouse=True)
@@ -209,3 +212,40 @@ def test_contract_grants_visibility_only_when_it_declares_it(superuser, db):
     assert bad.status_code == 201
     assert sql("SELECT contract ->> 'visible_to' FROM assistant_auto_run") == [("[\"user\"]",)]
     assert sql("SELECT count(*) FROM assistant_auto_run") == [(1,)]
+
+
+def test_the_agent_applies_from_its_own_turn(db, superuser, workspace):
+    """The reported dead end: the agent could never apply — its own turn was "busy".
+
+    `apply_draft` → `apply_project` → `_ensure_idle(project)` counted the conversation doing the
+    apply, so every autonomous apply answered `assistant_busy`, the run stopped, and the human was
+    left with "pulsa Vista previa y Aplicar".
+    """
+    from app.assistant.tools import run_tool
+    from app.projects.workview import for_session
+    from tests.test_assistant_apply import _applied, _draft_files, _session
+
+    _applied(workspace)
+    session = _session(db, superuser, _draft_files())
+    session.mode = "auto"
+    session.busy_since = datetime.now(UTC)          # the agent's own turn holds the claim
+    db.commit()
+
+    view = for_session(db, session)
+    contract = auto.RunContract.model_validate({"goal": "aplica", "stages": ["preview", "apply"]})
+    run = AssistantAutoRun(session_id=session.id, project_id=session.project_id,
+                           contract=contract.model_dump(mode="json"), status="running",
+                           confirmed_by=session.created_by)
+    db.add(run)
+    db.commit()
+    session.auto_run = run
+
+    result, summary = run_tool(db, superuser, view, "apply_draft", {}, get_settings())
+    version_id = result.get("id")
+    assert version_id, (result, summary)                # the applied version
+    assert "versión" in summary.lower() or "version" in summary.lower()
+    session = db.get(AssistantSession, session.id)
+    assert session.applied_version_id == version_id     # it is the conversation's version
+    # The run is closed by the turn's summary (`finish_auto_run`), so here only the contract's own
+    # record of the apply is asserted.
+    assert run.version_id == version_id and run.applies == 1 and run.status == "running"

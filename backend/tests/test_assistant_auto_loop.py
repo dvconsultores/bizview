@@ -326,3 +326,75 @@ def test_a_command_left_waiting_does_not_trap_the_conversation(chat):
                i=sid)
     assert (stub, "interrupted") in rows
     assert rows[-1][1] in ("running", "completed")
+
+
+def test_auto_without_a_contract_still_offers_the_execution_channel(chat):
+    """Reported: "esta sesión solo me da herramientas de lectura" (session in Auto, contract spent).
+
+    In Auto the agent always keeps `run_command`, `run_preview` and `apply_draft`; the contract is
+    opened when one of them is actually used, so a spent contract never degrades the conversation.
+    """
+    from app.assistant import auto
+    from app.assistant import tools as tools_module
+    from app.assistant.commands import guard
+
+    c, _project, sid = chat
+    body = _session(c, sid)
+    assert body["mode"] == "auto" and body["contract_status"] == "none"
+
+    class Session:
+        mode = "auto"
+        auto_run = None
+
+    offered = auto.offered_names("auto", None, frozenset(guard.allowed_tools(None)))
+    assert {"run_command", "run_preview", "apply_draft", "set_current_spec"} <= offered
+    assert "suggest_command" not in offered
+    for name in ("run_command", "run_preview", "apply_draft"):
+        assert auto.mode_gate(Session(), name, {}, None) is None
+    assert tools_module._AUTO_CHANNEL == ("run_command", "run_preview", "apply_draft")
+
+
+def test_the_first_stage_opens_the_contract_and_writes(chat):
+    """The whole reported flow: Auto, no contract, and the agent writes `tasks.md` itself."""
+    c, project, sid = chat
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC,
+                           "specs/001-ventas/plan.md": "# Plan\n\nPlan.\n"}, 1)
+    assert _session(c, sid)["contract_status"] == "none"
+
+    fake.SHARED.queue(
+        _reply(calls=[_call("run_command", {"command": "speckit-tasks",
+                                            "spec": "001-ventas"})]),
+        _reply(calls=[_call("edit_draft", {"ops": [
+            {"op": "write", "path": "specs/001-ventas/tasks.md",
+             "content": "# Tareas\n\n- [ ] T001 hacer\n"}]}, "call-2")]),
+        _reply("Tareas escritas."),
+    )
+    assert _send(c, sid).status_code == 202
+
+    body = _session(c, sid)
+    assert body["contract_status"] in ("stopped", "applied", "confirmed")
+    assert (fs.project_root(project["slug"]) / "specs/001-ventas/tasks.md").exists()
+    assert sql("SELECT count(*) FROM assistant_auto_run WHERE session_id = :i", i=sid) == [(1,)]
+    assert sql("SELECT detail->>'auto' FROM audit_event "
+               "WHERE kind = 'assistant_contract_confirmed' ORDER BY id DESC")[0] == ("true",)
+    assert not any("solo me da herramientas de lectura" in m["content"] for m in body["messages"])
+
+
+def test_a_spent_contract_is_renewed_by_the_next_write(chat):
+    """Auto + a stopped contract: the next apply opens a new one instead of refusing."""
+    c, project, sid = chat
+    _write(project["id"], {"specs/001-ventas/spec.md": SPEC}, 1)
+    _confirm(c, sid, {"goal": "x", "stages": ["draft"]})
+    sql("UPDATE assistant_auto_run SET status = 'stopped' WHERE session_id = :i", i=sid)
+    assert _session(c, sid)["contract_status"] == "stopped"
+
+    fake.SHARED.queue(_reply(calls=[_call("run_command", {"command": "speckit-plan",
+                                                          "spec": "001-ventas"})]),
+                      _reply("Sigo."))
+    assert _send(c, sid).status_code == 202
+
+    rows = sql("SELECT status FROM assistant_auto_run WHERE session_id = :i ORDER BY id", i=sid)
+    assert len(rows) == 2 and rows[-1][0] in ("running", "confirmed", "stopped", "applied")
+    stage = sql("SELECT stage FROM assistant_auto_run WHERE session_id = :i "
+                "ORDER BY id DESC", i=sid)
+    assert stage[0][0] == "plan"

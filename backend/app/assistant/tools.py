@@ -782,6 +782,9 @@ def _check_query_deps(session: Any, path: str) -> str:
     return f"{query_sha}|{spec_sha}"
 
 
+_AUTO_CHANNEL = ("run_command", "run_preview", "apply_draft")
+
+
 def _allowed_tools(session: Any) -> frozenset[str]:
     """The command guard's set, widened by the Auto tools when a contract is live (feature 028)."""
     base = frozenset(guard.allowed_tools(command_def(session)))
@@ -814,6 +817,14 @@ def _mode_check(db: Session, session: Any, name: str, args: dict[str, Any],
     proyecto, la fuente ni el proveedor. La denegación es un resultado de herramienta, no un error
     del turno: el modelo puede adaptarse o cerrar el run con `blocked:<reason>`.
     """
+    # Feature 028 (owner, 2026-10-21): the first stage/preview/apply of an Auto turn opens the run
+    # contract, so the conversation never falls back to read-only tools after a contract is spent.
+    needs_contract = (name in _AUTO_CHANNEL and auto.mode_of(session) == "auto"
+                      and auto.live_contract(session) is None)
+    if needs_contract:
+        from app.assistant import service as assistant_service
+
+        assistant_service.ensure_auto_contract(db, session, goal=args.get("summary"))
     contract = auto.contract_of(session)
     refusal = auto.mode_gate(session, name, args, contract)
     if refusal is not None:
@@ -938,8 +949,6 @@ def _dispatch(
         return _edit_draft(db, session, args)
     if name == "read_draft":
         return _read_draft(session, args)
-    if name == "run_preview":
-        return _run_preview(db, session, app_settings)
     if name == "update_notes":
         return _update_notes(db, session, args)
     if name == "finish_command":
@@ -955,8 +964,32 @@ def _dispatch(
     if name == "run_command":
         return _run_command(db, session, args)
     if name == "apply_draft":
-        return _apply_draft(db, actor, session, app_settings, ip)
+        return _guarded(lambda: _apply_draft(db, actor, session, app_settings, ip))
+    if name == "run_preview":
+        return _guarded(lambda: _run_preview(db, session, app_settings))
     raise ToolError("Herramienta desconocida.")
+
+
+def _guarded(call) -> tuple[dict[str, Any], str]:
+    """A product refusal (`ApiError`) becomes a tool result, not a dead turn.
+
+    Preview and apply answer 409 with the reason when something still has to be fixed (not ready,
+    a failing query check, a draft that changed). Inside a turn that reason belongs to the model —
+    it can fix it and retry — so it is returned as a refusal instead of failing the whole run with
+    "Ocurrió un error inesperado".
+    """
+    from app.errors import ApiError
+
+    try:
+        return call()
+    except ApiError as err:
+        detail = str(err.message)
+        if err.extra.get("errors"):
+            first = err.extra["errors"][0]
+            path = first.get("path") if isinstance(first, dict) else None
+            if path:
+                detail = f"{detail} ({path})"
+        raise ToolError(detail) from err
 
 
 def _get_app_guide(args: dict[str, Any]) -> tuple[dict[str, Any], str]:

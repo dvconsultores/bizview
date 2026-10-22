@@ -1194,7 +1194,7 @@ export const en: Catalogue = {
     pill: {
       ready: "Auto · ready",
       running: "Auto · running",
-      none: "Auto · no contract",
+      none: "Auto",
       stopped: "Auto · stopped",
       applied: "Auto · applied",
       failed: "Auto · failed",

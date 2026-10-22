@@ -4,6 +4,7 @@ import pytest
 from app.ai import fake
 from app.assistant import auto
 from app.config import get_settings
+from app.models import AssistantSession, Project
 from tests.conftest import PASSWORD, new_chat, signed_in, sql
 from tests.test_assistant_api import _chat_reply, _tool_call
 
@@ -90,31 +91,44 @@ def test_ask_refuses_check_query_with_a_draft_path(superuser, db):
 
 # --- Edit stays as it was ----------------------------------------------------------------
 
-def test_auto_without_a_contract_offers_only_reads(superuser, db):
-    """A new conversation is Auto with no contract yet: the writes wait for the authorisation."""
+def test_auto_without_a_contract_offers_the_whole_channel(superuser, db):
+    """A new conversation is Auto: the writes are offered, the contract opens with the call."""
     from app.assistant.commands import guard
 
     client = signed_in("root@example.com")
     sid = new_chat(client)
     offered = _offered(client, sid)
-    assert offered == set(guard.allowed_tools(None)) - {"suggest_command"} | {"set_current_spec"}
-    assert "apply_draft" not in offered and "run_command" not in offered
+    # Auto keeps the execution channel even before any contract exists (feature 028 revision): the
+    # channel is what lets the agent write, preview and apply instead of handing the clicks back.
+    assert offered == (set(guard.allowed_tools(None)) - {"suggest_command"}
+                       | {"set_current_spec", "run_command", "run_preview", "apply_draft"})
 
 
 # --- Auto ---------------------------------------------------------------------------------
 
-def test_auto_without_a_contract_refuses_the_auto_tools(superuser, db):
+def test_auto_without_a_contract_opens_one_and_uses_the_auto_tools(superuser, db):
+    """Owner, 2026-10-21: an Auto conversation is never left with read tools only.
+
+    The channel used to be gated on a confirmed contract, so a spent contract (or a conversation
+    that never ran one) answered "solo herramientas de lectura" and left the human the last clicks.
+    Selecting Auto is the authorisation: the first stage/preview/apply opens the contract itself.
+    """
     client = signed_in("root@example.com")
     sid = new_chat(client)
     client.post(f"/api/assistant/sessions/{sid}/mode", json={"mode": "auto"})
     offered = _offered(client, sid)
-    assert "apply_draft" not in offered and "run_preview" not in offered
+    assert {"run_command", "run_preview", "apply_draft"} <= offered
 
     fake.SHARED.queue(_chat_reply(tool_calls=[_tool_call("apply_draft", {})],
                                   stop_reason="tool_use"),
-                      _chat_reply("No hay contrato."))
+                      _chat_reply("No hay nada que aplicar."))
     body = _send(client, sid)
-    assert "contrato" in _tool_results(body)[0]["content"].lower()
+    refusal = _tool_results(body)[0]["content"].lower()
+    assert "contrato" not in refusal
+    # Refused for the real reason (nothing to apply), and the turn survives so the agent can fix it.
+    assert "borrador" in refusal
+    assert any(m["content"] == "No hay nada que aplicar." for m in body["messages"])
+    assert sql("SELECT count(*) FROM assistant_auto_run WHERE session_id = :i", i=sid) == [(1,)]
 
 
 def test_contract_stages_clip_the_tools(superuser, db):
@@ -223,6 +237,13 @@ def test_mode_gate_matrix():
     assert auto.mode_gate(S(), "run_command", {"command": "speckit-plan"}, contract) is None
     assert auto.mode_gate(S(), "run_preview", {}, contract) is not None      # stage clipped
     assert auto.mode_gate(S(), "apply_draft", {}, contract) is not None
+    # No contract is the normal state between runs: the channel is open and the contract opens
+    # with the call (owner, 2026-10-21).
+    assert auto.mode_gate(S(), "apply_draft", {}, None) is None
+    assert auto.mode_gate(S(), "run_preview", {}, None) is None
+    assert auto.mode_gate(S(), "run_command", {}, None) is None
+
+    S.mode = "edit"
     assert auto.mode_gate(S(), "apply_draft", {}, None).code == "assistant.contract.required"
 
 
@@ -252,3 +273,27 @@ def test_offered_names_never_widen_edit():
                                                      "stages": ["draft", "preview", "apply"]})
     widened = auto.offered_names("auto", auto_contract, base)
     assert {"apply_draft", "run_command", "run_preview"} <= widened
+
+
+def test_the_agent_applies_inside_its_own_turn(superuser, db):
+    """Reported: the run ended "Auto · detenido" and left "pulsa Vista previa y Aplicar".
+
+    `apply_draft` runs inside the agent's own turn, which holds the busy claim, so the project's
+    idle guard refused every autonomous apply with `assistant_busy`. The conversation doing the
+    apply is now excluded from that guard, and a refusal comes back as a tool result.
+    """
+    from app.projects import apply as project_apply
+
+    client = signed_in("root@example.com")
+    sid = new_chat(client)
+    client.post(f"/api/assistant/sessions/{sid}/mode", json={"mode": "auto"})
+    # Only the self-exclusion matters here: assert the guard ignores our own session.
+    session = db.get(AssistantSession, sid)
+    sql("UPDATE assistant_session SET busy_since = now() WHERE id = :i", i=sid)
+    db.expire_all()
+    session = db.get(AssistantSession, sid)
+    project = db.get(Project, session.project_id)
+    project_apply._ensure_idle(db, project, sid)          # no raise: it is our own claim
+    with pytest.raises(Exception) as other:
+        project_apply._ensure_idle(db, project, -1)        # another conversation: still refused
+    assert getattr(other.value, "code", "") == "assistant_busy"

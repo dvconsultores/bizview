@@ -27,13 +27,20 @@ def _detached(project_id: int) -> Project | None:
         return project
 
 
-def _ensure_idle(db, project: Project) -> None:
+def _ensure_idle(db, project: Project, ignore_session_id: int | None = None) -> None:
+    """No other conversation of the project may be writing.
+
+    `ignore_session_id` is the conversation doing the apply: feature 028's `apply_draft` runs
+    *inside* the agent's own turn, which holds the busy claim, so counting it would refuse every
+    autonomous apply with `assistant_busy` (reported: the run ended "Auto · detenido" and left the
+    last clicks to the human).
+    """
     from app.assistant.service import is_busy
 
     settings = get_settings()
     sessions = db.scalars(select(AssistantSession).where(
         AssistantSession.project_id == project.id, AssistantSession.busy_since.is_not(None)))
-    if any(is_busy(s, settings) for s in sessions):
+    if any(is_busy(s, settings) for s in sessions if s.id != ignore_session_id):
         raise ApiError(409, "assistant_busy", M("assistant.busy"))
 
 
@@ -94,11 +101,13 @@ def apply_project(db, actor, project: Project, ip, *, session=None):
     from app.assistant import origin, readiness
     from app.assistant.preview import drop_for_session
     from app.projects import fs
+    from app.projects.workview import real
     from app.workspace import service as workspace_service
 
     if project.deleted_at is not None:
         raise ApiError(404, "not_found", M("projects.not_found"))
-    _ensure_idle(db, project)
+    owner_session = real(session) if session is not None else None
+    _ensure_idle(db, project, getattr(owner_session, "id", None))
     view = _view(db, project, session)
     failures = origin.recheck_draft(db, view, get_settings())
     if failures:

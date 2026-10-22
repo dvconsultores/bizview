@@ -31,6 +31,7 @@ DISCOVERY_NAMES = frozenset({"list_sources", "describe_source", "profile_source"
                              "get_authoring_guide", "get_workspace"})
 ASK_TOOLS = frozenset(DISCOVERY_NAMES | {"get_app_guide", "get_project_overview", "read_draft"})
 MAX_STOP_REASON = 120
+MAX_GOAL = 2000          # `RunContract.goal`'s own limit
 
 
 class ContractError(ValueError):
@@ -63,7 +64,7 @@ class RunContract(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    goal: str = Field(min_length=1, max_length=2000)
+    goal: str = Field(min_length=1, max_length=MAX_GOAL)
     sources: list[SourceAllow] = Field(default_factory=list, max_length=20)
     stages: list[Stage] = Field(default_factory=lambda: ["draft", "preview", "apply"],
                                 min_length=1, max_length=3)
@@ -176,7 +177,13 @@ def mode_gate(session: Any, tool: str, args: dict[str, Any],
         if not allowed:
             return Refusal("assistant.mode.ask_refused", t("assistant.mode.ask_refused"))
         return None
+    # Owner, 2026-10-21: in Auto the execution channel is always available. A contract is created
+    # when a run actually starts (see `service.ensure_auto_contract`), so a spent contract never
+    # leaves the conversation with read tools only — the reported "esta sesión solo me da
+    # herramientas de lectura". A live contract can still *narrow* the stages (a saved profile).
     if tool == "apply_draft":
+        if mode == "auto" and contract is None:
+            return None
         if contract is None:
             return Refusal("assistant.contract.required", t("assistant.contract.required"))
         if not contract.allows_stage("apply"):
@@ -187,15 +194,15 @@ def mode_gate(session: Any, tool: str, args: dict[str, Any],
         if mode != "auto":
             return None            # the human button keeps its own rules (014/017)
         if contract is None:
-            return Refusal("assistant.contract.required", t("assistant.contract.required"))
+            return None
         if not contract.allows_stage("preview"):
             return Refusal("assistant.contract.stage_not_allowed",
                            t("assistant.contract.stage_not_allowed"))
         return None
-    if tool in AUTO_ONLY_TOOLS and (mode != "auto" or contract is None):
+    if tool in AUTO_ONLY_TOOLS and mode != "auto":
         return Refusal("assistant.contract.required", t("assistant.contract.required"))
     if tool == "run_command":
-        if contract is None or not contract.allows_stage("draft"):
+        if contract is not None and not contract.allows_stage("draft"):
             return Refusal("assistant.contract.stage_not_allowed",
                            t("assistant.contract.stage_not_allowed"))
         return None
@@ -304,12 +311,13 @@ def offered_names(mode: str, contract: RunContract | None, base: frozenset[str])
         return frozenset(base & ASK_TOOLS)
     if mode != "auto":
         return base
-    base = base - {"suggest_command"}
-    extra = {"run_command", "set_current_spec"}
-    if contract is not None and contract.allows_stage("preview"):
-        extra.add("run_preview")
-    if contract is not None and contract.allows_stage("apply"):
-        extra.add("apply_draft")
-    if contract is None:
-        extra = {"set_current_spec"}
-    return frozenset(base | extra)
+    # Auto keeps the whole execution channel: the contract is opened when a run starts, so its
+    # absence must not degrade the conversation to read-only tools.
+    extra = {"run_command", "run_preview", "apply_draft", "set_current_spec"}
+    if contract is not None:                   # a live contract may narrow the stages (profiles)
+        extra = {"run_command", "set_current_spec"}
+        if contract.allows_stage("preview"):
+            extra.add("run_preview")
+        if contract.allows_stage("apply"):
+            extra.add("apply_draft")
+    return frozenset((base - {"suggest_command"}) | extra)

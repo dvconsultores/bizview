@@ -1,5 +1,6 @@
 """API error envelope: {"error": {"code", "message", "fields"?}} (contracts/api.md)."""
 import logging
+import uuid
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -90,6 +91,12 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _internal(request: Request, exc: Exception):
-        log.exception("unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse(error_body("internal", M("common.unexpected")),
-                            status_code=500)
+        # A correlation id ties the "Ocurrió un error inesperado" on screen to the traceback in the
+        # server log: without it the report is impossible to act on (owner, 2026-10-22: the button
+        # said only "unexpected error"). The id is not a secret and carries no data.
+        request_id = uuid.uuid4().hex[:12]
+        log.exception("unhandled error on %s %s [%s]", request.method, request.url.path,
+                      request_id)
+        return JSONResponse(
+            error_body("internal", M("common.unexpected_id", request_id=request_id)),
+            status_code=500)

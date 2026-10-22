@@ -8,6 +8,25 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Auto keeps its execution channel, and it can actually apply (2026-10-22)**: a conversation in
+  Auto was left with read tools only whenever no contract was live — which is the normal state
+  between runs — so the agent answered "esta sesión solo me da herramientas de lectura: pulsa Vista
+  previa y Aplicar" and handed the last two clicks to the human. Selecting Auto is the
+  authorisation, so `run_command`, `run_preview` and `apply_draft` are always offered and the run
+  contract is opened by the first one that is used (audited as `assistant_contract_confirmed` with
+  `auto: true`); a live contract still narrows the stages. A spent contract is therefore harmless.
+  - Two real defects came out of the same report: `apply_project`'s idle guard counted the
+    conversation *doing* the apply, so every autonomous apply failed with `assistant_busy` (the
+    agent could never apply; now the applying conversation is excluded); and a product refusal
+    (not ready, failing query check) ended the whole turn with "Ocurrió un error inesperado"
+    instead of coming back as a tool result the agent can fix and retry.
+  - An authorised run also no longer stops at "Listo para aplicar": it is nudged to run the preview
+    and apply, which is what "no me preguntes" means.
+  - The pill reads **Auto** instead of "Auto · sin contrato": a contract between runs is not a
+    missing authorisation.
+  - A 500 now carries a reference (`Ocurrió un error inesperado (referencia …)`) that matches the
+    traceback in the server log, so a report can be acted on.
+
 - **The docked chat resizes like an editor pane, and its history has room (2026-10-21)**: the seam
   between the page and the chat is a drag handle (`role="separator"`, arrows, Home/End/Enter,
   double-click to reset), from 22 rem to 60 rem and never more than 70 % of the screen; the width is

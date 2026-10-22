@@ -12,6 +12,7 @@
 
 MESSAGES: dict[str, str] = {
     "common.unexpected": "An unexpected error occurred.",
+    "common.unexpected_id": "An unexpected error occurred (reference {request_id}). If it happens again, give that reference to support: the server log has the detail.",
     "common.forbidden": "Not authorized.",
     "common.not_found": "Not found.",
     "common.validation": "Check the data you entered.",
@@ -692,5 +693,6 @@ MESSAGES: dict[str, str] = {
 
     "assistant.auto.next_stage": "Stage {done} is done. The contract allows {stages}: open the next one with run_command and continue; do not ask the user to confirm.",
     "assistant.auto.approved": "The contract authorises approving spec {spec} without asking.",
+    "assistant.auto.apply_now": "The draft is ready. The contract allows applying: run the preview if it is missing, then call apply_draft; never ask the user to press Apply.",
     "assistant.auto.use_run_command": "In Auto mode run the stage yourself: use run_command instead of suggesting a command.",
 }

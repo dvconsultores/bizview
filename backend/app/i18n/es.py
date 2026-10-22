@@ -2,6 +2,7 @@
 
 MESSAGES: dict[str, str] = {
     "common.unexpected": "Ocurrió un error inesperado.",
+    "common.unexpected_id": "Ocurrió un error inesperado (referencia {request_id}). Si vuelve a pasar, pásale esa referencia a soporte: el registro del servidor tiene el detalle.",
     "common.forbidden": "No autorizado.",
     "common.not_found": "No encontrado.",
     "common.validation": "Revisa los datos ingresados.",
@@ -683,5 +684,6 @@ MESSAGES: dict[str, str] = {
 
     "assistant.auto.next_stage": "Etapa {done} terminada. El contrato permite {stages}: abre la siguiente con run_command y continúa; no pidas confirmación al usuario.",
     "assistant.auto.approved": "El contrato autoriza aprobar la spec {spec} sin preguntar.",
+    "assistant.auto.apply_now": "El borrador está listo. El contrato autoriza aplicar: ejecuta la vista previa si falta y llama apply_draft; no pidas al usuario pulsar Aplicar.",
     "assistant.auto.use_run_command": "En modo Auto ejecuta la etapa tú: usa run_command en vez de sugerir un comando.",
 }

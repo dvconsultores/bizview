@@ -155,7 +155,9 @@ describe("ModeSelector (feature 028, two modes)", () => {
     await act(async () => {
       root.render(<ModePill session={{ ...base, mode: "auto", contract_status: "none" }} />);
     });
-    expect(container.textContent).toBe("Auto · sin contrato");
+    // No contract is the normal state between runs (one opens with the next stage): the pill says
+    // just "Auto", never anything that reads like a missing authorisation.
+    expect(container.textContent).toBe("Auto");
 
     await act(async () => {
       root.render(

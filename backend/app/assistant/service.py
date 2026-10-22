@@ -250,11 +250,6 @@ _EMPTY_TEXT = "assistant.chat.empty"
 _CONTINUE_HINT = "assistant.chat.continue_hint"
 _INVALID_ARGS_TEXT = "assistant.chat.invalid_args"
 _STATE_HEADER = "\n\n## Estado\n"
-BUDGET_WARNING_LINE = (
-    "Aviso: presupuesto ≥ 80 %. El producto lo amplía solo hasta su máximo, así que NO cierres el "
-    "trabajo a medias ni propongas aplicar por presupuesto: termina el comando. Para gastar menos, "
-    "agrupa lecturas y no repitas consultas que ya hiciste."
-)
 BUSY_TEXT = "assistant.busy"
 CAPACITY_TEXT = "assistant.capacity"
 _INTERRUPTED_TEXT = "assistant.interrupted"
@@ -1204,6 +1199,39 @@ def create_contract(db, session: AssistantSession, project: Project, contract, a
     return run
 
 
+def ensure_auto_contract(db, session: AssistantSession,
+                         *, goal: str | None = None) -> AssistantAutoRun | None:
+    """Open the run contract of an Auto turn the first time that turn needs one.
+
+    Selecting Auto is the authorisation (owner, 2026-10-20: no step-up), so the contract is
+    bookkeeping — one row per run, audited, with the stages and the summary. Creating it lazily
+    keeps a plain question free of rows and makes a **spent** contract harmless: the next stage,
+    preview or apply opens a new one instead of leaving the conversation with read tools only
+    (reported: "esta sesión solo me da herramientas de lectura").
+    """
+    existing = live_auto_run(db, session)
+    if existing is not None:
+        session.auto_run = existing
+        return existing
+    if (session.mode or "auto") != "auto" or session.project_id is None:
+        return None
+    project = db.get(Project, session.project_id)
+    if project is None or project.deleted_at is not None:
+        return None
+    text = (goal or "").strip() or (session.title or "").strip() or "run"
+    contract = auto.parse_contract({"goal": text[:auto.MAX_GOAL],
+                                    "stages": ["draft", "preview", "apply"]})
+    actor = db.get(AppUser, session.created_by)
+    if actor is None:
+        return None
+    run = create_contract(db, session, project, contract, actor, None)
+    audit_record(db, "assistant_contract_confirmed", actor_id=actor.id,
+                 detail={"run": run.id, "session": session.id, "stages": list(contract.stages),
+                         "sources": [], "auto": True})
+    db.flush()
+    return run
+
+
 def arm_auto_watch(db, session: AssistantSession, run: AssistantAutoRun,
                    version: Any) -> None:
     """FR-008/FR-009: watch the first scheduled run and gate the new dashboards' visibility."""
@@ -1948,7 +1976,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _attach_suggestions(session, new_messages)
         activity.end_run(session, status)
         runs.end_from_activity(run, status, definition, finished=finished, error=error)
-        if auto_run is not None and status in _AUTO_END:
+        # A contract may have been opened in the middle of this turn (the first stage, preview or
+        # apply of an Auto turn), so the summary looks it up instead of the captured local.
+        live = live_auto_run(db, session) or auto_run
+        if live is not None and status in _AUTO_END:
             kind, reason = _AUTO_END[status]
             blocked = auto_blocked_reason(
                 next((m.content for m in reversed(new_messages)
@@ -1989,7 +2020,13 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     while rounds < max_rounds:
         _bump(session, "rounds")
-        # Feature 028: `run_command` switches the stage mid-turn, so the round re-reads it.
+        # Feature 028: `run_command` switches the stage mid-turn, and the first stage/preview/apply
+        # opens the contract, so the round re-reads both.
+        if auto_run is None:
+            fresh_contract = auto.live_contract(session)
+            if fresh_contract is not None:
+                auto_run = fresh_contract
+                max_rounds = max(max_rounds, app_settings.ai_auto_max_rounds)
         fresh = runs.active(db, session.id)
         if fresh is not None and fresh.status == "running" and fresh is not run:
             run = fresh
@@ -2247,6 +2284,18 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
         now_ready = readiness.compute(view)["ready"]
         if now_ready and not was_ready and (run is None or run.command == "speckit-implement"):
+            contract_now = auto.contract_of(session)
+            if (auto_run is not None and auto_run.status in auto.LIVE_STATUSES
+                    and contract_now is not None and contract_now.allows_stage("apply")):
+                # FR-004b: an authorised run finishes its own work. Ending at "ready" left the
+                # version unapplied and the run asking the human to press Aplicar.
+                nudge = t("assistant.auto.apply_now")
+                new_messages.append(_add(db, session, role="assistant", content=nudge))
+                history.append(ChatMessage(role="user", content=nudge))
+                session.updated_at = datetime.now(UTC)
+                _commit_round(db, session, claim)
+                was_ready = now_ready
+                continue
             if not any(ready in (reply.text or "") for ready in ("Listo para aplicar",
                                                                  "Ready to apply")):
                 summary = (view.draft or {}).get("summary") or t("assistant.progress.the_draft")
