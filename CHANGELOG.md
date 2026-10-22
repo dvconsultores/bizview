@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Vista previa did nothing: the worker had no project folders (2026-10-22)**: the `worker`
+  service mounted only `attachments`, so every preview it ran saw an empty draft, recorded
+  `status: succeeded` over zero files, and the workspace kept saying "el borrador cambió desde la
+  última vista previa" with **Aplicar** disabled — while the agent had written 51 files into the
+  project. The worker now mounts the projects folder **read-only** (only the backend writes it),
+  both in `bizview.yml` and in the compose file `deploy/install.sh` generates; the installer test
+  asserts both mounts. A preview that sees no files at all is recorded as **failed** with the reason
+  ("comprueba que la carpeta de proyectos esté montada (PROJECTS_DIR)") instead of a false success.
+
 ### Changed
 
 - **Auto keeps its execution channel, and it can actually apply (2026-10-22)**: a conversation in

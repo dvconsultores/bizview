@@ -505,6 +505,7 @@ MESSAGES: dict[str, str] = {
     "preview.checks_not_passed": "comprobación no superada",
     "preview.failed_reason": "La vista previa falló: {reason}",
     "preview.invalid_integration_yaml": "la integración no tiene integration.yaml válido",
+    "preview.empty_draft": "La vista previa no ve ningún archivo del proyecto. Comprueba que la carpeta de proyectos esté montada (PROJECTS_DIR) y vuelve a intentarlo.",
     "preview.validate_draft_before_preview": "Valida el borrador antes de la vista previa.",
     "preview.busy": "Ya hay una vista previa en curso; espera a que termine.",
     "preview.run_preview_first": "Ejecuta la vista previa primero.",

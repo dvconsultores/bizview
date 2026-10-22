@@ -515,6 +515,7 @@ MESSAGES: dict[str, str] = {
     "preview.checks_not_passed": "check failed",
     "preview.failed_reason": "Preview failed: {reason}",
     "preview.invalid_integration_yaml": "the integration has no valid integration.yaml",
+    "preview.empty_draft": "The preview sees no project files. Check that the projects folder is mounted (PROJECTS_DIR) and try again.",
     "preview.validate_draft_before_preview": "Validate the draft before running the preview.",
     "preview.busy": "A preview is already running; wait for it to finish.",
     "preview.run_preview_first": "Run the preview first.",

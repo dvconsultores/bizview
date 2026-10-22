@@ -369,10 +369,12 @@ services:
     command: ["python", "-m", "app.worker"]
     env_file: .env
     environment:
+      PROJECTS_DIR: /app/data/projects
       ATTACHMENTS_DIR: /app/data/attachments
     restart: unless-stopped
     volumes:
       - ./attachments:/app/data/attachments
+      - ./projects:/app/data/projects:ro   # the previews it runs read the project folders
     healthcheck:
       disable: true
     depends_on:

@@ -34,7 +34,11 @@ check "certificate source passed" 'grep -q "CADDY_TLS" "$D/bizview.yml" && grep 
 check "projects folder" '[[ -d "$D/projects" ]]'
 check "attachments folder" '[[ -d "$D/attachments" ]]'
 check "watchtower scoped by label" 'grep -q "bizview-watchtower" "$D/bizview.yml" && grep -q "WATCHTOWER_LABEL_ENABLE" "$D/bizview.yml" && [[ $(grep -c "watchtower.enable" "$D/bizview.yml") == 3 ]]'
-check "projects mounted in backend only" '[[ $(grep -c "./projects:/app/data/projects" "$D/bizview.yml") == 1 ]]'
+# The worker reads the project folders to run previews (read-only); only the backend writes them.
+check "projects mounted read-write in the backend" \
+  '[[ $(grep -c "^      - ./projects:/app/data/projects$" "$D/bizview.yml") == 1 ]]'
+check "projects mounted read-only in the worker" \
+  '[[ $(grep -c "^      - ./projects:/app/data/projects:ro" "$D/bizview.yml") == 1 ]]'
 check "project size setting" 'grep -q "^PROJECT_MAX_MB=20" "$D/.env"'
 check "timezone written" 'grep -q "^TIMEZONE='"'"'" "$D/.env"'
 check ".env is 600" '[[ $(stat -c %a "$D/.env") == 600 ]]'

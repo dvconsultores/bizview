@@ -45,6 +45,11 @@ services:
       disable: true
     volumes:
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # feature 024
+      # The previews it runs read the project folders (feature 020/014). Without this mount the
+      # worker saw an empty draft, recorded a "succeeded" preview over no files, and the workspace
+      # kept saying "el borrador cambió desde la última vista previa" while Apply stayed disabled.
+      # Read-only: only the backend writes project files.
+      - ${PROJECTS_DIR_HOST:-./projects}:/app/data/projects:ro
     depends_on:
       backend:
         condition: service_healthy

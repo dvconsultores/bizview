@@ -350,13 +350,24 @@ def run_draft_preview(db, session, *, time_limit_s: int = 300) -> dict:
         and isinstance(item["definition"].get("direct"), dict)
     }
     outcomes = [*results.values(), *direct_results.values()]
-    status = ("succeeded" if all(r["status"] == "succeeded" for r in outcomes)
-              else "failed")
+    empty_draft = ""
+    if not files:
+        # An empty draft is not a successful preview: recording one here (the worker without the
+        # projects volume saw no files) left the project saying "el borrador cambió desde la última
+        # vista previa" forever, with Apply disabled and no explanation.
+        status = "failed"
+        outcomes = []
+        empty_draft = t("preview.empty_draft")
+    else:
+        status = ("succeeded" if all(r["status"] == "succeeded" for r in outcomes)
+                  else "failed")
     now = datetime.now(UTC)
     session.preview = {"status": status, "finished_at": _iso(now),
                        "integrations": results, "preview_integrations": sorted(results),
                        "reports": direct_results, "fingerprint": fp,
                        "session_id": session.id}
+    if empty_draft:
+        session.preview["message"] = empty_draft
     record_outcome(db, session)
     return session.preview
 

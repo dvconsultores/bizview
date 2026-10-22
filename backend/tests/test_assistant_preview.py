@@ -518,3 +518,29 @@ def test_draft_layout_problem_is_reported_with_file_and_path(db, superuser, work
     assert problem["expected"]["enum"] == ["diaria", "por_producto", "resumen"]
     assert "no_existe" in problem["message"]
     assert result["readiness"]["ready"] is False
+
+
+def test_an_empty_draft_is_a_failed_preview_not_a_success(db, superuser):
+    """The worker without the projects volume saw no files and recorded a "succeeded" preview.
+
+    That is what kept the workspace saying "el borrador cambió desde la última vista previa" with
+    Apply disabled, while the project folder was full of files written by the agent (reported
+    2026-10-22). An empty draft now fails, with the reason in the payload.
+    """
+    from app.assistant import preview as assistant_preview
+    from app.assistant import readiness
+
+    import shutil
+
+    actor = db.get(AppUser, superuser.id)
+    project = project_service.create(db, actor, "Vacío preview")
+    db.commit()
+    session = service.create_session(db, actor, project_id=project.id)
+    db.commit()
+    # Exactly what a process without the projects volume sees: the folder is not there.
+    shutil.rmtree(fs.project_root(project.slug))
+
+    result = assistant_preview.run_draft_preview(db, session)
+    assert result["status"] == "failed"
+    assert "PROJECTS_DIR" in result["message"]
+    assert result["fingerprint"] == readiness.fingerprint({})
