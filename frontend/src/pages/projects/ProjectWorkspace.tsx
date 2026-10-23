@@ -835,7 +835,8 @@ export function ProjectWorkspace() {
         </div>
         {/* Below every pane, so phones see readiness without opening the editor. */}
         <StatusBar validation={check?.validation ?? null} readiness={check?.readiness ?? null}
-                   status={project.status} lastApplied={project.last_applied} save={save} busy={busy} />
+                   status={project.status} lastApplied={project.last_applied} save={save} busy={busy}
+                   onRunPending={readOnly ? undefined : () => void preview()} />
       </div>
     </div>
   );

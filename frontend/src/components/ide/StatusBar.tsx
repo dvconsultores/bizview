@@ -19,6 +19,9 @@ export function StatusBar(props: {
   lastApplied: ProjectLastApplied | null;
   save: SaveState;
   busy?: boolean;
+  /** Runs the action the pending reason asks for (today: the preview), so the bar is not just a
+   * diagnosis: "Ejecuta la vista previa" becomes the button that runs it. */
+  onRunPending?: () => void;
 }) {
   const t = useT();
   const errors = props.validation?.errors.length ?? 0;
@@ -46,9 +49,20 @@ export function StatusBar(props: {
         >
           {props.readiness.ready ? t.projects.ready : t.projects.notReady}
           {!props.readiness.ready && props.readiness.pending.length > 0 && (
-            <span className="max-w-[26rem] truncate text-ink-faint">
-              · {props.readiness.pending[0].message}
-            </span>
+            props.onRunPending && props.readiness.pending[0].code === "preview" ? (
+              <button
+                type="button"
+                data-run-pending=""
+                onClick={props.onRunPending}
+                className="inline-flex max-w-[26rem] items-center gap-1 truncate rounded px-1 text-accent underline hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+              >
+                {t.projects.runPreviewNow}
+              </button>
+            ) : (
+              <span className="max-w-[26rem] truncate text-ink-faint">
+                · {props.readiness.pending[0].message}
+              </span>
+            )
           )}
         </span>
       )}

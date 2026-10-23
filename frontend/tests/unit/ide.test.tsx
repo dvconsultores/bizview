@@ -218,6 +218,33 @@ describe("problems, status bar and conflicts", () => {
     );
   });
 
+  it("turns the pending preview reason into the button that runs it", async () => {
+    // "ok but what to do?" (owner, 2026-10-23): the bar said "Ejecuta la vista previa" and stopped
+    // there. The reason is now the action.
+    const onRunPending = vi.fn();
+    await render(
+      <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
+                 readiness={{ ready: false, pending: [
+                   { code: "preview", file: null, message: "Ejecuta la vista previa." }] }}
+                 status="borrador" lastApplied={null} save="saved" onRunPending={onRunPending} />,
+    );
+    const action = container.querySelector("[data-run-pending]") as HTMLButtonElement;
+    expect(action).not.toBeNull();
+    expect(action.textContent).toBe(t.projects.runPreviewNow);
+    await act(async () => action.click());
+    expect(onRunPending).toHaveBeenCalledTimes(1);
+
+    // A reason that is not an action (a query check) stays a plain explanation.
+    await render(
+      <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
+                 readiness={{ ready: false, pending: [
+                   { code: "query_check", file: "x.yaml", message: "Comprueba este archivo." }] }}
+                 status="borrador" lastApplied={null} save="saved" onRunPending={onRunPending} />,
+    );
+    expect(container.querySelector("[data-run-pending]")).toBeNull();
+    expect(container.textContent).toContain("Comprueba este archivo.");
+  });
+
   it("conflict bar choices", async () => {
     const h = { onDiff: vi.fn(), onOverwrite: vi.fn(), onDiscard: vi.fn() };
     await render(<ConflictBar kind="stale" current={{ revision_id: 3, sha256: "x", author: "Ana", time: null }} {...h} />);

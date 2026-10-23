@@ -1090,6 +1090,7 @@ export const es = {
     ready: "Listo para aplicar",
     notReady: "Pendiente para aplicar",
     saveFirstToApply: "Guarda los cambios para poder aplicar.",
+    runPreviewNow: "Ejecutar la vista previa",
     lastApplied: (date: string) => `Aplicado ${date}`,
     neverApplied: "Nunca aplicado",
     agentWorking: "El asistente está editando el proyecto…",
