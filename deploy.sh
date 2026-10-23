@@ -161,3 +161,7 @@ for tag in "${pushed[@]}"; do
     break
   fi
 done
+echo
+echo "Note: Watchtower recreates a container with ITS OWN saved configuration, so it applies a new"
+echo "IMAGE but never a change to bizview.yml (a new volume, a new variable, a new service). After an"
+echo "update that touched the compose file, run the two commands above once on the server."

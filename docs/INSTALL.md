@@ -617,9 +617,12 @@ consequences:
 - with a fixed tag such as `0.1.0`, nothing happens until you change the tag, which keeps an
   upgrade a deliberate act (the recommended setting for a customer).
 
-A release that renames containers (0.1.0 → the services are now `bizview-backend`,
-`bizview-worker`, `bizview-caddy` instead of `bizview-*-1`) or adds a service leaves the old
-containers running beside the new ones, still holding their ports. Apply it once with:
+Watchtower recreates a container with **its own saved configuration**: it applies a new image,
+never a change to `bizview.yml`. A release that adds a service or renames containers (0.1.0 → the
+services are now `bizview-backend`, `bizview-worker`, `bizview-caddy` instead of `bizview-*-1`) leaves
+the old containers running beside the new ones, still holding their ports, and a release that adds a
+**volume** or an **environment variable** keeps running without it until the compose file is applied
+once. Whenever an update touched `bizview.yml`, run this on the server after the images are pulled:
 
 ```bash
 docker compose -f bizview.yml up -d --build --remove-orphans
