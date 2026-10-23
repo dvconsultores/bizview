@@ -35,8 +35,14 @@ def _context(db: Session, user: AppUser, report_id: str) -> engine.Context:
     if version is None or dash is None or report_id not in version.artifacts.get("reports", {}):
         raise not_found(M("report.not_found"))
     ctx = engine.cached_context(version, report_id)
-    roles = (ctx.definition.get("access") or {}).get("roles") or ["admin"]
-    if "user" not in roles or dash.status != "available":
+    access = ctx.definition.get("access") or {}
+    roles = access.get("roles") or ["admin"]
+    # `grants: true` in the report means per-user grants are **also** required (schema:
+    # "si además se requieren permisos por usuario"): skipping the check because the report lists
+    # the `user` role let any user read a report meant to be granted one by one (found while
+    # reviewing the owner's ventas-facturacion report, 2026-10-22).
+    per_user = access.get("grants") is True
+    if per_user or "user" not in roles or dash.status != "available":
         dashboards.check_open(db, user, dash)
     return ctx
 

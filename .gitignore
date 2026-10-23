@@ -34,3 +34,6 @@ deploy/caddy/certs/*
 # Scratch output from local test runs (never part of the product).
 .*-out.txt
 .dod-*
+
+# A project downloaded with the workspace's Download button (kept out of the repo).
+/artemisa/

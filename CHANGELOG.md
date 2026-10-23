@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A report's `access.grants: true` was ignored (2026-10-22)**: the report API skipped the
+  per-user grant check whenever the report listed the `user` role, so `grants: true` ("si además se
+  requieren permisos por usuario") published the report to every signed-in user instead of gating
+  it. Found reviewing the owner's `ventas-facturacion` report, which declares exactly that.
+  Declaring the `user` role **without** `grants` still opens the report to users, as its author
+  intended.
+
 - **Vista previa did nothing: the worker had no project folders (2026-10-22)**: the `worker`
   service mounted only `attachments`, so every preview it ran saw an empty draft, recorded
   `status: succeeded` over zero files, and the workspace kept saying "el borrador cambió desde la

@@ -527,10 +527,10 @@ def test_an_empty_draft_is_a_failed_preview_not_a_success(db, superuser):
     Apply disabled, while the project folder was full of files written by the agent (reported
     2026-10-22). An empty draft now fails, with the reason in the payload.
     """
+    import shutil
+
     from app.assistant import preview as assistant_preview
     from app.assistant import readiness
-
-    import shutil
 
     actor = db.get(AppUser, superuser.id)
     project = project_service.create(db, actor, "Vacío preview")
