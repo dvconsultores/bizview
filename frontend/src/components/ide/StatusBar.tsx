@@ -35,7 +35,23 @@ export function StatusBar(props: {
           {props.validation.valid ? t.projects.valid : t.projects.problemsCount(errors)}
         </span>
       )}
-      {props.readiness && <span>{props.readiness.ready ? t.projects.ready : t.projects.notReady}</span>}
+      {props.readiness && (
+        // Why it is not ready, not just that it is not (owner, 2026-10-23: "idk how to apply"): the
+        // backend already sends the reason ("Ejecuta la vista previa", "Comprueba este archivo con
+        // check_query"), so it is shown here instead of leaving a greyed-out Apply unexplained.
+        <span
+          className="flex min-w-0 items-center gap-1"
+          data-readiness-pending=""
+          title={props.readiness.pending.map((item) => item.message).join("\n") || undefined}
+        >
+          {props.readiness.ready ? t.projects.ready : t.projects.notReady}
+          {!props.readiness.ready && props.readiness.pending.length > 0 && (
+            <span className="max-w-[26rem] truncate text-ink-faint">
+              · {props.readiness.pending[0].message}
+            </span>
+          )}
+        </span>
+      )}
       {props.status && <Badge tone={STATUS_TONE[props.status]}>{t.projects.status[props.status]}</Badge>}
       <span>{props.lastApplied
         ? t.projects.lastAppliedBy(props.lastApplied.version, formatDateTime(props.lastApplied.at),

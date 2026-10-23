@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A preview no longer depends on the worker seeing the projects folder (2026-10-23)**: the
+  request now carries the draft the backend validated (`assistant_preview_request.files`, migration
+  `0026_preview_request_files`) and the worker previews exactly those files. Until now the worker
+  re-read the folder from its own container: without the `projects` volume it previewed an empty
+  draft, which is why "Vista previa" appeared to do nothing and **Aplicar** stayed disabled. The
+  volume mount is still the correct deployment and stays; a preview simply cannot be wrong about
+  which files it ran any more — it uses the same ones that produced the fingerprint readiness
+  checks.
+- **The workspace says why it is not ready (2026-10-23)**: the status bar shows the first pending
+  reason the backend sends ("Ejecuta la vista previa", "Comprueba este archivo con check_query") and
+  lists them all on hover, and the disabled **Aplicar** button carries the same explanation (or
+  "Guarda los cambios para poder aplicar" while there are unsaved edits). It used to be a greyed-out
+  button with no reason.
 - **A report's `access.grants: true` was ignored (2026-10-22)**: the report API skipped the
   per-user grant check whenever the report listed the `user` role, so `grants: true` ("si además se
   requieren permisos por usuario") published the report to every signed-in user instead of gating

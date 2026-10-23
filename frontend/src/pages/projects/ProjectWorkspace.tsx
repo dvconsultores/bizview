@@ -702,8 +702,15 @@ export function ProjectWorkspace() {
           {!readOnly && (
             // On phones the label is in the accessible name only: the header must stay two rows so
             // the page fits the viewport and nothing slides under the sticky top bar.
+            // A disabled primary action explains itself (owner, 2026-10-23: "idk how to apply"):
+            // the first pending item is the reason the backend gives, already localized.
             <Button size="sm" icon={<Upload className="h-4 w-4" aria-hidden />}
                     aria-label={t.projects.apply}
+                    title={dirty ? t.projects.saveFirstToApply
+                      : !check?.readiness.ready
+                        ? [t.projects.notReady, ...(check?.readiness.pending ?? [])
+                            .map((item) => item.message)].join(": ")
+                        : undefined}
                     disabled={!check?.readiness.ready || dirty} onClick={() => setConfirm("apply")}>
               <span className="hidden sm:inline">{t.projects.apply}</span>
             </Button>

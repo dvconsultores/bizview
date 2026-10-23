@@ -200,6 +200,24 @@ describe("problems, status bar and conflicts", () => {
     expect(container.textContent).toContain(t.projects.neverApplied);
   });
 
+  it("says why the project is not ready, not just that it is not", async () => {
+    // Owner, 2026-10-23 ("idk how to apply or preview"): the reason the backend sends was invisible.
+    await render(
+      <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
+                 readiness={{ ready: false, pending: [
+                   { code: "preview", file: null, message: "Ejecuta la vista previa." },
+                   { code: "query_check", file: "x.yaml", message: "Comprueba este archivo." },
+                 ] }}
+                 status="borrador" lastApplied={null} save="saved" />,
+    );
+    const note = container.querySelector("[data-readiness-pending]")!;
+    expect(note.textContent).toContain(t.projects.notReady);
+    expect(note.textContent).toContain("Ejecuta la vista previa.");
+    expect(note.getAttribute("title")).toBe(
+      "Ejecuta la vista previa.\nComprueba este archivo.",
+    );
+  });
+
   it("conflict bar choices", async () => {
     const h = { onDiff: vi.fn(), onOverwrite: vi.fn(), onDiscard: vi.fn() };
     await render(<ConflictBar kind="stale" current={{ revision_id: 3, sha256: "x", author: "Ana", time: null }} {...h} />);

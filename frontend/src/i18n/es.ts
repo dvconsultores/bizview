@@ -1089,6 +1089,7 @@ export const es = {
     valid: "Válido",
     ready: "Listo para aplicar",
     notReady: "Pendiente para aplicar",
+    saveFirstToApply: "Guarda los cambios para poder aplicar.",
     lastApplied: (date: string) => `Aplicado ${date}`,
     neverApplied: "Nunca aplicado",
     agentWorking: "El asistente está editando el proyecto…",

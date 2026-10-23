@@ -314,15 +314,21 @@ def _render_direct(session, rid: str, definition: dict) -> dict:
         }
 
 
-def run_draft_preview(db, session, *, time_limit_s: int = 300) -> dict:
+def run_draft_preview(db, session, *, time_limit_s: int = 300,
+                      files: dict[str, str] | None = None) -> dict:
     """Runs every draft integration into the session's preview schemas (worker and agent tool
     share it), stores session.preview with the draft fingerprint and posts the outcome notice.
-    The preview lives on the project: one from another conversation drops that one's schemas."""
+    The preview lives on the project: one from another conversation drops that one's schemas.
+
+    `files` is the draft to run. The worker passes the copy stored with the request, so a preview
+    never depends on it seeing the projects folder (reported 2026-10-22: it did not).
+    """
     session = _view(db, session)
     previous = (session.preview or {}).get("session_id")
     if previous and previous != session.id:
         drop_for_session(previous)
-    files = (session.draft or {}).get("files", {})
+    if files is None:
+        files = (session.draft or {}).get("files", {})
     integrations, draft_reports = draft_items(files, active_integrations(db))
     fp = readiness.fingerprint(files)
     if integrations:
@@ -386,7 +392,9 @@ def request_preview(db, actor, session) -> dict:
             return run_draft_preview(db, session)
         except PreviewBusy:
             raise ApiError(409, "preview_running", M("preview.busy")) from None
-    db.add(AssistantPreviewRequest(session_id=session.id, requested_by=actor.id))
+    # The draft travels with the request: the worker may not share this process's projects folder.
+    db.add(AssistantPreviewRequest(session_id=session.id, requested_by=actor.id,
+                                   files=dict(session.draft["files"])))
     preview = {"status": "pending", "requested_at": _iso(datetime.now(UTC)),
                "session_id": session.id}
     session.preview = preview
@@ -438,7 +446,8 @@ def process_request(request_id: int) -> None:
                 session = db.get(AssistantSession, req.session_id)
                 if session is None:
                     return
-                run_draft_preview(db, session)
+                carried = req.files if isinstance(req.files, dict) and req.files else None
+                run_draft_preview(db, session, files=carried)
                 req.finished_at = datetime.now(UTC)
                 db.commit()
             except PreviewBusy:

@@ -728,6 +728,10 @@ class AssistantPreviewRequest(Base):
         DateTime(timezone=True), server_default=func.now())
     taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The draft the super user asked to preview, carried with the request (migration 0026). The
+    # worker then never reads the projects folder: the preview runs on exactly the files the
+    # backend validated, even when the two processes do not share that volume.
+    files: Mapped[dict | None] = mapped_column(JSONB)
 
 
 class ShareLink(Base):

@@ -544,3 +544,33 @@ def test_an_empty_draft_is_a_failed_preview_not_a_success(db, superuser):
     assert result["status"] == "failed"
     assert "PROJECTS_DIR" in result["message"]
     assert result["fingerprint"] == readiness.fingerprint({})
+
+
+def test_a_worker_without_the_projects_volume_still_previews(db, superuser, workspace, tmp_path,
+                                                             monkeypatch):
+    """The deployed worker had no `projects` mount: it saw no files and "succeeded" over nothing.
+
+    The request now carries the draft the backend validated, so the preview result no longer depends
+    on the worker sharing that folder (reported 2026-10-22: "vista previa" did nothing and Aplicar
+    stayed disabled).
+    """
+    lock(workspace)
+    apply(signed_in("root@example.com"))
+    s = _session(db, superuser, _draft())
+    client = signed_in("root@example.com")
+    assert client.post(f"/api/assistant/sessions/{s.id}/preview").status_code == 200
+    req = sql("SELECT id, files FROM assistant_preview_request WHERE session_id = :s", s=s.id)[0]
+    req_id, carried = req
+    assert isinstance(carried, dict) and "integrations/ventas-dos/integration.yaml" in carried
+
+    # The worker's own projects folder: empty, exactly like the container without the volume.
+    monkeypatch.setattr(get_settings(), "projects_dir", str(tmp_path / "worker-projects"))
+    (tmp_path / "worker-projects").mkdir()
+    preview.process_request(req_id)
+
+    result = _preview(s)
+    assert result["status"] == "succeeded", result
+    assert result["integrations"]["ventas-dos"]["datasets"]
+    from app.assistant import readiness
+
+    assert result["fingerprint"] == readiness.fingerprint(carried)
