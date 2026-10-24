@@ -5,7 +5,6 @@
 `TypeError: Object of type datetime is not JSON serializable` at insert time, *after* the apply
 had run, so every assistant-driven apply ended with "Ocurrió un error inesperado (TypeError)".
 """
-from __future__ import annotations
 
 import json
 from datetime import UTC, date, datetime
@@ -15,7 +14,7 @@ from uuid import UUID
 
 import pytest
 
-from app.assistant import tools
+from app.assistant import service, tools
 from app.assistant.service import _json_safe
 from app.i18n import use_locale
 
@@ -77,3 +76,14 @@ def test_apply_draft_payload_needs_json_safe(monkeypatch):
     safe = _json_safe(payload)
     assert json.loads(json.dumps(safe)) == safe
     assert safe["applied_at"] == "2026-10-24T20:39:51+00:00"
+
+
+def test_unexpected_error_names_the_tool(monkeypatch):
+    """The reader's report has to say *which* tool died: the type alone was undebuggable."""
+    use_locale("es")
+    failure = TypeError("Object of type datetime is not JSON serializable")
+    failure.tool_name = "apply_draft"
+    assert service._error_text(failure).endswith("(TypeError, apply_draft)")
+    bare = service._error_text(TypeError("boom"))
+    assert bare.endswith("(TypeError)")
+    assert "None" not in bare

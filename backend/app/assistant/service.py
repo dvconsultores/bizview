@@ -1888,15 +1888,16 @@ def _error_text(exc: BaseException | None) -> str:
     """What the conversation says about a failed run: a cause it can act on, never internals.
 
     A connection failure to the installation's database is by far the most common (remote database,
-    long turns); the rest keep the exception's type only, because its message may carry a host or a
-    credential and this text goes into the provider's history on the next turn. The traceback goes
-    to the server log with the session id.
+    long turns); the rest keep the exception's type and the tool it died in, because its message may
+    carry a host or a credential and this text goes into the provider's history on the next turn.
+    The traceback goes to the server log with the session id.
     """
     if exc is None:
         return t(_UNEXPECTED_TEXT)
     if isinstance(exc, (OperationalError, psycopg.OperationalError)):
         return t("assistant.unexpected_db")
-    return f"{t(_UNEXPECTED_TEXT)} ({type(exc).__name__})"
+    tool = getattr(exc, "tool_name", None)          # set where the tool is called
+    return f"{t(_UNEXPECTED_TEXT)} ({type(exc).__name__}{f', {tool}' if tool else ''})"
 
 
 def _post_error(session_id: int, claimed_at: datetime, exc: BaseException | None = None) -> None:
@@ -2250,6 +2251,9 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                     last_failed = signature
                     tool_result = {"error": exc.message}
                     summary = exc.message
+                except Exception as exc:                # a tool bug names the tool it died in
+                    exc.tool_name = call.name          # type: ignore[attr-defined]
+                    raise
                 activity.end_tool(
                     session,
                     not (isinstance(tool_result, dict) and tool_result.get("error")),
