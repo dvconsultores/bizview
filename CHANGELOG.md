@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **An Auto run can apply a project again (2026-10-24)**: every assistant-driven **apply** ended
+  with «Ocurrió un error inesperado (TypeError)» — for `001-mercado-cripto` and `002-panorama-cripto`
+  of the `coinmarketcap` project, and never once succeeded on the installation (five contracts, zero
+  applies) while the same apply from the **Aplicar** button worked. The tool result of `apply_draft`
+  carries the applied version (`version_json`), whose `applied_at` is a `datetime`; tool results are
+  stored in `assistant_message.tool_payload`, a JSONB column that psycopg dumps with a plain
+  `json.dumps`, so the insert raised `TypeError: Object of type datetime is not JSON serializable`
+  *after* the apply had run — the round was rolled back and the reader saw only the type name.
+  - Every tool result is now normalised to JSON data once, at the round boundary
+    (`service._json_safe`): datetimes and dates as ISO 8601, other product objects as text, and a
+    payload that still cannot be encoded is replaced by a note instead of killing the turn.
+  - Covered by `backend/tests/test_assistant_tool_payload.py`, which applies a draft with a fake
+    version and asserts the result is storable and that the unnormalised payload is what used to
+    break.
+
 - **A checklist gate can now be answered «arregla», and it no longer locks the conversation
   (2026-10-24)**: when `/speckit-implement` found unchecked items in
   `specs/<spec>/checklists/requirements.md`, it offered only «sí» (continue anyway) or «no»

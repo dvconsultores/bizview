@@ -7,7 +7,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import psycopg.errors
@@ -930,6 +930,24 @@ def _latest_round(history: list[ChatMessage]) -> list[ChatMessage]:
     if last_user >= 0:
         return history[last_user:]
     return list(history)
+
+
+def _json_safe(value: Any) -> Any:
+    """A tool result as JSON data, ready for `tool_payload` (JSONB) and the model's history.
+
+    Some tool payloads carry product objects with datetimes (`applied_at` of the version an apply
+    just created). `tool_payload` is JSONB and psycopg dumps it with a plain `json.dumps`, so the
+    insert raised `TypeError: Object of type datetime is not JSON serializable` *after* the work
+    was done and the whole round was lost (reported: an Auto run over a project always ended with
+    "Ocurrió un error inesperado (TypeError)" right after `apply_draft`).
+    """
+    def encode(item: Any) -> str:
+        return item.isoformat() if isinstance(item, (date, datetime)) else str(item)
+
+    try:
+        return json.loads(json.dumps(value, ensure_ascii=False, default=encode))
+    except (TypeError, ValueError):                # circular or exotic: never lose the turn
+        return {"note": "resultado no serializable"}
 
 
 def _add(db, session: AssistantSession, **fields) -> AssistantMessage:
@@ -2231,6 +2249,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 )
 
             args_for_payload = compact_args(call.name, call.args)
+            tool_result = _json_safe(tool_result)
             new_messages.append(_add(
                 db,
                 session,
