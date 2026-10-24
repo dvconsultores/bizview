@@ -25,9 +25,10 @@ interface ReportActionsProps {
 }
 
 /**
- * Feature 030 (FR-005, US2.3): the actions row. Filtros and Parámetros always show icon + label;
- * the rest are icon + label from 1024 px, an icon with a tooltip on tablets, and live inside "⋯" on
- * phones. Keyboard reachable, 44 px targets, `data-sheet-opener` so the sheet's outside-click does
+ * Feature 030 (FR-005, US2.3; owner 2026-10-24): a small control, not a toolbar. Filtros and
+ * Parámetros show icon + label; every other action lives in the "⋯" menu at every width, so the row
+ * is three controls and the dashboard keeps its room. Keyboard reachable (menu with roving focus,
+ * Esc closes and returns focus), 44 px targets, `data-sheet-opener` so the sheet's outside-click does
  * not swallow the button that opens it.
  */
 export function ReportActions({
@@ -91,6 +92,7 @@ export function ReportActions({
         </Button>
       </span>
 
+      {pinned.length > 0 ? (
       <div className="flex items-center gap-2">
         {pinned.map((action) => {
           const Icon = action.icon;
@@ -107,27 +109,9 @@ export function ReportActions({
           );
         })}
       </div>
+      ) : null}
 
-      <div className="hidden items-center gap-2 sm:flex">
-        {collapsed.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Button
-              key={action.id}
-              variant="secondary"
-              loading={action.loading}
-              icon={<Icon className="h-5 w-5" aria-hidden />}
-              onClick={action.onClick}
-              title={action.label}
-              aria-label={action.label}
-            >
-              <span className="max-[1023px]:sr-only">{action.label}</span>
-            </Button>
-          );
-        })}
-      </div>
-
-      <div className={collapsed.length > 0 ? "relative sm:hidden" : "hidden"} ref={menuRef}>
+      <div className={collapsed.length > 0 ? "relative" : "hidden"} ref={menuRef}>
         <button
           ref={triggerRef}
           type="button"

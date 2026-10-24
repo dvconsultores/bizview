@@ -199,7 +199,7 @@ test.describe("accessibility", () => {
     test.describe(`${scheme} theme`, () => {
       test.use({ colorScheme: scheme });
 
-      test("report, open sheet and open listbox are accessible", async ({ page }, testInfo) => {
+      test("report, filters sheet, open listbox and parameter panel are accessible", async ({ page }) => {
         await signIn(page);
         await page.goto(`/r/ventas?${SELECTION}&filter.product=Vacuna+triple`);
         await expect(kpi(page, "Ventas netas")).toContainText(/4,25\sUSD/);
@@ -220,14 +220,14 @@ test.describe("accessibility", () => {
         await expect(page.getByRole("listbox")).toBeVisible();
         await expectAccessible(page, "listbox", { waitIdle: false });
 
+        // Esc closes the listbox, then the sheet; the parameter panel is checked at this width.
         await page.keyboard.press("Escape");
-
-        if (!testInfo.project.name.endsWith("-320")) {
-          await page.setViewportSize({ width: 1280, height: 900 });
-          await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-          await paramsBar(page);
-          await expectAccessible(page, "parameters panel");
-        }
+        await page.keyboard.press("Escape");
+        await expect(sheet(page)).toHaveCount(0);
+        await expect(page.getByRole("button", { name: "Parámetros", exact: true })).toBeVisible();
+        await page.getByRole("button", { name: "Parámetros", exact: true }).click();
+        await paramsBar(page);
+        await expectAccessible(page, "parameters panel");
       });
     });
   }

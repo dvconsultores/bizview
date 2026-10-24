@@ -127,13 +127,19 @@ describe("ReportActions", () => {
     expect(labels.some((label) => label.includes(t.reportActions.params))).toBe(true);
   });
 
-  it("hides actions whose condition is false (no dashboard, no share)", async () => {
+  it("keeps the rest of the actions in the ⋯ menu, at every width", async () => {
     await act(async () => {
       root?.render(<ReportActions {...base} />);
     });
-    const text = document.body.textContent ?? "";
-    expect(text).not.toContain(t.reportActions.share);
-    expect(text).toContain(t.reportActions.pdf);
+    // Only three controls on the row: Filtros, Parámetros and the menu.
+    const row = document.querySelector('[data-testid="report-actions"]') as HTMLElement;
+    expect(row.querySelectorAll(":scope > button, :scope > span > button")).toHaveLength(2);
+    expect(document.body.textContent).not.toContain(t.reportActions.share);
+
+    const menu = document.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement;
+    await act(async () => menu.click());
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent);
+    expect(items).toEqual([t.reportActions.pdf, t.reportActions.tv]);
   });
 
   it("opens the phone menu with the collapsed actions and closes on Escape", async () => {

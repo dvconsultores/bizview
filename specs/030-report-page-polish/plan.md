@@ -152,6 +152,14 @@ As built:
   its tab list: it is a single "Filtros" panel now.
 - The shared view follows the same pattern.
 
+### 3c. Owner change (2026-10-24, second review): the actions row is three controls
+
+"same": the seven-button row above the dashboard was still the invasive part. The row is now
+**Filtros · Parámetros · ⋯** at every width; Descargar PDF, Compartir, Enviar por correo, Envíos
+programados and Modo TV live in the "⋯" menu (roving focus, Esc closes and returns focus). The
+shared view keeps its single PDF button visible plus the same menu. This supersedes FR-005's
+"icon+label ≥1024 px" tier and the 640–1023 px tooltip tier.
+
 ### 4. Chart transitions and reduced motion (US3.4, FR-012)
 
 Charts are hand-rolled SVG (`components/report/charts/*`). Geometry morphing is not available, so a

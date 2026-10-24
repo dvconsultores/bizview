@@ -100,8 +100,9 @@ All notable changes to this project are documented here. The format follows
   - **Parámetros** opens a **small inline control panel** under the meta line instead (period,
     comparison, refresh, palette and export format in one compact row): it covers nothing, the
     dashboard keeps its place, and it is closed by default.
-  - The actions row keeps Descargar PDF, Compartir, Enviar por correo, Envíos programados and Modo TV
-    as icon+label on desktop, an icon with a tooltip on tablets and inside "⋯" on phones.
+  - The actions row is three controls — **Filtros · Parámetros · ⋯** — at every width; Descargar
+    PDF, Compartir, Enviar por correo, Envíos programados and Modo TV live in the "⋯" menu, so the
+    dashboard keeps the room.
 - **Palette presets, chosen per installation (feature 030)**: charts and KPIs look vivid and
   intentional out of the box. Administración → **Apariencia** (new, super user) offers five presets —
   **Impacto** (default), **Clásico**, **Monocromo**, **Contraste alto** and **Daltónico** — each
