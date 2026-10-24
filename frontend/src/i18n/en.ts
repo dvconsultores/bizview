@@ -1637,8 +1637,6 @@ export const en: Catalogue = {
   },
   /** Feature 030: the filters/parameters sheet (never a modal). */
   reportSheet: {
-    title: "Filters and parameters",
-    tabs: { filters: "Filters", params: "Parameters" },
     done: "Done",
     close: "Close",
     moreFilters: (n: number) => `More filters (${n})`,

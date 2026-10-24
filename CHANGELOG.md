@@ -93,11 +93,13 @@ All notable changes to this project are documented here. The format follows
     `Año en curso · 1 ene – 23 oct 2026 · vs 2025 · Datos 23 oct 20:00`, and the applied filters sit
     under it as chips you remove with one tap ("+N más" when they overflow). "Consultado por" is no
     longer shown on screen: it stays in the PDF footer and the audit.
-  - **Filtros** and **Parámetros** open one non-blocking sheet — a 360 px side sheet from 1024 px,
-    a bottom sheet with a drag handle below, the dashboard visible and updating while you change
-    values (250 ms debounce). The URL still carries the state, so a link restores the same numbers.
+  - **Filtros** opens a non-blocking sheet — a 360 px side sheet from 1024 px, a bottom sheet with a
+    drag handle below — with the filters applying live (250 ms) and the dashboard still visible.
     Nothing is a modal: focus moves into the sheet, Esc closes it and returns focus to the button
     that opened it.
+  - **Parámetros** opens a **small inline control panel** under the meta line instead (period,
+    comparison, refresh, palette and export format in one compact row): it covers nothing, the
+    dashboard keeps its place, and it is closed by default.
   - The actions row keeps Descargar PDF, Compartir, Enviar por correo, Envíos programados and Modo TV
     as icon+label on desktop, an icon with a tooltip on tablets and inside "⋯" on phones.
 - **Palette presets, chosen per installation (feature 030)**: charts and KPIs look vivid and

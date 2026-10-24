@@ -90,6 +90,7 @@ async function renderForm(overrides: {
   applied?: ReportSelection;
   live?: boolean;
   section?: "all" | "period" | "filters";
+  variant?: "stacked" | "bar";
   loadOptions?: (
     filterId: string,
     period: ReportSelection,
@@ -126,6 +127,7 @@ async function renderForm(overrides: {
         loadOptions={loadOptions}
         live={overrides.live}
         section={overrides.section}
+        variant={overrides.variant}
       />,
     );
   });
@@ -434,5 +436,29 @@ describe("ParamsForm", () => {
     await renderForm({ def: { filters, dimensions }, section: "filters" });
     expect(document.body.textContent).toContain(t.reportSheet.moreFilters(5));
     expect(document.querySelector("details")).toBeTruthy();
+  });
+
+  it('variant="bar" lays the controls out in one row without headings or the apply footer', async () => {
+    await renderForm({ section: "period", variant: "bar" } as never);
+    const form = document.querySelector('[data-testid="params-form"]') as HTMLFormElement;
+    expect(form.dataset.variant).toBe("bar");
+    expect(form.querySelector("h3")).toBeNull();
+    expect(document.querySelector('[data-testid="pending-status"]')).toBeNull();
+    expect(findFieldByLabel(t.reportParams.period)).toBeTruthy();
+    expect(findFieldByLabel(t.reportParams.compare)).toBeTruthy();
+  });
+
+  it("live bar: a period change applies once after the debounce", async () => {
+    vi.useFakeTimers();
+    const { onApply } = await renderForm({ section: "period", variant: "bar", live: true } as never);
+    const periodSelect = findFieldByLabel(t.reportParams.period) as HTMLSelectElement;
+    await act(async () => {
+      changeSelect(periodSelect, "last_month");
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(onApply).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

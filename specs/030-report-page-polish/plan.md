@@ -15,9 +15,9 @@ gives them their look:
 2. The "Parámetros del reporte" card (today a 20 rem sidebar) disappears. What is left is a compact
    meta line (period · compared with · updated) and an **actions row** (Filtros, Parámetros, PDF,
    Compartir, Correo, Envíos, Modo TV).
-3. Filters and parameters move into one **non-blocking sheet** (`ReportSheet`): right side sheet
-   ≥1024 px, bottom sheet below, tabs "Filtros"/"Parámetros", state in the URL, live apply with a
-   250 ms debounce, applied filters as removable chips.
+3. Filters move into a **non-blocking sheet** (`ReportSheet`): right side sheet ≥1024 px, bottom
+   sheet below, state in the URL, live apply with a 250 ms debounce, applied filters as removable
+   chips. Parameters were moved to a small inline panel after the owner's review (see §3b).
 4. The shared view (`/s/<token>`) gets a light/dark toggle beside the language toggle; the share
    dialog gains an optional first-load theme; PDFs stay light.
 5. Charts and KPIs become vivid and intentional through **palette presets** (product data, JSON),
@@ -138,6 +138,19 @@ viewed-by plus the action buttons. It becomes two flat pieces under the title, n
   filter block become separately renderable so the sheet's two tabs do not duplicate the form.
 - Unknown filter in the URL keeps today's behaviour (ignored) and the sheet shows the one-line
   notice required by the edge cases.
+
+### 3b. Owner change (2026-10-24): parameters are a small inline panel, not a sheet tab
+
+The owner reviewed the shipped page and asked for the parameters to be less invasive: "make it
+hidden, it's invasive, it must show the dashboard, create a small control panel to show params".
+As built:
+
+- **Parámetros** toggles a compact panel (`ParamBar`, one row: Período · Comparar · Frecuencia ·
+  Paleta · export format) inserted between the meta line and the dashboard. It overlays nothing and
+  is closed by default; changes still apply live (250 ms) and the URL stays the state.
+- **Filtros** keeps the sheet (`ReportSheet`), because the filter list needs the room. The sheet lost
+  its tab list: it is a single "Filtros" panel now.
+- The shared view follows the same pattern.
 
 ### 4. Chart transitions and reduced motion (US3.4, FR-012)
 

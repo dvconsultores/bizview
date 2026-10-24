@@ -4,6 +4,7 @@ import type { PaletteId } from "../../api/types";
 import { useT } from "../../i18n";
 import { isPaletteId, PRESET_IDS } from "../../theme/palette";
 import { Button } from "../Button";
+import { iconButtonClass } from "../IconButton";
 import { Select } from "../Select";
 
 interface PaletteSelectProps {
@@ -11,6 +12,8 @@ interface PaletteSelectProps {
   value: string | null;
   /** Applies a preview for this view. `null` restores the declared/installation preset. */
   onChange: (preset: string | null) => void;
+  /** Feature 030: just the field, for the parameter panel's row. */
+  compact?: boolean;
 }
 
 const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "monocromoText" | "contrasteText" | "daltonicoText"> = {
@@ -28,12 +31,43 @@ const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "monocromo
  * definition itself changes through the project editor + a validated workspace version (IX), never
  * from a reader's screen.
  */
-export function PaletteSelect({ value, onChange }: PaletteSelectProps) {
+export function PaletteSelect({ value, onChange, compact = false }: PaletteSelectProps) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const declared = isPaletteId(value) ? value : null;
   const shown: PaletteId = declared ?? "impacto";
   const snippet = `layout:\n  theme:\n    palette: ${declared ?? "impacto"}`;
+
+  if (compact) {
+    return (
+      <div className="flex min-w-[9rem] flex-1 items-end gap-1">
+        <div className="min-w-0 flex-1" title={t.palette[DESCRIPTIONS[shown]]}>
+          <Select label={t.palette.label} value={declared ?? ""} onChange={(event) => onChange(event.target.value || null)}>
+            <option value="">{t.palette.installation}</option>
+            {PRESET_IDS.map((id) => (
+              <option key={id} value={id}>
+                {t.palette[id]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <button
+          type="button"
+          aria-label={t.palette.declare}
+          title={copied ? t.palette.copied : t.palette.declare}
+          onClick={() => {
+            void navigator.clipboard?.writeText(snippet).then(
+              () => setCopied(true),
+              () => setCopied(false),
+            );
+          }}
+          className={iconButtonClass()}
+        >
+          <Copy className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section className="space-y-3 border-t border-line pt-5">

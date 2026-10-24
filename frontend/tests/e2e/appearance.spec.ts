@@ -63,7 +63,7 @@ test("a report can preview its own palette from the Parámetros sheet", async ({
   await page.goto(`/r/ventas?${SELECTION}`);
   await page.getByRole("button", { name: "Parámetros", exact: true }).click();
 
-  const sheetRegion = page.getByTestId("report-sheet");
+  const sheetRegion = page.getByTestId("param-bar");
   await sheetRegion.getByLabel("Paleta").selectOption("daltonico");
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.palette))

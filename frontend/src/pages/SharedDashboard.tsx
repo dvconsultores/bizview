@@ -10,7 +10,8 @@ import type {
 import { ParamsForm } from "../components/report/ParamsForm";
 import { ReportActions } from "../components/report/ReportActions";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
-import { ReportSheet, type ReportSheetTab } from "../components/report/ReportSheet";
+import { ParamBar } from "../components/report/ParamBar";
+import { ReportSheet } from "../components/report/ReportSheet";
 import { ReportViews } from "../components/report/ReportViews";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
@@ -63,7 +64,8 @@ export function SharedDashboard() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [dataQuery, setDataQuery] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<ReportSheetTab | null>(null);
+  // Feature 030: filters in the sheet, parameters in the compact inline panel.
+  const [panel, setPanel] = useState<"filters" | "params" | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const previousTitleRef = useRef<string>(document.title);
@@ -335,7 +337,7 @@ export function SharedDashboard() {
                     applied={applied}
                     data={fresh ? data : null}
                     onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
-                    onOpenFilters={() => setSheet("filters")}
+                    onOpenFilters={() => setPanel("filters")}
                   />
                 </div>
               ) : null}
@@ -344,8 +346,8 @@ export function SharedDashboard() {
               <div className="w-full min-w-0 sm:w-auto sm:shrink-0">
                 <ReportActions
                   activeFilters={activeCount}
-                  onOpenFilters={() => setSheet("filters")}
-                  onOpenParams={() => setSheet("params")}
+                  onOpenFilters={() => setPanel("filters")}
+                  onOpenParams={() => setPanel((current) => (current === "params" ? null : "params"))}
                   alwaysVisible={1}
                   actions={[
                     {
@@ -361,6 +363,16 @@ export function SharedDashboard() {
               </div>
             ) : null}
           </div>
+
+          {applied && panel === "params" ? (
+            <ParamBar
+              def={report}
+              applied={applied}
+              onApply={apply}
+              loadOptions={loadOptions}
+              onClose={() => setPanel(null)}
+            />
+          ) : null}
 
           {pdfError && <Alert tone="error">{pdfError}</Alert>}
           {dataError && <Alert tone="error">{dataError}</Alert>}
@@ -384,15 +396,19 @@ export function SharedDashboard() {
         </div>
       </PageContainer>
 
-      <ReportSheet open={sheet !== null} tab={sheet ?? "filters"} onTabChange={setSheet} onClose={() => setSheet(null)}>
-        {applied && sheet !== null ? (
+      <ReportSheet
+        open={panel === "filters"}
+        title={t.reportActions.filters(activeCount)}
+        onClose={() => setPanel(null)}
+      >
+        {applied && panel === "filters" ? (
           <ParamsForm
             def={report}
             applied={applied}
             onApply={apply}
             loadOptions={loadOptions}
             live
-            section={sheet === "filters" ? "filters" : "period"}
+            section="filters"
             className="space-y-5"
           />
         ) : null}

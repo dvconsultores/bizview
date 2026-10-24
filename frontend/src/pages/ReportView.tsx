@@ -18,8 +18,8 @@ import { Spinner } from "../components/Spinner";
 import { ParamsForm } from "../components/report/ParamsForm";
 import { ReportActions } from "../components/report/ReportActions";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
-import { ReportSheet, type ReportSheetTab } from "../components/report/ReportSheet";
-import { PaletteSelect } from "../components/report/PaletteSelect";
+import { ParamBar } from "../components/report/ParamBar";
+import { ReportSheet } from "../components/report/ReportSheet";
 import { ExportSection } from "../components/report/ExportSection";
 import { View } from "../components/View";
 import type { MultiSelectOptions } from "../components/MultiSelect";
@@ -51,7 +51,7 @@ import {
   useAutoRefresh,
   useAutoRefreshMode,
 } from "../lib/autoRefresh";
-import { AutoRefreshControl, AutoRefreshStatusLine } from "../components/report/AutoRefreshControl";
+import { AutoRefreshStatusLine } from "../components/report/AutoRefreshControl";
 import { TvLayout } from "../components/report/TvLayout";
 import { useHideShellChrome } from "../components/ShellChrome";
 import {
@@ -116,7 +116,8 @@ export function ReportView() {
   const [loading, setLoading] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<ReportSheetTab | null>(null);
+  // Feature 030: filters open the side/bottom sheet; parameters open a compact inline panel.
+  const [panel, setPanel] = useState<"filters" | "params" | null>(null);
   const { setPalette } = useTheme();
   const [shownAt, setShownAt] = useState<Date | null>(null);
   const [storedMode, setStoredMode] = useAutoRefreshMode(id);
@@ -130,9 +131,12 @@ export function ReportView() {
 
   const tv = params.get("tv") === "1";
 
-  // Feature 030: the sheet is either closed or on one of its two tabs.
-  const openSheet = useCallback((tab: ReportSheetTab) => setSheet(tab), []);
-  const closeSheet = useCallback(() => setSheet(null), []);
+  const openFilters = useCallback(() => setPanel("filters"), []);
+  const toggleParams = useCallback(
+    () => setPanel((current) => (current === "params" ? null : "params")),
+    [],
+  );
+  const closePanel = useCallback(() => setPanel(null), []);
 
   /** The report's own palette (`layout.theme.palette`) wins over the installation's; the "Paleta"
    * selector applies a viewer-side preview until the declared value is edited in the project. */
@@ -500,8 +504,8 @@ export function ReportView() {
           applied ? (
             <ReportActions
               activeFilters={activeCount}
-              onOpenFilters={() => openSheet("filters")}
-              onOpenParams={() => openSheet("params")}
+              onOpenFilters={openFilters}
+              onOpenParams={toggleParams}
               actions={[
                 {
                   id: "pdf",
@@ -552,9 +556,26 @@ export function ReportView() {
             applied={applied}
             data={fresh ? data : null}
             onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
-            onOpenFilters={() => openSheet("filters")}
+            onOpenFilters={openFilters}
           />
         </div>
+      ) : null}
+
+      {applied && panel === "params" ? (
+        <ParamBar
+          def={def}
+          applied={applied}
+          onApply={apply}
+          loadOptions={loadOptions}
+          onClose={closePanel}
+          refresh={{
+            mode: storedMode,
+            onChange: setStoredMode,
+            cacheSeconds: def.direct?.cache_seconds,
+          }}
+          palette={{ value: palettePreview ?? declaredPalette, onChange: setPalettePreview }}
+          extra={exportSection}
+        />
       ) : null}
 
       <div className="mt-5 min-w-0 space-y-5">
@@ -593,37 +614,22 @@ export function ReportView() {
       </div>
 
       <ReportSheet
-        open={sheet !== null}
-        tab={sheet ?? "filters"}
-        onTabChange={setSheet}
-        onClose={closeSheet}
+        open={panel === "filters"}
+        title={t.reportActions.filters(activeCount)}
+        onClose={closePanel}
       >
-        {applied && sheet !== null ? (
+        {applied && panel === "filters" ? (
           <ParamsForm
             def={def}
             applied={applied}
             onApply={apply}
             loadOptions={loadOptions}
             live
-            section={sheet === "filters" ? "filters" : "period"}
+            section="filters"
             className="space-y-5"
           >
             {unknownFilters.length > 0 ? (
               <Alert tone="info">{t.reportSheet.unknownFilter}</Alert>
-            ) : null}
-            {sheet === "params" ? (
-              <>
-                <AutoRefreshControl
-                  mode={storedMode}
-                  onChange={setStoredMode}
-                  cacheSeconds={def.direct?.cache_seconds}
-                />
-                {exportSection}
-                <PaletteSelect
-                  value={palettePreview ?? declaredPalette}
-                  onChange={setPalettePreview}
-                />
-              </>
             ) : null}
           </ParamsForm>
         ) : null}

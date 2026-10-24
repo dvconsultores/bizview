@@ -2,18 +2,16 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 import { useT } from "../../i18n";
 
-export type ReportSheetTab = "filters" | "params";
-
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface ReportSheetProps {
   open: boolean;
-  tab: ReportSheetTab;
-  onTabChange: (tab: ReportSheetTab) => void;
+  /** Names the panel ("Filtros"); the dashboard keeps its own numbers visible beside it. */
+  title: string;
   onClose: () => void;
   children: ReactNode;
-  /** Rendered under the tab content ("Listo"). */
+  /** Rendered under the content ("Listo"). */
   footer?: ReactNode;
 }
 
@@ -24,7 +22,7 @@ interface ReportSheetProps {
  * a dialog, per the app's no-modals rule (`tests/unit/no-modals.test.ts`): focus moves in and cycles
  * while it is open, Esc closes it and returns focus to the opener, and the page behind stays usable.
  */
-export function ReportSheet({ open, tab, onTabChange, onClose, children, footer }: ReportSheetProps) {
+export function ReportSheet({ open, title, onClose, children, footer }: ReportSheetProps) {
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -87,11 +85,6 @@ export function ReportSheet({ open, tab, onTabChange, onClose, children, footer 
 
   if (!open) return null;
 
-  const tabs: { id: ReportSheetTab; label: string }[] = [
-    { id: "filters", label: t.reportSheet.tabs.filters },
-    { id: "params", label: t.reportSheet.tabs.params },
-  ];
-
   return (
     <div
       ref={panelRef}
@@ -117,24 +110,9 @@ export function ReportSheet({ open, tab, onTabChange, onClose, children, footer 
     >
       <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-line-strong lg:hidden" />
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <div role="tablist" aria-label={t.reportSheet.title} className="flex flex-1 gap-1 rounded-xl bg-surface-2 p-1">
-          {tabs.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="tab"
-              id={`${titleId}-${entry.id}`}
-              aria-selected={tab === entry.id}
-              aria-controls={`${titleId}-panel`}
-              onClick={() => onTabChange(entry.id)}
-              className={`min-h-tap flex-1 rounded-lg px-3 text-sm font-medium ${
-                tab === entry.id ? "bg-surface text-accent shadow-sm ring-1 ring-line" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
+        <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+          {title}
+        </h2>
         <button
           type="button"
           onClick={close}
@@ -144,17 +122,7 @@ export function ReportSheet({ open, tab, onTabChange, onClose, children, footer 
           <X className="mx-auto h-5 w-5" aria-hidden />
         </button>
       </div>
-      <div
-        id={`${titleId}-panel`}
-        role="tabpanel"
-        aria-labelledby={`${titleId}-${tab}`}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
-      >
-        <h2 id={titleId} className="sr-only">
-          {tabs.find((entry) => entry.id === tab)?.label ?? t.reportSheet.title}
-        </h2>
-        {children}
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
       <div className="shrink-0 border-t border-line px-4 py-3 pb-safe">
         {footer ?? (
           <button

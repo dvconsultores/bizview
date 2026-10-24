@@ -1620,8 +1620,6 @@ export const es = {
   },
   /** Feature 030: the filters/parameters sheet (never a modal). */
   reportSheet: {
-    title: "Filtros y parámetros",
-    tabs: { filters: "Filtros", params: "Parámetros" },
     done: "Listo",
     close: "Cerrar",
     moreFilters: (n: number) => `Más filtros (${n})`,

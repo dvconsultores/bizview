@@ -45,7 +45,7 @@ test("a report renders from its spec: KPIs, trend, ranking, filter, PDF", async 
   // Feature 030: the filters live in one non-blocking sheet and apply live.
   await page.getByRole("button", { name: /^Filtros/ }).click();
   const filters = page.getByTestId("report-sheet");
-  await expect(filters.getByRole("tab", { name: "Filtros" })).toHaveAttribute("aria-selected", "true");
+  await expect(filters.getByRole("heading", { level: 2, name: /^Filtros/ })).toBeVisible();
   await filters.getByRole("combobox", { name: "Producto" }).click();
   await filters.getByRole("option", { name: "Vacuna triple" }).click();
   await expect(page).toHaveURL(/filter\.product=Vacuna/);

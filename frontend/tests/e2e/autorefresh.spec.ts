@@ -41,16 +41,13 @@ const kpi = (page: Page, label: string) =>
     .filter({ hasText: label });
 
 const sheet = (page: Page) => page.getByTestId("report-sheet");
+const bar = (page: Page) => page.getByTestId("param-bar");
 
-/** Feature 030: the period and the auto-refresh controls live in the sheet's Parámetros tab. */
+/** Feature 030: the period and the auto-refresh live in the compact inline parameter panel. */
 async function params(page: Page) {
-  if ((await sheet(page).count()) === 0) await reportAction(page, "Parámetros");
-  await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page).getByRole("tab", { name: "Parámetros" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  return sheet(page);
+  if ((await bar(page).count()) === 0) await reportAction(page, "Parámetros");
+  await expect(bar(page)).toBeVisible();
+  return bar(page);
 }
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -290,8 +287,8 @@ test("offline: status shows reconnecting and data stays on screen", async ({
 
   // Feature 030: the sheet is the same at every width.
   await (await params(page)).getByLabel("Frecuencia").selectOption("data");
-  await page.keyboard.press("Escape");
-  await expect(sheet(page)).toHaveCount(0);
+  await bar(page).getByRole("button", { name: "Cerrar", exact: true }).click();
+  await expect(bar(page)).toHaveCount(0);
 
   await page.route("**/api/reports/ventas/version", (route) =>
     route.abort("internetdisconnected"),

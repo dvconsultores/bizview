@@ -13,16 +13,37 @@ export function AutoRefreshControl({
   mode,
   onChange,
   cacheSeconds,
+  compact = false,
 }: {
   mode: AutoRefreshMode;
   onChange: (m: AutoRefreshMode) => void;
   cacheSeconds?: number | null;
+  /** Feature 030: no heading, no border — a single field inside the parameter panel's row. */
+  compact?: boolean;
 }) {
   const t = useT();
   const headingId = useId();
   const dataLabel = cacheSeconds && cacheSeconds > 0
     ? `${t.autoRefresh.modes.data} (${t.autoRefresh.directEvery(Math.max(1, Math.round(cacheSeconds / 60)))})`
     : t.autoRefresh.modes.data;
+
+  if (compact) {
+    return (
+      <div className="min-w-[9rem] flex-1">
+        <Select
+          label={t.autoRefresh.frequency}
+          value={mode}
+          onChange={(e) => onChange(e.target.value as AutoRefreshMode)}
+        >
+          {AUTO_REFRESH_MODES.map((m) => (
+            <option key={m} value={m}>
+              {m === "data" ? dataLabel : t.autoRefresh.modes[m]}
+            </option>
+          ))}
+        </Select>
+      </div>
+    );
+  }
 
   return (
     <section aria-labelledby={headingId} className="mt-5 space-y-4 border-t border-line pt-5">

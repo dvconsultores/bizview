@@ -20,24 +20,16 @@ const theme = (page: Page) => page.evaluate(() => document.documentElement.datas
 const kpi = (page: Page, label: string) =>
   page.getByRole("region", { name: "Indicadores" }).getByRole("listitem").filter({ hasText: label });
 
-/** The sheet is a landmark region named after its active tab; `ParamsForm` also renders a named
- * section per block, so the test id is the unambiguous handle and the tab says which one is open. */
+/** Filtros opens the sheet; Parámetros opens the compact inline panel (never over the numbers). */
 const sheet = (page: Page) => page.getByTestId("report-sheet");
+const bar = (page: Page) => page.getByTestId("param-bar");
 const filtersSheet = async (page: Page) => {
   await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page).getByRole("tab", { name: "Filtros", exact: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
   return sheet(page);
 };
-const paramsSheet = async (page: Page) => {
-  await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page).getByRole("tab", { name: "Parámetros", exact: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  return sheet(page);
+const paramsBar = async (page: Page) => {
+  await expect(bar(page)).toBeVisible();
+  return bar(page);
 };
 
 function countDataRequests(page: Page) {
@@ -97,18 +89,18 @@ test.describe("desktop", () => {
     counter.reset();
 
     await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-    const params = await paramsSheet(page);
-    await expect(kpi(page, "Ventas netas")).toBeVisible(); // non-blocking: the numbers stay on screen
+    const params = await paramsBar(page);
+    await expect(kpi(page, "Ventas netas")).toBeVisible(); // inline: the numbers stay on screen
     await params.getByLabel("Comparar con").selectOption("previous_year");
 
     await expect.poll(() => counter.count).toBe(1); // debounced to one request
     await expect(page).toHaveURL(/compare=previous_year/);
-    await expect(sheet(page)).toBeVisible();
+    await expect(bar(page)).toBeVisible();
     await expect(kpi(page, "Ventas netas")).toBeVisible();
 
-    await page.keyboard.press("Escape");
-    await expect(sheet(page)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Parámetros", exact: true })).toBeFocused();
+    // Not a sheet: it closes with its own button, and pressing the action again toggles it.
+    await bar(page).getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(bar(page)).toHaveCount(0);
     counter.dispose();
   });
 
@@ -168,7 +160,7 @@ test.describe("desktop", () => {
     expect(cardDownload.suggestedFilename()).toMatch(/\.csv$/);
 
     await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-    const params = await paramsSheet(page);
+    const params = await paramsBar(page);
     const [sheetDownload] = await Promise.all([
       page.waitForEvent("download"),
       (async () => {
@@ -233,8 +225,8 @@ test.describe("accessibility", () => {
         if (!testInfo.project.name.endsWith("-320")) {
           await page.setViewportSize({ width: 1280, height: 900 });
           await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-          const params = await paramsSheet(page);
-          await expectAccessible(page, "parameters sheet");
+          await paramsBar(page);
+          await expectAccessible(page, "parameters panel");
         }
       });
     });

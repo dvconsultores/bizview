@@ -41,41 +41,38 @@ afterEach(async () => {
 
 async function renderSheet(props: Partial<Parameters<typeof ReportSheet>[0]> = {}) {
   const onClose = vi.fn();
-  const onTabChange = vi.fn();
   await act(async () => {
     root?.render(
-      <ReportSheet open tab="filters" onTabChange={onTabChange} onClose={onClose} {...props}>
+      <ReportSheet open title={t.reportActions.filters(0)} onClose={onClose} {...props}>
         <button type="button">dentro</button>
       </ReportSheet>,
     );
   });
-  return { onClose, onTabChange };
+  return { onClose };
 }
 
 const sheet = () => document.querySelector('[data-testid="report-sheet"]') as HTMLElement;
 
 describe("ReportSheet", () => {
-  it("is a labelled region with two tabs, never a dialog", async () => {
+  it("is a labelled region with a visible heading, never a dialog", async () => {
     await renderSheet();
     const panel = sheet();
     expect(panel.getAttribute("role")).toBe("region");
     expect(panel.hasAttribute("aria-modal")).toBe(false);
-    const tabs = Array.from(panel.querySelectorAll('[role="tab"]')).map((el) => el.textContent);
-    expect(tabs).toEqual([t.reportSheet.tabs.filters, t.reportSheet.tabs.params]);
-    expect(panel.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
-      t.reportSheet.tabs.filters,
-    );
+    expect(panel.querySelector("h2")?.textContent).toBe(t.reportActions.filters(0));
+    expect(panel.querySelector('[role="tablist"]')).toBeNull();
   });
 
-  it("switches tab through the tablist", async () => {
-    const { onTabChange } = await renderSheet();
-    const paramsTab = Array.from(document.querySelectorAll('[role="tab"]')).find(
-      (el) => el.textContent === t.reportSheet.tabs.params,
+  it("closes with its own close button and with Listo", async () => {
+    const { onClose } = await renderSheet();
+    const closeButton = document.querySelector(`[aria-label="${t.reportSheet.close}"]`) as HTMLButtonElement;
+    await act(async () => closeButton.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const done = Array.from(document.querySelectorAll("button")).find(
+      (el) => el.textContent === t.reportSheet.done,
     ) as HTMLButtonElement;
-    await act(async () => {
-      paramsTab.click();
-    });
-    expect(onTabChange).toHaveBeenCalledWith("params");
+    await act(async () => done.click());
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it("closes on Escape and returns focus to the opener", async () => {
@@ -147,7 +144,7 @@ describe("ReportSheet", () => {
   it("renders nothing while closed", async () => {
     await act(async () => {
       root?.render(
-        <ReportSheet open={false} tab="filters" onTabChange={() => {}} onClose={() => {}}>
+        <ReportSheet open={false} title={t.reportActions.filters(0)} onClose={() => {}}>
           <span>hijo</span>
         </ReportSheet>,
       );

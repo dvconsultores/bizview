@@ -41,8 +41,10 @@ export interface ParamsFormProps {
   className?: string;
   /** Feature 030: apply as the reader edits (250 ms debounce) instead of on "Aplicar". */
   live?: boolean;
-  /** Feature 030: render only the period block or only the filter block (the sheet's two tabs). */
+  /** Feature 030: render only the period block or only the filter block (the filters sheet). */
   section?: "all" | "period" | "filters";
+  /** `bar` lays the controls out in one compact row (the report page's parameter panel). */
+  variant?: "stacked" | "bar";
 }
 
 export function ParamsForm({
@@ -54,6 +56,7 @@ export function ParamsForm({
   className,
   live = false,
   section = "all",
+  variant = "stacked",
 }: ParamsFormProps) {
   const t = useT();
   const [draft, setDraft] = useState<ReportSelection>(applied);
@@ -189,139 +192,135 @@ export function ParamsForm({
   const grouped = def.filters.length >= 10;
   const shownFilters = grouped ? def.filters.slice(0, 6) : def.filters;
 
+  const bar = variant === "bar";
+  const row = bar ? "flex flex-wrap items-end gap-3" : undefined;
+  const heading = (text: string) =>
+    bar ? null : (
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{text}</h3>
+    );
+  const field = bar ? "min-w-[8.5rem] flex-1" : undefined;
+
   return (
     <form
       noValidate
       onSubmit={handleSubmit}
       className={className}
       data-testid="params-form"
+      data-variant={variant}
     >
-      {section !== "filters" && (
-      <section className="space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          {t.reportParams.periodSection}
-        </h3>
+      <div className={row}>
+        {section !== "filters" && (
+          <div className={bar ? "contents" : "space-y-4"}>
+            {heading(t.reportParams.periodSection)}
 
-        <Select
-          label={t.reportParams.period}
-          value={draft.period}
-          onChange={(e) => handlePeriodChange(e.target.value as PeriodPreset)}
-        >
-          {periodOptions.map((period) => (
-            <option key={period} value={period}>
-              {periodLabels[period] ?? period}
-            </option>
-          ))}
-        </Select>
+            <div className={field}>
+              <Select
+                label={t.reportParams.period}
+                value={draft.period}
+                onChange={(e) => handlePeriodChange(e.target.value as PeriodPreset)}
+              >
+                {periodOptions.map((period) => (
+                  <option key={period} value={period}>
+                    {periodLabels[period] ?? period}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-        {draft.period === "custom" && (
-          <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2">
-            <Input
-              ref={fromInputRef}
-              label={t.reportParams.from}
-              type="date"
-              required
-              value={draft.from}
-              max={draft.to || undefined}
-              error={errors.from}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, from: e.target.value }))
-              }
-            />
-            <Input
-              ref={toInputRef}
-              label={t.reportParams.to}
-              type="date"
-              required
-              value={draft.to}
-              min={draft.from || undefined}
-              error={errors.to}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, to: e.target.value }))
-              }
-            />
+            {draft.period === "custom" && (
+              <div className={bar ? "flex min-w-[15rem] flex-1 gap-3" : "grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"}>
+                <Input
+                  ref={fromInputRef}
+                  label={t.reportParams.from}
+                  type="date"
+                  required
+                  value={draft.from}
+                  max={draft.to || undefined}
+                  error={errors.from}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
+                />
+                <Input
+                  ref={toInputRef}
+                  label={t.reportParams.to}
+                  type="date"
+                  required
+                  value={draft.to}
+                  min={draft.from || undefined}
+                  error={errors.to}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
         )}
-      </section>
-      )}
 
-      {section !== "filters" && (
-      <section className="mt-5 space-y-4 border-t border-line pt-5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          {t.reportParams.compareSection}
-        </h3>
+        {section !== "filters" && (
+          <div className={bar ? "contents" : "mt-5 space-y-4 border-t border-line pt-5"}>
+            {heading(t.reportParams.compareSection)}
 
-        {compareOptions.length > 1 ? (
-          <Select
-            label={t.reportParams.compare}
-            value={draft.compare}
-            onChange={(e) =>
-              handleCompareChange(e.target.value as CompareMode)
-            }
-          >
-            {compareOptions.map((compare) => (
-              <option key={compare} value={compare}>
-                {compareLabels[compare] ?? compare}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Input
-            label={t.reportParams.compare}
-            readOnly
-            value={compareLabels[compareOptions[0]] ?? compareOptions[0]}
-          />
+            <div className={field}>
+              {compareOptions.length > 1 ? (
+                <Select
+                  label={t.reportParams.compare}
+                  value={draft.compare}
+                  onChange={(e) => handleCompareChange(e.target.value as CompareMode)}
+                >
+                  {compareOptions.map((compare) => (
+                    <option key={compare} value={compare}>
+                      {compareLabels[compare] ?? compare}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  label={t.reportParams.compare}
+                  readOnly
+                  value={compareLabels[compareOptions[0]] ?? compareOptions[0]}
+                />
+              )}
+            </div>
+          </div>
         )}
-      </section>
-      )}
 
-      {section !== "period" && def.filters.length > 0 && (
-        <section
-          aria-labelledby={filtersSectionId}
-          className="mt-5 space-y-4 border-t border-line pt-5"
-        >
-          <h3
-            id={filtersSectionId}
-            className="text-xs font-semibold uppercase tracking-wide text-ink-soft"
+        {section !== "period" && def.filters.length > 0 && (
+          <section
+            aria-labelledby={filtersSectionId}
+            className={bar ? "contents" : "mt-5 space-y-4 border-t border-line pt-5"}
           >
-            {t.reportParams.filtersSection}
-          </h3>
+            {heading(t.reportParams.filtersSection)}
 
-          {shownFilters.map(renderFilter)}
-          {grouped ? (
-            <details className="rounded-xl border border-line p-3">
-              <summary className="flex min-h-tap cursor-pointer items-center text-sm font-medium text-ink">
-                {t.reportSheet.moreFilters(def.filters.length - shownFilters.length)}
-              </summary>
-              <div className="mt-3 space-y-4">{def.filters.slice(shownFilters.length).map(renderFilter)}</div>
-            </details>
-          ) : null}
-        </section>
-      )}
-
-      {children}
-
-      <footer className="mt-5 flex flex-col gap-3 border-t border-line pt-5">
-        {live ? null : (
-          <>
-            <p
-              role="status"
-              className="text-sm text-ink-muted"
-              data-testid="pending-status"
-            >
-              {pending === 0
-                ? t.reportParams.noPending
-                : t.reportParams.pending(pending)}
-            </p>
-            <Button type="submit" variant="primary" block disabled={pending === 0}>
-              {t.reportParams.apply}
-            </Button>
-          </>
+            {shownFilters.map(renderFilter)}
+            {grouped ? (
+              <details className="rounded-xl border border-line p-3">
+                <summary className="flex min-h-tap cursor-pointer items-center text-sm font-medium text-ink">
+                  {t.reportSheet.moreFilters(def.filters.length - shownFilters.length)}
+                </summary>
+                <div className="mt-3 space-y-4">{def.filters.slice(shownFilters.length).map(renderFilter)}</div>
+              </details>
+            ) : null}
+          </section>
         )}
-        <Button type="button" variant="secondary" block onClick={handleClear}>
-          {t.reportParams.clear}
-        </Button>
-      </footer>
+
+        {children}
+      </div>
+
+      {bar ? null : (
+        <footer className="mt-5 flex flex-col gap-3 border-t border-line pt-5">
+          {live ? null : (
+            <>
+              <p role="status" className="text-sm text-ink-muted" data-testid="pending-status">
+                {pending === 0 ? t.reportParams.noPending : t.reportParams.pending(pending)}
+              </p>
+              <Button type="submit" variant="primary" block disabled={pending === 0}>
+                {t.reportParams.apply}
+              </Button>
+            </>
+          )}
+          <Button type="button" variant="secondary" block onClick={handleClear}>
+            {t.reportParams.clear}
+          </Button>
+        </footer>
+      )}
     </form>
   );
 }
