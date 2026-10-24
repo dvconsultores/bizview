@@ -4,6 +4,7 @@ Lifecycle helpers (create, finish, end-of-turn mapping, files, tokens, resume) a
 deterministic preflight (prerequisites and confirmation gates, no provider call).
 """
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -23,6 +24,10 @@ PREREQ_COMMAND = {"spec": "speckit-specify", "plan": "speckit-plan", "tasks": "s
 _YES = re.compile(r"^\s*(s[ií]|yes|y|ok|vale|dale|contin[uú]a|continuar|continue|proceed)\b",
                   re.I)
 _NO = re.compile(r"^\s*(no|n|cancela|cancelar|cancel|stop)\b", re.I)
+# The third answer to the checklist gate (feature 030 follow-up, owner 2026-10-24): "fix them"
+# instead of "proceed anyway" or "cancel".
+_FIX = re.compile(r"^\s*(arregl\w*|corrig\w*|complet\w*|marc\w*|rellen\w*|resuelv\w*"
+                  r"|fix\w*|complete\w*|tick\w*|check them|mark them)\b")
 _STATUS = re.compile(r"^(\s*\*\*Status\*\*:[ \t]*)(.*)$", re.M)
 _CHECK = re.compile(r"^\s*[-*] \[( |x|X)\]", re.M)
 _TITLE = re.compile(r"^# .*$", re.M)
@@ -161,11 +166,23 @@ def resume_info(db, run, notes: str | None) -> dict | None:
     return {"files": paths, "notes": notes or ""}
 
 
+def _plain(text: str) -> str:
+    """Lowercase without accents: «Arréglalas» reads as «arreglalas» for the gate words."""
+    return "".join(char for char in unicodedata.normalize("NFD", text)
+                   if unicodedata.category(char) != "Mn").lower()
+
+
 def answer(text: str) -> str | None:
-    """"yes", "no" or None for the user's reply to a confirmation gate."""
-    if _YES.match(text):
+    """The user's reply to a confirmation gate: "fix", "yes", "no" or None.
+
+    "fix" asks the product to repair what the gate complains about instead of skipping it —
+    for the checklist gate that means running the command that owns the checklist write."""
+    plain = _plain(text)
+    if _FIX.match(plain):
+        return "fix"
+    if _YES.match(plain):
         return "yes"
-    if _NO.match(text):
+    if _NO.match(plain):
         return "no"
     return None
 

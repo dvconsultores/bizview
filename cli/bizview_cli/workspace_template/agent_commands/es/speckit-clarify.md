@@ -78,11 +78,19 @@ SOLO el marcador `[ ]`/`[x]` de las que cambian de estado (nada más en ese arch
 rechaza). Informa las que ahora pasan, las regresiones, las que siguen sin marcar y el conteo
 "antes → después".
 
-### 8. Casos al inicio
+### 8. Cuando el foco es completar la lista de calidad
+Si el foco es la lista de calidad —por ejemplo porque en la puerta de `/speckit-implement` la
+persona respondió «arregla»—, **empieza por el paso 7**: marca solo las casillas que la spec ya
+cumple, con la evidencia en una línea. Para una casilla que no se cumple, no la marques: haz la
+pregunta mínima imprescindible (una por turno, paso 3) y corrige la spec con la respuesta; después
+vuelve a evaluarla. Nunca marques una casilla que la spec no cumpla y nunca edites el texto de la
+lista de calidad: solo el marcador.
+
+### 9. Casos al inicio
 Sin ambigüedades relevantes: dilo, sugiere `/speckit-plan` y llama a `finish_command`. Sin spec:
 pide ejecutar primero `/speckit-specify` y llama a `finish_command`.
 
-### 9. Informe final
+### 10. Informe final
 Preguntas hechas y respondidas, secciones tocadas, tabla de cobertura por categoría (Resuelta /
 Diferida / Clara / Pendiente), conteo de la lista de calidad y comando recomendado; luego
 `finish_command`.

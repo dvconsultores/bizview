@@ -50,7 +50,9 @@ acción humana: nunca la haces ni la simulas.
    consulta comprobada; vista previa correcta del proyecto actual. Revisa los pendientes en el
    Estado y resuélvelos.
 8. Si una tarea no se puede completar, explica el bloqueo y sugiere el comando (p. ej.
-   `/speckit-clarify` o `/speckit-plan`); deja esa tarea sin marcar.
+   `/speckit-clarify` o `/speckit-plan`); deja esa tarea sin marcar. Este comando no marca las
+   casillas de `checklists/requirements.md` (las marca `/speckit-clarify`): si aparecen sin marcar,
+   la persona puede responder «arregla» en la puerta y el producto pasa a `/speckit-clarify`.
 9. Con todas las tareas marcadas, cambia `**Status**:` a `Implemented` en `spec.md` (solo esa
    línea).
 10. Informe: tareas completadas, archivos escritos, resultado de las comprobaciones y de la vista

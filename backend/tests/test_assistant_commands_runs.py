@@ -55,8 +55,32 @@ def test_answer():
         assert runs.answer(text) == "yes", text
     for text in ("no", "No gracias", "cancelar"):
         assert runs.answer(text) == "no", text
+    # The owner's third answer (2026-10-24): have the checklist completed instead of skipped.
+    for text in ("arregla", "Arréglalas por favor", "corrige la spec", "completa las listas",
+                 "marca lo que falte", "fix it", "fix them", "complete the checklist"):
+        assert runs.answer(text) == "fix", text
     for text in ("B", "tal vez", "nosotros", "ya veremos"):
         assert runs.answer(text) is None, text
+
+
+def test_the_checklist_gate_offers_the_fix_answer():
+    implement = REGISTRY["speckit-implement"]
+    files = {f"specs/{SPEC}/spec.md": "**Status**: Approved\n",
+             f"specs/{SPEC}/plan.md": "plan", f"specs/{SPEC}/tasks.md": "tasks",
+             f"specs/{SPEC}/checklists/requirements.md": "- [x] a\n- [ ] b\n"}
+    with use_locale("es"):
+        message = runs.preflight(implement, SPEC, files).message
+        assert "arregla" in message and "sí" in message and "no" in message
+    with use_locale("en"):
+        message = runs.preflight(implement, SPEC, files).message
+        assert "fix" in message and "yes" in message and "no" in message
+
+
+def test_only_clarify_may_toggle_the_requirement_checklist():
+    """The gate hand-off depends on it: implement cannot tick what clarify owns."""
+    owners = [name for name, definition in REGISTRY.items()
+              if "req_checklist_toggle" in definition.writes]
+    assert owners == ["speckit-clarify"]
 
 
 def test_spec_status_and_approved_text():

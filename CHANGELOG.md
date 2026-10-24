@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A checklist gate can now be answered «arregla», and it no longer locks the conversation
+  (2026-10-24)**: when `/speckit-implement` found unchecked items in
+  `specs/<spec>/checklists/requirements.md`, it offered only «sí» (continue anyway) or «no»
+  (cancel), and the reader who then tried to have them fixed was refused with «Hay un comando en
+  curso (/fix); termínalo o espera a que acabe» for ever — the interrupted run kept the
+  conversation's single active-run slot, and the UPDATE that freed it was written in the same
+  flush *after* the new run's INSERT, so the partial unique index rejected it.
+  - The gate now says what each answer does and accepts «arregla» / «fix»: the product hands the
+    checklist to `/speckit-clarify` (the only command allowed to toggle those boxes) for the same
+    spec, which ticks what the spec already satisfies, asks the minimum question for what it does
+    not, and corrects the spec; then `/speckit-implement` runs again.
+  - The replacement of an abandoned run is flushed before the new run is created, so answering a
+    gate and starting a command never dead-ends. Gate answers are accent-insensitive («Sí»,
+    «Arréglalas»).
+  - `/speckit-clarify` and `/speckit-implement` say so in their prompts (Spanish and English).
+
 - **A preview PDF no longer fails with only a reference (2026-10-24)**: «PDF de vista previa» on a
   project could answer with the generic «Ocurrió un error inesperado (referencia …)», which gives the
   reader nothing to act on. A preview now renders the draft's report through `pdf.render_preview`,

@@ -75,10 +75,18 @@ ONLY the `[ ]`/`[x]` marker of the items whose state changes (nothing else in th
 refuses it). Report newly passing items, regressions, items still unchecked and the "before →
 after" count.
 
-### 8. Cases at the start
+### 8. When the focus is completing the quality checklist
+If the focus is the quality checklist — for example because the person answered «fix» at the
+`/speckit-implement` gate — **start at step 7**: tick only the items the spec already satisfies,
+with the evidence on one line. For an item that is not satisfied, leave it unticked: ask the single
+indispensable question (one per turn, step 3) and correct the spec with the answer, then evaluate it
+again. Never tick an item the spec does not satisfy, and never edit the checklist text: only the
+marker.
+
+### 9. Cases at the start
 No relevant ambiguity: say so, suggest `/speckit-plan` and call `finish_command`. No spec: ask to run
 `/speckit-specify` first and call `finish_command`.
 
-### 9. Final report
+### 10. Final report
 Questions asked and answered, sections touched, coverage table per category (Resolved / Deferred /
 Clear / Outstanding), checklist count and recommended command; then `finish_command`.

@@ -1641,11 +1641,20 @@ def _idempotence(db, session: AssistantSession, view, definition, spec: str | No
     return None
 
 
+def _fix_command(db, waiting_run):
+    """The gate's «arregla»: hand the checklist over to /speckit-clarify for the same spec."""
+    spec = waiting_run.spec
+    runs.finish(waiting_run, "interrupted")
+    db.flush()          # free the active-run slot before the clarify run is created
+    return registry.parse(f"/speckit-clarify {spec or ''}".strip())
+
+
 def _command_turn(db, actor, session: AssistantSession, parsed,
                   text: str) -> tuple[object | None, list[Reply] | None]:
     """Command handling of a new message (021 plan §6): the run the provider turn works for,
     or product replies when no provider call is needed."""
     current_run = runs.active(db, session.id)
+    fixing = None
     if parsed is None:
         if current_run is None or current_run.status != "waiting":
             refusal = _scope_refusal(db, session, text)
@@ -1654,15 +1663,25 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
             current_run.status = "running"       # the answer continues the command
             return current_run, None
         decision = runs.answer(text)
-        if decision == "no":
+        if decision == "fix" and current_run.pending["gate"] == "unchecked_checklists":
+            # «arregla»: the checklists cannot be ticked by the command that asked (each command
+            # writes only what its spec owns), so the gate hands over to the command that can:
+            # /speckit-clarify resolves what the items ask for and toggles them. The waiting run
+            # ends here, and the new one runs through the normal path below.
+            parsed = _fix_command(db, current_run)
+            fixing = t("commands.fixing_checklists", spec=current_run.spec or "—")
+        elif decision == "no":
             runs.finish(current_run, "interrupted")
             return current_run, [(t("commands.cancelled"), None)]
-        if decision != "yes":
+        elif decision != "yes":
             return current_run, [(runs.gate_message(current_run.pending), None)]
-        if current_run.pending["gate"] == "approve_spec":
-            _approve_spec(actor, for_session(db, session), current_run)
-        following = runs.advance(current_run)
-        return current_run, ([(following, None)] if following else None)
+        else:
+            if current_run.pending["gate"] == "approve_spec":
+                _approve_spec(actor, for_session(db, session), current_run)
+            following = runs.advance(current_run)
+            return current_run, ([(following, None)] if following else None)
+    if parsed is None:
+        return None, []
 
     definition = parsed.definition
     if not definition.provider:
@@ -1683,9 +1702,15 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
         # unanswered gate leaves behind. A new command replaces it — refusing with 409 here is a
         # dead end where every following message is refused (reported after a gate asked for a
         # "si" that never reached the run).
+        previous_status = current_run.status
         runs.finish(current_run, "interrupted")
+        # The active-run slot is a partial unique index; a single flush writes the INSERT of the
+        # new run before the UPDATE that frees the old one, so it must be flushed first or the
+        # new command is refused with `command_active` (owner, 2026-10-24: every attempt to run
+        # /fix after answering a gate hit «Hay un comando en curso»).
+        db.flush()
         log.info("replaced the %s command run %s left active in session %s",
-                 current_run.status, current_run.id, session.id)
+                 previous_status, current_run.id, session.id)
     refusal = _scope_refusal(db, session, parsed.args) if parsed.args else None
     if refusal:
         return None, [refusal]
@@ -1748,7 +1773,9 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
         _tools._approve_without_asking(db, view, run, spec, answered)
         auto_run.stage = _tools._STAGE_OF_COMMAND.get(definition.name)
         return run, [(t("commands.approved_by_run", spec=spec), None)]
-    return run, ([(check.message, None)] if check.pending else None)
+    replies = [*([(fixing, None)] if fixing else []),
+               *([(check.message, None)] if check.pending else [])]
+    return run, (replies or None)
 
 
 # A dropped connection to the installation's database kills one round, not the run: the database

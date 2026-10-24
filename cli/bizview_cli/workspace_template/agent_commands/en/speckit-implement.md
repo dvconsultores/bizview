@@ -50,7 +50,9 @@ never do it or pretend to.
    query checked; a correct preview of the current project. Review the pending items in the Estado
    section and resolve them.
 8. When a task cannot be completed, explain the blocker and suggest the command (e.g.
-   `/speckit-clarify` or `/speckit-plan`); leave that task unticked.
+   `/speckit-clarify` or `/speckit-plan`); leave that task unticked. This command never ticks the
+   items of `checklists/requirements.md` (that is `/speckit-clarify`'s job): when they are
+   unticked, the person can answer «fix» at the gate and the product switches to `/speckit-clarify`.
 9. With every task ticked, change `**Status**:` to `Implemented` in `spec.md` (only that line).
 10. Report: tasks completed, files written, the checks and preview results, pending items if any,
     and that the user applies with the project's Apply button; then `finish_command`. When you need
