@@ -601,6 +601,7 @@ MESSAGES: dict[str, str] = {
     "commands.path_not_allowed": "/{command} cannot change {path}; allowed paths: {allowed}",
     "commands.missing_prereq": "{doc} is missing; run {command} first.",
     "commands.confirm_open_clarifications": "The spec has points marked [NEEDS CLARIFICATION]; /speckit-clarify is recommended. Continue anyway?",
+    "commands.auto_hint": "To stop answering these gates one by one, choose **Auto** in the composer selector: one press signs the run contract and the assistant carries on to apply by itself.",
     "commands.confirm_unchecked_checklists": "Some checklists have unchecked items:\n{table}\nAnswer «yes» to continue anyway, «fix» to have them completed first, or «no» to cancel.",
     "commands.fixing_checklists": "Understood: switching to /speckit-clarify to complete the checklists of {spec} before continuing.",
     "commands.confirm_approve_spec": "The spec is not approved (**Status**: {status}). Approve it and continue with the implementation?",

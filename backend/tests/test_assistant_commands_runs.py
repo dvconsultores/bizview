@@ -148,6 +148,26 @@ def test_advance():
     assert (run.pending, run.status) == (None, "running")
 
 
+def test_the_gate_names_where_the_auto_switch_is():
+    """A gate the user has to answer says how to stop answering gates (the Auto contract)."""
+    pending = {"gates": ["unchecked_checklists"], "gate": "unchecked_checklists",
+               "table": "| requirements.md | 16 | 15 | 1 |", "status": "Draft"}
+    with use_locale("es"):
+        hint = runs.t("commands.auto_hint")
+        plain = runs.gate_message(pending)
+        hinted = runs.gate_message(pending, hint=hint)
+        assert "Auto" in hint      # the switch is named by the label the composer shows
+        assert hinted == f"{plain}\n\n{hint}"
+        assert plain in hinted
+        # a "yes" that lands on the next gate carries the same line
+        run = _run(status="waiting",
+                   pending={"gates": ["unchecked_checklists", "approve_spec"],
+                            "gate": "unchecked_checklists", "table": "t", "status": "Draft"})
+        assert runs.advance(run, hint=hint).endswith(hint)
+    with use_locale("en"):
+        assert "Auto" in runs.t("commands.auto_hint")
+
+
 def test_add_file_and_tokens():
     run = _run()
     runs.add_file(run, "a.md", "write", 1)

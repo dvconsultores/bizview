@@ -237,15 +237,18 @@ class Preflight:
     pending: dict | None = None  # confirmation gates: the run starts `waiting`
 
 
-def gate_message(pending: dict) -> str:
+def gate_message(pending: dict, hint: str | None = None) -> str:
+    """The gate's question; `hint` is the product's extra line (where the Auto switch is)."""
     gate = pending["gate"]
     if gate == "open_clarifications":
-        return t("commands.confirm_open_clarifications")
-    if gate == "unchecked_checklists":
-        return t("commands.confirm_unchecked_checklists", table=pending.get("table", ""))
-    if gate == "approve_spec":
-        return t("commands.confirm_approve_spec", status=pending.get("status") or "-")
-    raise ValueError(f"unknown gate {gate}")
+        text = t("commands.confirm_open_clarifications")
+    elif gate == "unchecked_checklists":
+        text = t("commands.confirm_unchecked_checklists", table=pending.get("table", ""))
+    elif gate == "approve_spec":
+        text = t("commands.confirm_approve_spec", status=pending.get("status") or "-")
+    else:
+        raise ValueError(f"unknown gate {gate}")
+    return f"{text}\n\n{hint}" if hint else text
 
 
 def preflight(definition: CommandDef, spec: str | None, files: dict[str, str]) -> Preflight:
@@ -275,12 +278,12 @@ def preflight(definition: CommandDef, spec: str | None, files: dict[str, str]) -
     return Preflight(message=gate_message(pending), pending=pending)
 
 
-def advance(run) -> str | None:
+def advance(run, hint: str | None = None) -> str | None:
     """After a "yes": the next gate's message, or None when the run can start."""
     gates = list(run.pending["gates"])[1:]
     if gates:
         run.pending = {**run.pending, "gates": gates, "gate": gates[0]}
-        return gate_message(run.pending)
+        return gate_message(run.pending, hint=hint)
     run.pending = None
     run.status = "running"
     return None

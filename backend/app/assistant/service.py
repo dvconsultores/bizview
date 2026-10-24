@@ -1659,6 +1659,11 @@ def _idempotence(db, session: AssistantSession, view, definition, spec: str | No
     return None
 
 
+def _gate_hint(db, session) -> str | None:
+    """Where the Auto switch is, unless a live contract is already answering the gates."""
+    return None if live_auto_run(db, session) is not None else t("commands.auto_hint")
+
+
 def _fix_command(db, waiting_run):
     """The gate's «arregla»: hand the checklist over to /speckit-clarify for the same spec."""
     spec = waiting_run.spec
@@ -1692,11 +1697,12 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
             runs.finish(current_run, "interrupted")
             return current_run, [(t("commands.cancelled"), None)]
         elif decision != "yes":
-            return current_run, [(runs.gate_message(current_run.pending), None)]
+            return current_run, [(runs.gate_message(current_run.pending,
+                                                    hint=_gate_hint(db, session)), None)]
         else:
             if current_run.pending["gate"] == "approve_spec":
                 _approve_spec(actor, for_session(db, session), current_run)
-            following = runs.advance(current_run)
+            following = runs.advance(current_run, hint=_gate_hint(db, session))
             return current_run, ([(following, None)] if following else None)
     if parsed is None:
         return None, []
@@ -1791,8 +1797,9 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
         _tools._approve_without_asking(db, view, run, spec, answered)
         auto_run.stage = _tools._STAGE_OF_COMMAND.get(definition.name)
         return run, [(t("commands.approved_by_run", spec=spec), None)]
+    hint = _gate_hint(db, session) if check.pending else None
     replies = [*([(fixing, None)] if fixing else []),
-               *([(check.message, None)] if check.pending else [])]
+               *([(runs.gate_message(check.pending, hint=hint), None)] if check.pending else [])]
     return run, (replies or None)
 
 
