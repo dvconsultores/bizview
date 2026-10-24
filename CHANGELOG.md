@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A preview PDF no longer fails with only a reference (2026-10-24)**: «PDF de vista previa» on a
+  project could answer with the generic «Ocurrió un error inesperado (referencia …)», which gives the
+  reader nothing to act on. A preview now renders the draft's report through `pdf.render_preview`,
+  which logs the traceback and, if the render fails, says which report failed in the reader's
+  language. The renderer itself was stress-checked against every view shape a draft can produce
+  (no comparison, empty series, one point, null values, a table of datetimes) and renders all of
+  them — the failures seen in production came from a build made while the report code was mid-change.
+  Covered by `backend/tests/test_pdf_preview.py`.
+
 - **A preview no longer depends on the worker seeing the projects folder (2026-10-23)**: the
   request now carries the draft the backend validated (`assistant_preview_request.files`, migration
   `0026_preview_request_files`) and the worker previews exactly those files. Until now the worker

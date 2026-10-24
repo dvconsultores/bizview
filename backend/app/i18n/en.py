@@ -518,6 +518,7 @@ MESSAGES: dict[str, str] = {
     "preview.empty_draft": "The preview sees no project files. Check that the projects folder is mounted (PROJECTS_DIR) and try again.",
     "preview.validate_draft_before_preview": "Validate the draft before running the preview.",
     "preview.busy": "A preview is already running; wait for it to finish.",
+    "preview.pdf_failed": "The preview PDF for report «{report}» could not be generated. The server log has the detail.",
     "preview.run_preview_first": "Run the preview first.",
     "preview.metric_not_found": "Report not found in the draft.",
     "preview.busy_retry": "A preview was already running; request it again.",

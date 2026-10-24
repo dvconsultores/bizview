@@ -327,10 +327,12 @@ def preview_report_pdf(slug: str, report_id: str, request: Request,
     if not definition["pdf"]:
         raise not_found(M("report.pdf_not_allowed"))
     settings = get_settings()
-    content = pdf.render(definition, _preview_data(db, session, report_id, request),
-                         organization=settings.organization_name,
-                         product=settings.product_name, viewer=actor.full_name, preview=True,
-                         palette=palette.resolve(definition, palette.installation_preset(db)))
+    content = pdf.render_preview(definition, _preview_data(db, session, report_id, request),
+                                 report_id=report_id,
+                                 organization=settings.organization_name,
+                                 product=settings.product_name, viewer=actor.full_name,
+                                 palette=palette.resolve(definition,
+                                                          palette.installation_preset(db)))
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{report_id}-vista-previa.pdf"'})
 

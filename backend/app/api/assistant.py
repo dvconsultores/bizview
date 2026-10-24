@@ -596,13 +596,13 @@ def get_preview_report_pdf(session_id: int, report_id: str, request: Request,
     payload = assistant_preview.report_data(
         db, session, report_id, request.query_params.multi_items(),
         datetime.now(ZoneInfo(settings.timezone)).date(), settings.timezone)
-    content = pdf.render(
+    content = pdf.render_preview(
         definition,
         payload,
+        report_id=report_id,
         organization=settings.organization_name,
         product=settings.product_name,
         viewer=actor.full_name,
-        preview=True,
         palette=palette.resolve(definition, palette.installation_preset(db)),
     )
     return Response(

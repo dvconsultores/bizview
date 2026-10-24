@@ -508,6 +508,7 @@ MESSAGES: dict[str, str] = {
     "preview.empty_draft": "La vista previa no ve ningún archivo del proyecto. Comprueba que la carpeta de proyectos esté montada (PROJECTS_DIR) y vuelve a intentarlo.",
     "preview.validate_draft_before_preview": "Valida el borrador antes de la vista previa.",
     "preview.busy": "Ya hay una vista previa en curso; espera a que termine.",
+    "preview.pdf_failed": "No se pudo generar el PDF de vista previa del reporte «{report}». El registro del servidor tiene el detalle.",
     "preview.run_preview_first": "Ejecuta la vista previa primero.",
     "preview.metric_not_found": "Reporte no encontrado en el borrador.",
     "preview.busy_retry": "Ya había otra vista previa en curso; vuelve a solicitarla.",
