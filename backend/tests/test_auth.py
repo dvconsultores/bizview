@@ -109,4 +109,7 @@ def test_public_config_and_health():
                                            "footer_credit": "GlobalDV",
                                            "vision_enabled": False, "attachments_max_mb": 5,
                                            "attachments_max_per_message": 4,
-                                           "google_auth": False}
+                                           "google_auth": False,
+                                           "palette_preset": "impacto",
+                                           "palette_presets": ["impacto", "clasico", "monocromo",
+                                                               "contraste", "daltonico"]}

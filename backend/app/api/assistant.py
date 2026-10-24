@@ -31,7 +31,7 @@ from app.models import (
 )
 from app.projects import fs
 from app.projects import service as projects_service
-from app.reports import pdf
+from app.reports import palette, pdf
 from app.security import crypto, mfa, profile, throttle
 from app.services import users
 from app.services.audit import record as audit_record
@@ -603,6 +603,7 @@ def get_preview_report_pdf(session_id: int, report_id: str, request: Request,
         product=settings.product_name,
         viewer=actor.full_name,
         preview=True,
+        palette=palette.resolve(definition, palette.installation_preset(db)),
     )
     return Response(
         content,

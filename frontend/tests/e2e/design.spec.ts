@@ -6,7 +6,7 @@ const SUPER = { email: "e2e-root@example.com", password: "E2e-super-pass-1" };
 const SELECTION = "period=custom&from=2026-09-27&to=2026-09-28&compare=previous_period";
 const ROUTES = [
   "/", "/tableros", `/r/ventas?${SELECTION}`, "/d/ventas", "/perfil", "/cambiar-clave", "/seguridad/doble-factor",
-  "/admin", "/admin/usuarios", "/admin/usuarios/nuevo", "/admin/auditoria", "/admin/ia",
+  "/admin", "/admin/usuarios", "/admin/usuarios/nuevo", "/admin/auditoria", "/admin/ia", "/admin/apariencia",
   "/admin/fuentes", "/admin/fuentes/nueva", "/admin/seguridad", "/admin/espacio",
   "/admin/integraciones", "/admin/tokens", "/no-autorizado", "/no-existe",
 ];
@@ -76,6 +76,33 @@ async function expectActiveLink(page: Page, route: string, label: string) {
   expect(isDistinct, `${route} active link distinct from sidebar`).toBe(true);
 }
 
+/** SC-001: walking up from the report title, the first max-width is the app container
+ * (`max-w-screen-2xl`, 1536 px). The old page-level `max-w-7xl` (1280 px) would be found first. */
+async function expectReportContainer(page: Page) {
+  const info = await page.evaluate(() => {
+    const h1 = Array.from(document.querySelectorAll("h1")).find((el) => el.getClientRects().length > 0);
+    if (!h1) return null;
+    let el: HTMLElement | null = h1.parentElement;
+    while (el && el !== document.body) {
+      const maxWidth = getComputedStyle(el).maxWidth;
+      if (maxWidth !== "none") {
+        return {
+          maxWidth,
+          width: Math.round(el.getBoundingClientRect().width),
+          viewport: window.innerWidth,
+        };
+      }
+      el = el.parentElement;
+    }
+    return { maxWidth: "none", width: Math.round(h1.getBoundingClientRect().width), viewport: window.innerWidth };
+  });
+  expect(info, "the report title is on screen").not.toBeNull();
+  expect(info!.maxWidth, "the report uses the app container").toBe("1536px");
+  if (info!.viewport > 1600) {
+    expect(info!.width).toBeGreaterThan(1500);
+  }
+}
+
 async function checkRoutes(page: Page, scheme: "dark" | "light") {
   // 19 routes, each with axe, against the external BI database: well past the 60 s default.
   test.setTimeout(120_000);
@@ -113,6 +140,10 @@ for (const scheme of ["dark", "light"] as const) {
 
         await signIn(page);
         await checkRoutes(page, scheme);
+        await page.goto(`/r/ventas?${SELECTION}`);
+        await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+        await expect(page.locator("[aria-busy=true]")).toHaveCount(0);
+        await expectReportContainer(page);
         await expectActiveLink(page, "/", "Inicio");
         await expectActiveLink(page, "/admin/usuarios", "Administración");   // sections live under it
       });

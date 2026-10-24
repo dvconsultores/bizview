@@ -12,7 +12,7 @@ Cualquier persona con acceso al tablero.
 ## Cómo se hace
 
 1. Aplica los filtros y el período que quieras (ver Filtros y períodos).
-2. En **Filtros y controles**, sección **Exportar**, elige el **Formato**: **PDF** o **CSV**.
+2. Abre **Parámetros** y, en la sección **Exportar**, elige el **Formato**: **PDF** o **CSV**.
 3. Pulsa **Generar reporte**. También puedes usar **Descargar PDF** en la parte superior del
    reporte.
 4. Para una sola tarjeta, abre su menú (**Opciones de** …) y elige **Descargar CSV**.

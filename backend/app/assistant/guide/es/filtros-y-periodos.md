@@ -10,7 +10,8 @@ Cualquier persona con acceso al tablero.
 
 ## Cómo se hace
 
-1. En el reporte abre **Filtros y controles** (en el teléfono, el botón **Filtros**).
+1. En el reporte pulsa **Filtros** (a la derecha del título); el panel lateral abre en la pestaña
+   **Filtros** y los números siguen visibles mientras cambias los valores.
 2. En **Período** elige, por ejemplo, **Hoy**, **Últimos 7 días**, **Mes en curso** o
    **Personalizado** con sus fechas **Desde** y **Hasta**.
 3. En **Comparar con** elige **Sin comparación**, **Período anterior** o **Año anterior**.

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { hasReportAction, reportAction } from "./fixtures/report-action";
 
 const SUPER = { email: "e2e-root@example.com", password: "E2e-super-pass-1" };
 const FETCH = { "X-Requested-With": "fetch" };
@@ -73,12 +74,56 @@ test.afterEach(async ({ request }) => {
 });
 
 test(
+  "the shared view switches theme without a reload and keeps the viewer's choice",
+  async ({ page, browser }, testInfo) => {
+    test.slow();
+    await signIn(page);
+    await page.goto(`/r/ventas?${SELECTION}`);
+    await reportAction(page, "Compartir");
+    const shareRegion = page.getByRole("region", { name: "Compartir tablero" });
+    // Feature 030: the link can force the first-load theme.
+    await shareRegion.getByLabel("Abrir en tema").selectOption("dark");
+    await shareRegion.getByRole("button", { name: "Crear enlace" }).click();
+    const url = (await shareRegion.locator("code").first().textContent())?.trim() ?? "";
+    const token = url.match(/\/s\/([A-Za-z0-9_-]+)$/)?.[1] ?? "";
+    expect(token).not.toBe("");
+
+    const publicContext = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL as string,
+      locale: testInfo.project.use.locale as string,
+      viewport: testInfo.project.use.viewport ?? undefined,
+      reducedMotion: "reduce",
+    });
+    const publicPage = await publicContext.newPage();
+    try {
+      await publicPage.goto(`/s/${token}?${SELECTION}`);
+      await expect(publicPage.getByRole("heading", { level: 1, name: "Ventas", exact: true })).toBeVisible();
+      await expect.poll(() => publicPage.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+
+      // The toggle next to the language switcher: instant, no reload, and it survives a reload.
+      await publicPage.getByRole("radio", { name: "Claro" }).click();
+      await expect.poll(() => publicPage.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
+      await publicPage.reload();
+      await expect(publicPage.getByRole("heading", { level: 1, name: "Ventas", exact: true })).toBeVisible();
+      await expect.poll(() => publicPage.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
+
+      // A PDF from a dark screen is still rendered (the backend always uses the light preset).
+      const download = publicPage.waitForEvent("download");
+      await publicPage.getByRole("button", { name: "Descargar PDF" }).click();
+      expect((await download).suggestedFilename()).toMatch(/^ventas.*\.pdf$/);
+    } finally {
+      await publicContext.close();
+    }
+  },
+);
+
+test(
   "an administrator shares a dashboard link; it opens without a session, downloads the PDF and stops working when revoked",
   async ({ page, browser }, testInfo) => {
     test.slow();
     await signIn(page);
     await page.goto(`/r/ventas?${SELECTION}`);
-    await page.getByRole("button", { name: "Compartir" }).click();
+    await reportAction(page, "Compartir");
     const shareRegion = page.getByRole("region", { name: "Compartir tablero" });
     await expect(shareRegion.getByRole("heading", { name: "Compartir tablero" })).toBeVisible();
 
@@ -160,13 +205,13 @@ test(
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Descargar PDF" }).click();
+    await reportAction(page, "Descargar PDF");
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("ventas-2026-09-27-2026-09-28.pdf");
     const downloadedBytes = readFileSync(await download.path());
     const downloadedSha256 = createHash("sha256").update(downloadedBytes).digest("hex");
 
-    await page.getByRole("button", { name: "Enviar por correo" }).click();
+    await reportAction(page, "Enviar por correo");
     const emailRegion = page.getByRole("region", { name: "Enviar por correo" });
     await expect(emailRegion.getByRole("heading", { name: "Enviar por correo" })).toBeVisible();
 
@@ -245,7 +290,7 @@ test("an administrator schedules a weekly email on a phone, pauses it and delete
   await page.goto(`/r/ventas?${SELECTION}`);
   await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
-  await page.getByRole("button", { name: "Envíos programados" }).click();
+  await reportAction(page, "Envíos programados");
   const view = page.getByRole("region", { name: "Envíos programados" });
   await expect(view.getByRole("heading", { name: "Envíos programados" })).toBeVisible();
   await expect(
@@ -327,8 +372,8 @@ test("sharing and email controls are hidden when the installation turns them off
   await signIn(page);
   await page.goto(`/r/ventas?${SELECTION}`);
   await expect(page.getByRole("heading", { level: 1, name: "Ventas", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Enviar por correo" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Compartir" }).click();
+  expect(await hasReportAction(page, "Enviar por correo")).toBe(false);
+  await reportAction(page, "Compartir");
   const shareRegion = page.getByRole("region", { name: "Compartir tablero" });
   await expect(shareRegion.getByText(/Los enlaces compartidos están desactivados/)).toBeVisible();
   await expect(shareRegion.getByRole("button", { name: "Crear enlace" })).toHaveCount(0);

@@ -6,10 +6,11 @@ import { Sparkline } from "./charts/Sparkline";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
 
+/** Feature 030 FR-009: filled delta badges whose colours come from the palette preset. */
 const TONE = {
-  good: "bg-success-soft text-success-strong ring-success-line",
-  bad: "bg-danger-soft text-danger-strong ring-danger-line",
-  flat: "bg-surface-2 text-ink-3 ring-line",
+  good: "bg-kpi-delta-bg-positive text-chart-positive ring-kpi-delta-bg-positive",
+  bad: "bg-kpi-delta-bg-negative text-chart-negative ring-kpi-delta-bg-negative",
+  flat: "bg-surface-2 text-kpi-neutral ring-line",
 };
 
 const ICONS: Record<KpiItem["format"], typeof Hash> = {
@@ -79,8 +80,8 @@ export function KpiGrid({
                     <span
                       className={
                         isTv
-                          ? "block text-4xl tabular-nums [overflow-wrap:anywhere] sm:text-5xl xl:text-6xl"
-                          : "block text-xl tabular-nums [overflow-wrap:anywhere] sm:text-3xl"
+                          ? "block text-[length:var(--kpi-numeral-tv)] tabular-nums tracking-[var(--kpi-tracking)] [overflow-wrap:anywhere] sm:text-[length:var(--kpi-numeral-tv-lg)] xl:text-[length:var(--kpi-numeral-tv-xl)]"
+                          : "block text-[length:var(--kpi-numeral)] tabular-nums tracking-[var(--kpi-tracking)] [overflow-wrap:anywhere] sm:text-[length:var(--kpi-numeral-lg)]"
                       }
                     >
                       {formatValue(k.value, k.format, currency)}

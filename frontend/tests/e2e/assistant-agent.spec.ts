@@ -5,6 +5,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import draft from "./fixtures/agent-draft.json" with { type: "json" };
+import { reportAction } from "./fixtures/report-action";
 
 const SUPER = { email: "e2e-root@example.com", password: "E2e-super-pass-1" };
 const FETCH = { "X-Requested-With": "fetch" };
@@ -217,7 +218,7 @@ test("empty installation → /speckit-implement ×2 → apply → ds_facturas_ag
     await expect(userPage.getByRole("button", { name: "Abrir asistente" })).toHaveCount(0);
     await check(userPage);
     const reportPdf = userPage.waitForEvent("download");
-    await userPage.getByRole("button", { name: "Descargar PDF" }).click();
+    await reportAction(userPage, "Descargar PDF");
     const reportDownload = await reportPdf;
     expect(reportDownload.suggestedFilename()).toMatch(/^facturas-agente.*\.pdf$/);
     expect(await reportDownload.failure()).toBeNull();

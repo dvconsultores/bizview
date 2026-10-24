@@ -61,12 +61,12 @@ Light (surface `#FFFFFF`, `kpi_text` `#0F172A` at 17.85:1):
 | role | value | contrast vs surface |
 |---|---|---|
 | primary | `#0B63F6` | 5.09:1 |
-| series1…8 | `#0B63F6` `#00897B` `#B45309` `#DB2777` `#7C3AED` `#15803D` `#C2410C` `#0E7490` | 5.09 · 4.23 · 5.02 · 4.60 · 5.70 · 5.02 · 5.18 · 5.36 |
-| positive | `#15803D` | 5.02:1 |
+| series1…8 | `#0B63F6` `#00897B` `#B45309` `#DB2777` `#7C3AED` `#166534` `#C2410C` `#0E7490` | 5.09 · 4.32 · 5.02 · 4.60 · 5.70 · 7.13 · 5.18 · 5.36 |
+| positive | `#166534` | 7.13:1 |
 | negative | `#B91C1C` | 6.47:1 |
-| neutral | `#334155` | 10.4:1 |
+| neutral | `#334155` | 10.35:1 |
 | grid | `#E2E8F0` | 1.23:1 (subtle by design) |
-| kpi_delta_bg.positive / .negative | `#DCFCE7` / `#FEE2E2` | text `#15803D` 4.57:1 · `#B91C1C` 5.30:1 |
+| kpi_delta_bg.positive / .negative | `#BBF7D0` / `#FECDD3` | badge text 5.88:1 · 4.59:1 |
 
 Dark (surface `#0F172A`, `kpi_text` `#F8FAFC` at 17.06:1):
 
@@ -76,17 +76,20 @@ Dark (surface `#0F172A`, `kpi_text` `#F8FAFC` at 17.06:1):
 | series1…8 | `#60A5FA` `#2DD4BF` `#FBBF24` `#F472B6` `#A78BFA` `#4ADE80` `#FB923C` `#22D3EE` | 7.02 · 9.59 · 10.69 · 6.74 · 6.56 · 10.25 · 7.89 · 9.88 |
 | positive | `#4ADE80` | 10.25:1 |
 | negative | `#FB7185` | 6.63:1 |
-| neutral | `#CBD5E1` | 9.85:1 |
-| grid | `#1E293B` | 1.72:1 |
-| kpi_delta_bg.positive / .negative | `#052E22` / `#450A0A` | text `#4ADE80` 8.48:1 · `#FB7185` 6.00:1 |
+| neutral | `#CBD5E1` | 12.02:1 |
+| grid | `#1E293B` | 1.22:1 |
+| kpi_delta_bg.positive / .negative | `#064E3B` / `#450A0A` | badge text 5.58:1 · 6.00:1 |
 
-Adjacent-series ΔE is ≥45 in light and ≥45 in dark; `positive`/`negative` ΔE is ≥104 in both.
+Adjacent-series ΔE is ≥45 in both themes; `positive`/`negative` ΔE is ≥104. The shipped values live in
+`frontend/src/theme/palettes/impacto.json` (mirrored for the PDF) and are re-checked on every run by
+`tests/unit/palette-presets.test.ts`.
 
 **Rationale**: the spec asks for "saturated primary, a distinct accent per secondary, bold numerals,
 strong delta colours, subtle grid" in the spirit of the reference dashboard, and delegates the exact
-hues to the plan against the palette check. Amber `#F59E0B` and teal `#00A99D` were the first
-candidates and both fail 3:1 on white (2.15 and 2.93) — they were replaced by `#B45309` and
-`#00897B`, which keep the hue family and pass.
+hues to the plan against the palette check. Three candidates were rejected by the numbers while this
+plan was written: amber `#F59E0B` (2.15:1 on white) and teal `#00A99D` (2.93:1) became `#B45309` and
+`#00897B`; and the first badge pair (`#15803D` on `#BBF7D0`) read at 4.14:1, so the positive role
+darkened to `#166534` (5.88:1 on the badge, 7.13:1 as a series).
 
 **Alternatives considered**: copy the reference dashboard's hues — it has no light variant and its
 pale accents fail 3:1, so it cannot pass the gate; use a generated 8-hue harmonic ramp — harder to
@@ -101,7 +104,7 @@ they are the interesting part):
 | preset | light series1…8 | dark series1…8 |
 |---|---|---|
 | `clasico` | `#3A7393` `#5098B8` `#7C3AED` `#0D9488` `#B45309` `#BE123C` `#4338CA` `#4D7C0F` | `#6AA6C3` `#98C3D8` `#A78BFA` `#2DD4BF` `#FBBF24` `#FB7185` `#818CF8` `#A3E635` |
-| `monocromo` | `#12232C` `#1B3541` `#234655` `#2B5768` `#336A7E` `#3C7D93` `#4790A6` `#4E9CB1` | `#DDEAF1` `#C4D9E5` `#AAC7D9` `#90B5CD` `#76A3C1` `#5C91B5` `#427FA9` `#2B6D9D` |
+| `monocromo` | `#101E25` `#182E36` `#203F49` `#29505D` `#326371` `#3B7585` `#44899B` `#4E9CB1` | `#DDEAF1` `#C4D9E5` `#AAC7D9` `#90B5CD` `#76A3C1` `#5C91B5` `#427FA9` `#2B6D9D` |
 | `contraste` | `#0B1220` `#1E3A8A` `#7F1D1D` `#14532D` `#7C2D12` `#4C1D95` `#134E4A` `#78350F` | `#F8FAFC` `#93C5FD` `#FCA5A5` `#86EFAC` `#FDE68A` `#C4B5FD` `#5EEAD4` `#FDBA74` |
 | `daltonico` | `#0072B2` `#D55E00` `#009E73` `#CC79A7` `#4B2E83` `#8C6D00` `#1B7F79` `#8B4513` | `#56B4E9` `#E69F00` `#009E73` `#CC79A7` `#C7A9E8` `#F0E442` `#5FD3C4` `#F4A261` |
 

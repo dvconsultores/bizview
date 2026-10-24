@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { FileDown, Link2Off, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { FileDown, Link2Off, RefreshCw } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type {
   ReportData,
@@ -8,10 +8,13 @@ import type {
   SharedDashboard as SharedDashboardData,
 } from "../api/types";
 import { ParamsForm } from "../components/report/ParamsForm";
-import { ContextBlock } from "../components/report/ContextBlock";
+import { ReportActions } from "../components/report/ReportActions";
+import { ReportMetaLine } from "../components/report/ReportMetaLine";
+import { ReportSheet, type ReportSheetTab } from "../components/report/ReportSheet";
 import { ReportViews } from "../components/report/ReportViews";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { Logo } from "../components/Logo";
 import { useBranding } from "../config/BrandingContext";
 import { useT } from "../i18n";
@@ -33,6 +36,9 @@ import { errorText } from "../lib/sharing";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { readCachedPreference } from "../theme/resolve";
+import { useTheme } from "../theme/ThemeContext";
+import { PageContainer } from "../components/PageContainer";
 import { Spinner } from "../components/Spinner";
 
 type LoadState =
@@ -57,10 +63,21 @@ export function SharedDashboard() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [dataQuery, setDataQuery] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [sheet, setSheet] = useState<ReportSheetTab | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const previousTitleRef = useRef<string>(document.title);
+  const { setPalette, setPreference } = useTheme();
+  const linkThemeApplied = useRef(false);
+
+  // Feature 030 (contracts/share-theme.md): the sharer's theme applies on the first load only, and
+  // only when this browser has no stored preference; afterwards the viewer's choice wins.
+  useEffect(() => {
+    if (sharedState.status !== "ok" || linkThemeApplied.current) return;
+    linkThemeApplied.current = true;
+    const forced = sharedState.shared.theme;
+    if (forced && readCachedPreference() === "system") void setPreference(forced);
+  }, [sharedState, setPreference]);
 
   const report = useMemo<ReportDefinition | null>(
     () =>
@@ -74,6 +91,18 @@ export function SharedDashboard() {
     () => (report ? parseSelection(params, report) : null),
     [params, report],
   );
+
+  // Feature 030: the report's declared palette wins over the installation's in the shared view too.
+  useEffect(() => {
+    if (!report) return;
+    setPalette(report.layout?.theme?.palette ?? null);
+  }, [report, setPalette]);
+  useEffect(() => () => setPalette(null), [setPalette]);
+
+  const activeCount = useMemo(() => {
+    if (!applied || !report) return 0;
+    return report.filters.reduce((sum, id) => sum + (applied.filters[id]?.length ?? 0), 0);
+  }, [applied, report]);
 
   const apply = useCallback(
     (s: ReportSelection) => {
@@ -247,7 +276,7 @@ export function SharedDashboard() {
 
   if (sharedState.status === "error" || !report) {
     return (
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+      <PageContainer as="main" className="py-12">
         <Alert
           tone="error"
           action={
@@ -264,141 +293,110 @@ export function SharedDashboard() {
             ? sharedState.message
             : t.common.unexpected}
         </Alert>
-      </main>
+      </PageContainer>
     );
   }
 
   const sharedData = sharedState.shared;
-  const orgName =
-    branding.organization_name || branding.product_name;
+  const orgName = branding.organization_name || branding.product_name;
 
   return (
     <div className="min-h-screen">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Logo className="h-8 w-8" />
-          <span className="min-w-0 truncate font-semibold text-ink">{orgName}</span>
-          <div className="ml-auto shrink-0">
+        <PageContainer className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+          <Logo className="h-8 w-8 shrink-0" />
+          <span className="min-w-0 flex-1 truncate font-semibold text-ink">{orgName}</span>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <LanguageSwitcher compact />
+            {/* Feature 030 (FR-006): the viewer picks the theme; the choice stays on this device. */}
+            <ThemeSwitcher compact />
           </div>
-        </div>
+        </PageContainer>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <PageContainer as="main" className="py-6">
         <div className="space-y-5">
           <Alert tone="info">
             {t.sharing.shared.banner(formatDate(sharedData.expires_at))}
           </Alert>
 
-          <div>
-            <h1 className="text-2xl font-bold text-ink sm:text-3xl">
-              {localized(sharedData.dashboard, "name")}
-            </h1>
-            {localized(report, "description") && (
-              <p className="mt-1 text-sm text-ink-2">
-                {localized(report, "description")}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            {applied && (
-              <ContextBlock
-                def={report}
-                applied={applied}
-                data={fresh ? data : null}
-                incompleteCustom={incompleteCustom}
-                onRemoveFilter={(filterId, value) =>
-                  apply(withoutFilterValue(applied, filterId, value))
-                }
-                viewer={null}
-                actions={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      icon={
-                        <SlidersHorizontal
-                          className="h-5 w-5"
-                          aria-hidden
-                        />
-                      }
-                      className="lg:hidden"
-                      aria-expanded={showFilters}
-                      onClick={() => setShowFilters((v) => !v)}
-                    >
-                      {showFilters
-                        ? t.sharing.shared.hideFilters
-                        : t.sharing.shared.filters}
-                    </Button>
-                    {report.pdf && query !== null && (
-                      <Button
-                        variant="secondary"
-                        icon={<FileDown className="h-5 w-5" aria-hidden />}
-                        loading={pdfBusy}
-                        onClick={() => void handlePdf()}
-                      >
-                        {t.reportParams.downloadPdf}
-                      </Button>
-                    )}
-                  </div>
-                }
-              />
-            )}
-
-            {pdfError && <Alert tone="error">{pdfError}</Alert>}
-            {dataError && <Alert tone="error">{dataError}</Alert>}
-            {fresh && data && isStale(data) && (
-              <Alert tone="warning">{staleText(data)}</Alert>
-            )}
-          </div>
-
-          <div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-6">
-            <Card
-              className={`${showFilters ? "block" : "hidden"} mb-5 p-5 lg:mb-0 lg:block`}
-            >
-              {applied && (
-                <ParamsForm
-                  def={report}
-                  applied={applied}
-                  onApply={apply}
-                  loadOptions={loadOptions}
-                  className="space-y-5"
-                >
-                  <Button
-                    variant="ghost"
-                    className="mt-2 lg:hidden"
-                    icon={
-                      <SlidersHorizontal className="h-5 w-5" aria-hidden />
-                    }
-                    onClick={() => setShowFilters(false)}
-                  >
-                    {t.sharing.shared.hideFilters}
-                  </Button>
-                </ParamsForm>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold text-ink sm:text-3xl">
+                {localized(sharedData.dashboard, "name")}
+              </h1>
+              {localized(report, "description") && (
+                <p className="mt-1 text-sm text-ink-2">{localized(report, "description")}</p>
               )}
-            </Card>
-
-            <div
-              className={`space-y-5 transition-opacity motion-reduce:transition-none ${
-                dataLoading || !fresh ? "opacity-60" : ""
-              }`}
-              aria-busy={dataLoading || undefined}
-              inert={!fresh || dataLoading ? true : undefined}
-            >
-              {dataLoading && !data && (
-                <div
-                  role="status"
-                  className="flex justify-center py-8 text-accent"
-                >
-                  <Spinner className="h-8 w-8" />
-                  <span className="sr-only">{t.common.loading}</span>
+              {applied ? (
+                <div className="mt-2">
+                  <ReportMetaLine
+                    def={report}
+                    applied={applied}
+                    data={fresh ? data : null}
+                    onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
+                    onOpenFilters={() => setSheet("filters")}
+                  />
                 </div>
-              )}
-              {data && <ReportViews data={data} def={report} />}
+              ) : null}
             </div>
+            {applied ? (
+              <div className="w-full min-w-0 sm:w-auto sm:shrink-0">
+                <ReportActions
+                  activeFilters={activeCount}
+                  onOpenFilters={() => setSheet("filters")}
+                  onOpenParams={() => setSheet("params")}
+                  alwaysVisible={1}
+                  actions={[
+                    {
+                      id: "pdf",
+                      label: t.reportActions.pdf,
+                      icon: FileDown,
+                      onClick: () => void handlePdf(),
+                      show: report.pdf && query !== null,
+                      loading: pdfBusy,
+                    },
+                  ]}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {pdfError && <Alert tone="error">{pdfError}</Alert>}
+          {dataError && <Alert tone="error">{dataError}</Alert>}
+          {fresh && data && isStale(data) && <Alert tone="warning">{staleText(data)}</Alert>}
+
+          <div
+            className={`space-y-5 transition-opacity motion-reduce:transition-none ${
+              dataLoading || !fresh ? "opacity-60" : ""
+            }`}
+            aria-busy={dataLoading || undefined}
+            inert={!fresh || dataLoading ? true : undefined}
+          >
+            {dataLoading && !data && (
+              <div role="status" className="flex justify-center py-8 text-accent">
+                <Spinner className="h-8 w-8" />
+                <span className="sr-only">{t.common.loading}</span>
+              </div>
+            )}
+            {data && <ReportViews data={data} def={report} />}
           </div>
         </div>
-      </main>
+      </PageContainer>
+
+      <ReportSheet open={sheet !== null} tab={sheet ?? "filters"} onTabChange={setSheet} onClose={() => setSheet(null)}>
+        {applied && sheet !== null ? (
+          <ParamsForm
+            def={report}
+            applied={applied}
+            onApply={apply}
+            loadOptions={loadOptions}
+            live
+            section={sheet === "filters" ? "filters" : "period"}
+            className="space-y-5"
+          />
+        ) : null}
+      </ReportSheet>
     </div>
   );
 }

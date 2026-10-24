@@ -1,0 +1,47 @@
+{
+  "id": "contraste",
+  "label_key": "palette.contraste",
+  "strategy": "categorical",
+  "light": {
+    "primary": "#0B1220",
+    "series1": "#0B1220",
+    "series2": "#1E3A8A",
+    "series3": "#7F1D1D",
+    "series4": "#14532D",
+    "series5": "#7C2D12",
+    "series6": "#4C1D95",
+    "series7": "#134E4A",
+    "series8": "#78350F",
+    "positive": "#065F46",
+    "negative": "#991B1B",
+    "neutral": "#334155",
+    "grid": "#CBD5E1",
+    "surface": "#FFFFFF",
+    "kpi_text": "#0F172A",
+    "kpi_delta_bg": {
+      "positive": "#D1FAE5",
+      "negative": "#FEE2E2"
+    }
+  },
+  "dark": {
+    "primary": "#F8FAFC",
+    "series1": "#F8FAFC",
+    "series2": "#93C5FD",
+    "series3": "#FCA5A5",
+    "series4": "#86EFAC",
+    "series5": "#FDE68A",
+    "series6": "#C4B5FD",
+    "series7": "#5EEAD4",
+    "series8": "#FDBA74",
+    "positive": "#6EE7B7",
+    "negative": "#FECACA",
+    "neutral": "#E2E8F0",
+    "grid": "#334155",
+    "surface": "#0F172A",
+    "kpi_text": "#F8FAFC",
+    "kpi_delta_bg": {
+      "positive": "#064E3B",
+      "negative": "#7F1D1D"
+    }
+  }
+}

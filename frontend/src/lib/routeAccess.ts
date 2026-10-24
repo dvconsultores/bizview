@@ -23,6 +23,7 @@ export const ROUTES: { pattern: string; access: RouteAccess }[] = [
   { pattern: "/admin/fuentes", access: "superuser" },
   { pattern: "/admin/fuentes/nueva", access: "superuser" },
   { pattern: "/admin/fuentes/:id", access: "superuser" },
+  { pattern: "/admin/apariencia", access: "superuser" },
   { pattern: "/admin/seguridad", access: "superuser" },
   { pattern: "/admin/espacio", access: "superuser" },
   { pattern: "/admin/integraciones", access: "superuser" },

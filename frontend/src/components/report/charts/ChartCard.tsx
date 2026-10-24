@@ -10,11 +10,15 @@ export function ChartCard({
   title,
   legend,
   caption,
+  signature,
   children,
 }: {
   title: string;
   legend?: ReactNode;
   caption?: string;
+  /** Feature 030 (FR-004): the data the chart draws; a change replays a ≤300 ms fade so a filter
+   * update is visible without morphing geometry. `prefers-reduced-motion` removes it. */
+  signature?: string;
   children: (width: number) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +32,11 @@ export function ChartCard({
       </div>
       <figure className="mt-3">
         <div ref={ref} className="w-full" style={{ minHeight: CHART_MIN_HEIGHT }}>
-          {width > 0 ? children(width) : null}
+          {width > 0 ? (
+            <div key={signature} className="chart-data-in">
+              {children(width)}
+            </div>
+          ) : null}
         </div>
         {caption ? <figcaption className="mt-2 text-xs text-ink-muted [overflow-wrap:anywhere]">{caption}</figcaption> : null}
       </figure>

@@ -357,6 +357,20 @@ topics:
       es: ["seguridad", "perfil privado", "perfil internet", "comprobaciones"]
       en: ["security", "private profile", "internet profile", "checks"]
     related: [administracion, auditoria, doble-factor, telegram]
+  - id: apariencia
+    section: administracion
+    title: {es: "Apariencia", en: "Appearance"}
+    summary:
+      es: "Cómo elegir la paleta de colores de todos los reportes de la instalación."
+      en: "How to choose the colour palette of every report in the installation."
+    roles: [superuser]
+    routes: ["/admin/apariencia"]
+    tiles: ["/admin/apariencia"]
+    commands: []
+    aliases:
+      es: ["apariencia", "paleta", "colores", "tema de los reportes", "impacto", "contraste"]
+      en: ["appearance", "palette", "colours", "report theme", "impact", "contrast"]
+    related: [administracion, definir-un-reporte, actualizacion-y-modo-tv]
   - id: ia
     section: administracion
     title: {es: "Inteligencia artificial", en: "Artificial intelligence"}

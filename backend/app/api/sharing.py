@@ -26,6 +26,8 @@ SelectionValue = str | list[Annotated[str, Field(max_length=200)]]
 class LinkIn(BaseModel):
     days: int = Field(default=links.DEFAULT_DAYS, ge=links.MIN_DAYS, le=links.MAX_DAYS)
     note: str | None = Field(default=None, max_length=links.NOTE_MAX)
+    # Feature 030 (T047): the theme the shared view applies on its first load.
+    theme: Literal["light", "dark"] | None = None
 
 
 class EmailIn(BaseModel):
@@ -105,6 +107,7 @@ def create_link(
         dash,
         days=body.days,
         note=body.note,
+        theme=body.theme,
         ip=client_ip(request),
     )
     return {

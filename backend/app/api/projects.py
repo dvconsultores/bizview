@@ -320,7 +320,7 @@ def preview_report_data(slug: str, report_id: str, request: Request,
 def preview_report_pdf(slug: str, report_id: str, request: Request,
                        actor: AppUser = Depends(require_superuser), db: Session = DB):
     from app.assistant import preview as assistant_preview
-    from app.reports import pdf
+    from app.reports import palette, pdf
 
     session = _conversation(db, projects.get(db, slug), actor)
     definition = assistant_preview.report_definition(db, session, report_id)
@@ -329,7 +329,8 @@ def preview_report_pdf(slug: str, report_id: str, request: Request,
     settings = get_settings()
     content = pdf.render(definition, _preview_data(db, session, report_id, request),
                          organization=settings.organization_name,
-                         product=settings.product_name, viewer=actor.full_name, preview=True)
+                         product=settings.product_name, viewer=actor.full_name, preview=True,
+                         palette=palette.resolve(definition, palette.installation_preset(db)))
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{report_id}-vista-previa.pdf"'})
 

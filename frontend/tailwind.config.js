@@ -15,6 +15,9 @@ const TOKENS = [
   "success-bright", "success", "success-strong", "success-deep", "success-soft", "success-line",
   "warning", "warning-strong", "warning-deep", "warning-soft", "warning-line",
   "backdrop", "toast", "chart-1", "chart-2", "chart-grid", "chart-axis", "chart-label",
+  // Feature 030: the palette preset's semantic roles and KPI surfaces.
+  "chart-positive", "chart-negative", "chart-neutral", "kpi-text", "kpi-surface", "kpi-neutral",
+  "kpi-delta-bg-positive", "kpi-delta-bg-negative",
   "field", "field-focus", "line-accent", "on-primary",
 ];
 const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;

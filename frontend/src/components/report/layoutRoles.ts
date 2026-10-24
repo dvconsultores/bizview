@@ -8,9 +8,10 @@ const FALLBACK: ColorRole = "primary";
 
 const FILL: Record<ColorRole, string> = {
   primary: "fill-primary",
-  positive: "fill-success",
-  negative: "fill-danger",
-  neutral: "fill-ink-soft",
+  // Feature 030: the semantic pair follows the palette preset (verified AA in both themes).
+  positive: "fill-chart-positive",
+  negative: "fill-chart-negative",
+  neutral: "fill-chart-neutral",
   muted: "fill-ink-faint",
   series1: "fill-chart-1",
   series2: "fill-chart-2",
@@ -24,9 +25,9 @@ const FILL: Record<ColorRole, string> = {
 
 const STROKE: Record<ColorRole, string> = {
   primary: "stroke-primary",
-  positive: "stroke-success",
-  negative: "stroke-danger",
-  neutral: "stroke-ink-soft",
+  positive: "stroke-chart-positive",
+  negative: "stroke-chart-negative",
+  neutral: "stroke-chart-neutral",
   muted: "stroke-ink-faint",
   series1: "stroke-chart-1",
   series2: "stroke-chart-2",
@@ -40,9 +41,9 @@ const STROKE: Record<ColorRole, string> = {
 
 const SURFACE: Record<ColorRole, string> = {
   primary: "bg-primary",
-  positive: "bg-success",
-  negative: "bg-danger",
-  neutral: "bg-ink-soft",
+  positive: "bg-chart-positive",
+  negative: "bg-chart-negative",
+  neutral: "bg-chart-neutral",
   muted: "bg-ink-faint",
   series1: "bg-chart-1",
   series2: "bg-chart-2",

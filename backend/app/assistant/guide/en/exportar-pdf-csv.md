@@ -11,7 +11,7 @@ Anyone with access to the dashboard.
 ## How to
 
 1. Apply the filters and the period you want (see Filters and periods).
-2. In **Filters and controls**, **Export** section, choose the **Format**: **PDF** or **CSV**.
+2. Open **Parameters** and, in the **Export** section, choose the **Format**: **PDF** or **CSV**.
 3. Press **Generate report**. You can also use **Download PDF** at the top of the report.
 4. For a single card, open its menu and choose **Download CSV**.
 

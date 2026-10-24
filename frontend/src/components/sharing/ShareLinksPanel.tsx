@@ -20,6 +20,7 @@ import { Card } from "../Card";
 import { CopyButton } from "../CopyButton";
 import { EmptyState } from "../EmptyState";
 import { Input } from "../Input";
+import { Select } from "../Select";
 import { Spinner } from "../Spinner";
 import { useToast } from "../Toast";
 
@@ -40,6 +41,7 @@ export function ShareLinksPanel({ code }: { code: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [days, setDays] = useState(7);
   const [note, setNote] = useState("");
+  const [theme, setTheme] = useState<"" | "light" | "dark">("");
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string>
   >({});
@@ -98,7 +100,7 @@ export function ShareLinksPanel({ code }: { code: string }) {
     try {
       const createdLink = await api.post<CreatedShareLink>(
         `/api/dashboards/${encodeURIComponent(code)}/links`,
-        { days, note: note.trim() || null },
+        { days, note: note.trim() || null, theme: theme || null },
       );
       setCreated(createdLink);
       setNote("");
@@ -224,6 +226,19 @@ export function ShareLinksPanel({ code }: { code: string }) {
               onChange={(e) => setNote(e.target.value)}
               error={fieldErrors.note}
             />
+
+            {/* Feature 030: the theme the link opens in the first time; the viewer can still switch. */}
+            <div className="max-w-xs">
+              <Select
+                label={t.sharing.themeLabel}
+                value={theme}
+                onChange={(event) => setTheme(event.target.value as "" | "light" | "dark")}
+              >
+                <option value="">{t.sharing.themeAuto}</option>
+                <option value="light">{t.sharing.themeLight}</option>
+                <option value="dark">{t.sharing.themeDark}</option>
+              </Select>
+            </div>
 
             {atMax && (
               <Alert tone="warning">

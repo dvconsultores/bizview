@@ -35,7 +35,12 @@ export function BarChart({ frame, categories, series, orientation, stacked }: Ba
   const drawn = series.filter((entry) => entry.values.some((value) => value !== null));
 
   return (
-    <ChartCard title={frame.title} legend={<ChartLegend series={drawn} />} caption={label}>
+    <ChartCard
+      title={frame.title}
+      legend={<ChartLegend series={drawn} />}
+      caption={label}
+      signature={JSON.stringify([stacked, categories.length, drawn.map((entry) => [entry.id, entry.values])])}
+    >
       {(width) =>
         orientation === "horizontal" ? (
           <HorizontalBars width={width} categories={categories} series={drawn} stacked={stacked} label={label} />

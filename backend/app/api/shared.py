@@ -13,7 +13,7 @@ from app.db import DB
 from app.engine import report as engine
 from app.errors import not_found
 from app.i18n import M
-from app.reports import pdf
+from app.reports import palette, pdf
 from app.security import throttle
 from app.sharing import links
 
@@ -59,6 +59,7 @@ def get_shared(
                       **({"name_en": definition["title_en"]}
                          if definition.get("title_en") else {})},
         "expires_at": shared.expires_at,
+        "theme": shared.theme,
         "report": definition,
     }
 
@@ -112,6 +113,7 @@ def shared_pdf(
         organization=settings.organization_name,
         product=settings.product_name,
         viewer=None,
+        palette=palette.resolve(definition, palette.installation_preset(db)),
     )
     period = payload["selection"]["current"]
     name = f"{ctx.report_id}-{period['from']}-{period['to']}.pdf"

@@ -88,6 +88,8 @@ function changeInput(input: HTMLInputElement, value: string) {
 async function renderForm(overrides: {
   def?: Partial<ReportDefinition>;
   applied?: ReportSelection;
+  live?: boolean;
+  section?: "all" | "period" | "filters";
   loadOptions?: (
     filterId: string,
     period: ReportSelection,
@@ -122,6 +124,8 @@ async function renderForm(overrides: {
         applied={applied}
         onApply={onApply}
         loadOptions={loadOptions}
+        live={overrides.live}
+        section={overrides.section}
       />,
     );
   });
@@ -377,5 +381,58 @@ describe("ParamsForm", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain(t.reportParams.fromRequired);
     expect(text).toContain(t.reportParams.toRequired);
+  });
+
+  it("live: a complete change applies once after the 250 ms debounce", async () => {
+    vi.useFakeTimers();
+    const { onApply } = await renderForm({ live: true });
+
+    const periodSelect = findFieldByLabel(t.reportParams.period) as HTMLSelectElement;
+    await act(async () => {
+      changeSelect(periodSelect, "last_month");
+    });
+    expect(onApply).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(260);
+    });
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply.mock.calls[0][0].period).toBe("last_month");
+    vi.useRealTimers();
+  });
+
+  it("live: an incomplete custom range is never applied", async () => {
+    vi.useFakeTimers();
+    const { onApply } = await renderForm({ live: true });
+
+    const periodSelect = findFieldByLabel(t.reportParams.period) as HTMLSelectElement;
+    await act(async () => {
+      changeSelect(periodSelect, "custom");
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(onApply).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('section="filters" renders only the filters block', async () => {
+    await renderForm({ section: "filters" });
+    expect(document.body.textContent).not.toContain(t.reportParams.periodSection);
+    expect(document.body.textContent).toContain(t.reportParams.filtersSection);
+    expect(findFieldByLabel("Marca")).toBeTruthy();
+  });
+
+  it('section="period" renders only the period and comparison blocks', async () => {
+    await renderForm({ section: "period" });
+    expect(document.body.textContent).toContain(t.reportParams.periodSection);
+    expect(document.body.textContent).not.toContain(t.reportParams.filtersSection);
+  });
+
+  it("groups the tail of a long filter list under a collapsible heading", async () => {
+    const filters = Array.from({ length: 11 }, (_, i) => `f${i}`);
+    const dimensions = Object.fromEntries(filters.map((id) => [id, { label: id.toUpperCase() }]));
+    await renderForm({ def: { filters, dimensions }, section: "filters" });
+    expect(document.body.textContent).toContain(t.reportSheet.moreFilters(5));
+    expect(document.querySelector("details")).toBeTruthy();
   });
 });

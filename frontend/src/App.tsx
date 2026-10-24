@@ -7,6 +7,7 @@ import { BrandingProvider } from "./config/BrandingContext";
 import { ReauthProvider } from "./components/ReauthDialog";
 import { ViewHost } from "./components/ViewHost";
 import { AdminHome } from "./pages/admin/AdminHome";
+import { Appearance } from "./pages/admin/Appearance";
 import { AI } from "./pages/admin/AI";
 import { RunProfiles } from "./pages/admin/RunProfiles";
 import { Security } from "./pages/admin/Security";
@@ -76,7 +77,8 @@ export function App() {
                     <Route path="admin/fuentes" element={<RequireSuperuser><Sources /></RequireSuperuser>} />
                     <Route path="admin/fuentes/nueva" element={<RequireSuperuser><SourceForm /></RequireSuperuser>} />
                     <Route path="admin/fuentes/:id" element={<RequireSuperuser><SourceForm /></RequireSuperuser>} />
-                    <Route path="admin/seguridad" element={<RequireSuperuser><Security /></RequireSuperuser>} />
+                    <Route path="admin/apariencia" element={<RequireSuperuser><Appearance /></RequireSuperuser>} />
+                  <Route path="admin/seguridad" element={<RequireSuperuser><Security /></RequireSuperuser>} />
                     <Route path="admin/espacio" element={<RequireSuperuser><Workspace /></RequireSuperuser>} />
                     <Route path="admin/integraciones" element={<RequireSuperuser><Integrations /></RequireSuperuser>} />
                     <Route path="admin/tokens" element={<RequireSuperuser><Tokens /></RequireSuperuser>} />

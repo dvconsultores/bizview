@@ -86,7 +86,7 @@ export function PieChart({
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
   return (
-    <ChartCard title={frame.title} caption={label}>
+    <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}>
       {() => {
         if (total <= 0) return <p className="text-sm text-ink-muted">{emptyText}</p>;
         const radius = SIZE / 2 - 4;

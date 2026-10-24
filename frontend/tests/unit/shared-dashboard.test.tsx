@@ -25,6 +25,14 @@ vi.mock("../../src/api/client", () => ({
   },
 }));
 
+vi.mock("../../src/auth/AuthContext", () => ({
+  useAuth: () => ({ user: null, setUser: vi.fn() }),
+}));
+
+vi.mock("../../src/components/Toast", () => ({
+  useToast: () => vi.fn(),
+}));
+
 vi.mock("../../src/lib/download", () => ({
   downloadPdf: vi.fn().mockResolvedValue(undefined),
 }));
@@ -32,6 +40,7 @@ vi.mock("../../src/lib/download", () => ({
 import { api, ApiError } from "../../src/api/client";
 import { downloadPdf } from "../../src/lib/download";
 import { SharedDashboard } from "../../src/pages/SharedDashboard";
+import { ThemeProvider } from "../../src/theme/ThemeContext";
 import { t } from "../../src/i18n/es";
 
 let container: HTMLDivElement;
@@ -109,11 +118,13 @@ const reportData = {
 async function renderPage() {
   await act(async () => {
     root?.render(
-      <MemoryRouter initialEntries={["/s/tok_abc"]}>
-        <Routes>
-          <Route path="/s/:token" element={<SharedDashboard />} />
-        </Routes>
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter initialEntries={["/s/tok_abc"]}>
+          <Routes>
+            <Route path="/s/:token" element={<SharedDashboard />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeProvider>,
     );
   });
   await flush();

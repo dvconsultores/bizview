@@ -21,7 +21,12 @@ export function LineChart({ frame, categories, series, area = false }: TrendChar
   const filled = area && current !== undefined && current.values.length > 1 && current.values.every((value) => value !== null);
 
   return (
-    <ChartCard title={frame.title} legend={<ChartLegend series={drawn} />} caption={label}>
+    <ChartCard
+      title={frame.title}
+      legend={<ChartLegend series={drawn} />}
+      caption={label}
+      signature={JSON.stringify(drawn.map((entry) => [entry.id, entry.values]))}
+    >
       {(width) => {
         const scale = chartScale(drawn.flatMap((entry) => entry.values), categories.length, width);
         const indexes = axisLabelIndexes(categories.length);

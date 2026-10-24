@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 from reportlab.graphics.charts.lineplots import LinePlot
 from reportlab.graphics.shapes import Drawing, String
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -16,12 +15,9 @@ from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Space
 
 from app.config import get_settings
 from app.i18n import M, current, localized, t, use_locale
+from app.reports.palette import ReportPalette, resolve
 from app.reports.pdf_layout import DEFAULT_MARGINS, page_setup, pdf_document, render_layout
 
-BLUE = colors.HexColor("#1d4ed8")
-INK = colors.HexColor("#0f172a")
-MUTED = colors.HexColor("#475569")
-LINE = colors.HexColor("#cbd5e1")
 DASH = "\u2013"
 PERIOD_LABELS = {
     "today": "Hoy",
@@ -106,29 +102,31 @@ def _freshness_line(freshness: dict) -> str | None:
     return t("pdf.live", source=escape(source), when=formatted)
 
 
-def _styles():
+def _styles(palette: ReportPalette):
     base = getSampleStyleSheet()
     return {
-        "title": ParagraphStyle("t", parent=base["Title"], textColor=INK, fontSize=18,
+        "title": ParagraphStyle("t", parent=base["Title"], textColor=palette.ink, fontSize=18,
                                 alignment=0, spaceAfter=2 * mm),
-        "meta": ParagraphStyle("m", parent=base["Normal"], textColor=MUTED, fontSize=9,
+        "meta": ParagraphStyle("m", parent=base["Normal"], textColor=palette.muted, fontSize=9,
                                leading=12),
-        "h2": ParagraphStyle("h", parent=base["Heading2"], textColor=INK, fontSize=12,
+        "h2": ParagraphStyle("h", parent=base["Heading2"], textColor=palette.ink, fontSize=12,
                              spaceBefore=5 * mm, spaceAfter=2 * mm),
-        "cell": ParagraphStyle("c", parent=base["Normal"], textColor=INK, fontSize=9, leading=11),
-        "preview": ParagraphStyle("p", parent=base["Normal"], textColor=BLUE,
+        "cell": ParagraphStyle("c", parent=base["Normal"], textColor=palette.ink, fontSize=9,
+                               leading=11),
+        "preview": ParagraphStyle("p", parent=base["Normal"], textColor=palette.primary,
                                   fontName="Helvetica-Bold", fontSize=10, leading=13),
     }
 
 
-def _table(rows: list[list], widths: list[float], numeric_from: int = 1) -> Table:
+def _table(rows: list[list], widths: list[float], palette: ReportPalette,
+           numeric_from: int = 1) -> Table:
     t = Table(rows, colWidths=widths, repeatRows=1)
     t.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 9),
-        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.8, BLUE),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.3, LINE),
+        ("TEXTCOLOR", (0, 0), (-1, -1), palette.ink),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, palette.primary),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.3, palette.line),
         ("ALIGN", (numeric_from, 0), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -137,7 +135,7 @@ def _table(rows: list[list], widths: list[float], numeric_from: int = 1) -> Tabl
     return t
 
 
-def _trend_chart(view: dict) -> Drawing:
+def _trend_chart(view: dict, palette: ReportPalette) -> Drawing:
     width, height = 170 * mm, 55 * mm
     d = Drawing(width, height)
     plot = LinePlot()
@@ -149,9 +147,9 @@ def _trend_chart(view: dict) -> Drawing:
     if len(cur) < 2:
         data = [[*s, (1, s[0][1] if s else 0)] for s in data]
     plot.data = data
-    plot.lines[0].strokeColor, plot.lines[0].strokeWidth = BLUE, 1.6
+    plot.lines[0].strokeColor, plot.lines[0].strokeWidth = palette.primary, 1.6
     if len(data) > 1:
-        plot.lines[1].strokeColor, plot.lines[1].strokeWidth = MUTED, 0.8
+        plot.lines[1].strokeColor, plot.lines[1].strokeWidth = palette.muted, 0.8
         plot.lines[1].strokeDashArray = (3, 2)
     plot.xValueAxis.visibleLabels = False
     plot.yValueAxis.labelTextFormat = lambda v: fmt(v, "number")
@@ -159,7 +157,7 @@ def _trend_chart(view: dict) -> Drawing:
     d.add(plot)
     d.add(String(14 * mm, height - 4 * mm, t("pdf.legend_current") + (
         t("pdf.legend_previous") if len(data) > 1 else ""),
-                 fontSize=7, fillColor=MUTED))
+                 fontSize=7, fillColor=palette.muted))
     return d
 
 
@@ -219,11 +217,15 @@ def meta_lines(definition: dict, payload: dict, viewer: str | None) -> list[str]
 
 def render(definition: dict, payload: dict, *, organization: str, product: str,
            viewer: str | None = None, preview: bool = False, layout: dict | None = None,
-           locale: str | None = None) -> bytes:
-    """`definition` = report definition JSON; `payload` = the data response (selection, views)."""
+           locale: str | None = None, palette: ReportPalette | None = None) -> bytes:
+    """`definition` = report definition JSON; `payload` = the data response (selection, views).
+
+    `palette` is the resolved preset (030): callers pass the installation's one; without it the
+    report's own `layout.theme.palette` resolves, falling back to `impacto`."""
     loc = locale or current()
     with use_locale(loc):
-        st = _styles()
+        pal = palette if palette is not None else resolve(definition)
+        st = _styles(pal)
         cur = definition.get("currency", "USD")
         sel = payload["selection"]
         legacy = layout or definition.get("pdf_layout") or {}
@@ -247,7 +249,7 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
         if declarative is not None:
             story = render_layout(definition=definition, payload=payload, styles=st,
                                   organization=organization, product=product, viewer=viewer,
-                                  preview=preview, locale=loc)
+                                  preview=preview, locale=loc, palette=pal)
             doc.build(story)
             return buf.getvalue()
         meta = meta_lines(definition, payload, viewer)
@@ -270,7 +272,7 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
                                  for k in view["items"]]
                 story += [Paragraph(t("pdf.summary"), st["h2"]),
                           _table(rows, [70 * mm, 40 * mm] +
-                                 ([40 * mm, 30 * mm] if compare else []))]
+                                 ([40 * mm, 30 * mm] if compare else []), pal)]
             elif view["type"] == "trend":
                 view_label = localized(view, "label") or view["label"]
                 head = [t("pdf.from"), view_label] + ([t("pdf.previous")] if compare else [])
@@ -280,8 +282,8 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
                                  for p in view["points"]]
                 story += [KeepTogether([
                     Paragraph(t("pdf.trend", label=escape(view_label)), st["h2"]),
-                    _trend_chart(view)]),
-                          _table(rows, [50 * mm, 50 * mm] + ([50 * mm] if compare else []))]
+                    _trend_chart(view, pal)]),
+                          _table(rows, [50 * mm, 50 * mm] + ([50 * mm] if compare else []), pal)]
             elif view["type"] == "ranking":
                 view_label = localized(view, "label") or view["label"]
                 view_title = localized(view, "title") or view["title"]
@@ -296,7 +298,7 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
                                  for i, it in enumerate(view["items"])]
                 story += [Paragraph(escape(view_title), st["h2"]),
                           _table(rows, [8 * mm, 82 * mm, 36 * mm, 26 * mm]
-                                 + ([26 * mm] if compare else []), numeric_from=2)]
+                                 + ([26 * mm] if compare else []), pal, numeric_from=2)]
             elif view["type"] == "table":
                 cols = view["columns"]
                 dims = sum(1 for c in cols if c["kind"] == "dimension")
@@ -309,6 +311,6 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
                 width = doc.width / len(cols)
                 view_title = localized(view, "title") or view.get("title") or t("pdf.detail")
                 story += [Paragraph(escape(view_title), st["h2"]),
-                          _table(rows, [width] * len(cols), numeric_from=dims)]
+                          _table(rows, [width] * len(cols), pal, numeric_from=dims)]
         doc.build(story)
         return buf.getvalue()

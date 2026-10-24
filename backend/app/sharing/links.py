@@ -142,6 +142,7 @@ def to_json(link: ShareLink, creator_name: str | None, origin: str = "manual") -
         "visits": link.visits,
         "last_visit_at": link.last_visit_at,
         "active": is_active(link),
+        "theme": link.theme,
         "origin": origin,
         "counted": origin != "subscription",
     }
@@ -167,6 +168,7 @@ def create(
     days: int,
     note: str | None,
     ip: str | None,
+    theme: str | None = None,
     counted: bool = True,
 ) -> tuple[ShareLink, str]:
     if user.role != "admin":
@@ -207,6 +209,7 @@ def create(
         dashboard_id=dash.id,
         token_hash=token_hash(raw),
         note=clean_note,
+        theme=theme,
         created_by=user.id,
         expires_at=now + timedelta(days=days),
     )
@@ -262,6 +265,7 @@ class Shared:
     expires_at: datetime
     dashboard: Dashboard
     ctx: engine.Context
+    theme: str | None = None
 
 
 def find(db: Session, raw: str | None) -> ShareLink | None:
@@ -278,7 +282,8 @@ def usable(db: Session, link: ShareLink, now: datetime | None = None) -> Shared 
     ctx = report_context(db, dash)
     if ctx is None:
         return None
-    return Shared(link_id=link.id, expires_at=link.expires_at, dashboard=dash, ctx=ctx)
+    return Shared(link_id=link.id, expires_at=link.expires_at, dashboard=dash, ctx=ctx,
+                  theme=link.theme)
 
 
 def resolve(db: Session, raw: str | None) -> Shared | None:

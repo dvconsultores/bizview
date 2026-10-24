@@ -329,6 +329,61 @@ def test_color_roles_pass(ws) -> None:
     assert validate.validate(ws).ok is True
 
 
+# ------------------------------------------------------------------- tema (paleta)
+
+
+def _layout_with_theme(palette: object) -> dict:
+    """El layout de prueba con un preset declarado en layout.theme."""
+    return {**_web(_kpi()), "theme": {"palette": palette}}
+
+
+@pytest.mark.parametrize("palette", report_layout.PALETTE_PRESETS)
+def test_theme_palette_presets_are_accepted(ws, palette) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout=_layout_with_theme(palette))
+    result = validate.validate(ws)
+    assert result.issues == []
+    assert result.ok is True
+
+
+def test_theme_is_optional(ws) -> None:
+    """Sin layout.theme el informe usa la paleta de la instalación."""
+    _with_view_ids(ws)
+    _edit_report(ws, layout=_web(_kpi()))
+    result = validate.validate(ws)
+    assert result.issues == []
+
+
+def test_unknown_theme_palette_is_reported(ws) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout=_layout_with_theme("neon"))
+    issue = _issue(_layout_issues(ws), "layout_range", "/layout/theme/palette")
+    assert issue.level == "error"
+    assert "palette 'neon' no es un valor admitido" in issue.message
+    assert issue.expected == {"enum": list(report_layout.PALETTE_PRESETS)}
+    assert "impacto" in (issue.fix or "")
+
+
+def test_hex_theme_palette_is_a_colour_literal(ws) -> None:
+    """Un hexadecimal sigue siendo un color literal, no un valor fuera de catálogo (026 FR-005)."""
+    _with_view_ids(ws)
+    _edit_report(ws, layout=_layout_with_theme("#ff0000"))
+    issues = _layout_issues(ws)
+    assert [i.code for i in issues] == ["layout_color_literal"]
+    assert issues[0].path == "/layout/theme/palette"
+    assert "color literal '#ff0000'" in issues[0].message
+    assert "impacto" not in issues[0].message
+
+
+def test_theme_rejects_unknown_keys(ws) -> None:
+    _edit_report(ws, layout={"theme": {"palette": "impacto", "font": "serif"}})
+    result = validate.validate(ws)
+    assert result.ok is False
+    issue = _issue(result, "schema_error", "/layout/theme")
+    assert "`font`" in (issue.fix or "")
+    assert "palette" in (issue.fix or "")
+
+
 def test_address_anywhere_in_layout_is_rejected(ws) -> None:
     _with_view_ids(ws)
     _edit_report(ws, layout=_web({"id": "nota", "type": "text",
@@ -483,3 +538,4 @@ def test_catalogues_cover_every_type() -> None:
     assert schema["$defs"]["pdf_block"]["properties"]["type"]["enum"] == list(
         report_layout.PDF_BLOCK_TYPES)
     assert schema["$defs"]["color_role"]["enum"] == list(report_layout.COLOR_ROLES)
+    assert schema["$defs"]["palette_id"]["enum"] == list(report_layout.PALETTE_PRESETS)

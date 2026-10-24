@@ -21,7 +21,6 @@ from reportlab.graphics.charts.barcharts import HorizontalBarChart, VerticalBarC
 from reportlab.graphics.charts.lineplots import LinePlot
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.shapes import Circle, Drawing
-from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4, LETTER, landscape
 from reportlab.lib.styles import ParagraphStyle
@@ -40,19 +39,8 @@ from reportlab.platypus import (
 
 from app.config import get_settings
 from app.i18n import localized, t, tn
+from app.reports.palette import ReportPalette, resolve
 
-BLUE = colors.HexColor("#1d4ed8")
-INK = colors.HexColor("#0f172a")
-MUTED = colors.HexColor("#475569")
-LINE = colors.HexColor("#cbd5e1")
-SERIES_COLORS = ("#1d4ed8", "#0f766e", "#b45309", "#7e22ce",
-                 "#b91c1c", "#0369a1", "#4d7c0f", "#a16207")
-PALETTE: dict[str, Any] = {
-    "primary": BLUE, "positive": colors.HexColor("#15803d"),
-    "negative": colors.HexColor("#b91c1c"), "neutral": MUTED,
-    "muted": colors.HexColor("#94a3b8"),
-    **{f"series{i}": colors.HexColor(c) for i, c in enumerate(SERIES_COLORS, start=1)},
-}
 FONTS = {"sans": "Helvetica", "sans_bold": "Helvetica-Bold",
          "serif": "Times-Roman", "mono": "Courier"}
 ALIGN = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
@@ -114,7 +102,7 @@ def _content_height(layout: dict) -> float:
     return size[1] - (margins["top"] + margins["bottom"]) * mm
 
 
-def _styles(base: dict) -> dict:
+def _styles(base: dict, palette: ReportPalette) -> dict:
     """The block styles, on top of the ones the fixed story already builds."""
     return {
         **base,
@@ -124,8 +112,9 @@ def _styles(base: dict) -> dict:
                                spaceAfter=2 * mm),
         "heading": ParagraphStyle("h26", parent=base["h2"], spaceBefore=2 * mm),
         "text_caption": ParagraphStyle("xc26", parent=base["cell"], fontSize=8, leading=11,
-                                       textColor=MUTED),
-        "kpi_label": ParagraphStyle("kl26", parent=base["cell"], fontSize=8, textColor=MUTED),
+                                       textColor=palette.muted),
+        "kpi_label": ParagraphStyle("kl26", parent=base["cell"], fontSize=8,
+                                    textColor=palette.muted),
         "kpi_value": ParagraphStyle("kv26", parent=base["cell"], fontName="Helvetica-Bold",
                                     fontSize=13),
         "small": ParagraphStyle("s26", parent=base["meta"], fontSize=8),
@@ -151,6 +140,7 @@ class Layout:
     pdf: dict
     width: float
     blocks: list
+    palette: ReportPalette
     index: int = 0
 
 
@@ -238,15 +228,17 @@ class PageNumber(Flowable):
 
 
 def render_layout(*, definition: dict, payload: dict, styles, organization: str, product: str,
-                  viewer: str | None, preview: bool, locale: str) -> list:
+                  viewer: str | None, preview: bool, locale: str,
+                  palette: ReportPalette | None = None) -> list:
     """Historia de flowables para definition["layout"]["pdf"]."""
     pdf_doc = pdf_document(definition) or {}
     blocks = _blocks(pdf_doc)
-    story = Story(definition.get("layout") or {}, _styles(styles))
+    pal = palette if palette is not None else resolve(definition)
+    story = Story(definition.get("layout") or {}, _styles(styles, pal))
     ctx = Layout(definition=definition, payload=payload, styles=story.styles,
                  organization=organization, product=product, viewer=viewer, preview=preview,
                  locale=locale, currency=definition.get("currency", "USD"), pdf=pdf_doc,
-                 width=story.width, blocks=blocks)
+                 width=story.width, blocks=blocks, palette=pal)
     for index, block in enumerate(blocks):
         ctx.index = index
         _BLOCKS[block["type"]](ctx, block, story)
@@ -277,28 +269,27 @@ def _view(ctx: Layout, block: dict) -> dict | None:
     return None
 
 
-def _colour(role, index: int = 0) -> Any:
-    """A declared role as a drawing colour; unknown roles fall back to the palette order."""
-    if isinstance(role, str) and role.lower().replace("_", "") in PALETTE:
-        return PALETTE[role.lower().replace("_", "")]
-    return PALETTE[f"series{index % len(SERIES_COLORS) + 1}"]
-
-
-def _role_colour(block: dict, index: int) -> Any:
+def _role_colour(ctx: Layout, block: dict, index: int) -> Any:
     """The palette colour of the i-th series: the declared role when there is one (R8)."""
     roles = block.get("colors")
     roles = [roles] if isinstance(roles, str) else (roles if isinstance(roles, list) else [])
     role = roles[index] if index < len(roles) else None
-    return _colour(role, index)
+    return ctx.palette.role(role, index)
 
 
-def _markdown(text: str) -> str:
+def _hex(color: Any) -> str:
+    """`#RRGGBB` of a palette colour, for the one place a colour rides inside markup."""
+    red, green, blue = (round(channel * 255) for channel in (color.red, color.green, color.blue))
+    return f"#{red:02X}{green:02X}{blue:02X}"
+
+
+def _markdown(text: str, link: str) -> str:
     """The markdown subset of a layout text: bold, italics, links and line breaks (R9).
 
     The text is escaped first with the same escaping the fixed story uses, so a layout can never
     inject markup or HTML; only those four forms are turned back into markup."""
     out = escape(text.strip())
-    out = LINK_RE.sub(r'<link href="\2" color="#1d4ed8">\1</link>', out)
+    out = LINK_RE.sub(rf'<link href="\2" color="{link}">\1</link>', out)
     out = BOLD_RE.sub(r"<b>\1</b>", out)
     out = ITALIC_RE.sub(r"<i>\1</i>", out)
     return out.replace("\n", "<br/>")
@@ -368,8 +359,8 @@ def _kpi_row(ctx: Layout, block: dict, story: Story) -> None:
         table = Table(rows, colWidths=[width] * len(chunk))
         table.setStyle(TableStyle([
             ("FONT", (0, 0), (-1, -1), "Helvetica", 9),
-            ("TEXTCOLOR", (0, 1), (-1, 1), INK),
-            ("LINEBELOW", (0, 1), (-1, 1), 0.6, BLUE),
+            ("TEXTCOLOR", (0, 1), (-1, 1), ctx.palette.ink),
+            ("LINEBELOW", (0, 1), (-1, 1), 0.6, ctx.palette.primary),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("TOPPADDING", (0, 0), (-1, -1), 2),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
@@ -487,7 +478,7 @@ def _line_chart(ctx: Layout, block: dict, series: list[tuple], height: float) ->
     plot.width, plot.height = width - 18 * mm, height - 14 * mm
     plot.data = [[(i, v or 0) for i, v in enumerate(s[2])] for s in series]
     for i, _serie in enumerate(plot.data):
-        plot.lines[i].strokeColor = _role_colour(block, i)
+        plot.lines[i].strokeColor = _role_colour(ctx, block, i)
         plot.lines[i].strokeWidth = 1.6 if i == 0 else 0.9
     plot.xValueAxis.visibleLabels = False
     plot.yValueAxis.labelTextFormat = lambda v: _pdf().fmt(v, "number")
@@ -506,8 +497,8 @@ def _bar_chart(ctx: Layout, block: dict, labels: list[str], series: list[tuple],
     chart.width, chart.height = width - 22 * mm, height - 16 * mm
     chart.data = [s[2] for s in series]
     for i, _serie in enumerate(chart.data):
-        chart.bars[i].fillColor = _role_colour(block, i)
-        chart.bars[i].strokeColor = colors.white
+        chart.bars[i].fillColor = _role_colour(ctx, block, i)
+        chart.bars[i].strokeColor = ctx.palette.surface
     if block.get("stacked"):
         chart.stacked = 1
     chart.categoryAxis.categoryNames = [_trim(label) for label in labels]
@@ -542,17 +533,17 @@ def _pie_chart(ctx: Layout, block: dict, labels: list[str], values: list, height
     pie.labels = [f"{_trim(name)} {_pdf().fmt(v / total * 100, 'percent') if total else ''}"
                   for name, v in zip(names, slices, strict=True)]
     pie.sideLabels = 1
-    pie.slices.strokeColor, pie.slices.strokeWidth = colors.white, 0.6
+    pie.slices.strokeColor, pie.slices.strokeWidth = ctx.palette.surface, 0.6
     for i, _slice in enumerate(slices):
-        pie.slices[i].fillColor = _role_colour(block, i)
+        pie.slices[i].fillColor = _role_colour(ctx, block, i)
         pie.slices[i].fontSize = 6
     drawing.add(pie)
     if donut:
         centre_x = pie.x + pie.width / 2
         centre_y = pie.y + pie.height / 2
         radius = min(pie.width, pie.height) / 4
-        drawing.add(Circle(centre_x, centre_y, radius, fillColor=colors.white,
-                           strokeColor=colors.white))
+        drawing.add(Circle(centre_x, centre_y, radius, fillColor=ctx.palette.surface,
+                           strokeColor=ctx.palette.surface))
     return drawing
 
 
@@ -582,7 +573,7 @@ def _table(ctx: Layout, block: dict, story: Story) -> None:
         kept, omitted = _fit_rows(head, body, widths, _available(story, ctx) - reserve)
         body = body[:kept]
     table = Table([head, *body] + ([totals] if totals else []), colWidths=widths, repeatRows=1)
-    table.setStyle(_table_style(columns, totals is not None))
+    table.setStyle(_table_style(ctx, columns, totals is not None))
     title = localized(view, "title", ctx.locale) or localized(block, "title", ctx.locale)
     flow = []
     if title:
@@ -668,13 +659,13 @@ def _totals_row(ctx: Layout, block: dict, view: dict, columns: list[dict]) -> li
     return cells
 
 
-def _table_style(columns: list[dict], has_totals: bool) -> TableStyle:
+def _table_style(ctx: Layout, columns: list[dict], has_totals: bool) -> TableStyle:
     commands = [
         ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 9),
-        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.8, BLUE),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.3, LINE),
+        ("TEXTCOLOR", (0, 0), (-1, -1), ctx.palette.ink),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, ctx.palette.primary),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.3, ctx.palette.line),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
@@ -683,7 +674,7 @@ def _table_style(columns: list[dict], has_totals: bool) -> TableStyle:
     if numeric:
         commands.append(("ALIGN", (numeric[0], 0), (-1, -1), "RIGHT"))
     if has_totals:
-        commands.append(("LINEABOVE", (0, -1), (-1, -1), 0.8, BLUE))
+        commands.append(("LINEABOVE", (0, -1), (-1, -1), 0.8, ctx.palette.primary))
         commands.append(("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9))
     return TableStyle(commands)
 
@@ -767,7 +758,7 @@ def _text(ctx: Layout, block: dict, story: Story) -> None:
     font = FONTS.get(str(block.get("font_name") or "").lower())
     if font:
         paragraph_style.fontName = font
-    story.add(Paragraph(_markdown(text), paragraph_style))
+    story.add(Paragraph(_markdown(text, _hex(ctx.palette.primary)), paragraph_style))
 
 
 def _page_break(ctx: Layout, block: dict, story: Story) -> None:

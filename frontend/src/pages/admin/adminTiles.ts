@@ -1,4 +1,4 @@
-import { Database, FolderKanban, History, KeyRound, ShieldCheck, Sparkles, Users, Workflow } from "lucide-react";
+import { Database, FolderKanban, History, KeyRound, Palette, ShieldCheck, Sparkles, Users, Workflow } from "lucide-react";
 import type { Catalogue } from "../../i18n";
 
 /** The Administración tiles (feature 023 drift test: every `to` has a guide topic). */
@@ -15,6 +15,7 @@ export const ADMIN_TILES: AdminTile[] = [
   { to: "/admin/fuentes", title: (t) => t.admin.sources.title, text: (t) => t.admin.home.sourcesText, icon: Database, superOnly: true },
   { to: "/admin/integraciones", title: (t) => t.admin.home.integrations, text: (t) => t.admin.home.integrationsText, icon: Workflow, superOnly: true },
   { to: "/admin/tokens", title: (t) => t.admin.tokens.title, text: (t) => t.admin.home.tokensText, icon: KeyRound, superOnly: true },
+  { to: "/admin/apariencia", title: (t) => t.appearance.title, text: (t) => t.appearance.tileText, icon: Palette, superOnly: true },
   { to: "/admin/seguridad", title: (t) => t.admin.security.security, text: (t) => t.admin.home.securityText, icon: ShieldCheck, superOnly: true },
   { to: "/admin/auditoria", title: (t) => t.nav.audit, text: (t) => t.admin.home.auditText, icon: History, superOnly: true },
   { to: "/proyectos", title: (t) => t.projects.title, text: (t) => t.admin.home.projectsText, icon: FolderKanban, superOnly: true },

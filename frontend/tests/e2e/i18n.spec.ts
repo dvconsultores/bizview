@@ -2,6 +2,7 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { es } from "../../src/i18n/es";
 import { en } from "../../src/i18n/en";
+import { reportAction } from "./fixtures/report-action";
 
 const FETCH = { "X-Requested-With": "fetch" };
 const SUPER_USER = { email: "e2e-root@example.com", password: "E2e-super-pass-1" };
@@ -141,24 +142,24 @@ test("every screen and in-page view speaks English", async ({ page }) => {
     await page.waitForFunction(() => document.querySelectorAll("[aria-busy=true]").length === 0);
 
     // Share view
-    await page.getByRole("button", { name: en.sharing.share, exact: true }).click();
+    await reportAction(page, en.sharing.share);
     await expect(page.getByRole("region", { name: en.sharing.shareTitle })).toBeVisible();
     await expectLanguage(page, "en", "share view");
     await page.keyboard.press("Escape");
 
     // Email view
-    await page.getByRole("button", { name: en.sharing.email.emailButton, exact: true }).click();
+    await reportAction(page, en.sharing.email.emailButton);
     await expectLanguage(page, "en", "email view");
     await page.keyboard.press("Escape");
 
     // Scheduled sends view
-    await page.getByRole("button", { name: en.sharing.schedules.schedulesButton, exact: true }).click();
+    await reportAction(page, en.sharing.schedules.schedulesButton);
     await expectLanguage(page, "en", "schedules view");
     await page.keyboard.press("Escape");
 
     // Filters view
-    await page.getByRole("button", { name: en.reportParams.filtersButton(0), exact: true }).click();
-    await expectLanguage(page, "en", "filters view");
+    await page.getByRole("button", { name: en.reportActions.filters(0), exact: true }).click();
+    await expectLanguage(page, "en", "filters sheet");
     await page.keyboard.press("Escape");
 
     // Shared link view

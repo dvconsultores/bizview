@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { reportAction } from "./fixtures/report-action";
 
 // Route handlers may still be fetching when a test ends; drop them so no request outlives it.
 test.afterEach(async ({ page }) => {
@@ -39,8 +40,18 @@ const kpi = (page: Page, label: string) =>
     .getByRole("listitem")
     .filter({ hasText: label });
 
-const panel = (page: Page) =>
-  page.getByRole("complementary", { name: "Filtros y controles" });
+const sheet = (page: Page) => page.getByTestId("report-sheet");
+
+/** Feature 030: the period and the auto-refresh controls live in the sheet's Parámetros tab. */
+async function params(page: Page) {
+  if ((await sheet(page).count()) === 0) await reportAction(page, "Parámetros");
+  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page).getByRole("tab", { name: "Parámetros" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  return sheet(page);
+}
 
 async function expectNoHorizontalScroll(page: Page) {
   await expect
@@ -111,15 +122,9 @@ test.describe("desktop", () => {
     await page.goto(`/r/ventas?${SELECTION}`);
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
-    // Make a pending edit before enabling auto-refresh.
-    const desde = panel(page).getByLabel("Desde");
-    await desde.fill("2026-09-26");
-    await expect(panel(page).getByTestId("pending-status")).toHaveText(
-      "1 cambio sin aplicar",
-    );
-
-    // Enable "Al llegar datos nuevos".
-    await panel(page).getByLabel("Frecuencia").selectOption("data");
+    // Feature 030: the period applies live in the sheet; there is no pending state to keep.
+    const panel = await params(page);
+    await panel.getByLabel("Frecuencia").selectOption("data");
     await expect(page.getByTestId("autorefresh-status")).toContainText(
       "Actualización automática · última",
     );
@@ -140,12 +145,9 @@ test.describe("desktop", () => {
 
     await expect(page.getByText(/Datos actualizados \d{2}:\d{2}/)).toBeVisible();
 
-    // Draft edits are preserved.
-    await expect(panel(page).getByTestId("pending-status")).toHaveText(
-      "1 cambio sin aplicar",
-    );
-    await expect(panel(page).getByLabel("Desde")).toHaveValue("2026-09-26");
-    await expect(page).not.toHaveURL(/from=2026-09-26/);
+    // The applied selection is untouched by the refresh and the sheet stays open.
+    await expect(panel.getByLabel("Desde")).toHaveValue("2026-09-27");
+    await expect(page).toHaveURL(/from=2026-09-27/);
 
     // No further refresh: the version on screen is now the bumped one.
     const v = versionCalls;
@@ -155,7 +157,7 @@ test.describe("desktop", () => {
 
     // The setting is remembered after reload.
     await page.reload();
-    await expect(panel(page).getByLabel("Frecuencia")).toHaveValue("data");
+    await expect((await params(page)).getByLabel("Frecuencia")).toHaveValue("data");
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -188,7 +190,8 @@ test.describe("desktop", () => {
     await page.goto(`/r/ventas?${SELECTION}`);
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
-    await panel(page).getByLabel("Frecuencia").selectOption("1");
+    const panel = await params(page);
+    await panel.getByLabel("Frecuencia").selectOption("1");
 
     // Ignore the initial requests.
     versionCalls = 0;
@@ -200,7 +203,7 @@ test.describe("desktop", () => {
     await advanceUntil(page, () => dataCalls, 2);
     expect(versionCalls).toBe(0);
 
-    await panel(page).getByLabel("Frecuencia").selectOption("off");
+    await panel.getByLabel("Frecuencia").selectOption("off");
     await page.clock.fastForward(61_000);
     await page.waitForTimeout(500);
     expect(dataCalls).toBe(2);
@@ -225,7 +228,7 @@ test.describe("tv desktop", () => {
     await page.goto(`/r/ventas?${SELECTION}`);
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
-    await page.getByRole("button", { name: "Modo TV" }).click();
+    await reportAction(page, "Modo TV");
     await expect(page).toHaveURL(/tv=1/);
 
     const tvLayout = page.getByTestId("tv-layout");
@@ -235,7 +238,7 @@ test.describe("tv desktop", () => {
       page.getByRole("navigation", { name: "Principal" }),
     ).toHaveCount(0);
     await expect(page.getByRole("contentinfo")).toHaveCount(0);
-    await expect(panel(page)).toHaveCount(0);
+    await expect(sheet(page)).toHaveCount(0);
 
     // Wait for the report data, then check the TV value size (SC-003).
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
@@ -262,13 +265,13 @@ test.describe("tv desktop", () => {
     await expect(page).not.toHaveURL(/tv=1/);
     await expect(page).toHaveURL(/from=2026-09-27/);
     await expect(page).toHaveURL(/compare=previous_period/);
-    await expect(panel(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Parámetros", exact: true })).toBeVisible();
     await expect(
       page.getByRole("navigation", { name: "Principal" }).first(),
     ).toBeVisible();
 
     // Esc also exits.
-    await page.getByRole("button", { name: "Modo TV" }).click();
+    await reportAction(page, "Modo TV");
     await expect(page.getByTestId("tv-layout")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("tv-layout")).toHaveCount(0);
@@ -285,16 +288,10 @@ test("offline: status shows reconnecting and data stays on screen", async ({
   // Fake clock only after the report loaded: installed earlier it freezes the page's own startup.
   await page.clock.install();
 
-  // Enable data mode via the view appropriate for the viewport.
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width < 1024) {
-    await page.getByRole("button", { name: /^Filtros/ }).click();
-    const view = page.getByRole("region", { name: "Filtros y controles" });
-    await view.getByLabel("Frecuencia").selectOption("data");
-    await view.getByRole("button", { name: "Volver" }).click();
-  } else {
-    await panel(page).getByLabel("Frecuencia").selectOption("data");
-  }
+  // Feature 030: the sheet is the same at every width.
+  await (await params(page)).getByLabel("Frecuencia").selectOption("data");
+  await page.keyboard.press("Escape");
+  await expect(sheet(page)).toHaveCount(0);
 
   await page.route("**/api/reports/ventas/version", (route) =>
     route.abort("internetdisconnected"),

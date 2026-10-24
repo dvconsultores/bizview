@@ -85,6 +85,41 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The report page uses the app's width and puts its controls behind one sheet (feature 030)**:
+  the report and the shared view now span the same container as Tableros and Administración (the
+  page no longer draws its own narrower column), on phones the gutters are 16 px and there is no
+  horizontal scroll.
+  - The "Parámetros del reporte" card is gone. Under the title one meta line reads
+    `Año en curso · 1 ene – 23 oct 2026 · vs 2025 · Datos 23 oct 20:00`, and the applied filters sit
+    under it as chips you remove with one tap ("+N más" when they overflow). "Consultado por" is no
+    longer shown on screen: it stays in the PDF footer and the audit.
+  - **Filtros** and **Parámetros** open one non-blocking sheet — a 360 px side sheet from 1024 px,
+    a bottom sheet with a drag handle below, the dashboard visible and updating while you change
+    values (250 ms debounce). The URL still carries the state, so a link restores the same numbers.
+    Nothing is a modal: focus moves into the sheet, Esc closes it and returns focus to the button
+    that opened it.
+  - The actions row keeps Descargar PDF, Compartir, Enviar por correo, Envíos programados and Modo TV
+    as icon+label on desktop, an icon with a tooltip on tablets and inside "⋯" on phones.
+- **Palette presets, chosen per installation (feature 030)**: charts and KPIs look vivid and
+  intentional out of the box. Administración → **Apariencia** (new, super user) offers five presets —
+  **Impacto** (default), **Clásico**, **Monocromo**, **Contraste alto** and **Daltónico** — each
+  previewed in both themes; the choice is saved on the installation (`appearance_settings`, migration
+  `0027`) and every report follows it, screen and PDF.
+  - Presets are product data (`frontend/src/theme/palettes/*.json`, mirrored for the PDF renderer),
+    so no report carries a colour: a report may name one in its definition
+    (`layout.theme.palette`, validated by the CLI schema) and the "Paleta" selector in its sheet
+    previews any preset. Series hues never follow branding; the brand primary still drives buttons
+    and links.
+  - An automated check runs in the suite for every preset × theme: series ≥3:1 against the card
+    surface (≥7:1 for **Contraste alto**), adjacent-series ΔE, a distinct positive/negative pair, AA
+    KPI text and badge text, a subtle grid, and a byte-identical copy for the PDF. `Clásico` had to
+    darken its second series (`#98C3D8`, 1.89:1 on white) to pass — the only visual change to
+    "today's look".
+- **The shared view can switch to light theme (feature 030)**: `/s/<token>` gains a Claro/Oscuro
+  toggle beside the language switcher; it follows the device by default, re-themes instantly and
+  remembers the choice in that browser only. The share dialog may force the first-load theme
+  (`share_link.theme`), and a PDF downloaded from any screen theme is always light.
+
 - **Agent modes and autonomous runs (feature 028)**: the Asistente composer gets one small mode
   chip at the bottom right, next to the send arrow, with two choices — **Preguntar / Ask** (reads
   only) and **Auto** (the default). In Auto the agent runs the whole pipeline on its own: it chains

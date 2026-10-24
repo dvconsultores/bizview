@@ -1,4 +1,4 @@
-"""Reglas de layout.web y layout.pdf que el esquema JSON no puede expresar.
+"""Reglas de layout.web, layout.pdf y layout.theme que el esquema JSON no puede expresar.
 
 Referencias (vista, métrica, columna de la vista y filtro), catálogo de tipos, ids duplicados,
 límites numéricos, colores literales, direcciones y avisos de idoneidad del gráfico. El validador
@@ -41,6 +41,8 @@ TEXT_ALIGNS = ("left", "center", "right")
 KPI_DELTAS = ("previous_period", "none")
 BAR_ORIENTATIONS = ("vertical", "horizontal")
 SPACER_SIZES = ("sm", "md", "lg")
+# Presets de paleta (FR-008): los ids que comparten el CLI, el backend y la interfaz.
+PALETTE_PRESETS = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
 
 SPAN_BOUNDS = (1, 12)
 TOP_N_BOUNDS = (2, 12)
@@ -92,6 +94,9 @@ def check_layout(definition: dict, *, file: str, entry: str = "report") -> list[
     web = layout.get("web")
     if isinstance(web, dict):
         _web(web, facts, file, entry, out)
+    theme = layout.get("theme")
+    if isinstance(theme, dict):
+        _theme(theme, file, entry, out)
     pdf = layout.get("pdf")
     if isinstance(pdf, dict):
         _pdf(pdf, facts, file, entry, out)
@@ -203,6 +208,19 @@ def _legacy_pdf(definition: dict) -> bool:
     if not isinstance(pdf, dict):
         return False
     return any(key in pdf for key in ("views", "orientation"))
+
+
+# ------------------------------------------------------------------ layout.theme
+
+
+def _theme(theme: dict, file: str, entry: str, out: list[Issue]) -> None:
+    """Comprueba layout.theme: solo el id de un preset de paleta (FR-008).
+
+    Un color literal aquí lo denuncia el recorrido de textos de `check_layout`, no `_enum`.
+    """
+
+    _enum(out, entry, file, "/layout/theme/palette", "palette", theme.get("palette"),
+          PALETTE_PRESETS)
 
 
 # ------------------------------------------------------------------ layout.web

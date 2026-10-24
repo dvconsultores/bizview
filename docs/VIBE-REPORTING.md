@@ -155,6 +155,21 @@ Periods (today … last 12 months, custom), comparisons (previous period, previo
 → "Nuevo"), freshness and PDF are provided by the product. The AI narrative receives **only** the
 metrics listed in `inputs` — aggregated, never rows.
 
+### Palette per report (optional)
+
+Every installation picks a colour palette for its charts in **Administración → Apariencia**
+(`Impacto`, `Clásico`, `Monocromo`, `Contraste alto`, `Daltónico`). A report may declare its own;
+it then travels with the workspace version and applies to the web page and the PDF:
+
+```yaml
+layout:
+  theme:
+    palette: contraste   # impacto | clasico | monocromo | contraste | daltonico
+```
+
+The value is a preset name, never a colour: report definitions carry semantic roles only, so the
+palette check can guarantee contrast and distinguishability in both themes.
+
 ### English labels (optional)
 
 Reports can provide English variants via `_en` keys:

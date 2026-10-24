@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { reportAction } from "./fixtures/report-action";
 
 // Feature 005: the backend seeds a workspace (tests.e2e_schema seed): integration
 // "ventas-prueba" loaded once, report "ventas" applied.
@@ -41,18 +42,20 @@ test("a report renders from its spec: KPIs, trend, ranking, filter, PDF", async 
   await page.getByText("Ver datos").click();
   await expect(page.getByRole("row", { name: /27 sept?\.? 2026/ })).toBeVisible();
 
-  await page.getByRole("button", { name: /^Filtros/ }).click();                // feature 012: phone view
-  const filters = page.getByRole("region", { name: "Filtros y controles" });
+  // Feature 030: the filters live in one non-blocking sheet and apply live.
+  await page.getByRole("button", { name: /^Filtros/ }).click();
+  const filters = page.getByTestId("report-sheet");
+  await expect(filters.getByRole("tab", { name: "Filtros" })).toHaveAttribute("aria-selected", "true");
   await filters.getByRole("combobox", { name: "Producto" }).click();
   await filters.getByRole("option", { name: "Vacuna triple" }).click();
-  await filters.getByRole("button", { name: "Aplicar filtros" }).click();
-  await expect(filters).toBeHidden();
   await expect(page).toHaveURL(/filter\.product=Vacuna/);
   await expect(kpi(page, "Ventas netas")).toContainText(/4,25\sUSD/);
+  await filters.getByRole("button", { name: "Listo", exact: true }).click();
+  await expect(filters).toHaveCount(0);
   await check(page);
 
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Descargar PDF" }).click();
+  await reportAction(page, "Descargar PDF");
   expect((await download).suggestedFilename()).toBe("ventas-2026-09-27-2026-09-28.pdf");
 
   await page.getByRole("button", { name: "Generar resumen" }).click();         // AI is off

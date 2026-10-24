@@ -105,6 +105,23 @@
   --c-chart-grid: 226 232 240;
   --c-chart-axis: 148 163 184;
   --c-chart-label: 71 85 105;
+  /* Feature 030: the preset's semantic roles and KPI surfaces (overwritten at runtime by
+   * src/theme/palette.ts; these are the `clasico` values, i.e. today's look). */
+  --c-chart-positive: 4 120 87;
+  --c-chart-negative: 190 18 60;
+  --c-chart-neutral: 71 85 105;
+  --c-kpi-text: 15 23 42;
+  --c-kpi-surface: 255 255 255;
+  --c-kpi-neutral: 71 85 105;
+  --c-kpi-delta-bg-positive: 236 253 245;
+  --c-kpi-delta-bg-negative: 255 241 242;
+  /* KPI numeral scale (FR-009): `impacto` enlarges it and tightens the tracking. */
+  --kpi-numeral: 1.25rem;
+  --kpi-numeral-lg: 1.875rem;
+  --kpi-numeral-tv: 2.25rem;
+  --kpi-numeral-tv-lg: 3rem;
+  --kpi-numeral-tv-xl: 3.75rem;
+  --kpi-tracking: -0.01em;
   --grad-from: var(--brand-600);
   --grad-to: var(--brand-800);
   --radius-card: 1.25rem;
@@ -177,11 +194,37 @@
   --c-chart-grid: 51 65 85;
   --c-chart-axis: 100 116 139;
   --c-chart-label: 148 163 184;
+  --c-chart-positive: 52 211 153;
+  --c-chart-negative: 251 113 133;
+  --c-chart-neutral: 203 213 225;
+  --c-kpi-text: 248 250 252;
+  --c-kpi-surface: 15 23 42;
+  --c-kpi-neutral: 203 213 225;
+  --c-kpi-delta-bg-positive: 2 44 34;
+  --c-kpi-delta-bg-negative: 76 5 25;
   --grad-from: var(--brand-600);
   --grad-to: var(--brand-800);
   --shadow-card: 0 0 0 1px rgb(51 65 85 / 0.6), 0 4px 16px -4px rgb(0 0 0 / 0.5);
   --shadow-raised: 0 0 0 1px rgb(51 65 85 / 0.8), 0 10px 30px -10px rgb(0 0 0 / 0.7);
   --hero-color: #172b37;
+}
+
+/* Feature 030 FR-009: `impacto` also sets the KPI typography and the card surfaces. The palette
+ * colours come from the JSON preset at runtime; only the shapes live here. Other presets keep
+ * today's typography. */
+:root[data-palette="impacto"] {
+  --kpi-numeral: 1.75rem;
+  --kpi-numeral-lg: 2.5rem;
+  --kpi-numeral-tv: 3rem;
+  --kpi-numeral-tv-lg: 3.75rem;
+  --kpi-numeral-tv-xl: 4.5rem;
+  --kpi-tracking: -0.03em;
+  --radius-card: 1rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.08), 0 8px 24px -8px rgb(15 23 42 / 0.18);
+}
+:root[data-theme="dark"][data-palette="impacto"] {
+  --shadow-card: 0 0 0 1px rgb(71 85 105 / 0.55), 0 12px 32px -12px rgb(0 0 0 / 0.75);
+  --shadow-raised: 0 0 0 1px rgb(100 116 139 / 0.7), 0 18px 40px -12px rgb(0 0 0 / 0.85);
 }
 
 @layer base {
@@ -242,6 +285,25 @@
 }
 
 @layer utilities {
+  /* Feature 030: a filter change is announced by a short fade, never by morphing the geometry. */
+  @keyframes chart-data-in {
+    from {
+      opacity: 0.35;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .chart-data-in {
+    animation: chart-data-in 250ms ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart-data-in {
+      animation: none;
+    }
+  }
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }

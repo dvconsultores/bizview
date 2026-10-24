@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { reportAction } from "./fixtures/report-action";
 
 // Feature 006 — dark mode (specs/006-dark-mode/quickstart.md). The theme is stored on the super
 // user's account, so every test puts it back to "system" for the suites that run after it.
@@ -251,7 +252,7 @@ test.describe("reports", () => {
 
     const pdf = async () => {
       const download = page.waitForEvent("download");
-      await page.getByRole("button", { name: "Descargar PDF" }).click();
+      await reportAction(page, "Descargar PDF");
       const stream = await (await download).createReadStream();
       const chunks: Buffer[] = [];
       for await (const c of stream) chunks.push(c as Buffer);

@@ -1,14 +1,6 @@
-import {
-  CalendarClock,
-  FileDown,
-  Mail,
-  PanelLeftOpen,
-  Share2,
-  SlidersHorizontal,
-  Tv,
-} from "lucide-react";
+import { CalendarClock, FileDown, Mail, Share2, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { api, ApiError } from "../api/client";
 import type {
   Dashboard,
@@ -18,18 +10,16 @@ import type {
 } from "../api/types";
 import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
-import { Button } from "../components/Button";
 import { PageHeader } from "../components/PageHeader";
 import { Narrative } from "../components/report/Narrative";
 import { ReportViews } from "../components/report/ReportViews";
 import type { LayoutParamsWiring } from "../components/report/LayoutBlocks";
 import { Spinner } from "../components/Spinner";
-import { ContextBlock } from "../components/report/ContextBlock";
-import {
-  ParamsPanel,
-  useReportPanelCollapsed,
-} from "../components/report/ParamsPanel";
 import { ParamsForm } from "../components/report/ParamsForm";
+import { ReportActions } from "../components/report/ReportActions";
+import { ReportMetaLine } from "../components/report/ReportMetaLine";
+import { ReportSheet, type ReportSheetTab } from "../components/report/ReportSheet";
+import { PaletteSelect } from "../components/report/PaletteSelect";
 import { ExportSection } from "../components/report/ExportSection";
 import { View } from "../components/View";
 import type { MultiSelectOptions } from "../components/MultiSelect";
@@ -48,6 +38,7 @@ import {
 import {
   filterOptionsQuery,
   isIncompleteCustom,
+  unknownFilterIds,
   parseSelection,
   sameSelection,
   selectionQuery,
@@ -73,6 +64,7 @@ import {
 import { freshnessText, isStale, staleText } from "../lib/freshness";
 import { formatRange } from "../lib/numbers";
 import { useToast } from "../components/Toast";
+import { useTheme } from "../theme/ThemeContext";
 import { EmailSendPanel } from "../components/sharing/EmailSendPanel";
 import { ShareLinksPanel } from "../components/sharing/ShareLinksPanel";
 import { SubscriptionsPanel } from "../components/sharing/SubscriptionsPanel";
@@ -117,7 +109,6 @@ export function ReportView() {
   const toast = useToast();
   const { id = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const location = useLocation();
   const [def, setDef] = useState<ReportDefinition | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
   const [dataQuery, setDataQuery] = useState<string | null>(null);
@@ -125,9 +116,8 @@ export function ReportView() {
   const [loading, setLoading] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useReportPanelCollapsed();
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [pendingApply, setPendingApply] = useState<ReportSelection | null>(null);
+  const [sheet, setSheet] = useState<ReportSheetTab | null>(null);
+  const { setPalette } = useTheme();
   const [shownAt, setShownAt] = useState<Date | null>(null);
   const [storedMode, setStoredMode] = useAutoRefreshMode(id);
   const [fs, setFs] = useState(() => isFullscreen());
@@ -139,6 +129,19 @@ export function ReportView() {
   const loadingRef = useRef(false);
 
   const tv = params.get("tv") === "1";
+
+  // Feature 030: the sheet is either closed or on one of its two tabs.
+  const openSheet = useCallback((tab: ReportSheetTab) => setSheet(tab), []);
+  const closeSheet = useCallback(() => setSheet(null), []);
+
+  /** The report's own palette (`layout.theme.palette`) wins over the installation's; the "Paleta"
+   * selector applies a viewer-side preview until the declared value is edited in the project. */
+  const declaredPalette = def?.layout?.theme?.palette ?? null;
+  const [palettePreview, setPalettePreview] = useState<string | null>(null);
+  useEffect(() => {
+    setPalette(palettePreview ?? declaredPalette);
+  }, [palettePreview, declaredPalette, setPalette]);
+  useEffect(() => () => setPalette(null), [setPalette]);
 
   // TV mode is meant to be looked at, not worked in: the chat steps aside with the rest of the
   // chrome (feature 025).
@@ -246,6 +249,7 @@ export function ReportView() {
     [params, def],
   );
   const incompleteCustom = applied ? isIncompleteCustom(applied) : false;
+  const unknownFilters = useMemo(() => (def ? unknownFilterIds(params, def) : []), [params, def]);
   const query =
     applied && def && !incompleteCustom ? selectionQuery(applied, def) : null;
 
@@ -397,28 +401,6 @@ export function ReportView() {
     />
   );
 
-  const applyFromView = useCallback(
-    (s: ReportSelection) => {
-      setFiltersOpen(false);
-      if (applied && !sameSelection(s, applied)) {
-        setPendingApply(s);
-      }
-    },
-    [applied],
-  );
-
-  // Apply a selection chosen in the phone view only after the view's history entry is popped,
-  // otherwise the replace would land on the view entry and the pop would restore the old URL.
-  useEffect(() => {
-    if (
-      pendingApply !== null &&
-      !((location.state as { view?: string[] } | null)?.view?.length)
-    ) {
-      apply(pendingApply);
-      setPendingApply(null);
-    }
-  }, [pendingApply, location.state, apply]);
-
   const activeCount = useMemo(() => {
     if (!applied || !def) return 0;
     return def.filters.reduce(
@@ -448,7 +430,7 @@ export function ReportView() {
 
   if (!def) {
     return (
-      <div className="mx-auto max-w-7xl">
+      <div>
         <Breadcrumbs back="/" items={[]} />
         {error ? (
           <Alert tone="error">{error}</Alert>
@@ -502,7 +484,7 @@ export function ReportView() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div>
       <Breadcrumbs
         back="/"
         items={[
@@ -510,115 +492,72 @@ export function ReportView() {
           { label: localized(def, "title") },
         ]}
       />
-      <PageHeader title={localized(def, "title")} subtitle={localized(def, "description") || undefined} />
 
-      <div
-        className={
-          collapsed
-            ? "space-y-5"
-            : "lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+      <PageHeader
+        title={localized(def, "title")}
+        subtitle={localized(def, "description") || undefined}
+        actions={
+          applied ? (
+            <ReportActions
+              activeFilters={activeCount}
+              onOpenFilters={() => openSheet("filters")}
+              onOpenParams={() => openSheet("params")}
+              actions={[
+                {
+                  id: "pdf",
+                  label: t.reportActions.pdf,
+                  icon: FileDown,
+                  onClick: exportPdf,
+                  show: def.pdf && query !== null,
+                  loading: pdfBusy,
+                },
+                {
+                  id: "share",
+                  label: t.reportActions.share,
+                  icon: Share2,
+                  onClick: () => setSharePanel("share"),
+                  show: user?.role === "admin" && !!dashCode,
+                },
+                {
+                  id: "email",
+                  label: t.reportActions.email,
+                  icon: Mail,
+                  onClick: () => setSharePanel("email"),
+                  show: !!dashCode && emailAvailable,
+                },
+                {
+                  id: "schedules",
+                  label: t.reportActions.schedules,
+                  icon: CalendarClock,
+                  onClick: () => setSharePanel("schedules"),
+                  show: user?.role === "admin" && !!dashCode,
+                },
+                {
+                  id: "tv",
+                  label: t.reportActions.tv,
+                  icon: Tv,
+                  onClick: enterTv,
+                  show: true,
+                },
+              ]}
+            />
+          ) : undefined
         }
-      >
-        {!collapsed && applied ? (
-          <ParamsPanel onCollapse={() => setCollapsed(true)}>
-            <ParamsForm
-              def={def}
-              applied={applied}
-              onApply={apply}
-              loadOptions={loadOptions}
-            >
-              <AutoRefreshControl
-              mode={storedMode}
-              onChange={setStoredMode}
-              cacheSeconds={def.direct?.cache_seconds}
-            />
-              {exportSection}
-            </ParamsForm>
-          </ParamsPanel>
-        ) : null}
+      />
 
-        <div className="min-w-0 space-y-5">
-          {applied ? (
-            <ContextBlock
-              def={def}
-              applied={applied}
-              data={fresh ? data : null}
-              viewer={user?.full_name ?? null}
-              incompleteCustom={incompleteCustom}
-              onRemoveFilter={(filterId, value) =>
-                apply(withoutFilterValue(applied, filterId, value))
-              }
-              actions={
-                <>
-                  <Button
-                    variant="secondary"
-                    className="lg:hidden"
-                    icon={<SlidersHorizontal className="h-5 w-5" aria-hidden />}
-                    onClick={() => setFiltersOpen(true)}
-                  >
-                    {t.reportParams.filtersButton(activeCount)}
-                  </Button>
-                  {collapsed ? (
-                    <Button
-                      variant="secondary"
-                      className="hidden lg:inline-flex"
-                      icon={<PanelLeftOpen className="h-5 w-5" aria-hidden />}
-                      onClick={() => setCollapsed(false)}
-                    >
-                      {t.reportParams.expand}
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="secondary"
-                    icon={<Tv className="h-5 w-5" aria-hidden />}
-                    onClick={enterTv}
-                  >
-                    {t.tvMode.enter}
-                  </Button>
-                  {def.pdf && query !== null ? (
-                    <Button
-                      variant="secondary"
-                      loading={pdfBusy}
-                      icon={<FileDown className="h-5 w-5" aria-hidden />}
-                      onClick={exportPdf}
-                    >
-                      {t.reportParams.downloadPdf}
-                    </Button>
-                  ) : null}
-                  {user?.role === "admin" && dashCode ? (
-                    <Button
-                      variant="secondary"
-                      icon={<Share2 className="h-5 w-5" aria-hidden />}
-                      onClick={() => setSharePanel("share")}
-                    >
-                      {t.sharing.share}
-                    </Button>
-                  ) : null}
-                  {dashCode && emailAvailable ? (
-                    <Button
-                      variant="secondary"
-                      icon={<Mail className="h-5 w-5" aria-hidden />}
-                      onClick={() => setSharePanel("email")}
-                    >
-                      {t.sharing.email.emailButton}
-                    </Button>
-                  ) : null}
-                  {user?.role === "admin" && dashCode ? (
-                    <Button
-                      variant="secondary"
-                      icon={
-                        <CalendarClock className="h-5 w-5" aria-hidden />
-                      }
-                      onClick={() => setSharePanel("schedules")}
-                    >
-                      {t.sharing.schedules.schedulesButton}
-                    </Button>
-                  ) : null}
-                </>
-              }
-            />
-          ) : null}
+      {applied ? (
+        <div className="mb-5">
+          <ReportMetaLine
+            def={def}
+            applied={applied}
+            data={fresh ? data : null}
+            onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
+            onOpenFilters={() => openSheet("filters")}
+          />
+        </div>
+      ) : null}
 
+      <div className="mt-5 min-w-0 space-y-5">
           <AutoRefreshStatusLine status={autoStatus} lastAt={shownAt} />
 
           {pdfError ? <Alert tone="error">{pdfError}</Alert> : null}
@@ -651,30 +590,44 @@ export function ReportView() {
               ) : null}
             </div>
           ) : null}
-        </div>
       </div>
 
-      <View
-        open={filtersOpen}
-        title={t.reportParams.panelTitle}
-        onClose={() => setFiltersOpen(false)}
+      <ReportSheet
+        open={sheet !== null}
+        tab={sheet ?? "filters"}
+        onTabChange={setSheet}
+        onClose={closeSheet}
       >
-        {filtersOpen && applied ? (
+        {applied && sheet !== null ? (
           <ParamsForm
             def={def}
             applied={applied}
-            onApply={applyFromView}
+            onApply={apply}
             loadOptions={loadOptions}
+            live
+            section={sheet === "filters" ? "filters" : "period"}
+            className="space-y-5"
           >
-            <AutoRefreshControl
-              mode={storedMode}
-              onChange={setStoredMode}
-              cacheSeconds={def.direct?.cache_seconds}
-            />
-            {exportSection}
+            {unknownFilters.length > 0 ? (
+              <Alert tone="info">{t.reportSheet.unknownFilter}</Alert>
+            ) : null}
+            {sheet === "params" ? (
+              <>
+                <AutoRefreshControl
+                  mode={storedMode}
+                  onChange={setStoredMode}
+                  cacheSeconds={def.direct?.cache_seconds}
+                />
+                {exportSection}
+                <PaletteSelect
+                  value={palettePreview ?? declaredPalette}
+                  onChange={setPalettePreview}
+                />
+              </>
+            ) : null}
           </ParamsForm>
         ) : null}
-      </View>
+      </ReportSheet>
 
       <View
         open={sharePanel === "share"}

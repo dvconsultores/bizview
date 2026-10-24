@@ -21,7 +21,7 @@ from app.engine import report as engine
 from app.errors import ApiError, not_found
 from app.i18n import M
 from app.models import AppUser, Dashboard, ReportCache
-from app.reports import pdf
+from app.reports import palette, pdf
 from app.services import dashboards
 from app.workspace import service as workspace
 
@@ -176,7 +176,8 @@ def report_pdf(report_id: str, request: Request, user: AppUser = Depends(current
     payload = _data(db, ctx, request.query_params.multi_items())
     settings = get_settings()
     content = pdf.render(definition, payload, organization=settings.organization_name,
-                         product=settings.product_name, viewer=user.full_name)
+                         product=settings.product_name, viewer=user.full_name,
+                         palette=palette.resolve(definition, palette.installation_preset(db)))
     period = payload["selection"]["current"]
     name = f"{report_id}-{period['from']}-{period['to']}.pdf"
     return Response(content, media_type="application/pdf",

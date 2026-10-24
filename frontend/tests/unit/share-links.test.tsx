@@ -164,7 +164,7 @@ describe("ShareLinksPanel", () => {
 
     expect(api.post).toHaveBeenCalledWith(
       "/api/dashboards/ventas/links",
-      { days: 30, note: "Para Ana" },
+      { days: 30, note: "Para Ana", theme: null },
     );
     expect(container.textContent).toContain(t.sharing.createdOnce);
     expect(container.textContent).toContain(

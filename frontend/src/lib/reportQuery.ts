@@ -70,6 +70,19 @@ export function parseSelection(params: URLSearchParams, def: ReportDefinition): 
   return { period, from, to, compare, filters };
 }
 
+/** Feature 030 edge case: filter ids the URL carries that the report no longer declares. They are
+ * ignored by `parseSelection`; the sheet tells the reader instead of silently dropping them. */
+export function unknownFilterIds(params: URLSearchParams, def: ReportDefinition): string[] {
+  const declared = new Set(def.filters);
+  const unknown = new Set<string>();
+  for (const [key] of params) {
+    if (!key.startsWith("filter.")) continue;
+    const id = key.slice("filter.".length);
+    if (id && !declared.has(id)) unknown.add(id);
+  }
+  return [...unknown];
+}
+
 export function serializeSelection(s: ReportSelection, def?: ReportDefinition): URLSearchParams {
   const params = new URLSearchParams();
   params.set("period", s.period);

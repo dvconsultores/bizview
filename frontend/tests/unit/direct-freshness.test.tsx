@@ -25,6 +25,14 @@ vi.mock("../../src/api/client", () => ({
   },
 }));
 
+vi.mock("../../src/auth/AuthContext", () => ({
+  useAuth: () => ({ user: null, setUser: vi.fn() }),
+}));
+
+vi.mock("../../src/components/Toast", () => ({
+  useToast: () => vi.fn(),
+}));
+
 vi.mock("../../src/lib/download", () => ({
   downloadPdf: vi.fn().mockResolvedValue(undefined),
 }));
@@ -32,11 +40,12 @@ vi.mock("../../src/lib/download", () => ({
 import { api, ApiError } from "../../src/api/client";
 import type { ReportData, ReportDefinition } from "../../src/api/types";
 import { AutoRefreshControl } from "../../src/components/report/AutoRefreshControl";
-import { ContextBlock } from "../../src/components/report/ContextBlock";
+import { ReportMetaLine } from "../../src/components/report/ReportMetaLine";
 import { formatDateTime } from "../../src/lib/format";
 import { freshnessText, isStale, isDirect } from "../../src/lib/freshness";
 import { t } from "../../src/i18n/es";
 import { Workspace } from "../../src/pages/admin/Workspace";
+import { ThemeProvider } from "../../src/theme/ThemeContext";
 import { SharedDashboard } from "../../src/pages/SharedDashboard";
 
 let container: HTMLDivElement;
@@ -86,9 +95,11 @@ async function renderSharedDashboard(data?: ReportData, error?: ApiError) {
   });
   await act(async () => {
     root?.render(
-      <MemoryRouter initialEntries={["/s/tok_abc"]}>
-        <Routes><Route path="/s/:token" element={<SharedDashboard />} /></Routes>
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter initialEntries={["/s/tok_abc"]}>
+          <Routes><Route path="/s/:token" element={<SharedDashboard />} /></Routes>
+        </MemoryRouter>
+      </ThemeProvider>,
     );
   });
   await flush();
@@ -152,16 +163,16 @@ describe("freshnessText / isStale", () => {
   });
 });
 
-describe("ContextBlock direct live text", () => {
+describe("ReportMetaLine direct live text", () => {
   it("renders the live line", async () => {
     await act(async () => {
       root?.render(
-        <ContextBlock
+        <ReportMetaLine
           def={report}
           data={directLiveData}
-          applied={{ period: "last_month", from: null, to: null, compare: "none", filters: {} }}
-          incompleteCustom={false}
+          applied={{ period: "last_month", from: "", to: "", compare: "none", filters: {} }}
           onRemoveFilter={() => {}}
+          onOpenFilters={() => {}}
         />,
       );
     });

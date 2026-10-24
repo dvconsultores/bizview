@@ -12,6 +12,7 @@ from app import errors
 from app.api import (
     admin,
     ai,
+    appearance,
     assistant,
     auth,
     dashboards,
@@ -99,7 +100,8 @@ def create_app() -> FastAPI:
         return response
 
     for module in (health, auth, me, dashboards, admin, ai, sources, security, workspace,
-                   reports, tokens, telegram, assistant, projects, shared, sharing, guide, oauth):
+                   reports, tokens, telegram, assistant, projects, shared, sharing, guide, oauth,
+                   appearance):
         app.include_router(module.router)
     if os.environ.get("BIZVIEW_TEST_HOOKS") == "1":   # e2e only (feature 007); never in images
         from app.api import testhooks

@@ -16,8 +16,9 @@ Cualquier persona con acceso a ese tablero.
    indicador sin valor anterior se marca como nuevo.
 3. Debajo vienen la tendencia, los rankings y las tablas. **Ver datos** muestra los números de
    un gráfico.
-4. Los **Parámetros del reporte** dicen el **Período**, contra qué está **Comparado con**, cuándo
-   son los **Datos actualizados** y quién lo consultó (**Consultado por**).
+4. Bajo el título, una línea resume el **Período**, el rango de fechas con el que se compara y
+   cuándo son los **Datos actualizados**. Los filtros aplicados aparecen como etiquetas que se
+   quitan con un toque.
 5. Si el reporte declara su composición, las tarjetas aparecen en el orden y con el ancho que
    eligió quien lo escribió; en el teléfono se apilan en ese mismo orden. Si no la declara, el
    tablero se compone solo.
@@ -36,4 +37,4 @@ Cualquier persona con acceso a ese tablero.
 
 ## Problemas frecuentes
 
-- «Sin datos en el período.»: cambia el período en **Filtros y controles**.
+- «Sin datos en el período.»: cambia el período en **Parámetros**.

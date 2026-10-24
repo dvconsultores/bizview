@@ -1,0 +1,47 @@
+{
+  "id": "daltonico",
+  "label_key": "palette.daltonico",
+  "strategy": "categorical",
+  "light": {
+    "primary": "#0072B2",
+    "series1": "#0072B2",
+    "series2": "#D55E00",
+    "series3": "#009E73",
+    "series4": "#CC79A7",
+    "series5": "#4B2E83",
+    "series6": "#8C6D00",
+    "series7": "#1B7F79",
+    "series8": "#8B4513",
+    "positive": "#006B4F",
+    "negative": "#A8321F",
+    "neutral": "#334155",
+    "grid": "#E2E8F0",
+    "surface": "#FFFFFF",
+    "kpi_text": "#0F172A",
+    "kpi_delta_bg": {
+      "positive": "#D1FAE5",
+      "negative": "#FEE2E2"
+    }
+  },
+  "dark": {
+    "primary": "#56B4E9",
+    "series1": "#56B4E9",
+    "series2": "#E69F00",
+    "series3": "#009E73",
+    "series4": "#CC79A7",
+    "series5": "#C7A9E8",
+    "series6": "#F0E442",
+    "series7": "#5FD3C4",
+    "series8": "#F4A261",
+    "positive": "#5FD3A8",
+    "negative": "#F3A093",
+    "neutral": "#CBD5E1",
+    "grid": "#1E293B",
+    "surface": "#0F172A",
+    "kpi_text": "#F8FAFC",
+    "kpi_delta_bg": {
+      "positive": "#064E3B",
+      "negative": "#4C0519"
+    }
+  }
+}

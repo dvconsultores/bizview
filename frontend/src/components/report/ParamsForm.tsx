@@ -39,6 +39,10 @@ export interface ParamsFormProps {
   ) => Promise<MultiSelectOptions>;
   children?: ReactNode;
   className?: string;
+  /** Feature 030: apply as the reader edits (250 ms debounce) instead of on "Aplicar". */
+  live?: boolean;
+  /** Feature 030: render only the period block or only the filter block (the sheet's two tabs). */
+  section?: "all" | "period" | "filters";
 }
 
 export function ParamsForm({
@@ -48,6 +52,8 @@ export function ParamsForm({
   loadOptions,
   children,
   className,
+  live = false,
+  section = "all",
 }: ParamsFormProps) {
   const t = useT();
   const [draft, setDraft] = useState<ReportSelection>(applied);
@@ -75,6 +81,15 @@ export function ParamsForm({
     () => (showErrors ? validateSelection(draft) : {}),
     [showErrors, draft],
   );
+
+  // Feature 030 (FR-004): the sheet applies live — one request per 250 ms burst, and only when the
+  // draft is complete (an incomplete custom range or a missing date is never sent).
+  useEffect(() => {
+    if (!live || pending === 0) return;
+    if (Object.keys(validateSelection(draft)).length > 0 || isIncompleteCustom(draft)) return;
+    const id = window.setTimeout(() => onApply(draft), 250);
+    return () => window.clearTimeout(id);
+  }, [live, draft, pending, onApply]);
 
   const optionsBase = useMemo(() => {
     const baseIsComplete =
@@ -160,6 +175,20 @@ export function ParamsForm({
     return loaders;
   }, [def.filters, getFilterLoader]);
 
+  const renderFilter = (filterId: string) => (
+    <MultiSelect
+      key={filterId}
+      label={localized(def.dimensions[filterId], "label") ?? filterId}
+      values={draft.filters[filterId] ?? []}
+      onChange={(values) => handleFilterChange(filterId, values)}
+      loadOptions={filterLoaders[filterId]}
+      reloadKey={optionsReloadKey}
+    />
+  );
+  // Feature 030 edge case: with 10+ filters the tail sits under a collapsible heading.
+  const grouped = def.filters.length >= 10;
+  const shownFilters = grouped ? def.filters.slice(0, 6) : def.filters;
+
   return (
     <form
       noValidate
@@ -167,6 +196,7 @@ export function ParamsForm({
       className={className}
       data-testid="params-form"
     >
+      {section !== "filters" && (
       <section className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
           {t.reportParams.periodSection}
@@ -213,7 +243,9 @@ export function ParamsForm({
           </div>
         )}
       </section>
+      )}
 
+      {section !== "filters" && (
       <section className="mt-5 space-y-4 border-t border-line pt-5">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
           {t.reportParams.compareSection}
@@ -241,8 +273,9 @@ export function ParamsForm({
           />
         )}
       </section>
+      )}
 
-      {def.filters.length > 0 && (
+      {section !== "period" && def.filters.length > 0 && (
         <section
           aria-labelledby={filtersSectionId}
           className="mt-5 space-y-4 border-t border-line pt-5"
@@ -254,34 +287,37 @@ export function ParamsForm({
             {t.reportParams.filtersSection}
           </h3>
 
-          {def.filters.map((filterId) => (
-            <MultiSelect
-              key={filterId}
-              label={localized(def.dimensions[filterId], "label") ?? filterId}
-              values={draft.filters[filterId] ?? []}
-              onChange={(values) => handleFilterChange(filterId, values)}
-              loadOptions={filterLoaders[filterId]}
-              reloadKey={optionsReloadKey}
-            />
-          ))}
+          {shownFilters.map(renderFilter)}
+          {grouped ? (
+            <details className="rounded-xl border border-line p-3">
+              <summary className="flex min-h-tap cursor-pointer items-center text-sm font-medium text-ink">
+                {t.reportSheet.moreFilters(def.filters.length - shownFilters.length)}
+              </summary>
+              <div className="mt-3 space-y-4">{def.filters.slice(shownFilters.length).map(renderFilter)}</div>
+            </details>
+          ) : null}
         </section>
       )}
 
       {children}
 
       <footer className="mt-5 flex flex-col gap-3 border-t border-line pt-5">
-        <p
-          role="status"
-          className="text-sm text-ink-muted"
-          data-testid="pending-status"
-        >
-          {pending === 0
-            ? t.reportParams.noPending
-            : t.reportParams.pending(pending)}
-        </p>
-        <Button type="submit" variant="primary" block disabled={pending === 0}>
-          {t.reportParams.apply}
-        </Button>
+        {live ? null : (
+          <>
+            <p
+              role="status"
+              className="text-sm text-ink-muted"
+              data-testid="pending-status"
+            >
+              {pending === 0
+                ? t.reportParams.noPending
+                : t.reportParams.pending(pending)}
+            </p>
+            <Button type="submit" variant="primary" block disabled={pending === 0}>
+              {t.reportParams.apply}
+            </Button>
+          </>
+        )}
         <Button type="button" variant="secondary" block onClick={handleClear}>
           {t.reportParams.clear}
         </Button>

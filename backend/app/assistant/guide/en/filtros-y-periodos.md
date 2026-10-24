@@ -11,7 +11,8 @@ Anyone with access to the dashboard.
 
 ## How to
 
-1. In the report open **Filters and controls** (on a phone, the **Filters** button).
+1. In the report press **Filters** (right of the title); the side panel opens on the **Filters** tab
+   and the numbers stay visible while you change values.
 2. In **Period** choose, for example, **Today**, **Last 7 days**, **Month to date** or **Custom**
    with its **From** and **To** dates.
 3. In **Compare with** choose **No comparison**, **Previous period** or **Previous year**.

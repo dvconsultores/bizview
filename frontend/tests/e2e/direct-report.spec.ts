@@ -2,6 +2,7 @@
 // + mount golden-direct; restore afterwards.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { reportAction } from "./fixtures/report-action";
 const SUPER = { email: "e2e-root@example.com", password: "E2e-super-pass-1" };
 const FETCH = { "X-Requested-With": "fetch" };
 async function signIn(page: Page) {
@@ -76,7 +77,7 @@ test("direct-only workspace → apply → live dashboard at 375 px → PDF", asy
   await check(page);
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Descargar PDF" }).click();
+  await reportAction(page, "Descargar PDF");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^ventas-directo.*\.pdf$/);
   expect(await download.failure()).toBeNull();

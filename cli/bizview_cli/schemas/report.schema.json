@@ -634,6 +634,17 @@
         "pdf": {
           "description": "Composición declarativa del PDF exportado.",
           "$ref": "#/$defs/pdf_layout"
+        },
+        "theme": {
+          "description": "Ajustes de tema del informe. Ausente = la paleta de la instalación.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "palette": {
+              "description": "Paleta con la que se pinta el informe; ausente = la de la instalación.",
+              "$ref": "#/$defs/palette_id"
+            }
+          }
         }
       }
     },
@@ -725,6 +736,16 @@
         "sans_bold",
         "serif",
         "mono"
+      ]
+    },
+    "palette_id": {
+      "description": "Paleta con nombre del informe; nunca un color literal (hexadecimal, rgb() o hsl()).",
+      "enum": [
+        "impacto",
+        "clasico",
+        "monocromo",
+        "contraste",
+        "daltonico"
       ]
     },
     "web_layout": {

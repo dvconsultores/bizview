@@ -5,9 +5,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.ai import vision_enabled
+from app.api.appearance import preset_ids
 from app.config import get_settings
 from app.db import get_engine, get_read_sessionmaker
-from app.models import TelegramSettings
+from app.models import PALETTE_PRESET_IDS, AppearanceSettings, TelegramSettings
 from app.telegram import service as telegram
 
 LICENSE = "AGPL-3.0-or-later"
@@ -38,7 +39,8 @@ def public_config():
             "attachments_max_mb": s.attachments_max_mb,
             "attachments_max_per_message": s.attachments_max_per_message,
             "google_auth": s.google_enabled_effective,
-            **_telegram_config()}
+            **_telegram_config(),
+            **_palette_config()}
 
 
 def _telegram_config() -> dict:
@@ -51,3 +53,16 @@ def _telegram_config() -> dict:
     except Exception:
         log.warning("telegram availability could not be read")
     return {"telegram_sign_in": False, "telegram_bot": None}
+
+
+def _palette_config() -> dict:
+    """Installation palette (feature 030); the default preset whenever the row cannot be read."""
+    preset = PALETTE_PRESET_IDS[0]
+    try:
+        with get_read_sessionmaker()() as db:   # one round trip, no BEGIN/ROLLBACK
+            row = db.get(AppearanceSettings, 1)
+            if row is not None:
+                preset = row.palette_preset
+    except Exception:
+        log.warning("palette preset could not be read")
+    return {"palette_preset": preset, "palette_presets": list(preset_ids())}

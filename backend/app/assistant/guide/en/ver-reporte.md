@@ -16,8 +16,8 @@ Anyone with access to that dashboard.
    period. An indicator with no previous value is marked as new.
 3. Below come the trend, the rankings and the tables. **View data** shows the numbers of a
    chart.
-4. The **Report parameters** state the **Period**, what it is **Compared with**, when the
-   **Data updated** and who viewed it (**Viewed by**).
+4. Under the title one line summarises the **Period**, the date range it is compared with and when
+   the data was updated. Applied filters show as chips you remove with one tap.
 5. When the report declares its own composition, the cards appear in the order and with the width
    its author chose; on a phone they stack in that same order. Without it, the dashboard composes
    itself.
@@ -35,4 +35,4 @@ Anyone with access to that dashboard.
 
 ## Common problems
 
-- "No data in the period.": change the period in **Filters and controls**.
+- "No data in the period.": change the period in **Parameters**.

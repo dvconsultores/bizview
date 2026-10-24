@@ -94,6 +94,9 @@ export interface PublicConfig {
   /** Feature 027: whether this installation offers Google as an additional sign-in method. */
   google_auth: boolean;
   default_locale?: Locale;
+  /** Feature 030: the installation's palette preset (default "impacto") and the ids it may use. */
+  palette_preset?: PaletteId;
+  palette_presets?: PaletteId[];
 }
 
 export type AIProvider = "none" | "anthropic" | "openai_compatible";
@@ -502,6 +505,18 @@ export interface PdfLayout {
 export interface LayoutDocument {
   web?: WebLayout;
   pdf?: PdfLayout;
+  /** Feature 030: the report's own palette, overriding the installation's (026 FR-005 holds — a
+   * preset id, never a colour). */
+  theme?: { palette?: PaletteId };
+}
+
+/** Feature 030: the palette presets shipped with the product (`frontend/src/theme/palettes/`). */
+export type PaletteId = "impacto" | "clasico" | "monocromo" | "contraste" | "daltonico";
+
+/** Feature 030: Administración → Apariencia (contracts/appearance-api.md). */
+export interface AppearanceSettings {
+  palette_preset: PaletteId;
+  presets: PaletteId[];
 }
 
 /** data-model §8: the CLI's `Issue` shape, as the engine sends it in `layout_problems`. */
@@ -968,6 +983,8 @@ export interface ShareLink {
   active: boolean;
   origin: ShareLinkOrigin;
   counted: boolean;
+  /** Feature 030: the first-load theme chosen when the link was created. */
+  theme?: ShareTheme | null;
 }
 
 export interface ShareLinksState {
@@ -1065,7 +1082,11 @@ export interface SharedDashboard {
   dashboard: { code: string; name: string; name_en?: string };
   expires_at: string;
   report: ReportDefinition;
+  /** Feature 030: the theme the sharer chose for the first load; `null` follows the viewer. */
+  theme?: ShareTheme | null;
 }
+
+export type ShareTheme = "light" | "dark";
 
 // Feature 020: BI projects (one folder per project, cloud editor, history).
 export type ProjectStatus = "borrador" | "aplicado" | "cambios" | "retirado";

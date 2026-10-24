@@ -15,6 +15,7 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     SmallInteger,
+    String,
     Text,
     Time,
     UniqueConstraint,
@@ -66,6 +67,8 @@ AUDIT_KINDS = (
     "assistant_mode_changed", "assistant_contract_confirmed", "assistant_run_started",
     "assistant_run_applied", "assistant_run_stopped", "assistant_run_rolled_back",
     "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
+    # feature 030
+    "appearance_updated",
 )
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
@@ -92,6 +95,15 @@ ATTACHMENT_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
 EMAIL_SEND_STATUSES = ("queued", "sending", "sent", "partial", "failed")
 EMAIL_DELIVERY_STATUSES = ("queued", "sent", "failed", "skipped")
 SUBSCRIPTION_FREQUENCIES = ("daily", "weekly", "monthly")
+# Feature 030: the palette presets an installation may choose from. Must stay in step with
+# `app.reports.palette.PRESET_IDS`, the product data both renderers read; this mirror exists
+# because the ORM and the migrations never import product modules.
+PALETTE_PRESET_IDS: tuple[str, ...] = (
+    "impacto", "clasico", "monocromo", "contraste", "daltonico",
+)
+DEFAULT_PALETTE_PRESET = "impacto"
+# Feature 030 (T047): the theme a share link forces on its first load; NULL follows the viewer.
+SHARE_THEMES = ("light", "dark")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -479,6 +491,22 @@ class TelegramSettings(Base):
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
 
 
+class AppearanceSettings(Base):
+    """Installation appearance (feature 030): singleton row holding the palette preset."""
+    __tablename__ = "appearance_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(_in("palette_preset", PALETTE_PRESET_IDS), name="appearance_palette"),
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    palette_preset: Mapped[str] = mapped_column(
+        String(32), server_default=text(f"'{DEFAULT_PALETTE_PRESET}'"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
 class TelegramLink(Base):
     """A user's own Telegram account (feature 007), by its permanent id."""
     __tablename__ = "telegram_link"
@@ -742,6 +770,7 @@ class ShareLink(Base):
         CheckConstraint("note IS NULL OR char_length(note) <= 200", name="note_len"),
         CheckConstraint("expires_at > created_at", name="expiry"),
         CheckConstraint("visits >= 0", name="visits"),
+        CheckConstraint(_in("theme", SHARE_THEMES), name="theme"),
         Index(
             "ix_share_link_active",
             "dashboard_id",
@@ -767,6 +796,9 @@ class ShareLink(Base):
     )
     visits: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Feature 030 (T047): the theme the shared view applies on its first load; NULL follows the
+    # viewer's own choice (today's behaviour).
+    theme: Mapped[str | None] = mapped_column(String(5))
 
 
 class EmailSubscription(Base):

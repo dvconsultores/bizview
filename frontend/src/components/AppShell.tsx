@@ -7,6 +7,7 @@ import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/AuthContext";
 import { useBranding } from "../config/BrandingContext";
 import { useT } from "../i18n";
+import { APP_CONTAINER, APP_GUTTER } from "../lib/layout";
 import { initials } from "../lib/format";
 import { readNavCollapsed, writeNavCollapsed } from "../lib/navPrefs";
 import { useTheme } from "../theme/ThemeContext";
@@ -290,7 +291,7 @@ export function AppShell() {
                     // With the chat docked the content already lost the panel's column, so it uses
                     // all of what is left: the centered cap would leave canvas in front of the
                     // panel on a wide screen (the same "exaggerated space" the owner reported).
-                    docked ? "lg:pl-4 lg:pr-0" : "mx-auto max-w-screen-2xl sm:px-5 lg:px-4"
+                    docked ? "lg:pl-4 lg:pr-0" : `${APP_CONTAINER} ${APP_GUTTER}`
                   }`
             }
           >
