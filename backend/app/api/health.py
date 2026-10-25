@@ -23,9 +23,19 @@ def health():
         with get_engine().connect() as c:
             c.execute(text("SELECT 1"))
     except Exception:
-        return JSONResponse({"status": "unavailable", "version": get_settings().version},
-                            status_code=503)
-    return {"status": "ok", "version": get_settings().version}
+        return JSONResponse({"status": "unavailable", **_build()}, status_code=503)
+    return {"status": "ok", **_build()}
+
+
+def _build() -> dict:
+    """What this process is: the release version and, in a release image, its commit.
+
+    Release images carry the commit they were built from (`deploy.sh` → build arg →
+    `BIZVIEW_COMMIT`), so `curl /api/health` answers whether a fix is actually deployed instead of
+    looking for line numbers in a traceback. A development checkout leaves it out.
+    """
+    s = get_settings()
+    return {"version": s.version, **({"commit": s.bizview_commit} if s.bizview_commit else {})}
 
 
 @router.get("/api/config")

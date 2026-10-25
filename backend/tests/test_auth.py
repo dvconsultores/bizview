@@ -113,3 +113,13 @@ def test_public_config_and_health():
                                            "palette_preset": "impacto",
                                            "palette_presets": ["impacto", "clasico", "monocromo",
                                                                "contraste", "daltonico"]}
+
+
+def test_health_names_the_commit_the_image_was_built_from(monkeypatch):
+    """Release images carry their commit: `curl /api/health` says whether a fix is deployed."""
+    from app.api.health import _build
+    from app.config import get_settings
+
+    assert "commit" not in _build()                  # a development checkout has none
+    monkeypatch.setattr(get_settings(), "bizview_commit", "3fb5fff")
+    assert _build() == {"version": get_settings().version, "commit": "3fb5fff"}

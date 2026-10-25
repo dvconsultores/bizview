@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Which code a running installation actually has (2026-10-25)**: a fix was committed, the deploy
+  never reached the server, and the reader reported «still error» with the same traceback — the
+  only way to tell was to compare `service.py` line numbers in the log against each commit.
+  `deploy.sh` now bakes the commit into the image (`BIZVIEW_COMMIT`) and `/api/health` reports it
+  next to the version: `{"status":"ok","version":"0.1.0","commit":"3fb5fff"}`. A development
+  checkout answers without the field. Documented in the upgrade section of `docs/INSTALL.md`.
+
 - **An Auto run can apply a project again (2026-10-24)**: every assistant-driven **apply** ended
   with «Ocurrió un error inesperado (TypeError)» — for `001-mercado-cripto` and `002-panorama-cripto`
   of the `coinmarketcap` project, and never once succeeded on the installation (five contracts, zero

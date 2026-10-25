@@ -121,7 +121,7 @@ else
 fi
 
 # ── Build & push ────────────────────────────────────────────────────────────
-build_args=(--build-arg "BIZVIEW_VERSION=$VERSION")
+build_args=(--build-arg "BIZVIEW_VERSION=$VERSION" --build-arg "BIZVIEW_COMMIT=$COMMIT")
 [[ -n "$SOURCE_URL" ]] && build_args+=(--build-arg "BIZVIEW_SOURCE_URL=$SOURCE_URL")
 label="org.opencontainers.image.revision=$COMMIT"
 

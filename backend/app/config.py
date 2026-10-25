@@ -48,6 +48,9 @@ class Settings(BaseSettings):
 
     # Baked into the backend image (BIZVIEW_VERSION); the VERSION file in development.
     bizview_version: str = Field(default_factory=_file_version)
+    # Commit the image was built from (BIZVIEW_COMMIT, a build arg deploy.sh passes): /api/health
+    # then answers which code a running installation actually has, instead of leaving it to guess.
+    bizview_commit: str | None = None
     # Source code offered to every user (AGPL-3.0 §13). Release images bake in the repository
     # address (build arg BIZVIEW_SOURCE_URL → SOURCE_URL); an installation may override it.
     source_url: str | None = None

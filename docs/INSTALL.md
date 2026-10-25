@@ -641,6 +641,18 @@ To check immediately instead of waiting: `docker compose -f bizview.yml run --rm
 `watchtower` service from the compose file if that is not acceptable, and upgrade with the commands
 above.
 
+**Confirm what is actually running.** `/api/health` answers with the release version and the commit
+the image was built from (`deploy.sh` bakes it in):
+
+```bash
+curl -sk https://bi.example.com/api/health
+# {"status":"ok","version":"0.1.0","commit":"3fb5fff"}
+```
+
+If `commit` is not the one you published, the server is still running the previous image — the tag
+did not move, or Watchtower has not polled yet. A development checkout (no `BIZVIEW_COMMIT`) answers
+without the `commit` field.
+
 ## 9. Backup and restore
 
 The database holds all product data (users, access, audit, applied workspace versions, file

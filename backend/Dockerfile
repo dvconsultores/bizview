@@ -2,13 +2,17 @@ FROM python:3.12-slim
 
 # Set by the release pipeline; shown in /api/health, /api/config and the interface.
 ARG BIZVIEW_VERSION=dev
+# Commit the image is built from (deploy.sh passes it): /api/health reports it, so an installation
+# can be asked which code it runs.
+ARG BIZVIEW_COMMIT=
 # Repository address offered to every user (AGPL-3.0 §13); an installation may override it.
 ARG BIZVIEW_SOURCE_URL=""
 LABEL org.opencontainers.image.title="bizview-backend" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
       org.opencontainers.image.version="${BIZVIEW_VERSION}" \
       org.opencontainers.image.source="${BIZVIEW_SOURCE_URL}"
-ENV BIZVIEW_VERSION=${BIZVIEW_VERSION} SOURCE_URL=${BIZVIEW_SOURCE_URL}
+ENV BIZVIEW_VERSION=${BIZVIEW_VERSION} SOURCE_URL=${BIZVIEW_SOURCE_URL} \
+    BIZVIEW_COMMIT=${BIZVIEW_COMMIT}
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"
