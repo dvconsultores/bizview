@@ -20,7 +20,7 @@ The confirmation lasts 5 minutes: it is not asked again during that time.
 
 It is asked, for example, when creating or changing data sources, changing roles, resetting
 another person's two-factor, creating tokens, setting up Telegram, allowing direct reports,
-applying the workspace, **Apply project** and **Withdraw from workspace**.
+applying the workspace, **Apply project** and **Delete project**.
 
 ## Common problems
 

@@ -261,19 +261,6 @@ def apply_project(slug: str, request: Request, actor: AppUser = Depends(require_
             "project": projects.detail(db, p, actor)}
 
 
-@router.post("/{slug}/withdraw")
-def withdraw_project(slug: str, request: Request, actor: AppUser = Depends(require_superuser),
-                     _: Auth = Depends(recent_reauth), db: Session = DB):
-    from app.projects import apply as project_apply
-    from app.workspace import service as workspace_service
-
-    p = projects.get(db, slug)
-    version = project_apply.withdraw_project(db, actor, p, client_ip(request))
-    db.refresh(p)
-    return {"version": workspace_service.version_json(version),
-            "project": projects.detail(db, p, actor)}
-
-
 @router.delete("/{slug}", status_code=204)
 def delete_project(slug: str, request: Request, actor: AppUser = Depends(require_superuser),
                    _: Auth = Depends(recent_reauth), db: Session = DB):

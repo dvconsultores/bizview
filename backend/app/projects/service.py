@@ -314,11 +314,16 @@ def _trash_name(slug: str, when) -> str:
 
 
 def delete_project(db: Session, actor: AppUser, project: Project, ip: str | None) -> None:
-    """Move the folder to `.papelera` and mark the project deleted (refused while applied)."""
-    from app.projects import fs, specs
+    """Move the folder to `.papelera` and mark the project deleted.
+
+    An applied project leaves the workspace first (a version without it): deleting a dashboard is
+    one action now that «Retirar del espacio» is gone. It is still refused when another project
+    depends on it — that would break the other project's reports.
+    """
+    from app.projects import apply, fs, specs
 
     if specs.applied_files(db, project) is not None:
-        raise ApiError(409, "project_applied", M("projects.project_applied"))
+        apply.leave_workspace(db, actor, project, ip)
     now = datetime.now(UTC)
     root = fs.project_root(project.slug)
     if root.exists():

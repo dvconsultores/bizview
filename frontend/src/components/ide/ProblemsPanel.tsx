@@ -1,4 +1,4 @@
-import { AlertTriangle, RotateCw, X, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, RotateCw, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ProjectIssue, ProjectValidation } from "../../api/types";
 import { useT } from "../../i18n";
@@ -36,6 +36,8 @@ export function ProblemsPanel(props: {
   onOpen: (file: string, line: number | null) => void;
   onRevalidate?: () => void;
   checking?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   const t = useT();
   const errors = props.validation?.errors ?? [];
@@ -110,8 +112,10 @@ export function ProblemsPanel(props: {
     );
   };
 
+  const collapsed = props.collapsed ?? false;
   return (
-    <section className="flex h-full min-h-0 flex-col" aria-labelledby="problems-heading">
+    <section className={collapsed ? "" : "flex h-full min-h-0 flex-col"}
+             aria-labelledby="problems-heading">
       <h2 id="problems-heading" className="flex flex-wrap items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-sm font-semibold text-ink">
         {t.projects.problemsPanel}
         {shownErrors.length > 0 && <span className="text-xs font-normal text-danger">{t.projects.problemsCount(shownErrors.length)}</span>}
@@ -129,8 +133,24 @@ export function ProblemsPanel(props: {
             {t.projects.recheck}
           </button>
         )}
+        {props.onToggle && (
+          <button
+            type="button"
+            onClick={props.onToggle}
+            aria-expanded={!collapsed}
+            aria-controls="problems-body"
+            aria-label={collapsed ? t.projects.showProblems : t.projects.hideProblems}
+            title={collapsed ? t.projects.showProblems : t.projects.hideProblems}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-normal text-ink-2 hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            {collapsed ? <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                       : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            <span className="sr-only">{collapsed ? t.projects.showProblems : t.projects.hideProblems}</span>
+          </button>
+        )}
       </h2>
-      <div className="min-h-0 flex-1 overflow-auto p-1">
+      {!collapsed && (
+        <div id="problems-body" className="min-h-0 flex-1 overflow-auto p-1">
         {shownErrors.length + shownWarnings.length === 0 ? (
           <p className="p-3 text-sm text-ink-muted">{t.projects.noProblems}</p>
         ) : (
@@ -148,7 +168,8 @@ export function ProblemsPanel(props: {
             </button>
           </p>
         )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

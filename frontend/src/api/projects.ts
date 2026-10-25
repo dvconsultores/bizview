@@ -49,8 +49,6 @@ export const projectsApi = {
   apply: (slug: string) =>
     api.post<{ version: WorkspaceVersion; revalidated: boolean; project: ProjectDetail }>(
       `${base(slug)}/apply`),
-  withdraw: (slug: string) =>
-    api.post<{ version: WorkspaceVersion; project: ProjectDetail }>(`${base(slug)}/withdraw`),
   remove: (slug: string) => api.del<void>(base(slug)),
   convert: (slug: string) => api.post<ProjectDetail>(`${base(slug)}/convert`),
   requestPreview: (slug: string) => api.post<{ preview: unknown }>(`${base(slug)}/preview`),
@@ -124,7 +122,7 @@ export async function importProjectZip(
   return data as ProjectImportResult;
 }
 
-/** Is this item of the history a revision group (vs an apply/withdraw event)? */
+/** Is this item of the history a revision group (vs an apply event)? */
 export function isRevisionGroup(item: HistoryItem): item is RevisionGroup {
   return "files" in item && Array.isArray(item.files);
 }

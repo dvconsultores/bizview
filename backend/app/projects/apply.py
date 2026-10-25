@@ -1,4 +1,4 @@
-"""Apply / withdraw a BI project as a new workspace version (feature 020, plan section 8).
+"""Apply a BI project as a new workspace version (feature 020, plan section 8).
 
 Applying composes the project with the other applied projects of the active version (R3),
 validates and locks the tree and activates it through `workspace.service.apply_tree`, which
@@ -147,8 +147,13 @@ def apply_project(db, actor, project: Project, ip, *, session=None):
     return version, changed
 
 
-def withdraw_project(db, actor, project: Project, ip):
-    """New version without the project; refused when other projects depend on it."""
+def leave_workspace(db, actor, project: Project, ip):
+    """New version without the project; refused when other projects depend on it.
+
+    Deleting an applied project runs this first: it is not an action of its own any more (owner,
+    2026-10-25: «Retirar del espacio» is gone from the interface), and the guard stays because a
+    report of another project may use this one.
+    """
     from app.projects import specs
     from app.workspace import service as workspace_service
 

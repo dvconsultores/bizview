@@ -22,8 +22,8 @@ Solo el **Superusuario**. El agente nunca aplica: siempre es una acción tuya.
 
 - Si después cambias archivos, el proyecto queda en **Cambios sin aplicar** hasta que lo vuelvas
   a aplicar.
-- **Retirar del espacio** crea una versión nueva sin este proyecto; la carpeta y su historial se
-  conservan.
+- **Eliminar proyecto** saca antes el proyecto del espacio (una versión nueva sin él) y luego
+  manda la carpeta a la papelera; se niega si otro proyecto depende de este.
 - Para deshacer una aplicación usa **Volver a la versión anterior** en
   [Abrir Espacio de trabajo](app:/admin/espacio).
 - Los ids de integraciones, reportes y distribuciones son únicos entre todos los proyectos.

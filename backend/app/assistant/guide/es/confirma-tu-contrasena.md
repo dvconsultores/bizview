@@ -20,7 +20,7 @@ La confirmación vale 5 minutos: en ese tiempo no se vuelve a pedir.
 
 Se pide, por ejemplo, al crear o cambiar fuentes de datos, cambiar roles, restablecer el doble
 factor de otra persona, crear tokens, configurar Telegram, permitir reportes directos, aplicar
-el espacio de trabajo, **Aplicar proyecto** y **Retirar del espacio**.
+el espacio de trabajo, **Aplicar proyecto** y **Eliminar proyecto**.
 
 ## Problemas frecuentes
 

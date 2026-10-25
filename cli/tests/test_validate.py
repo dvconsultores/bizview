@@ -105,7 +105,7 @@ def test_report_references(ws, old, new, code):
 
 
 def test_a_set_without_a_join_is_reported(ws):
-    """The engine answered «Conjuntos sin unión» at render time; the validator has to say it first."""
+    """The engine answered «Conjuntos sin unión» at render time; the validator says it first."""
     path = ws / "reports/resumen/report.yaml"
     path.write_text(path.read_text().replace(
         "joins: [{left: lines.product_code, right: products.product_code}]\n", ""))

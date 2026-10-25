@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Play, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Play, Sparkles, Trash2, Upload } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { isRevisionGroup, projectsApi } from "../../api/projects";
 import type {
@@ -44,7 +44,7 @@ interface Buffer {
   conflict?: { kind: "stale" | "disk"; current: FileChangedCurrent | null };
 }
 
-type Confirm = "apply" | "withdraw" | "delete" | "convert";
+type Confirm = "apply" | "delete" | "convert";
 
 const STATUS_TONE: Record<ProjectStatus, "gray" | "green" | "amber" | "red"> = {
   borrador: "gray", aplicado: "green", cambios: "amber", retirado: "red",
@@ -159,6 +159,7 @@ export function ProjectWorkspace() {
   }, [slug]);
 
   const [checking, setChecking] = useState(false);
+  const [problemsOpen, setProblemsOpen] = useState(true);   // the panel can be put away
   const revalidate = useCallback(async () => {
     setChecking(true);
     try {
@@ -384,10 +385,6 @@ export function ProjectWorkspace() {
         setProject(res.project);
         setResult({ tone: "success", text: `${t.projects.applied(res.version.id)}${res.revalidated ? ` ${t.projects.revalidated}` : ""}` });
         setAppliedReports(res.version.projects?.[slug]?.reports ?? []);
-      } else if (kind === "withdraw") {
-        const res = await projectsApi.withdraw(slug);
-        setProject(res.project);
-        setResult({ tone: "success", text: t.projects.withdrawn(res.version.id) });
       } else if (kind === "convert") {
         setProject(await projectsApi.convert(slug));
         setResult({ tone: "success", text: t.projects.converted });
@@ -458,10 +455,9 @@ export function ProjectWorkspace() {
   }
 
   const confirmText: Record<Confirm, string> = {
-    apply: t.projects.applyConfirm, withdraw: t.projects.withdrawConfirm,
-    delete: t.projects.deleteConfirm, convert: t.projects.convertConfirm,
+    apply: t.projects.applyConfirm, delete: t.projects.deleteConfirm,
+    convert: t.projects.convertConfirm,
   };
-  const applied = project.status === "aplicado" || project.status === "cambios";
   const changes = project.changed_files;
 
   const filesPane = (
@@ -491,10 +487,12 @@ export function ProjectWorkspace() {
           }}
         />
       </div>
-      <div className="max-h-[45%] min-h-[8rem] border-t border-line">
+      <div className={problemsOpen ? "max-h-[45%] min-h-[8rem] border-t border-line"
+                                  : "border-t border-line"}>
         <ProblemsPanel validation={check?.validation ?? null} slug={slug}
                        onOpen={(file, line) => void openFile(file, line)}
-                       onRevalidate={() => void revalidate()} checking={checking} />
+                       onRevalidate={() => void revalidate()} checking={checking}
+                       collapsed={!problemsOpen} onToggle={() => setProblemsOpen((open) => !open)} />
       </div>
     </div>
   );
@@ -715,15 +713,9 @@ export function ProjectWorkspace() {
               <span className="hidden sm:inline">{t.projects.apply}</span>
             </Button>
           )}
-          {applied && (
-            <Button size="sm" variant="secondary" icon={<Undo2 className="h-4 w-4" aria-hidden />}
-                    onClick={() => setConfirm("withdraw")}>
-              {t.projects.withdraw}
-            </Button>
-          )}
           {readOnly ? (
             <Button size="sm" variant="secondary" onClick={() => setConfirm("convert")}>{t.projects.convert}</Button>
-          ) : !applied && (
+          ) : (
             <button
               type="button"
               aria-label={t.projects.deleteProject}

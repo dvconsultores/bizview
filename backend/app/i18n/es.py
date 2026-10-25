@@ -553,7 +553,6 @@ MESSAGES: dict[str, str] = {
     "projects.spec_number": "la nueva carpeta de spec debe usar el número {number}",
     "projects.slug_locked": "el slug no se puede cambiar después de aplicar el proyecto",
     "projects.slug_taken": "ya existe un proyecto con el slug {slug}",
-    "projects.project_applied": "el proyecto está aplicado; retíralo del espacio primero",
     "projects.read_only": "esta conversación es de solo lectura",
     "projects.managed_by_project": "lo gestiona el proyecto {project}; cámbialo en sus archivos",
     "projects.git_project": "el proyecto viene de Git; cámbialo en el repositorio",

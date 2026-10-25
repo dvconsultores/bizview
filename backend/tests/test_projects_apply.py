@@ -1,4 +1,4 @@
-"""Feature 020 T063: apply, withdraw, rollback and delete projects."""
+"""Feature 020 T063: apply, rollback and delete projects."""
 from datetime import UTC, datetime, timedelta
 from textwrap import dedent
 
@@ -127,34 +127,52 @@ def test_id_clash_names_owner(applied):
                for e in r.json()["error"]["errors"])
 
 
-def test_withdraw(applied, origin, env):
+def test_applying_one_project_leaves_the_other_untouched(applied, origin, env):
+    """Reported 2026-10-25: applying coinmarketcap left artemisa in «Cambios sin aplicar».
+
+    Composing a version dumped every project's YAML again, so the projects that were not being
+    applied came out reformatted and their file hashes stopped matching their folders.
+    """
     c = applied
     a = project_a(c, origin)
     apply_ok(c, a)
     b = project_b(c)
     apply_ok(c, b)
-    r = reauth(c).post(f"/api/projects/{a}/withdraw")
+    apply_ok(c, a)                                   # a second apply of the first project
+    other = c.get(f"/api/projects/{b}").json()
+    assert other["status"] == "aplicado"
+    assert other["changed_files"] == {"added": [], "changed": [], "removed": []}
+    assert c.get(f"/api/projects/{a}").json()["status"] == "aplicado"
+
+
+def test_deleting_an_applied_project_leaves_the_workspace_first(applied, origin, env):
+    """«Retirar del espacio» is gone from the interface: deleting an applied project does both."""
+    c = applied
+    a = project_a(c, origin)
+    apply_ok(c, a)
+    b = project_b(c)
+    apply_ok(c, b)
+    r = reauth(c).delete(f"/api/projects/{a}")
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "project_dependants"
     assert "proyecto-b" in r.json()["error"]["message"]
-    r = reauth(c).post(f"/api/projects/{b}/withdraw")
-    assert r.status_code == 200, r.text
-    assert "proyecto-b" not in r.json()["version"]["projects"]
-    assert r.json()["project"]["status"] == "retirado"
+    r = reauth(c).delete(f"/api/projects/{b}")
+    assert r.status_code == 204, r.text
+    assert "proyecto-b" not in sql(
+        "SELECT projects FROM workspace_version ORDER BY id DESC LIMIT 1")[0][0]
     assert sql(OWNED_B)[0][0] == 0
-    assert (env / "proyecto-b" / "reports/ventas-b/report.yaml").exists()
+    assert not (env / b).exists()
     assert sql("SELECT count(*) FROM project_file_revision r JOIN project p "
                "ON p.id = r.project_id WHERE p.slug = 'proyecto-b'")[0][0] > 0
+    kinds = [row[0] for row in sql("SELECT kind FROM audit_event "
+                                   "WHERE kind LIKE 'project_%' ORDER BY id")]
+    assert kinds[-2:] == ["project_withdrawn", "project_deleted"]
 
 
 def test_delete_and_purge(applied, origin, env):
     c = applied
     a = project_a(c, origin)
     apply_ok(c, a)
-    r = reauth(c).delete(f"/api/projects/{a}")
-    assert r.status_code == 409
-    assert r.json()["error"]["code"] == "project_applied"
-    assert reauth(c).post(f"/api/projects/{a}/withdraw").status_code == 200
     assert reauth(c).delete(f"/api/projects/{a}").status_code == 204
     assert not (env / a).exists()
     trash = list((env / ".papelera").iterdir())

@@ -8,6 +8,25 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Applying one project no longer marks the others as changed (2026-10-25)**: the version stored
+  only the parsed definition of each integration and report, and composing the next version dumped it
+  back through `yaml.safe_dump`, so every project that was **not** being applied came out
+  reformatted, its file hashes no longer matched its folder, and it showed «Cambios sin aplicar»
+  (reported: applying `coinmarketcap` marked `artemisa` as changed, and the other way round).
+  A version now stores each project's files as they were applied (`projects[slug]["tree"]`) and the
+  composition replays them byte for byte — including what the artifact and spec archives do not
+  hold, such as `.specify/memory/constitution.md`. Artifacts also keep their own text (`source`), so
+  a version without a tree composes as before. Covered by
+  `backend/tests/test_compose_idempotent.py` and `test_projects_apply.py`.
+
+- **A report that reads two datasets has to declare the join, and the validator says so
+  (2026-10-25)**: «Panorama cripto» applied cleanly and then the dashboard answered «Conjuntos sin
+  unión: altseason» — the engine builds one query per report and the second dataset was joined by
+  nobody, a rule only the renderer checked. The validator now walks the same join graph as the
+  engine and reports `unjoined_sets` on the report (with the `joins:` line to add, picking a shared
+  column) before the project can be applied. Spanish and English messages, documented in
+  `docs/VIBE-REPORTING.md`.
+
 - **Which code a running installation actually has (2026-10-25)**: a fix was committed, the deploy
   never reached the server, and the reader reported «still error» with the same traceback — the
   only way to tell was to compare `service.py` line numbers in the log against each commit.
@@ -86,6 +105,16 @@ All notable changes to this project are documented here. The format follows
   ("comprueba que la carpeta de proyectos esté montada (PROJECTS_DIR)") instead of a false success.
 
 ### Changed
+
+- **«Retirar del espacio» is gone; deleting an applied project does it (2026-10-25)**: two actions
+  for taking a project out of the workspace was one too many. The button, its confirmation, its
+  string and the `POST /api/projects/{slug}/withdraw` endpoint are removed; **Eliminar proyecto** is
+  offered for applied projects too, takes the project out of the workspace in a new version and then
+  moves the folder to the bin (still refused when another project depends on it). The user guide and
+  the audit trail keep explaining it.
+- **The problems panel can be put away (2026-10-25)**: the project workspace keeps it under the file
+  tree and it took a fixed share of the height. A chevron in its header collapses it to the title
+  line (counts still visible) and expands it again.
 
 - **Auto keeps its execution channel, and it can actually apply (2026-10-22)**: a conversation in
   Auto was left with read tools only whenever no contract was live — which is the normal state

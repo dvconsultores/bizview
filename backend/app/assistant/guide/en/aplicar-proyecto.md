@@ -21,8 +21,8 @@ Only the **Superuser**. The agent never applies: it is always your action.
 
 - If you change files afterwards, the project stays in **Unapplied changes** until you apply it
   again.
-- **Withdraw from workspace** creates a new version without this project; its folder and history
-  are kept.
+- **Delete project** takes the project out of the workspace first (a new version without it) and
+  then moves the folder to the bin; it is refused when another project depends on this one.
 - To undo an apply use **Roll back to previous version** in
   [Open Workspace](app:/admin/espacio).
 - Integration, report and distribution ids are unique across all projects.
