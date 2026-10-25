@@ -76,6 +76,13 @@ function TestResult({ result }: { result: AITestResult }) {
     <Alert tone="error">
       <p className="font-semibold">{t.ai.testFail}</p>
       {result.error ? <p className="mt-1">{result.error.message}</p> : null}
+      {/* The provider's own words: «devolvió un error» cannot be acted on. */}
+      {result.error?.detail ? (
+        <div className="mt-2">
+          <p className="font-medium">{t.ai.detail}</p>
+          <p className="mt-1 max-h-40 overflow-auto break-words rounded-lg bg-subtle p-2 font-mono text-xs text-ink-2">{result.error.detail}</p>
+        </div>
+      ) : null}
       {result.latency_ms !== null ? <p className="mt-1">{t.ai.latency(result.latency_ms)}</p> : null}
     </Alert>
   );

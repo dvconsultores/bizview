@@ -2161,6 +2161,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 db.flush()
                 end("error", exc.code)
                 return new_messages
+            log.warning("assistant provider failure in session %s: %s (%s)",
+                        session.id, exc.code, exc.detail or "-")
             new_messages.append(_add(db, session, role="assistant", content=exc.message))
             session.updated_at = datetime.now(UTC)
             db.flush()

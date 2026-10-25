@@ -22,8 +22,11 @@ from app.ai import (
 from app.config import Settings
 from app.i18n import t
 
-STATUS_CODES = {401: "invalid_key", 403: "forbidden", 404: "model_not_found",
+STATUS_CODES = {401: "invalid_key", 402: "no_credit", 403: "forbidden", 404: "model_not_found",
                 429: "rate_limited"}
+# Some providers answer a 400 (not a 404) for a model they do not know; the body is the only clue.
+MODEL_MARKERS = ("model not exist", "model_not_found", "no such model", "unknown model",
+                 "invalid model", "model does not exist")
 CONTEXT_MARKERS = (
     "maximum context length",
     "context_length_exceeded",
@@ -211,6 +214,9 @@ class OpenAICompatibleProvider:
                 if r.status_code == 400 and any(
                         marker in r.text.lower() for marker in CONTEXT_MARKERS):
                     raise AIError("context_too_long", detail)
+                if r.status_code == 400 and any(
+                        marker in r.text.lower() for marker in MODEL_MARKERS):
+                    raise AIError("model_not_found", detail)
                 code = STATUS_CODES.get(r.status_code, "provider_error")
                 raise AIError(code, detail)
             try:

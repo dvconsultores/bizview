@@ -45,7 +45,9 @@ def test_connection(settings: Settings) -> dict:
     except AIError as e:
         if e.detail:
             log.warning("AI connection test failed: %s (%s)", e.code, e.detail)
-        result["error"] = {"code": e.code, "message": e.message}
+        # The provider's own words, already redacted: the super user configured it and cannot
+        # fix "the provider returned an error" without them.
+        result["error"] = {"code": e.code, "message": e.message, "detail": e.detail}
     else:
         result.update(ok=True, model=reply.model, reply=reply.text[:200] or t("ai.empty_reply"))
     result["latency_ms"] = int((time.monotonic() - started) * 1000)

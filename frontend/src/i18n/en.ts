@@ -544,6 +544,7 @@ export const en: Catalogue = {
     testFail: "Test failed",
     latency: (ms: number) => `Responded in ${(ms / 1000).toFixed(1)} s`,
     reply: "Response",
+    detail: "What the provider answered",
     howTitle: "How to enable it",
     howTitleChange: "How to change the configuration",
     howText:

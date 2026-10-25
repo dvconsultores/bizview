@@ -524,6 +524,7 @@ export const es = {
     testFail: "La prueba falló",
     latency: (ms: number) => `Respondió en ${(ms / 1000).toFixed(1)} s`,
     reply: "Respuesta",
+    detail: "Lo que respondió el proveedor",
     howTitle: "Cómo activarla",
     howTitleChange: "Cómo cambiar la configuración",
     howText:

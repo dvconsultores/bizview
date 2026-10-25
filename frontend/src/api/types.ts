@@ -117,7 +117,7 @@ export interface AITestResult {
   model: string | null;
   latency_ms: number | null;
   reply: string | null;
-  error: { code: string; message: string } | null;
+  error: { code: string; message: string; detail?: string | null } | null;
 }
 
 // --- feature 004: data sources and security -----------------------------------------------

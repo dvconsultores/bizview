@@ -159,15 +159,31 @@ def test_openai_compatible_without_key_sends_no_auth():
     assert oc(handler, key=None).complete("x").text == "OK"
 
 
-@pytest.mark.parametrize("status,code", [(401, "invalid_key"), (403, "forbidden"),
-                                         (404, "model_not_found"), (429, "rate_limited"),
-                                         (500, "provider_error")])
+@pytest.mark.parametrize("status,code", [(401, "invalid_key"), (402, "no_credit"),
+                                         (403, "forbidden"), (404, "model_not_found"),
+                                         (429, "rate_limited"), (500, "provider_error")])
 def test_openai_compatible_http_errors(status, code):
     p = oc(lambda r: httpx.Response(status, text=f"error with {KEY}"))
     p._sleep = lambda s: None
     with pytest.raises(AIError) as e:
         p.complete("x")
     assert e.value.code == code and KEY not in (e.value.detail or "")
+
+
+def test_openai_compatible_400_naming_the_model_is_that_model():
+    """DeepSeek and others answer 400, not 404, for a model they do not know."""
+    p = oc(lambda r: httpx.Response(
+        400, json={"error": {"message": "Model Not Exist", "type": "invalid_request_error"}}))
+    with pytest.raises(AIError) as e:
+        p.complete("x")
+    assert e.value.code == "model_not_found"
+
+
+def test_openai_compatible_400_without_a_clue_stays_provider_error():
+    p = oc(lambda r: httpx.Response(400, json={"error": {"message": "bad temperature"}}))
+    with pytest.raises(AIError) as e:
+        p.complete("x")
+    assert e.value.code == "provider_error"
 
 
 @pytest.mark.parametrize("exc,code", [(httpx.ReadTimeout("slow"), "timeout"),
@@ -189,6 +205,16 @@ def test_openai_compatible_content_filter_is_refused():
 
 
 # --- Anthropic provider -------------------------------------------------------------------
+
+def test_anthropic_status_without_a_class_is_named():
+    """DeepSeek (Anthropic-compatible) answers 402 when the account has no balance."""
+    from app.ai.anthropic_provider import code_for_status
+
+    assert code_for_status(402) == "no_credit"
+    assert code_for_status(404) == "model_not_found"
+    assert code_for_status(418) == "provider_error"
+    assert code_for_status(None) == "provider_error"
+
 
 def test_anthropic_unreachable_endpoint():
     """Local closed port: exercises the SDK error mapping without contacting Anthropic."""

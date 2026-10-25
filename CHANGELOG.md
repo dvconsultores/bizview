@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A failing AI provider says why (2026-10-25)**: the chat answered «El proveedor de IA devolvió un
+  error.» and nothing else — no status, no message, not even a line in the log — while the provider
+  was rejecting every call (the same session had answered fine two hours earlier). Three changes:
+  an exhausted balance is no longer an unknown error (`402` → `no_credit`, «La cuenta del proveedor
+  de IA no tiene saldo»), a `400` that names the model becomes «El modelo configurado no existe»,
+  and the generic message points at Administración → IA. The turn now logs the code and the redacted
+  provider answer, and the connection test **shows** that answer instead of keeping it in the log.
+
 - **Applying one project no longer marks the others as changed (2026-10-25)**: the version stored
   only the parsed definition of each integration and report, and composing the next version dumped it
   back through `yaml.safe_dump`, so every project that was **not** being applied came out

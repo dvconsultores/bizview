@@ -14,20 +14,23 @@ from typing import Literal, Protocol
 from app.config import Settings
 from app.i18n import t
 
-ERROR_CODES = ("not_configured", "invalid_key", "forbidden", "model_not_found", "rate_limited",
-               "unreachable", "timeout", "refused", "context_too_long", "provider_error")
+ERROR_CODES = ("not_configured", "invalid_key", "forbidden", "model_not_found", "no_credit",
+               "rate_limited", "unreachable", "timeout", "refused", "context_too_long",
+               "provider_error")
 
 MESSAGES = {
     "not_configured": "La IA no está configurada.",
     "invalid_key": "La clave de API no es válida.",
     "forbidden": "La clave de API no tiene permiso para usar este modelo.",
     "model_not_found": "El modelo configurado no existe o no está disponible.",
+    "no_credit": "La cuenta del proveedor de IA no tiene saldo; recárgala o cambia de clave.",
     "rate_limited": "El proveedor limitó las solicitudes. Intenta de nuevo en unos minutos.",
     "unreachable": "No se pudo conectar con el proveedor de IA.",
     "timeout": "El proveedor de IA no respondió a tiempo.",
     "refused": "El proveedor rechazó la solicitud.",
     "context_too_long": "La conversación superó el contexto máximo del modelo.",
-    "provider_error": "El proveedor de IA devolvió un error.",
+    "provider_error": "El proveedor de IA devolvió un error; revisa la clave, el saldo y "
+                      "el modelo en Administración → IA.",
 }
 
 
