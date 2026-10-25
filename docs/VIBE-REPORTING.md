@@ -149,6 +149,10 @@ filters: [product]
 ai_narrative: {enabled: true, inputs: [net_sales, orders], instructions: Resume en 3 frases.}
 ```
 
+Every alias of `uses` has to be reachable from the alias of `date` through `joins`: a report is one
+query, so a set nobody joins cannot be read and the dashboard would answer «Conjuntos sin unión».
+The validator says so before the report can be applied, with the line to add.
+
 Expressions may use only the declared aliases' columns and allow-listed functions (`sum`,
 `count`, `avg`, `min`, `max`, `coalesce`, `case`, `round`, `date_trunc`, …); no sub-queries.
 Periods (today … last 12 months, custom), comparisons (previous period, previous year, zero base

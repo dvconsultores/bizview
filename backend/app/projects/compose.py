@@ -62,12 +62,23 @@ LEGACY_PROJECT_YAML = ('name: "Principal"\nslug: principal\n'
 
 
 def version_projects(version) -> dict[str, dict[str, str]]:
-    """Project trees of an applied version: {slug: {path: text}} (research R3)."""
+    """Project trees of an applied version: {slug: {path: text}} (research R3).
+
+    A version stores each project's files as they were applied (`projects[slug]["tree"]`), so
+    composing the next one replays them byte for byte: rebuilding them from the parsed artifacts
+    reformatted the projects that were not being applied and left them in «Cambios sin aplicar».
+    Versions applied before that answer without a tree and are rebuilt: the artifact's `source`
+    text first, then the dumped definition.
+    """
     projects = getattr(version, "projects", None) or {}
     if not projects:
         return {"principal": {**legacy_tree(version), "project.yaml": LEGACY_PROJECT_YAML}}
     result = {}
     for slug, meta in sorted(projects.items()):
+        stored = meta.get("tree")
+        if isinstance(stored, dict) and stored:
+            result[slug] = dict(sorted(stored.items()))
+            continue
         tree: dict[str, str] = {}
         if meta.get("project_yaml"):
             tree["project.yaml"] = meta["project_yaml"]

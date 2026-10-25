@@ -1204,6 +1204,66 @@ def _check_direct_spec(entry: Entry, issues: list[Issue]) -> None:
                                 file=rel_spec, expected={"line": line}, fix=t(fix)))
 
 
+def _check_joined(entry: Entry, a: dict, aliases: dict[str, dict[str, dict]], ry: str,
+                  issues: list[Issue]) -> None:
+    """Every alias of `uses` has to be reachable from the date's alias through `joins`.
+
+    The engine builds one FROM for the whole report and answered 409 «Conjuntos sin unión» at render
+    time — after the report had validated, been applied and reached the dashboard (reported
+    2026-10-25: «Panorama cripto» showed «Conjuntos sin unión: altseason»). The same walk the engine
+    does decides it here, where the author can still declare the join.
+    """
+    base = a["date"].split(".", 1)[0]
+    if base not in aliases:
+        return                                   # a bad `date` is already its own issue
+    joined = {base}
+    pending = [j for j in (a.get("joins") or [])
+               if isinstance(j, dict) and isinstance(j.get("left"), str)
+               and isinstance(j.get("right"), str)]
+    while pending:
+        progressed = False
+        for j in list(pending):
+            left, right = j["left"].split(".", 1)[0], j["right"].split(".", 1)[0]
+            new = right if left in joined and right not in joined else (
+                left if right in joined and left not in joined else None)
+            if new is None:
+                if left in joined and right in joined:
+                    pending.remove(j)            # the engine calls this a repeated join
+                    progressed = True
+                continue
+            joined.add(new)
+            pending.remove(j)
+            progressed = True
+        if not progressed:
+            break
+    missing = sorted(set(aliases) - joined)
+    if not missing:
+        return
+    where = "direct.tables" if "direct" in a else "uses"
+    issues.append(Issue(entry.key, "unjoined_sets",
+                        t("validate.unjoined_sets", aliases=", ".join(missing)),
+                        file=ry, path=_pointer(where.split(".")),
+                        expected={"alias": missing[0], "base": base},
+                        fix=t("validate.fix_unjoined_sets",
+                              join=_join_hint(aliases, missing, joined, base))))
+
+
+def _join_hint(aliases: dict[str, dict[str, dict]], missing: list[str], joined: set[str],
+               base: str) -> str:
+    """The `joins:` line to write: the first shared column between the aliases to unite."""
+    for alias in missing:
+        for other in sorted(joined):
+            shared = [c for c in aliases[alias] if c in aliases.get(other, {})]
+            if not shared:
+                continue
+            dates = [c for c in shared
+                     if aliases[alias][c].get("type") in DATE_TYPES
+                     and aliases[other][c].get("type") in DATE_TYPES]
+            col = sorted(dates or shared)[0]
+            return f"joins: [{{left: {other}.{col}, right: {alias}.{col}}}]"
+    return f"joins: [{{left: {base}.<columna>, right: {missing[0]}.<columna>}}]"
+
+
 def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Issue],
                   invalid: set[str] | frozenset[str] = frozenset(),
                   direct: DirectContext | None = None) -> None:
@@ -1236,6 +1296,7 @@ def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Iss
                                     file=ry, path=_pointer(["joins", i, side]),
                                     fix=t("validate.fix_use_existing_alias_column",
                                           aliases=_names(aliases))))
+    _check_joined(entry, a, aliases, ry, issues)
     date = _ref(a["date"], aliases)
     if date is None or date.get("type") not in DATE_TYPES:
         where = "direct.tables" if "direct" in a else "uses"

@@ -194,6 +194,8 @@ MESSAGES: dict[str, str] = {
     "validate.spec_mode_direct_but_uses_datasets": "el spec declara **Modo**: directo pero report.yaml usa uses (datasets)",
     "validate.fix_declare_direct_or_remove_mode": "declara direct en report.yaml o quita **Modo**: directo del spec",
     "validate.join_missing": "join: no existe {side_value}",
+    "validate.unjoined_sets": "Conjuntos sin unión: {aliases}",
+    "validate.fix_unjoined_sets": "declara {join} para unirlos",
     "validate.fix_use_existing_alias_column": "usa alias.columna existente; alias: {aliases}",
     "validate.fix_declare_date_in": "declara una columna date o timestamptz en {where}",
     "validate.date_must_be_timestamptz": "date: {date} debe ser una columna date/timestamptz",

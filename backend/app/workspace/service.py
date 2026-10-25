@@ -297,8 +297,13 @@ def _artifacts(result: wsv.Result, root: Path | None = None) -> tuple[dict, dict
             files = {path[len(prefix):]: data.decode("utf-8")
                      for path, data in entry.files.items()
                      if path.startswith(prefix) and path != own}
+            # `source` is the artifact's own file, byte for byte: composing the next version
+            # replays it instead of dumping the parsed definition, which rewrote the files of every
+            # project that was not being applied (applying one marked the others as changed).
             artifacts[group][entry.id] = {"definition": entry.artifact, "files": files,
-                                          "project": entry.project, "spec": _rel_spec(entry)}
+                                          "project": entry.project, "spec": _rel_spec(entry),
+                                          "source": (entry.files.get(own) or b"").decode()
+                                          or None}
             if result.layout == "v2":
                 continue
             documents = {
@@ -311,9 +316,11 @@ def _artifacts(result: wsv.Result, root: Path | None = None) -> tuple[dict, dict
             }
             specs[entry.key]["documents"] = documents
     for entry in result.distributions.values():
-        artifacts["distributions"][entry.id] = {"definition": entry.artifact,
-                                                "project": entry.project,
-                                                "spec": entry.artifact.get("spec")}
+        own = f"distributions/{entry.id}.yaml"
+        artifacts["distributions"][entry.id] = {
+            "definition": entry.artifact, "project": entry.project,
+            "spec": entry.artifact.get("spec"),
+            "source": (entry.files.get(own) or b"").decode("utf-8") or None}
     if result.layout == "v2":
         specs = _v2_specs(result, root)
     return artifacts, specs
@@ -326,11 +333,16 @@ def _projects_meta(db: Session, result: wsv.Result, root: Path | None) -> dict:
     meta: dict = {}
     for slug in sorted(result.projects):
         base = root / "projects" / slug
-        files = {}
+        files, tree = {}, {}
         for path in sorted(base.rglob("*")) if base.is_dir() else ():
             rel = path.relative_to(base).as_posix()
             if path.is_file() and not path.is_symlink() and layout.is_allowed(rel):
-                files[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+                data = path.read_bytes()
+                files[rel] = hashlib.sha256(data).hexdigest()
+                try:
+                    tree[rel] = data.decode("utf-8")
+                except UnicodeDecodeError:      # not project text: the digest is all there is
+                    continue
         row = db.scalar(select(Project).where(Project.slug == slug, Project.deleted_at.is_(None)))
         manifest = base / "project.yaml"
         meta[slug] = {
@@ -339,6 +351,9 @@ def _projects_meta(db: Session, result: wsv.Result, root: Path | None) -> dict:
             "name": row.name if row else slug,
             "project_yaml": manifest.read_text(encoding="utf-8") if manifest.is_file() else None,
             "files": files,
+            # The project's files as applied: composing the next version replays them instead of
+            # rebuilding them (`compose.version_projects`).
+            "tree": tree,
         }
     return meta
 

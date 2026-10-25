@@ -104,6 +104,23 @@ def test_report_references(ws, old, new, code):
     assert code in codes(ws)
 
 
+def test_a_set_without_a_join_is_reported(ws):
+    """The engine answered «Conjuntos sin unión» at render time; the validator has to say it first."""
+    path = ws / "reports/resumen/report.yaml"
+    path.write_text(path.read_text().replace(
+        "joins: [{left: lines.product_code, right: products.product_code}]\n", ""))
+    result = validate(ws)
+    issue = next(i for i in result.issues if i.code == "unjoined_sets")
+    assert issue.message == "Conjuntos sin unión: products"
+    assert issue.fix == ("declara joins: [{left: lines.product_code, "
+                         "right: products.product_code}] para unirlos")
+    assert not result.ok
+
+
+def test_a_joined_report_has_no_unjoined_sets(ws):
+    assert "unjoined_sets" not in codes(ws)
+
+
 def test_schema_errors_and_id_mismatch(ws):
     path = ws / "reports/resumen/report.yaml"
     path.write_text(path.read_text().replace("id: resumen", "id: otro"))
