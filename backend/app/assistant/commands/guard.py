@@ -35,6 +35,7 @@ _KIND_HINTS = {
     "distribucion": "distributions/<{ids}>.yaml",
 }
 _SPEC_FOLDER = re.compile(r"^specs/(?P<spec>\d{3}-[a-z0-9-]+)/")
+_ARTIFACT_PATH = re.compile(r"^(?:integrations|reports|distributions)/")
 _ARTIFACT_REF = re.compile(
     r"(?:integrations/(?P<integration>[a-z0-9][a-z0-9-]*)/"
     r"|reports/(?P<report>[a-z0-9][a-z0-9-]*)/"
@@ -327,6 +328,17 @@ def check_ops(ctx: Context, ops: list[dict]) -> str | None:
                     M("commands.path_other_spec", command=ctx.definition.name, path=path,
                       current=ctx.spec, owner=owner))
             hints = checker.hints()
+            if _ARTIFACT_PATH.match(path) and not any(
+                    hint.startswith(("integrations/", "reports/", "distributions/"))
+                    for hint in hints):
+                # A refused artifact write used to name the allowed paths only (2026-10-26), and
+                # the run stopped («en /speckit-converge solo se agregan tareas… me detengo»). The
+                # way out is a stage that does write artifacts, so say which one.
+                raise GuardError(
+                    "path_not_allowed",
+                    {"path": path, "command": ctx.definition.name, "allowed": hints},
+                    M("commands.path_not_allowed_artifact", command=ctx.definition.name,
+                      path=path, allowed=", ".join(hints), spec=ctx.spec or "<spec>"))
             raise GuardError(
                 "path_not_allowed",
                 {"path": path, "command": ctx.definition.name, "allowed": hints},

@@ -82,6 +82,10 @@ VALIDATION_LINE_CHARS = 300
 REFERENCED_TABLES = 8
 QUERY_NOTES_MAX = 8
 DECISIONS_MAX = 10
+# The run summary is read by a person: one decision per line, repeated ones folded, and each one
+# short enough to scan (they were one paragraph joined with «; »).
+SUMMARY_DECISION_CHARS = 240
+SUMMARY_DECISIONS_MAX = 15
 DONE_MAX = 10
 
 # Base system prefix (021 plan §4): identity, rules, scope, data, command discipline; the command's
@@ -1131,6 +1135,27 @@ def _preview_rows(session: AssistantSession) -> str:
     return ", ".join(parts)
 
 
+def _summary_decisions(values) -> list[str]:
+    """The decisions of a run as readable lines: one per decision, no repeats, bounded.
+
+    The reader gets this in the chat, so it is prose to scan, not a single paragraph: the same
+    decision noted in two turns appeared twice, and a wall of «…; …; …» was unreadable.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in values or []:
+        text = " ".join(str(item).split())
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(text if len(text) <= SUMMARY_DECISION_CHARS
+                   else text[:SUMMARY_DECISION_CHARS - 1].rstrip() + "…")
+    return out[-SUMMARY_DECISIONS_MAX:]
+
+
 def _auto_summary(db, session: AssistantSession, run: AssistantAutoRun) -> dict:
     """FR-004/US1 AC4: version, ids, schedule, decisions taken, preview rows and tokens."""
     from app.models import WorkspaceVersion
@@ -1142,7 +1167,7 @@ def _auto_summary(db, session: AssistantSession, run: AssistantAutoRun) -> dict:
         contract = None
     version = db.get(WorkspaceVersion, run.version_id) if run.version_id else None
     working = session.working_state or {}
-    decisions = [str(item) for item in (working.get("decisions") or [])]
+    decisions = _summary_decisions(working.get("decisions") or [])
     return {
         "version_id": run.version_id,
         "version": version.id if version is not None else None,
@@ -1176,7 +1201,8 @@ def _summary_text(summary: dict, reason: str | None) -> str:
     if summary.get("schedule"):
         lines.append(t("assistant.summary.schedule", schedule=", ".join(summary["schedule"])))
     if summary.get("decisions"):
-        lines.append(t("assistant.summary.decisions", decisions="; ".join(summary["decisions"])))
+        lines.append(t("assistant.summary.decisions_title"))
+        lines.extend(f"- {item}" for item in summary["decisions"])
     if summary.get("preview_rows"):
         lines.append(t("assistant.summary.preview_rows", rows=summary["preview_rows"]))
     lines.append(t("assistant.summary.tokens", tokens=summary.get("tokens", 0)))

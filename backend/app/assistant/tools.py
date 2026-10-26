@@ -353,7 +353,8 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "name": "read_draft",
         "description": (
             "Lee el contenido actual de archivos del proyecto (incluye cambios hechos en el "
-            "editor o por otras conversaciones)."
+            "editor o por otras conversaciones). Devuelve siempre el contenido: si el archivo "
+            "no cambió desde una lectura anterior lo dice, pero lo vuelve a incluir."
         ),
         "parameters": {
             "type": "object",
@@ -1870,14 +1871,17 @@ def _read_draft(
             continue
         content = files[path]
         digest = history.sha(content)
+        # The hash is *extra* information, never a substitute for the content (2026-10-26). The
+        # provider payload keeps the data of the newest exchange only — history.build replays older
+        # results as their one-line summary — so answering «sin cambios» left the model unable to
+        # see the file again: the run ended saying «no puedo leer el contenido real de
+        # integration.yaml» and the reader gave up (20M tokens, `limit:rounds`, three runs).
         if reads.get(path) == digest:
-            # The file did not change since this run read it: the hash is enough.
             unchanged[path] = digest
-            continue
         if total + len(content) <= MAX_TOOL_RESULT_CHARS:
             result_files[path] = content
             total += len(content)
-            reads[path] = digest          # only a full read counts as cached
+            reads[path] = digest          # remembered only to say "did not change"
         else:
             remaining = MAX_TOOL_RESULT_CHARS - total
             if remaining > 0:
@@ -1890,7 +1894,7 @@ def _read_draft(
     _remember(session, {path: history.sha(files[path]) for path in result_files})
     note = None
     if unchanged:
-        note = "sin cambios desde la lectura anterior"
+        note = "sin cambios desde la lectura anterior (el contenido va incluido)"
     summary = f"Leyó {len(result_files)} archivos del proyecto."
     if unchanged:
         hashes = ", ".join(f"{path}: {digest[:12]}" for path, digest in unchanged.items())

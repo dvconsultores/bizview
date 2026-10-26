@@ -250,18 +250,31 @@ def test_converge_with_zero_gaps_is_replayed_from_the_stored_run(chat, superuser
     assert "no encontró huecos" in r.json()["messages"][-1]["content"]
 
 
-def test_read_draft_returns_the_hash_when_the_file_did_not_change(chat):
+def test_read_draft_returns_the_content_when_the_file_did_not_change(chat):
+    """A repeat read must still carry the file (reported 2026-10-26).
+
+    The provider payload keeps the data of the newest exchange only, so a read from an earlier round
+    is replayed as its one-line summary. Answering «sin cambios» left the model with no way to see
+    the file again: the run ended saying «no puedo leer el contenido real de integration.yaml»
+    (reported 2026-10-26: three runs, `limit:rounds`, 20M tokens).
+    """
     c, _, sid = chat
+    spec_path = "specs/001-integracion-facturas/spec.md"
     fake.SHARED.queue(
-        _reply("", [_call("read_draft", {"paths": ["specs/001-integracion-facturas/spec.md"]})]),
-        _reply("", [_call("read_draft", {"paths": ["specs/001-integracion-facturas/spec.md"]},
-                          "call-2")]),
+        _reply("", [_call("read_draft", {"paths": [spec_path]})]),
+        _reply("", [_call("read_draft", {"paths": [spec_path]}, "call-2")]),
         _reply("Leído.", [_call("finish_command", {"summary": "ok"}, "call-3")]),
     )
     assert _send(c, sid, "/speckit-plan 001-integracion-facturas").status_code == 202
+
     reads = [m for m in _session(c, sid)["messages"] if m.get("tool_name") == "read_draft"]
     assert len(reads) == 2
     assert "sin cambios desde la lectura anterior" in reads[-1]["content"]
+
+    # The third call is the model asking something else: the payload it receives must still contain
+    # the file, whichever round read it (the newest used to be a hash, older ones a summary).
+    payload = json.dumps(fake.SHARED.requests[-1]["messages"], ensure_ascii=False)
+    assert "Integración de facturas" in payload
 
 
 def test_a_huge_command_run_is_not_stopped_by_tokens(chat):

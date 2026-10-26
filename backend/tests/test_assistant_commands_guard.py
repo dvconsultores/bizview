@@ -167,6 +167,18 @@ def test_refusal_names_the_path_and_the_allowed_patterns():
     assert "specs/003-ventas/spec.md" in err.params["allowed"]
     assert "specs/003-ventas/plan.md" in str(err)
 
+
+def test_a_refused_artifact_says_which_stage_writes_it():
+    """The run stopped («en /speckit-converge solo se agregan tareas… me detengo») because the
+    refusal named the allowed paths and nothing else. It now names the way out."""
+    err = refused(ctx("speckit-converge", files={"specs/003-ventas/tasks.md": "- [X] T001 a"}),
+                  w("reports/ventas/report.yaml"))
+    assert "speckit-implement 003-ventas" in str(err)
+    assert "/fix" in str(err)
+    # A spec document is not an artifact: that refusal keeps its short form.
+    plan = refused(ctx("speckit-tasks"), w("specs/003-ventas/plan.md"))
+    assert "speckit-implement" not in str(plan)
+
 def test_fix_only_edits_existing_artifacts():
     """/fix is the shortcut for small changes: no new artifacts, no new specs."""
     files = {"integrations/ventas/integration.yaml": "x",

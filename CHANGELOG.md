@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Un run deja de quedarse atascado, y el resumen se puede leer (2026-10-26)**: tres runs seguidos
+  del proyecto `coinmarketcap` terminaron igual —«Me detengo y no aplico: … no puedo leer el
+  contenido real de integration.yaml»— con 20 M de tokens y `limit:rounds`. Dos defectos, los dos
+  arreglados:
+  - **`read_draft` devolvía solo un hash al releer un archivo.** El payload que recibe el modelo
+    conserva los datos del *último* intercambio; los resultados anteriores viajan como su resumen de
+    una línea (`history.build`). Así, cuando el modelo volvía a leer `integration.yaml` para corregir
+    un fallo de la vista previa, recibía «sin cambios desde la lectura anterior» y un sha: el
+    contenido ya no estaba en ninguna parte —ni en el resultado nuevo ni en el anterior, ya
+    resumido— y el run se detenía sin poder arreglar nada. Ahora `read_draft` **siempre devuelve el
+    contenido**; el hash queda como información extra («sin cambios desde la lectura anterior (el
+    contenido va incluido)»). La prueba de `test_assistant_commands_resolution.py` reproduce el
+    incidente: sin el arreglo, el payload del modelo no contiene el archivo.
+  - **«Resumen del run» era un solo párrafo**: las decisiones se unían con «; » en una línea (20
+    decisiones, con la misma repetida en dos turnos) y no había forma de leerlas. Ahora va un título
+    y **una decisión por línea**, sin repetidas, cada una recortada a 240 caracteres y las últimas
+    15 como máximo (`_summary_decisions`).
+  - Un rechazo del *guard* por escribir un artefacto desde un comando que no lo escribe
+    (`/speckit-converge`, `/speckit-tasks`…) decía solo las rutas permitidas, así que el modelo se
+    detenía: ahora nombra la salida —«pasa a la etapa que sí lo escribe con `run_command`:
+    `speckit-implement <spec>` (o termina este comando y ejecuta `/fix`)»—.
+
 - **Corrección crítica: aislamiento por proyecto (2026-10-26)**: la página de `artemisa` mostraba un
   problema de `coinmarketcap` (`projects/coinmarketcap/reports/panorama-cripto/report.yaml#/uses ·
   Conjuntos sin unión: altseason`) con su botón «Aplicar arreglo», que respondía
