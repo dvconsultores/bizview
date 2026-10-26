@@ -32,8 +32,10 @@ from app.ai import (
     vision_enabled,
 )
 from app.ai import errors as ai_errors
+from app.ai.history_rules import HistoryInvalid, validate_messages
 from app.assistant import activity, auto, origin, readiness
 from app.assistant import attachments as _attachments
+from app.assistant import history as history_module
 from app.assistant import tools as _tools
 from app.assistant.commands import registry, resolve, runs, scope
 from app.assistant.commands.prompt import context_for, system_for
@@ -868,54 +870,15 @@ def compact_history(messages: list[ChatMessage], summaries: dict[str, str]) -> l
 def _load_history_with_summaries(
     db, session_id: int
 ) -> tuple[list[ChatMessage], dict[str, str]]:
-    rows = list(
-        db.scalars(
-            select(AssistantMessage)
-            .where(AssistantMessage.session_id == session_id)
-            .order_by(AssistantMessage.id.desc())
-            .limit(HISTORY_LIMIT)
-        )
-    )
-    rows = [
-        m for m in rows
-        if not (m.role == "tool" and not (m.tool_payload or {}).get("call_id"))
-    ]
-    rows.reverse()
+    """The replayed conversation and the stored one-line summary of every tool result.
 
-    summaries = {}
-    for m in rows:
-        if m.role == "tool":
-            payload = m.tool_payload or {}
-            summaries[payload.get("call_id")] = m.content
-
-    msgs = [_message_to_chat_message(m) for m in rows]
-    repaired = []
-    i = 0
-    while i < len(msgs):
-        msg = msgs[i]
-        repaired.append(msg)
-        if msg.role == "assistant" and msg.tool_calls:
-            call_ids = {call.id for call in msg.tool_calls}
-            j = i + 1
-            seen = set()
-            while j < len(msgs) and msgs[j].role == "tool":
-                if msgs[j].tool_call_id in call_ids:
-                    seen.add(msgs[j].tool_call_id)
-                repaired.append(msgs[j])
-                j += 1
-            missing = [call.id for call in msg.tool_calls if call.id not in seen]
-            for mid in missing:
-                repaired.append(
-                    ChatMessage(role="tool", content="sin resultado", tool_call_id=mid)
-                )
-            i = j
-        else:
-            i += 1
-
-    first_user = next((i for i, m in enumerate(repaired) if m.role == "user"), None)
-    if first_user is not None:
-        repaired = repaired[first_user:]
-    return compact_history(repaired, summaries), summaries
+    Building is `app.assistant.history`'s job (feature 036): pairing a result with the `tool_use`
+    that asked for it by call id is what keeps a conversation replayable.
+    """
+    rows = history_module.load(db, session_id, window=HISTORY_LIMIT)
+    built = history_module.build(rows)
+    summaries = {row.call_id: row.content for row in rows if row.role == "tool" and row.call_id}
+    return built.messages, summaries
 
 
 def _load_history(db, session_id: int) -> list[ChatMessage]:
@@ -1125,7 +1088,9 @@ MAX_AI_RETRY_WAIT = 60.0
 _RETRY_CODES = frozenset({"rate_limited", "provider_down", "provider_error"})
 # Codes where a second identical request cannot help.
 _NO_RETRY_CODES = frozenset({"refused", "invalid_tool_call", "not_configured", "no_credit",
-                             "bad_key", "model_not_found"})
+                             "bad_key", "model_not_found",
+                             # 036: the same rows would be rejected again: the reader repairs.
+                             "history_invalid"})
 
 
 def _provider_error(exc: AIError, request_id: str) -> dict:
@@ -2029,6 +1994,32 @@ def stop(db, session: AssistantSession, settings, reason: str = "stopped:user"
     return msg
 
 
+def repair_history(db, actor, session: AssistantSession, ip: str | None) -> dict:
+    """Make one stored conversation replayable again (feature 036).
+
+    Pairs every tool result with the assistant turn that asked for it, flags what cannot be paired
+    (a preview notice, a result whose `tool_use` is gone) and answers what changed and whether the
+    conversation can be sent now. The provider is never called: this is bookkeeping, so it works
+    with the AI down (VIII) — which is exactly when somebody notices the problem.
+    """
+    from app.assistant import repair as repair_module
+
+    report = repair_module.repair(db, session.id)
+    db.flush()
+    built = history_module.build(history_module.load(db, session.id, window=None))
+    problems = validate_messages(built.messages)
+    audit_record(
+        db,
+        "assistant_conversation_repaired",
+        actor_id=actor.id,
+        ip=ip,
+        detail={"session": session.id, "paired": report["paired"],
+                "orphans": report["orphans"], "replayable": not problems},
+    )
+    db.flush()
+    return {**report, "replayable": not problems, "problems": problems[:5]}
+
+
 def _command_extra(run) -> str:
     """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023)."""
     if run.command == "ayuda" and run.arguments:
@@ -2180,9 +2171,14 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         if restricted:
             context = f"{context}\n\n{_tools.DISCOVERY_DONE_TEXT}"
         try:
+            # 036: the payload is built and validated in one place before every call.
+            try:
+                built = history_module.for_provider(
+                    history_module.from_chat(history), provider.name, session_id=session.id)
+            except HistoryInvalid as exc:
+                raise AIError("history_invalid", "; ".join(exc.problems)) from None
             reply = provider.chat(
-                _with_images(compact_history(history, summaries),
-                             [] if images_dropped else images),
+                _with_images(built.messages, [] if images_dropped else images),
                 tools=tools,
                 system=(system_for(definition, run.locale, spec=run.spec, stage=stage)
                         if run is not None else system_prefix()),
@@ -2265,8 +2261,9 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                     for c in reply.tool_calls
                 ]
             }
-        new_messages.append(_add(db, session, role="assistant", content=reply.text,
-                                 tool_payload=calls_payload))
+        asked = _add(db, session, role="assistant", content=reply.text,
+                     tool_payload=calls_payload)
+        new_messages.append(asked)
 
         if not reply.tool_calls:
             session.updated_at = datetime.now(UTC)
@@ -2288,6 +2285,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         repeated_name = ""
         repeated_error = ""
         round_touched = []
+        pending_results: list[dict] = []
         for call in reply.tool_calls:
             if call.args_error is not None:
                 round_invalid = True
@@ -2330,18 +2328,15 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
             args_for_payload = compact_args(call.name, call.args)
             tool_result = _json_safe(tool_result)
-            new_messages.append(_add(
-                db,
-                session,
-                role="tool",
-                content=summary,
-                tool_name=call.name,
-                tool_payload={
+            pending_results.append({
+                "content": summary,
+                "tool_name": call.name,
+                "tool_payload": {
                     "call_id": call.id,
                     "args": args_for_payload,
                     "result": tool_result,
                 },
-            ))
+            })
             summaries[call.id] = summary
             turn_summaries.append(summary)
             history.append(
@@ -2353,6 +2348,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 )
             )
 
+        # 036: the results are written once, at the end of the round, so a round that dies
+        # half-way leaves no result behind (and every row names its call and its assistant turn).
+        for fields in pending_results:
+            new_messages.append(_add(db, session, role="tool", **fields))
         _record_recent_files(session, round_touched)
         session.updated_at = datetime.now(UTC)
         _commit_round(db, session, claim)
