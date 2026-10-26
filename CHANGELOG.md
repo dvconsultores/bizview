@@ -8,6 +8,39 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A conversation can be replayed again: no orphan `tool_result` (2026-10-26)**: every message of
+  the `coinmarketcap` conversation answered
+  `400 — unexpected tool_use_id found in tool_result blocks: call_00_g9JN…` while Probar passed and
+  the provider was healthy: the *stored* history was structurally invalid, so the conversation was
+  poisoned for good and «continua» failed exactly like everything else.
+  - The rows show why: `apply_draft`'s own note («Contrato del run autorizado: draft, preview,
+    apply.») was written **between** the assistant's `tool_use` and its result, and the loader paired
+    results with the *immediately following* rows. It therefore invented a «sin resultado» for a call
+    that did have one, and left the real result standing alone after an assistant text — the payload
+    then carried a `tool_result` whose `tool_use` was not in the previous message.
+  - `app/assistant/history.py` is now the only place that turns stored rows into provider messages:
+    it pairs every result with the call that asked for it **by call id**, emits the results of one
+    assistant turn as the single user turn right after it, not too late for a tool's note, drops
+    what cannot be paired and turns an unanswered call into a short text note; the window cuts only
+    at a user-text boundary, and an exchange older than the window travels as its stored summary,
+    never as blocks.
+  - `app/ai/history_rules.py` checks the rules of both providers (Anthropic: alternation, results
+    first in the turn, unique ids; OpenAI-compatible: `tool` right after the assistant whose
+    `tool_calls` name it) before every call — the loop repairs once and, if it is still invalid,
+    fails with the new `history_invalid` code instead of a bare `provider_error`. Both providers
+    assert the body they built, so a converter bug cannot reach the wire either.
+  - Tool rows are written **once, at the end of the round**, and carry `call_id`,
+    `assistant_message_id` and `round` (migration `0029_assistant_history` pairs the existing rows
+    and flags what cannot be paired, logging the count per conversation). A round that fails, is
+    stopped or hits a budget therefore leaves no `tool` row at all.
+  - **Reparar conversación** fixes an already-broken conversation in one click, from the
+    `history_invalid` bubble or the chat header menu (owner or any super user, audited as
+    `assistant_conversation_repaired`); it never calls the provider, so it works with the AI down.
+    The guide's «Chat del agente → Problemas frecuentes» explains it, and says so.
+  - Covered by `backend/tests/test_history_build.py` (the incident's rows, 10 000 generated histories
+    for both providers), `test_history_atomic.py` (a failing and a stopped round leave zero results
+    and the next turn sends) and `test_history_repair.py` (migration helper, endpoint, audit).
+
 - **A failing AI provider says why (2026-10-25)**: the chat answered «El proveedor de IA devolvió un
   error.» and nothing else — no status, no message, not even a line in the log — while the provider
   was rejecting every call (the same session had answered fine two hours earlier). Three changes:

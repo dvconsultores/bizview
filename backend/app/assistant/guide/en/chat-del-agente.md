@@ -32,4 +32,10 @@ Only the **Superuser**, when AI is configured in the installation.
 
 ## Common problems
 
-- **No budget**: the conversation reached its usage limit; continue in a new one.
+- The conversation answers "The stored conversation cannot be sent to the provider again": a tool
+  result is missing the call that asked for it. Press **Repair conversation** in the notice (or in
+  the **More conversation actions** menu of the header): the product pairs the results again and
+  tells you how many it paired and how many it dropped. Nothing you wrote is lost, and the AI is
+  not needed to repair it.
+- If the notice shows up in an old conversation after upgrading, the upgrade already did that
+  repair once; the button is for one specific conversation.

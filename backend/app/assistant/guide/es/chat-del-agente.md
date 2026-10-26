@@ -33,3 +33,11 @@ Solo el **Superusuario**, cuando la IA está configurada en la instalación.
 ## Problemas frecuentes
 
 - **Sin presupuesto**: la conversación llegó a su límite de uso; continúa en una nueva.
+- La conversación responde «La conversación guardada no se puede reenviar al proveedor»: falta
+  emparejar un resultado de herramienta con la llamada que lo pidió. Pulsa
+  **Reparar conversación** en el aviso, o en el menú **Más acciones de la conversación** del
+  encabezado:
+  el producto vuelve a emparejar los resultados y te dice cuántos emparejó y cuántos descartó. No
+  se pierde nada de lo escrito y no hace falta la IA para repararlo.
+- Si el aviso aparece en una conversación antigua después de actualizar, la actualización ya hizo
+  esa reparación una vez; el botón sirve para una conversación concreta.
