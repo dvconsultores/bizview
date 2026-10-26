@@ -780,6 +780,11 @@ class AssistantPreviewRequest(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     session_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"), index=True)
+    # Feature 037: the request carries the project it belongs to, so the worker resolves the folder
+    # from it (and refuses a request whose project and conversation disagree) instead of inferring
+    # the scope from the conversation alone.
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("project.id", ondelete="CASCADE"), index=True)
     requested_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
     requested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())

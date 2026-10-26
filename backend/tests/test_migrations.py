@@ -21,7 +21,8 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "share_link", "email_send", "email_delivery", "email_subscription",
               "direct_read_log", "report_rollup", "project", "project_file_revision",
               "assistant_command_run", "assistant_attachment", "google_link",
-              "assistant_auto_run", "assistant_run_profile"}
+              "assistant_auto_run", "assistant_run_profile", "ai_status",
+              "appearance_settings"}
 
 
 def schema_tables():
@@ -166,8 +167,8 @@ def test_assistant_messages_cascade_with_session(database):
         "VALUES (:s, 'user', 'hola')", s=session_id)
     sql("INSERT INTO assistant_message (session_id, role, content, tool_name, tool_payload) "
         "VALUES (:s, 'tool', 'n=1', 'list_sources', '{\"n\": 1}'::jsonb)", s=session_id)
-    sql("INSERT INTO assistant_preview_request (session_id, requested_by) VALUES (:s, :u)",
-        s=session_id, u=user.id)
+    sql("INSERT INTO assistant_preview_request (session_id, project_id, requested_by) "
+        "VALUES (:s, :p, :u)", s=session_id, p=pid, u=user.id)
 
     with pytest.raises(IntegrityError):
         sql("INSERT INTO assistant_message (session_id, role, content) "

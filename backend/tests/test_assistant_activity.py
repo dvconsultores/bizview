@@ -268,9 +268,11 @@ def test_background_preview(superuser):
     client = signed_in("root@example.com")
     sid = _new_session(client)
 
+    project_id = sql("SELECT project_id FROM assistant_session WHERE id = :i", i=sid)[0][0]
     rows = sql(
-        "INSERT INTO assistant_preview_request (session_id) VALUES (:i) RETURNING id",
-        i=sid,
+        "INSERT INTO assistant_preview_request (session_id, project_id) "
+        "VALUES (:i, :p) RETURNING id",
+        i=sid, p=project_id,
     )
     preview_id = rows[0][0]
 
