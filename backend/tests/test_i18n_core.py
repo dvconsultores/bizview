@@ -145,7 +145,11 @@ def test_ai_error_message_english():
     from app.ai import AIError
 
     with i18n.use_locale("en"):
-        assert AIError("timeout").message == "The AI provider did not respond in time."
+        # 035: timeouts and connection failures are one code now.
+        assert AIError("provider_down").message == (
+            "Could not talk to the AI provider: it does not answer, cannot be reached, "
+            "or returns a server error."
+        )
 
 
 def test_ai_messages_match_catalogue():

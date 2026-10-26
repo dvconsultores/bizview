@@ -11,39 +11,36 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from app.ai.errors import CODES as ERROR_CODES
+from app.ai.errors import MESSAGES as MESSAGES
+from app.ai.errors import action_for, transient
 from app.config import Settings
 from app.i18n import t
 
-ERROR_CODES = ("not_configured", "invalid_key", "forbidden", "model_not_found", "no_credit",
-               "rate_limited", "unreachable", "timeout", "refused", "context_too_long",
-               "provider_error")
-
-MESSAGES = {
-    "not_configured": "La IA no está configurada.",
-    "invalid_key": "La clave de API no es válida.",
-    "forbidden": "La clave de API no tiene permiso para usar este modelo.",
-    "model_not_found": "El modelo configurado no existe o no está disponible.",
-    "no_credit": "La cuenta del proveedor de IA no tiene saldo; recárgala o cambia de clave.",
-    "rate_limited": "El proveedor limitó las solicitudes. Intenta de nuevo en unos minutos.",
-    "unreachable": "No se pudo conectar con el proveedor de IA.",
-    "timeout": "El proveedor de IA no respondió a tiempo.",
-    "refused": "El proveedor rechazó la solicitud.",
-    "context_too_long": "La conversación superó el contexto máximo del modelo.",
-    "provider_error": "El proveedor de IA devolvió un error; revisa la clave, el saldo y "
-                      "el modelo en Administración → IA.",
-}
-
 
 class AIError(Exception):
-    def __init__(self, code: str, detail: str | None = None):
+    """A provider failure with a code from `app.ai.errors` and the provider's own words."""
+
+    def __init__(self, code: str, detail: str | None = None,
+                 retry_after: float | None = None):
         assert code in ERROR_CODES, code
         super().__init__(code)
         self.code = code
-        self.detail = detail  # already redacted; for logs only
+        self.detail = detail            # already redacted; for logs and the admin page
+        self.retry_after = retry_after  # seconds the provider asked for, when it said
 
     @property
     def message(self) -> str:
         return t(f"ai.error.{self.code}")
+
+    @property
+    def action(self) -> str | None:
+        return action_for(self.code)
+
+    @property
+    def transitory(self) -> bool:
+        return transient(self.code)
+
 
 
 @dataclass(frozen=True)

@@ -19,21 +19,15 @@ from app.ai import (
     ToolSpec,
     redact,
 )
+from app.ai.errors import (  # noqa: F401  (re-exported: the Anthropic provider imports them)
+    CONTEXT_MARKERS,
+    MODEL_MARKERS,
+    STATUS_CODES,
+    code_for_body,
+    detail_of,
+)
 from app.config import Settings
 from app.i18n import t
-
-STATUS_CODES = {401: "invalid_key", 402: "no_credit", 403: "forbidden", 404: "model_not_found",
-                429: "rate_limited"}
-# Some providers answer a 400 (not a 404) for a model they do not know; the body is the only clue.
-MODEL_MARKERS = ("model not exist", "model_not_found", "no such model", "unknown model",
-                 "invalid model", "model does not exist")
-CONTEXT_MARKERS = (
-    "maximum context length",
-    "context_length_exceeded",
-    "context length",
-    "too many tokens",
-    "prompt is too long",
-)
 
 
 def _usage(usage_data: dict) -> ChatUsage:
@@ -202,23 +196,21 @@ class OpenAICompatibleProvider:
                 else:
                     r = self._client.post("/chat/completions", json=body)
             except httpx.TimeoutException as e:
-                raise AIError("timeout", self._safe(e)) from None
+                raise AIError("provider_down", self._safe(e)) from None
             except httpx.TransportError as e:
-                raise AIError("unreachable", self._safe(e)) from None
+                raise AIError("provider_down", self._safe(e)) from None
             if r.status_code == 429 and attempt == 1:
                 self._sleep(self._retry_after(r))
                 attempt = 2
                 continue
             if r.status_code >= 400:
-                detail = self._safe(f"HTTP {r.status_code}: {r.text}")
-                if r.status_code == 400 and any(
-                        marker in r.text.lower() for marker in CONTEXT_MARKERS):
-                    raise AIError("context_too_long", detail)
-                if r.status_code == 400 and any(
-                        marker in r.text.lower() for marker in MODEL_MARKERS):
-                    raise AIError("model_not_found", detail)
-                code = STATUS_CODES.get(r.status_code, "provider_error")
-                raise AIError(code, detail)
+                # 400 vs 404 depends on the provider: the body decides between a conversation that
+                # is too long, a model that does not exist, and anything else.
+                code = code_for_body(r.status_code, r.text) if r.status_code < 500 else \
+                    code_for_body(r.status_code, "")
+                raise AIError(code, self._safe(f"HTTP {r.status_code}: {r.text}"),
+                              retry_after=(retry_after_seconds(r.headers)
+                                           if r.status_code == 429 else None))
             try:
                 return r.json()
             except ValueError:
@@ -228,4 +220,20 @@ class OpenAICompatibleProvider:
         return retry_after_seconds(response.headers)
 
     def _safe(self, error: object) -> str:
-        return redact(str(error), self._key)
+        return detail_of(str(error), self._key)
+
+    def list_models(self) -> list[str] | None:
+        """Model ids the endpoint reports, or None when it has no `/models` (common in clones)."""
+        try:
+            r = self._client.get("/models", timeout=10)
+            if r.status_code >= 400:
+                return None
+            data = r.json()
+        except Exception:            # unreachable, no endpoint, unexpected shape: not an error
+            return None
+        rows = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            return None
+        ids = [row.get("id") for row in rows
+               if isinstance(row, dict) and isinstance(row.get("id"), str)]
+        return ids or None

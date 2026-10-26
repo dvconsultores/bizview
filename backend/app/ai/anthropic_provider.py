@@ -14,9 +14,9 @@ from app.ai import (
     ChatUsage,
     ToolCall,
     ToolSpec,
-    redact,
 )
-from app.ai.openai_compatible import CONTEXT_MARKERS, MODEL_MARKERS, retry_after_seconds
+from app.ai.errors import code_for_body, code_for_status, detail_of
+from app.ai.openai_compatible import retry_after_seconds
 from app.config import Settings
 
 # Models that accept server-side refusal fallback ("default" routing, beta 2026-07-01).
@@ -29,15 +29,6 @@ def _tokens(usage, name: str) -> int:
     return getattr(usage, name, 0) or 0
 
 
-
-# Statuses the SDK classes above do not cover. 402 is the balance of an Anthropic-compatible
-# provider (DeepSeek answers it when the account runs out, mid-run).
-STATUS_CODES = {402: "no_credit", 404: "model_not_found", 429: "rate_limited"}
-
-
-def code_for_status(status: int | None) -> str:
-    """A provider's HTTP status as one of our AI error codes."""
-    return STATUS_CODES.get(status, "provider_error")
 
 
 class AnthropicProvider:
@@ -216,30 +207,27 @@ class AnthropicProvider:
                 if manual_retry and attempts == 1:
                     self._sleep(retry_after_seconds(e.response.headers))
                     continue
-                raise AIError("rate_limited", self._safe(e)) from None
+                raise AIError("rate_limited", self._safe(e),
+                              retry_after=retry_after_seconds(e.response.headers)) from None
             except anthropic.AuthenticationError as e:
-                raise AIError("invalid_key", self._safe(e)) from None
+                raise AIError("bad_key", self._safe(e)) from None
             except anthropic.PermissionDeniedError as e:
-                raise AIError("forbidden", self._safe(e)) from None
+                raise AIError("bad_key", self._safe(e)) from None
             except anthropic.NotFoundError as e:
                 raise AIError("model_not_found", self._safe(e)) from None
             except anthropic.BadRequestError as e:
-                detail = self._safe(e)
-                lowered = str(e).lower()
-                if any(marker in lowered for marker in CONTEXT_MARKERS):
-                    raise AIError("context_too_long", detail) from None
-                if any(marker in lowered for marker in MODEL_MARKERS):
-                    raise AIError("model_not_found", detail) from None
-                raise AIError("provider_error", detail) from None
+                # A 400 carries the reason in its body: too long, unknown model, or else.
+                raise AIError(code_for_body(400, str(e)), self._safe(e)) from None
             except anthropic.APITimeoutError as e:  # subclass of APIConnectionError: check first
-                raise AIError("timeout", self._safe(e)) from None
+                raise AIError("provider_down", self._safe(e)) from None
             except anthropic.APIConnectionError as e:
-                raise AIError("unreachable", self._safe(e)) from None
+                raise AIError("provider_down", self._safe(e)) from None
             except anthropic.APIStatusError as e:
                 # The SDK has no class for every status: an exhausted balance is a 402 on the
                 # Anthropic-compatible endpoints (DeepSeek), and it read as an unknown error.
-                raise AIError(code_for_status(getattr(e, "status_code", None)),
-                              self._safe(e)) from None
+                status = getattr(e, "status_code", None)
+                code = code_for_body(status, str(e)) if status == 400 else code_for_status(status)
+                raise AIError(code, self._safe(e)) from None
 
         if response.stop_reason == "refusal":
             category = getattr(getattr(response, "stop_details", None), "category", None)
@@ -258,4 +246,13 @@ class AnthropicProvider:
         return client.messages.create(**params)
 
     def _safe(self, error: Exception) -> str:
-        return redact(f"{type(error).__name__}: {error}", self._key)
+        return detail_of(f"{type(error).__name__}: {error}", self._key)
+
+    def list_models(self) -> list[str] | None:
+        """Model ids the endpoint reports; None when it has no models endpoint."""
+        try:
+            page = self._client.models.list()
+        except Exception:            # a 404 on Anthropic-compatible endpoints is normal
+            return None
+        ids = [row.id for row in getattr(page, "data", []) if getattr(row, "id", None)]
+        return ids or None

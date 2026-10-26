@@ -59,6 +59,7 @@ AUDIT_KINDS = (
     # feature 020
     "project_created", "project_updated", "project_deleted", "project_purged", "project_applied",
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
+    "project_fix_applied",
     # feature 024
     "assistant_attachment_uploaded", "assistant_attachment_deleted",
     # feature 027
@@ -505,6 +506,25 @@ class AppearanceSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+class AIStatus(Base):
+    """The installation's last AI outcome (feature 035): one row, never a key.
+
+    It answers «is the AI working?» (`/api/health`, the Administración page) and lets Auto refuse a
+    run — without calling the provider — while the provider is provably unusable."""
+    __tablename__ = "ai_status"
+    __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(Text)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The provider's own words, redacted and capped: shown to the super user, never in /api/health.
+    last_error_detail: Mapped[str | None] = mapped_column(Text)
+    last_model: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class TelegramLink(Base):

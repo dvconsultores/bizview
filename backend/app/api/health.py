@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.ai import vision_enabled
+from app.ai import state, vision_enabled
 from app.api.appearance import preset_ids
 from app.config import get_settings
 from app.db import get_engine, get_read_sessionmaker
@@ -23,8 +23,24 @@ def health():
         with get_engine().connect() as c:
             c.execute(text("SELECT 1"))
     except Exception:
-        return JSONResponse({"status": "unavailable", **_build()}, status_code=503)
-    return {"status": "ok", **_build()}
+        return JSONResponse({"status": "unavailable", **_build(), "ai": ai_block()},
+                            status_code=503)
+    return {"status": "ok", **_build(), "ai": ai_block()}
+
+
+def ai_block() -> dict:
+    """Whether the AI is configured and how its last call went — never the key, never the text.
+
+    Feature 035: «is the AI working?» must be answerable from outside, and a reader must not have to
+    find the backend container to know. `last_error_detail` stays on the Administración page only.
+    """
+    s = get_settings()
+    status = state.read()
+    return {"configured": bool(s.ai_enabled), "provider": s.ai_provider,
+            "model": s.ai_model_effective,
+            "last_ok_at": status["last_ok_at"],
+            "last_error_code": status["last_error_code"],
+            "last_error_at": status["last_error_at"]}
 
 
 def _build() -> dict:
