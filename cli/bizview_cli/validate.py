@@ -21,7 +21,15 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError, best_match
 from sqlglot import exp
 
-from bizview_cli import __version__, layout, materialize, report_layout, sqlsafety, transform
+from bizview_cli import (
+    __version__,
+    fixops,
+    layout,
+    materialize,
+    report_layout,
+    sqlsafety,
+    transform,
+)
 from bizview_cli.i18n import t
 
 SPEC_FILES = ("spec.md", "plan.md", "tasks.md")
@@ -117,6 +125,11 @@ SCHEMAS = {n: _schema(n) for n in ("integration", "report", "request", "workspac
                                   "project", "distribution")}
 
 
+def problem_id(code: str, file: str | None, path: str | None) -> str:
+    """Stable id of a problem: what the interface posts back and the agent's tool receives."""
+    return f"{code}:{file or ''}:{path or '/'}"
+
+
 @dataclass
 class Issue:
     entry: str
@@ -127,12 +140,15 @@ class Issue:
     path: str | None = None
     expected: dict | None = None
     fix: str | None = None
+    # Machine-applicable half of the correction (feature 035): {"file", "json_path", "op",
+    # "value"} — a JSON Pointer operation on the YAML, so the product can apply it without an AI.
+    fix_data: dict | None = None
 
     def __str__(self) -> str:
         return f"[{self.code}] {self.entry}: {self.message}"
 
     def as_dict(self) -> dict:
-        return {
+        data = {
             "entry": self.entry,
             "code": self.code,
             "message": self.message,
@@ -141,7 +157,11 @@ class Issue:
             "path": self.path,
             "expected": self.expected,
             "fix": self.fix,
+            "fix_data": self.fix_data,
         }
+        if self.fix_data or self.file:
+            data["problem_id"] = problem_id(self.code, self.file, self.path)
+        return data
 
 
 @dataclass
@@ -1240,12 +1260,32 @@ def _check_joined(entry: Entry, a: dict, aliases: dict[str, dict[str, dict]], ry
     if not missing:
         return
     where = "direct.tables" if "direct" in a else "uses"
-    issues.append(Issue(entry.key, "unjoined_sets",
-                        t("validate.unjoined_sets", aliases=", ".join(missing)),
-                        file=ry, path=_pointer(where.split(".")),
-                        expected={"alias": missing[0], "base": base},
-                        fix=t("validate.fix_unjoined_sets",
-                              join=_join_hint(aliases, missing, joined, base))))
+    for alias in missing:
+        pair = _join_pair(aliases, alias, joined)
+        issues.append(Issue(
+            entry.key, "unjoined_sets",
+            t("validate.unjoined_sets", aliases=alias),
+            file=ry, path=_pointer(where.split(".")),
+            expected={"alias": alias, "base": base},
+            fix=t("validate.fix_unjoined_sets", join=_join_hint(aliases, [alias], joined, base)),
+            fix_data=({"file": ry, "json_path": "/joins", "op": "append",
+                       "value": {"left": pair[0], "right": pair[1], "type": "left"}}
+                      if pair else None)))
+
+
+def _join_pair(aliases: dict[str, dict[str, dict]], alias: str,
+               joined: set[str]) -> tuple[str, str] | None:
+    """`(left, right)` for a join, picking a column both aliases have (a date when there is one)."""
+    for other in sorted(joined):
+        shared = [c for c in aliases[alias] if c in aliases.get(other, {})]
+        if not shared:
+            continue
+        dates = [c for c in shared
+                 if aliases[alias][c].get("type") in DATE_TYPES
+                 and aliases[other][c].get("type") in DATE_TYPES]
+        col = sorted(dates or shared)[0]
+        return f"{other}.{col}", f"{alias}.{col}"
+    return None
 
 
 def _join_hint(aliases: dict[str, dict[str, dict]], missing: list[str], joined: set[str],
@@ -1262,6 +1302,85 @@ def _join_hint(aliases: dict[str, dict[str, dict]], missing: list[str], joined: 
             col = sorted(dates or shared)[0]
             return f"joins: [{{left: {other}.{col}, right: {alias}.{col}}}]"
     return f"joins: [{{left: {base}.<columna>, right: {missing[0]}.<columna>}}]"
+
+
+# ---------------------------------------------------------------- correcciones deterministas (035)
+
+VIEW_TYPES = ("kpis", "trend", "ranking", "table")
+_VIEW_SYNONYMS = (
+    (("kpi", "indicador", "indicator", "card", "tarjeta"), "kpis"),
+    (("line", "linear", "area", "chart", "grafico", "gráfico", "evolution", "evolucion",
+      "tendencia", "serie"), "trend"),
+    (("rank", "top", "bar", "barras", "barra", "ordering"), "ranking"),
+    (("table", "tabla", "grid", "rejilla", "list", "lista"), "table"),
+)
+
+
+def _suggest_view_type(value: str) -> str:
+    """The view type a person most likely meant (the schema only accepts four)."""
+    lowered = str(value).lower()
+    for words, kind in _VIEW_SYNONYMS:
+        if any(word in lowered for word in words):
+            return kind
+    return "table"
+
+
+def fixable_rules(kind: str, data: dict, key: str, file: str, issues: list[Issue]) -> None:
+    """Corrections the product can apply on its own, before the schema gate (035 FR-013).
+
+    These run on the raw YAML because a schema failure drops the entry from every later check: a
+    report whose only problem is a missing label still gets the one-click fix, and the schema error
+    disappears by itself on the next validation.
+    """
+    if not isinstance(data, dict):
+        return
+    if kind == "integration":
+        if not isinstance(data.get("schedule"), str) or not data["schedule"].strip():
+            issues.append(Issue(
+                key, "schedule_missing", t("validate.schedule_missing"), file=file,
+                path="/schedule", fix=t("validate.fix_schedule_missing"),
+                fix_data={"file": file, "json_path": "/schedule", "op": "set",
+                          "value": "0 * * * *"}))
+        return
+    if kind != "report":
+        return
+    for group in ("metrics", "dimensions"):
+        block = data.get(group)
+        if not isinstance(block, dict):
+            continue
+        for identifier, item in block.items():
+            if not isinstance(item, dict):
+                continue
+            if item.get("label"):
+                continue          # `label_en` is optional: a Spanish label alone is fine
+            missing = ["label", "label_en"]
+            fixed = dict(item)
+            for name in missing:
+                fixed[name] = fixops.humanise(identifier)
+            issues.append(Issue(
+                f"{key}.{group}.{identifier}", "label_missing",
+                t("validate.label_missing", where=f"{group}.{identifier}",
+                  fields=", ".join(missing)),
+                file=file, path=_pointer([group, identifier]),
+                fix=t("validate.fix_label_missing", label=fixops.humanise(identifier)),
+                fix_data={"file": file, "json_path": _pointer([group, identifier]), "op": "set",
+                          "value": fixed}))
+    for i, view in enumerate(data.get("views") or []):
+        if not isinstance(view, dict):
+            continue
+        type_ = view.get("type")
+        if not isinstance(type_, str) or type_ in VIEW_TYPES:
+            continue
+        suggestion = _suggest_view_type(type_)
+        fixed = dict(view)
+        fixed["type"] = suggestion
+        issues.append(Issue(
+            f"{key}.views.{i}", "view_type_unknown",
+            t("validate.view_type_unknown", view=type_), file=file, path=_pointer(["views", i]),
+            expected={"enum": list(VIEW_TYPES)},
+            fix=t("validate.fix_view_type_unknown", view=suggestion),
+            fix_data={"file": file, "json_path": _pointer(["views", i, "type"]), "op": "set",
+                      "value": suggestion}))
 
 
 def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Issue],
@@ -1304,7 +1423,9 @@ def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Iss
                if date_cols else t("validate.fix_declare_date_in", where=where))
         issues.append(Issue(entry.key, "invalid_reference",
                             t("validate.date_must_be_timestamptz", date=a['date']),
-                            file=ry, path="/date", fix=fix))
+                            file=ry, path="/date", fix=fix,
+                            fix_data=({"file": ry, "json_path": "/date", "op": "set",
+                                       "value": date_cols[0]} if date_cols else None)))
     metrics = a["metrics"]
     sql_metrics = {mid for mid, m in metrics.items() if "sql" in m}
     for mid, m in metrics.items():
@@ -1459,6 +1580,8 @@ def _load_entries(root: Path, kind: str, issues: list[Issue],
                                 t("validate.yaml_contains_invalid_chars", name=f"{kind}.yaml"),
                                 file=file))
             continue
+        if data is not None:
+            fixable_rules(kind, data, key, file, issues)
         if data is None or not _schema_errors(kind, data, key, issues, file=file):
             if invalid is not None:
                 invalid.add(folder.name)

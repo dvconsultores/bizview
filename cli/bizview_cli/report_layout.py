@@ -97,6 +97,17 @@ def check_layout(definition: dict, *, file: str, entry: str = "report") -> list[
     theme = layout.get("theme")
     if isinstance(theme, dict):
         _theme(theme, file, entry, out)
+        if "palette" not in theme:
+            # A theme was started and left without a palette: the installation's applies, so this
+            # is a warning with a one-click pin (035 FR-013). A report with no theme at all says
+            # nothing on purpose and stays quiet.
+            out.append(_issue(
+                entry, "layout_palette_missing",
+                "layout.theme no fija paleta: se usa la de la instalación", file=file,
+                path="/layout/theme/palette", level="warning",
+                fix=f"fija la paleta {PALETTE_PRESETS[0]} en layout.theme.palette",
+                fix_data={"file": file, "json_path": "/layout/theme/palette", "op": "set",
+                          "value": PALETTE_PRESETS[0]}))
     pdf = layout.get("pdf")
     if isinstance(pdf, dict):
         _pdf(pdf, facts, file, entry, out)
@@ -426,7 +437,8 @@ def _only(value: object, path: str, label: str, facts: _Facts, file: str, entry:
     if value is None:
         return
     names = _names(facts.filters)
-    for i, item in enumerate(_as_list(value)):
+    items = _as_list(value)
+    for i, item in enumerate(items):
         if isinstance(item, str) and item in facts.filters:
             continue
         out.append(_issue(
@@ -434,7 +446,10 @@ def _only(value: object, path: str, label: str, facts: _Facts, file: str, entry:
             f"{label}: no existe el filtro '{item}' en only", file=file, path=f"{path}/{i}",
             expected={"enum": list(facts.filters)},
             fix=f"usa un filtro declarado en filters: {names}" if names
-            else "declara el filtro en filters"))
+            else "quita la referencia o declara el filtro en filters",
+            fix_data={"file": file,
+                      "json_path": path if len(items) == 1 else f"{path}/{i}",
+                      "op": "remove", "value": None}))
 
 
 # --------------------------------------------------------------- ids y límites
@@ -608,13 +623,13 @@ def _top_n_suitable(top_n: object, view: dict | None, path: str, label: str, fil
 
 def _issue(entry: str, code: str, message: str, *, file: str, path: str,
            expected: dict | None = None, fix: str | None = None,
-           level: str = "error") -> Issue:
+           level: str = "error", fix_data: dict | None = None) -> Issue:
     """Crea un `validate.Issue`; la importación es diferida porque validate importa este módulo."""
 
     from bizview_cli.validate import Issue
 
     return Issue(entry, code, message, level=level, file=file, path=path, expected=expected,
-                 fix=fix)
+                 fix=fix, fix_data=fix_data)
 
 
 def _ptr(*parts: str | int) -> str:

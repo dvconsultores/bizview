@@ -369,6 +369,24 @@ TOOL_SPECS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "apply_fix",
+        "description": (
+            "Aplica el arreglo determinista que el validador ya calculó para un problema del "
+            "proyecto (los que muestran «Arreglo:» y un id). Úsala en lugar de edit_draft para "
+            "esos problemas: no reescribe el archivo a mano ni gasta tokens en YAML."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "problem_id": {
+                    "type": "string",
+                    "description": "Id del problema tal como aparece en la validación",
+                }
+            },
+            "required": ["problem_id"],
+        },
+    },
+    {
         "name": "run_preview",
         "description": (
             "Ejecuta la vista previa del borrador válido en esquemas temporales (nunca en los "
@@ -531,7 +549,7 @@ DISCOVERY_TOOLS = frozenset(
 )
 RUN_READS_KEY = "run_reads"
 MEMO_TOOLS = frozenset({"describe_source", "profile_source", "get_authoring_guide", "check_query"})
-DRAFT_TOOLS = ("propose_draft", "edit_draft", "read_draft", "update_notes")
+DRAFT_TOOLS = ("propose_draft", "edit_draft", "read_draft", "update_notes", "apply_fix")
 REPEAT_NOTE = (
     "Ya consultaste esto en esta ejecución; usa el resultado anterior y "
     "avanza al borrador."
@@ -947,6 +965,8 @@ def _dispatch(
         return _propose_draft(db, session, args)
     if name == "edit_draft":
         return _edit_draft(db, session, args)
+    if name == "apply_fix":
+        return _guarded(lambda: _apply_fix(db, actor, session, args))
     if name == "read_draft":
         return _read_draft(session, args)
     if name == "update_notes":
@@ -1682,6 +1702,42 @@ def _propose_draft(
         "assistant.summary.proposed_draft", count=len(files)
     )
 
+
+def _apply_fix(db: Session, actor: Any, session: Any,
+               args: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Apply the deterministic correction the validator published for one problem (035 FR-014).
+
+    The agent must use this instead of writing the same YAML by hand: the fix is data the validator
+    produced, so there is nothing to hallucinate and nothing to pay for.
+    """
+    from app.api.appearance import preset_of
+    from app.models import Project
+    from app.projects import fixes as project_fixes
+    from app.projects import service as projects
+
+    problem_id = args.get("problem_id")
+    if not isinstance(problem_id, str) or not problem_id.strip():
+        raise ToolError("Falta problem_id: usa el id que devolvió la validación.")
+    project = db.get(Project, session.project_id) if session.project_id else None
+    if project is None:
+        raise ToolError("Esta conversación no tiene proyecto.")
+    problems = projects.revalidate(db, project)["validation"]
+    match = next((item for item in [*problems.get("errors", []), *problems.get("warnings", [])]
+                  if item.get("problem_id") == problem_id), None)
+    if match is None:
+        raise ToolError(
+            "Ese problema ya no existe (o cambió): vuelve a validar y usa el id actual.")
+    fix = match.get("fix_data")
+    if not isinstance(fix, dict):
+        raise ToolError("Ese problema no tiene un arreglo determinista: corrígelo con edit_draft.")
+    state = project_fixes.apply_fixes(db, actor, project, [{**fix, "problem_id": problem_id}],
+                                      None, installation_palette=preset_of(db))
+    session.refresh()
+    result = state["results"][0] if state.get("results") else {}
+    return ({"applied": {"problem_id": problem_id, "file": fix["file"],
+                         "diff": result.get("diff")},
+             "validation": state.get("validation")},
+            t("assistant.summary.fix_applied", file=fix["file"]))
 
 def _edit_draft(
     db: Session,

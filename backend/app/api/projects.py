@@ -261,6 +261,40 @@ def apply_project(slug: str, request: Request, actor: AppUser = Depends(require_
             "project": projects.detail(db, p, actor)}
 
 
+class FixIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    file: str = Field(min_length=1, max_length=400)
+    json_path: str = Field(min_length=1, max_length=400)
+    op: str = Field(min_length=3, max_length=10)
+    value: object = None
+    base_sha256: str | None = None
+    problem_id: str | None = Field(default=None, max_length=400)
+
+
+class FixesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fixes: list[FixIn] = Field(min_length=1, max_length=50)
+
+
+@router.post("/{slug}/fix")
+def apply_fixes(slug: str, body: FixesIn, request: Request,
+                actor: AppUser = Depends(require_superuser),
+                _: Auth = Depends(recent_reauth), db: Session = DB):
+    """Apply the deterministic corrections validation published (035 FR-011/FR-012).
+
+    Works with the AI off: it never touches the provider. The response carries the applied diffs
+    and the new validation, so the panel updates without a second round trip.
+    """
+    from app.api.appearance import preset_of
+    from app.projects import fixes as project_fixes
+
+    p = projects.get(db, slug)
+    db.commit()                                     # apply_ops writes in its own transaction
+    return project_fixes.apply_fixes(db, actor, p, [f.model_dump() for f in body.fixes],
+                                     client_ip(request),
+                                     installation_palette=preset_of(db))
+
+
 @router.delete("/{slug}", status_code=204)
 def delete_project(slug: str, request: Request, actor: AppUser = Depends(require_superuser),
                    _: Auth = Depends(recent_reauth), db: Session = DB):

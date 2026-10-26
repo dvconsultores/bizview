@@ -121,6 +121,79 @@ def test_a_joined_report_has_no_unjoined_sets(ws):
     assert "unjoined_sets" not in codes(ws)
 
 
+def test_the_join_problem_carries_an_appendable_fix(ws):
+    """035: the fix the reader sees is the fix the product applies."""
+    path = ws / "reports/resumen/report.yaml"
+    path.write_text(path.read_text().replace(
+        "joins: [{left: lines.product_code, right: products.product_code}]\n", ""))
+    issue = next(i for i in validate(ws).issues if i.code == "unjoined_sets")
+    assert issue.fix_data == {"file": "reports/resumen/report.yaml", "json_path": "/joins",
+                              "op": "append",
+                              "value": {"left": "lines.product_code",
+                                        "right": "products.product_code", "type": "left"}}
+    assert issue.as_dict()["problem_id"].startswith("unjoined_sets:reports/resumen/report.yaml:")
+
+
+def test_the_date_problem_sets_a_date_column(ws):
+    path = ws / "reports/resumen/report.yaml"
+    path.write_text(path.read_text().replace("date: lines.local_date",
+                                            "date: lines.document_id"))
+    issue = next(i for i in validate(ws).issues if i.code == "invalid_reference"
+                 and i.path == "/date")
+    assert issue.fix_data["op"] == "set" and issue.fix_data["json_path"] == "/date"
+    assert issue.fix_data["value"] == "lines.local_date"
+
+
+def test_a_metric_without_label_gets_a_one_click_fix(ws):
+    path = ws / "reports/resumen/report.yaml"
+    document = yaml.safe_load(path.read_text())
+    document["metrics"]["orders"].pop("label")
+    path.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+    issue = next(i for i in validate(ws).issues if i.code == "label_missing")
+    assert issue.fix_data["json_path"] == "/metrics/orders"
+    assert issue.fix_data["value"]["label"] == "Orders"
+    assert issue.fix_data["value"]["label_en"] == "Orders"
+    assert issue.fix_data["value"]["sql"] == document["metrics"]["orders"]["sql"]
+
+
+def test_an_unknown_view_type_suggests_the_nearest_one(ws):
+    path = ws / "reports/resumen/report.yaml"
+    document = yaml.safe_load(path.read_text())
+    document["views"][1]["type"] = "line"
+    path.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+    issue = next(i for i in validate(ws).issues if i.code == "view_type_unknown")
+    assert issue.fix_data == {"file": "reports/resumen/report.yaml",
+                              "json_path": "/views/1/type", "op": "set", "value": "trend"}
+
+
+def test_an_integration_without_schedule_gets_the_default(ws):
+    path = ws / "integrations/ventas/integration.yaml"
+    document = yaml.safe_load(path.read_text())
+    document.pop("schedule")
+    path.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+    issue = next(i for i in validate(ws).issues if i.code == "schedule_missing")
+    assert issue.fix_data == {"file": "integrations/ventas/integration.yaml",
+                              "json_path": "/schedule", "op": "set", "value": "0 * * * *"}
+
+
+def test_fixops_apply_the_operations_the_validator_publishes():
+    from bizview_cli.fixops import FixError, apply_fix
+
+    doc = {"views": [{"type": "kpis"}], "metrics": {"a": {"sql": "sum(x)"}}}
+    apply_fix(doc, "/joins", "append", {"left": "a.b", "right": "c.b"})
+    apply_fix(doc, "/joins", "append", {"left": "a.d", "right": "e.d"})
+    apply_fix(doc, "/views", "insert", {"index": 0, "value": {"type": "table"}})
+    apply_fix(doc, "/views/1", "remove", None)
+    apply_fix(doc, "/metrics/a", "set", {"sql": "sum(x)", "label": "A", "label_en": "A"})
+    assert doc == {"joins": [{"left": "a.b", "right": "c.b"}, {"left": "a.d", "right": "e.d"}],
+                   "views": [{"type": "table"}],
+                   "metrics": {"a": {"sql": "sum(x)", "label": "A", "label_en": "A"}}}
+    for bad in (("/nope/deep", "set", 1), ("/views/9", "remove", None),
+                ("/metrics/a/sql/inner", "set", 1)):
+        with pytest.raises(FixError):
+            apply_fix(dict(doc), *bad)
+
+
 def test_schema_errors_and_id_mismatch(ws):
     path = ws / "reports/resumen/report.yaml"
     path.write_text(path.read_text().replace("id: resumen", "id: otro"))
@@ -561,8 +634,9 @@ def test_pdf_layout_schema(
 def test_issue_as_dict(ws: Path) -> None:
     _edit(ws, "reports/resumen/report.yaml", "date: lines.local_date", "date: lines.document_id")
     issue = next(i for i in validate(ws).issues if i.code == "invalid_reference")
-    assert set(issue.as_dict()) == {"entry", "code", "message", "level", "file", "path",
-                                   "expected", "fix"}
+    data = issue.as_dict()
+    assert set(data) == {"entry", "code", "message", "level", "file", "path", "expected", "fix",
+                         "fix_data", "problem_id"}
 
 
 def test_report_accepts_optional_english_texts(ws):

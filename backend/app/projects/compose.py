@@ -167,6 +167,23 @@ def _fingerprint(files: dict[str, tuple[int, str]]) -> str:
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
+
+def _project_fix(fix: dict | None, problem: dict, prefix: str,
+                 file: str) -> tuple[dict | None, str | None]:
+    """The fix and the problem id with a project-relative path (035).
+
+    The validator composes the tree, so it names files `projects/<slug>/…`; the interface and the
+    fix endpoint speak project-relative paths. Keeping the composed path made every fix refuse
+    itself with «el archivo no existe».
+    """
+    from bizview_cli.validate import problem_id
+
+    if isinstance(fix, dict) and isinstance(fix.get("file"), str):
+        fix = {**fix, "file": fix["file"][len(prefix):]
+               if fix["file"].startswith(prefix) else fix["file"]}
+    relative = file[len(prefix):] if file.startswith(prefix) else (file or None)
+    return fix, problem_id(str(problem.get("code") or ""), relative, problem.get("path"))
+
 def validate_project(db, project) -> dict:
     """Validate the project composed with the other applied projects (plan section 7)."""
     import tempfile
@@ -207,6 +224,7 @@ def validate_project(db, project) -> dict:
             p["project"] = file.split("/")[1]
         else:
             p["project"] = None
+        p["fix_data"], p["problem_id"] = _project_fix(p.get("fix_data"), p, prefix, file)
         (errors if level == "error" else warnings).append(p)
     for rid, report in result.reports.items():
         if len(rid) > MAX_DASHBOARD_CODE and report.project == project.slug:
