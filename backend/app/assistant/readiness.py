@@ -357,6 +357,14 @@ def compute(session, user_texts: list[str] | None = None) -> dict:
         return {"ready": False, "pending": [{"code": "draft", "file": None,
                                               "message": t("readiness.no_draft")}]}
     valid = (session.validation or {}).get("valid") is True
+    # Feature 037: the composition (this project + the applied snapshot of the others) must also be
+    # valid; a project that is itself fine is blocked by the ones it shares the workspace with, and
+    # the pending entry names them instead of hiding the problem or blaming this project.
+    validation = session.validation or {}
+    composed = validation.get("composed_valid", valid) is True
+    blockers = sorted(slug for slug, counts in (validation.get("other_projects") or {}).items()
+                      if (counts or {}).get("errors"))
+    workspace_errors = int(validation.get("workspace_errors") or 0)
 
     personal_by_src: dict[str, dict[str, str]] = {}
     for src, flags in ((session.working_state or {}).get("personal") or {}).items():
@@ -501,5 +509,16 @@ def compute(session, user_texts: list[str] | None = None) -> dict:
             "message": t("readiness.preview_needed"),
         })
 
-    ready = valid and not pending
+    if valid and blockers:
+        pending.append({
+            "code": "other_projects", "file": None,
+            "message": t("projects.other_projects_block", projects=", ".join(blockers)),
+        })
+    if valid and workspace_errors:
+        pending.append({
+            "code": "workspace", "file": None,
+            "message": t("projects.workspace_block", count=workspace_errors),
+        })
+
+    ready = valid and composed and not pending
     return {"ready": ready, "pending": pending}

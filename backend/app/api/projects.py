@@ -21,12 +21,14 @@ from app.projects import service as projects
 
 router = APIRouter(prefix="/api/projects")
 
-CLIENT_ERRORS = ("path_not_allowed", "path_unsafe", "too_large", "not_text", "project_too_large",
-                 "spec_number", "file_changed")
+CLIENT_ERRORS = ("path_not_allowed", "path_unsafe", "path_outside_project", "too_large",
+                 "not_text", "project_too_large", "spec_number", "file_changed")
 
 
 def path_error(e: fs.ProjectPathError) -> ApiError:
     """HTTP error for a project file error (422 for bad input, 409 for conflicts, else 503)."""
+    if e.code == "project_not_found":
+        return ApiError(404, "not_found", e.message)
     status = 409 if e.code == "file_changed" else 422 if e.code in CLIENT_ERRORS else 503
     return ApiError(status, e.code, e.message, extra={"current": getattr(e, "current", None)}
                     if e.code == "file_changed" else None)
@@ -240,10 +242,17 @@ def validate(slug: str, actor: AppUser = Depends(require_superuser), db: Session
 
 
 def _conversation(db: Session, p: Project, actor: AppUser):
-    """The project's latest conversation (preview requests run in one); created if none."""
+    """The caller's latest conversation of the project (preview requests run in one).
+
+    Feature 037: filtered by the caller, not only by project. Taking any user's newest conversation
+    wrote the request, its outcome message and the project's `preview` into a conversation the
+    caller was not looking at, so the result appeared in somebody else's chat.
+    """
     from app.assistant import service as assistant
 
-    session = db.scalars(select(AssistantSession).where(AssistantSession.project_id == p.id)
+    session = db.scalars(select(AssistantSession)
+                         .where(AssistantSession.project_id == p.id,
+                                AssistantSession.created_by == actor.id)
                          .order_by(AssistantSession.updated_at.desc()).limit(1)).first()
     return session or assistant.create_session(db, actor, project_id=p.id)
 

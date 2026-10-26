@@ -4,6 +4,7 @@ Applying composes the project with the other applied projects of the active vers
 validates and locks the tree and activates it through `workspace.service.apply_tree`, which
 stores the owners (`workspace_version.projects`) and syncs the owned subscriptions.
 """
+import logging
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,8 @@ from app.errors import ApiError
 from app.i18n import M
 from app.models import AssistantSession, Project
 from app.services.audit import record as audit_record
+
+log = logging.getLogger(__name__)
 
 
 def _detached(project_id: int) -> Project | None:
@@ -106,6 +109,13 @@ def apply_project(db, actor, project: Project, ip, *, session=None):
 
     if project.deleted_at is not None:
         raise ApiError(404, "not_found", M("projects.not_found"))
+    folder = fs.project_folder(project.id, db=db)
+    log.info("apply: project %s (id %s), root %s", project.slug, project.id, folder)
+    if not folder.is_dir():
+        # Applying a project whose folder is not there would compose a version *without* its files,
+        # which is data loss, not an apply (feature 037).
+        raise ApiError(409, "project_folder_missing",
+                       M("projects.folder_missing", slug=project.slug, path=str(folder)))
     owner_session = real(session) if session is not None else None
     _ensure_idle(db, project, getattr(owner_session, "id", None))
     view = _view(db, project, session)

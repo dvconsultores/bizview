@@ -1,5 +1,6 @@
 """Project trees from applied workspace versions (feature 020, research R3/R10)."""
 
+import logging
 import re
 from pathlib import Path
 
@@ -7,6 +8,8 @@ import yaml
 
 KIND_LINE = {"integration": "integracion", "report": "reporte"}
 _KIND_V2 = re.compile(r"^\s*[-*]?\s*\*\*(?:Tipo|Type)\*\*:", re.M)
+
+log = logging.getLogger(__name__)
 
 
 def _dump(definition: dict) -> str:
@@ -185,7 +188,13 @@ def _project_fix(fix: dict | None, problem: dict, prefix: str,
     return fix, problem_id(str(problem.get("code") or ""), relative, problem.get("path"))
 
 def validate_project(db, project) -> dict:
-    """Validate the project composed with the other applied projects (plan section 7)."""
+    """Validate the project composed with the other applied projects (plan section 7).
+
+    Feature 037: the composition is still what gets validated — a duplicate id or a reference into
+    another project is real — but a project only *publishes* the findings about its own files. The
+    others are counted (`other_projects`) and the workspace-level ones (`bizview.yaml`) too, so the
+    page, the panel, the chat and «Aplicar arreglo» never speak of a file this project cannot write.
+    """
     import tempfile
 
     from bizview_cli import validate as wsv
@@ -199,8 +208,16 @@ def validate_project(db, project) -> dict:
     from app.workspace.service import MAX_DASHBOARD_CODE
 
     active = workspace_service.active(db)
-    errors: list[dict] = []
-    warnings: list[dict] = []
+    own_errors: list[dict] = []
+    own_warnings: list[dict] = []
+    foreign: dict[str, dict[str, int]] = {}
+    workspace = {"errors": 0, "warnings": 0}
+    try:
+        own_root = fs.project_root(project.slug)
+    except Exception:                                  # an unsafe slug is reported, not logged
+        own_root = None
+    log.info("validating project %s (id %s, root %s, base version %s)", project.slug, project.id,
+             own_root, active.id if active else None)
     with tempfile.TemporaryDirectory() as tmp:
         root = compose(db, include=project, dest=Path(tmp))
         names = {n.lower() for n in db.scalars(select(DataSource.name))}
@@ -209,6 +226,7 @@ def validate_project(db, project) -> dict:
     for issue in result.issues:
         p = issue.as_dict()
         level = p.pop("level", "error")
+        bucket = "errors" if level == "error" else "warnings"
         file = p.get("file") or ""
         p["line"] = None
         if file.startswith(prefix):
@@ -220,28 +238,34 @@ def validate_project(db, project) -> dict:
                 text = None
             p["line"] = positions.problem_line({**p, "file": rel}, text)
             p["project"] = project.slug
+            p["fix_data"], p["problem_id"] = _project_fix(p.get("fix_data"), p, prefix, file)
+            (own_errors if level == "error" else own_warnings).append(p)
         elif file.startswith("projects/"):
-            p["project"] = file.split("/")[1]
+            slug = file.split("/")[1]
+            foreign.setdefault(slug, {"errors": 0, "warnings": 0})[bucket] += 1
         else:
-            p["project"] = None
-        p["fix_data"], p["problem_id"] = _project_fix(p.get("fix_data"), p, prefix, file)
-        (errors if level == "error" else warnings).append(p)
+            workspace[bucket] += 1
     for rid, report in result.reports.items():
         if len(rid) > MAX_DASHBOARD_CODE and report.project == project.slug:
-            errors.append({
+            own_errors.append({
                 "entry": f"reports/{rid}", "code": "invalid_report_id",
                 "message": t("tree.report_id_max_length", max=MAX_DASHBOARD_CODE),
                 "file": f"reports/{rid}/report.yaml", "path": "/id", "expected": None,
                 "fix": t("tree.report_id_max_length_fix", max=MAX_DASHBOARD_CODE),
                 "line": 1, "project": project.slug,
             })
-    warnings += _subscription_cap_warnings(db, project, result)
+    own_warnings += _subscription_cap_warnings(db, project, result)
     files, _ = fs.list_files(project.slug)
+    composed_errors = (len(own_errors) + workspace["errors"]
+                       + sum(item["errors"] for item in foreign.values()))
     return {
-        "valid": not errors, "errors": errors, "warnings": warnings,
+        "valid": not own_errors, "errors": own_errors, "warnings": own_warnings,
+        "composed_valid": composed_errors == 0,
+        "other_projects": dict(sorted(foreign.items())),
+        "workspace_errors": workspace["errors"], "workspace_warnings": workspace["warnings"],
         "base_version": active.id if active else None,
         "fingerprint": _fingerprint(files),
-        "project_ok": not any(e.get("project") == project.slug for e in errors),
+        "project_ok": not own_errors,
     }
 
 

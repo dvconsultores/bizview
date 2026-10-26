@@ -6,6 +6,7 @@ import re
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -213,7 +214,25 @@ def _view(db, session):
 
     if isinstance(session, WorkView) or not getattr(session, "project_id", None):
         return session
-    return for_session(db, session)
+    view = for_session(db, session)
+    if view.project is None:
+        # Feature 037: a conversation whose project row is gone has no folder to read; saying so is
+        # better than previewing "nothing" (that is what «no ve ningún archivo» looked like).
+        raise ApiError(404, "not_found", M("preview.project_gone", slug=str(session.project_id)))
+    return view
+
+
+def project_scope(session) -> tuple[str | None, Path | None]:
+    """Slug and folder of the project a preview runs for (feature 037, logged on every run)."""
+    from app.projects import fs
+
+    slug = getattr(getattr(session, "project", None), "slug", None)
+    if not slug:
+        return None, None
+    try:
+        return slug, fs.project_root(slug)
+    except fs.ProjectPathError:
+        return slug, None
 
 
 def _schemas_of(session) -> int:
@@ -329,6 +348,14 @@ def run_draft_preview(db, session, *, time_limit_s: int = 300,
         drop_for_session(previous)
     if files is None:
         files = (session.draft or {}).get("files", {})
+    slug, root = project_scope(session)
+    empty_message = t("preview.empty_draft", slug=slug or "?", root=root or "?")
+    # Feature 037: the resolved folder is logged at the start, so a wrong scope and a missing
+    # volume are told apart from the log without guessing (reported 2026-10-26).
+    log.info("preview: session %s, project %s, root %s, files %s", session.id, slug, root,
+             len(files))
+    if slug and (root is None or not root.is_dir()):
+        log.warning("preview: project folder %s of %s is missing", root, slug)
     integrations, draft_reports = draft_items(files, active_integrations(db))
     fp = readiness.fingerprint(files)
     if integrations:
@@ -356,14 +383,13 @@ def run_draft_preview(db, session, *, time_limit_s: int = 300,
         and isinstance(item["definition"].get("direct"), dict)
     }
     outcomes = [*results.values(), *direct_results.values()]
-    empty_draft = ""
-    if not files:
+    failed_for_no_files = not files
+    if failed_for_no_files:
         # An empty draft is not a successful preview: recording one here (the worker without the
         # projects volume saw no files) left the project saying "el borrador cambió desde la última
         # vista previa" forever, with Apply disabled and no explanation.
         status = "failed"
         outcomes = []
-        empty_draft = t("preview.empty_draft")
     else:
         status = ("succeeded" if all(r["status"] == "succeeded" for r in outcomes)
                   else "failed")
@@ -372,8 +398,8 @@ def run_draft_preview(db, session, *, time_limit_s: int = 300,
                        "integrations": results, "preview_integrations": sorted(results),
                        "reports": direct_results, "fingerprint": fp,
                        "session_id": session.id}
-    if empty_draft:
-        session.preview["message"] = empty_draft
+    if failed_for_no_files:
+        session.preview["message"] = empty_message
     record_outcome(db, session)
     return session.preview
 
@@ -393,7 +419,8 @@ def request_preview(db, actor, session) -> dict:
         except PreviewBusy:
             raise ApiError(409, "preview_running", M("preview.busy")) from None
     # The draft travels with the request: the worker may not share this process's projects folder.
-    db.add(AssistantPreviewRequest(session_id=session.id, requested_by=actor.id,
+    db.add(AssistantPreviewRequest(session_id=session.id, project_id=session.project.id,
+                                   requested_by=actor.id,
                                    files=dict(session.draft["files"])))
     preview = {"status": "pending", "requested_at": _iso(datetime.now(UTC)),
                "session_id": session.id}
@@ -406,14 +433,20 @@ def _fail_request(db, request_id: int, message: str) -> None:
     req = db.get(AssistantPreviewRequest, request_id)
     if req is None:
         return
+    now = datetime.now(UTC)
+    req.finished_at = now
     session = db.get(AssistantSession, req.session_id)
     if session is None:
+        db.commit()
         return
-    session = _view(db, session)
-    now = datetime.now(UTC)
+    try:
+        session = _view(db, session)
+    except ApiError:
+        # The project is gone: nowhere to publish the outcome, but the work order is finished.
+        db.commit()
+        return
     session.preview = {"status": "failed", "finished_at": _iso(now), "message": message,
                        "session_id": session.id}
-    req.finished_at = now
     record_outcome(db, session)
     db.commit()
 
@@ -436,7 +469,11 @@ def _owner_locale(db, request_id: int) -> str:
 
 
 def process_request(request_id: int) -> None:
-    """Worker thread: run every draft integration into the session's preview schemas."""
+    """Worker thread: run every draft integration into the session's preview schemas.
+
+    Feature 037: the request names its project; the worker checks it against the conversation and
+    resolves the folder from it, logging the root it is about to read.
+    """
     with get_sessionmaker()() as db:
         with use_locale(_owner_locale(db, request_id)):
             try:
@@ -445,7 +482,28 @@ def process_request(request_id: int) -> None:
                     return
                 session = db.get(AssistantSession, req.session_id)
                 if session is None:
+                    _fail_request(db, request_id, t("preview.run_failed"))
                     return
+                project = db.get(Project, req.project_id)
+                expected = db.get(Project, session.project_id) if session.project_id else None
+                if project is None or project.deleted_at is not None:
+                    _fail_request(db, request_id,
+                                  t("preview.project_gone", slug=str(req.project_id)))
+                    return
+                if expected is None or expected.id != project.id:
+                    log.warning("preview %s: request project %s, conversation project %s",
+                                request_id, project.slug,
+                                expected.slug if expected is not None else None)
+                    _fail_request(db, request_id,
+                                  t("preview.project_mismatch", sent=project.slug,
+                                    expected=expected.slug if expected is not None else "?"))
+                    return
+                from app.projects import fs
+
+                root = fs.project_root(project.slug)
+                log.info("preview %s: project %s (id %s), root %s, carried %s files",
+                         request_id, project.slug, project.id, root,
+                         len(req.files or {}))
                 carried = req.files if isinstance(req.files, dict) and req.files else None
                 run_draft_preview(db, session, files=carried)
                 req.finished_at = datetime.now(UTC)
