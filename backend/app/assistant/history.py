@@ -144,9 +144,36 @@ def window_start(rows: Sequence[StoredMessage], window: int | None = None) -> in
     return 0
 
 
+def compact_args(name: str, args: dict) -> dict:
+    if name == "propose_draft":
+        files = args.get("files")
+        return {
+            "files": sorted(files) if isinstance(files, dict) else files,
+            "summary": args.get("summary"),
+        }
+    if name == "edit_draft":
+        ops = args.get("ops")
+        return {
+            "ops": [
+                {"op": o.get("op"), "path": o.get("path")}
+                for o in ops
+                if isinstance(o, dict)
+            ]
+            if isinstance(ops, list)
+            else [],
+            "summary": args.get("summary"),
+        }
+    return dict(args)
+
+
 def build(rows: Sequence[StoredMessage], *, window: int | None = None,
-          repair: bool = False) -> Built:
-    """Rows → provider-ready messages. `repair=True` also drops what the rules forbid."""
+          repair: bool = False, summaries: dict[str, str] | None = None) -> Built:
+    """Rows → provider-ready messages. `repair=True` also drops what the rules forbid.
+
+    `summaries` (call id → one line) is what an older exchange keeps when it is replayed from the
+    turn's own history, which carries the data block but not the stored summary.
+    """
+    summaries = summaries or {}
     kept = list(rows)
     kept = kept[window_start(kept, window):]
     kept = _trim_leading(kept)
@@ -189,6 +216,10 @@ def build(rows: Sequence[StoredMessage], *, window: int | None = None,
             notes: list[str] = []
             answered = {result.call_id for result in results.get(row.id, [])}
             for call in row.calls:
+                if row.id != newest:
+                    # An older exchange keeps its ids but not its payload: the arguments of a
+                    # draft are worth one line, not a whole file tree (015 FR-012/013).
+                    call = dataclasses.replace(call, args=compact_args(call.name, call.args))
                 if call.id in emitted:
                     # Same id asked twice: the provider sees one block, so one of them must go.
                     built.dropped.append(f"duplicate:{call.id}")
@@ -209,7 +240,11 @@ def build(rows: Sequence[StoredMessage], *, window: int | None = None,
             for result in results.get(row.id, []):
                 # The newest exchange carries the data the model is working with; older ones
                 # carry their stored one-line summary (the same rows, nothing re-fetched).
-                text = result.data or result.content if row.id == newest else result.content
+                if row.id == newest:
+                    text = result.data or result.content
+                else:
+                    text = (summaries.get(result.call_id or "") or result.content
+                            or result.data)
                 out.append(ChatMessage(role="tool", content=text or result.data,
                                        tool_call_id=result.call_id))
         # a tool row is emitted with its owner; anything left over was dropped above
@@ -224,9 +259,10 @@ def build(rows: Sequence[StoredMessage], *, window: int | None = None,
 def for_provider(rows: Sequence[StoredMessage], provider: str, *,
                  window: int | None = None,
                  session_id: int | None = None,
+                 summaries: dict[str, str] | None = None,
                  repair: bool = True) -> Built:
     """Build, validate, and repair once. Raises `HistoryInvalid` when it still cannot be sent."""
-    built = build(rows, window=window)
+    built = build(rows, window=window, summaries=summaries)
     problems = validate_messages(built.messages, provider)
     if not problems:
         _log_if_dirty(built, session_id)
@@ -235,7 +271,7 @@ def for_provider(rows: Sequence[StoredMessage], provider: str, *,
                 session_id if session_id is not None else "-", provider, "; ".join(problems))
     if not repair:
         raise HistoryInvalid(problems)
-    built = build(rows, window=window, repair=True)
+    built = build(rows, window=window, repair=True, summaries=summaries)
     problems = validate_messages(built.messages, provider)
     if problems:
         raise HistoryInvalid(problems)

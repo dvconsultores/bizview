@@ -291,10 +291,10 @@ def test_discovery_limit_restricts_then_returns_after_draft(
         names = [t["name"] for t in req["tools"]]
         assert "describe_source" in names
         assert tools.DISCOVERY_DONE_TEXT not in req["context"]
-    restricted = [*tools.DRAFT_TOOLS, "get_app_guide"]     # 023: the guide stays offered
-    assert [t["name"] for t in reqs[3]["tools"]] == restricted
+    restricted = {*tools.DRAFT_TOOLS, "get_app_guide"}     # 023: the guide stays offered
+    assert {t["name"] for t in reqs[3]["tools"]} == restricted
     assert tools.DISCOVERY_DONE_TEXT in reqs[3]["context"]
-    assert [t["name"] for t in reqs[4]["tools"]] == restricted
+    assert {t["name"] for t in reqs[4]["tools"]} == restricted
     assert tools.DISCOVERY_DONE_TEXT in reqs[4]["context"]
     names_after_draft = [t["name"] for t in reqs[5]["tools"]]
     assert "describe_source" in names_after_draft

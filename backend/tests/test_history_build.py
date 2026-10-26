@@ -166,6 +166,24 @@ def test_an_older_exchange_travels_as_its_stored_summary():
     assert by_id["c2"] == DATA                           # the newest exchange keeps the data
 
 
+def test_an_older_in_memory_exchange_replays_its_stored_summary():
+    """The turn's own history carries the data block, not the stored summary: 015 needs both."""
+    rows = history.from_chat([
+        ChatMessage("user", "propon"),
+        ChatMessage("assistant", "", tool_calls=(ToolCall("c1", "propose_draft",
+                                                          {"files": {"a": "x"}, "summary": "s"}),)),
+        ChatMessage("tool", DATA, tool_call_id="c1"),
+        ChatMessage("assistant", "", tool_calls=(ToolCall("c2", "list_sources", {}),)),
+        ChatMessage("tool", "<datos>x</datos>", tool_call_id="c2"),
+    ])
+    built = history.build(rows, summaries={"c1": "Propuso un borrador."})
+    contents = {m.tool_call_id: m.content for m in built.messages if m.role == "tool"}
+    assert contents["c1"] == "Propuso un borrador."      # older: one line
+    assert contents["c2"] == "<datos>x</datos>"          # newest: what it is working with
+    older = next(m for m in built.messages if m.role == "assistant" and m.tool_calls)
+    assert older.tool_calls[0].args == {"files": ["a"], "summary": "s"}   # args compacted
+
+
 def test_a_window_without_a_user_message_keeps_the_whole_turn():
     rows = [row(1, "assistant", "", calls=(call("c1"),)),
             row(2, "tool", "ok", call_id="c1", owner_id=1, data=DATA)]

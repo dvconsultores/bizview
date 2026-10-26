@@ -39,6 +39,7 @@ from app.assistant import history as history_module
 from app.assistant import tools as _tools
 from app.assistant.commands import registry, resolve, runs, scope
 from app.assistant.commands.prompt import context_for, system_for
+from app.assistant.history import compact_args
 from app.assistant.personal import query_tables
 from app.assistant.tools import ToolError, _bump, run_tool
 from app.config import get_settings
@@ -792,28 +793,6 @@ def _context(session: AssistantSession, settings, user_texts: list[str] | None =
     """Dynamic per-round tail sent after the history, kept out of system so the prompt
     prefix stays cacheable."""
     return state_text(session, settings, user_texts).lstrip("\n")
-
-
-def compact_args(name: str, args: dict) -> dict:
-    if name == "propose_draft":
-        files = args.get("files")
-        return {
-            "files": sorted(files) if isinstance(files, dict) else files,
-            "summary": args.get("summary"),
-        }
-    if name == "edit_draft":
-        ops = args.get("ops")
-        return {
-            "ops": [
-                {"op": o.get("op"), "path": o.get("path")}
-                for o in ops
-                if isinstance(o, dict)
-            ]
-            if isinstance(ops, list)
-            else [],
-            "summary": args.get("summary"),
-        }
-    return dict(args)
 
 
 def _message_to_chat_message(msg: AssistantMessage) -> ChatMessage:
@@ -2174,7 +2153,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             # 036: the payload is built and validated in one place before every call.
             try:
                 built = history_module.for_provider(
-                    history_module.from_chat(history), provider.name, session_id=session.id)
+                    history_module.from_chat(history), provider.name, session_id=session.id,
+                    summaries=summaries)
             except HistoryInvalid as exc:
                 raise AIError("history_invalid", "; ".join(exc.problems)) from None
             reply = provider.chat(
