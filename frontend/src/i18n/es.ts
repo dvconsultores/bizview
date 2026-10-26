@@ -1116,6 +1116,7 @@ export const es = {
     overwrite: "Sobrescribir",
     discardMine: "Descartar mis cambios",
     problemsPanel: "Problemas",
+    problemsOf: (slug: string) => `Problemas del proyecto ${slug}`,
     problemsCount: (n: number) => (n === 1 ? "1 problema" : `${n} problemas`),
     warningsCount: (n: number) => (n === 1 ? "1 advertencia" : `${n} advertencias`),
     recheck: "Volver a comprobar",
@@ -1129,7 +1130,7 @@ export const es = {
     dismissedCount: (n: number) => (n === 1 ? "1 descartado" : `${n} descartados`),
     showDismissed: "Mostrar",
 
-    otherProject: (slug: string) => `del proyecto ${slug}`,
+    blockedByOthers: (projects: string) => `El espacio tiene problemas en otros proyectos (${projects}); no se corrigen desde aquí.`,
     fix: "Cómo corregir",
     expected: "Esperado",
     line: (n: number) => `línea ${n}`,

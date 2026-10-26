@@ -1246,6 +1246,11 @@ export interface ProjectValidation {
   base_version?: number | null;
   fingerprint?: string;
   project_ok?: boolean;
+  /** Feature 037: issues found in *other* projects of the composition, as counts (never fixable). */
+  other_projects?: Record<string, { errors: number; warnings: number }>;
+  workspace_errors?: number;
+  workspace_warnings?: number;
+  composed_valid?: boolean;
 }
 
 export interface ProjectCheck { validation: ProjectValidation; readiness: AssistantReadiness }

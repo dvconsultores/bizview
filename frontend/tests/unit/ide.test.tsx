@@ -146,19 +146,22 @@ describe("problems, status bar and conflicts", () => {
     valid: false,
     errors: [
       { code: "schema_error", message: "falta id", file: "reports/r/report.yaml", line: 3, project: "demo", fix: "agrega id" },
-      { code: "duplicate_id", message: "id repetido", file: "integrations/x/integration.yaml", line: 1, project: "otro" },
+      { code: "duplicate_id", message: "id repetido", file: "projects/otro/reports/x/report.yaml", line: 1, project: "otro" },
     ],
     warnings: [],
+    other_projects: { otro: { errors: 1, warnings: 0 } },
   };
 
   it("a problem of this project opens the file at its line", async () => {
     const onOpen = vi.fn();
     await render(<ProblemsPanel validation={validation} slug="demo" onOpen={onOpen} />);
-    expect(container.textContent).toContain(t.projects.problemsCount(2));
-    expect(container.textContent).toContain(t.projects.otherProject("otro"));
+    expect(container.textContent).toContain(t.projects.problemsCount(1));
+    // Feature 037: another project's problem is not rendered, not linked and not fixable.
+    expect(container.textContent).not.toContain("id repetido");
+    expect(container.textContent).toContain(t.projects.blockedByOthers("otro"));
     const own = Array.from(container.querySelectorAll("button"))
-      .filter((b) => !b.getAttribute("aria-label"));   // the open link, not the dismiss one
-    expect(own).toHaveLength(1);   // the other project's problem is not a link
+      .filter((b) => b.textContent?.includes("falta id"));
+    expect(own).toHaveLength(1);
     await act(async () => own[0].click());
     expect(onOpen).toHaveBeenCalledWith("reports/r/report.yaml", 3);
   });
@@ -166,13 +169,14 @@ describe("problems, status bar and conflicts", () => {
   it("a problem can be dismissed and brought back", async () => {
     localStorage.clear();
     await render(<ProblemsPanel validation={validation} slug="demo" onOpen={vi.fn()} />);
-    expect(container.textContent).toContain(t.projects.problemsCount(2));
+    expect(container.textContent).toContain(t.projects.problemsCount(1));
     const dismiss = labelled(t.projects.dismissProblem)!;
     await act(async () => dismiss.click());
-    expect(container.textContent).toContain(t.projects.problemsCount(1));
+    expect(container.textContent).not.toContain("falta id");
     expect(container.textContent).toContain(t.projects.dismissedCount(1));
     await act(async () => button(t.projects.showDismissed)!.click());
-    expect(container.textContent).toContain(t.projects.problemsCount(2));
+    expect(container.textContent).toContain("falta id");
+    expect(container.textContent).toContain(t.projects.problemsCount(1));
   });
 
   it("re-checks on demand", async () => {

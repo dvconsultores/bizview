@@ -204,13 +204,24 @@ export function ProjectWorkspace() {
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
+    // Feature 037: nothing of the previous project survives a navigation — the panel used to keep
+    // the last validation while the new one was in flight, which is another project's problems on
+    // this page.
+    setCheck(null);
+    setSession(null);
     refresh().then(() => { if (!cancelled) void revalidate(); })
       .catch((e) => !cancelled && setLoadError(errorText(e, t.common.unexpected)));
     return () => { cancelled = true; };
   }, [refresh, revalidate, t]);
 
   // Conversation of the chat pane: ?chat=<id>, else the viewer's latest one in the project.
-  const chatId = search.get("chat") ?? (project?.conversations[0] ? String(project.conversations[0].id) : null);
+  // Feature 037: a deep link is honoured only when that conversation is one of *this project's*
+  // conversations (the id came from a URL, so it is data, not a promise): a project page can no
+  // longer show another project's chat, its validation or its preview.
+  const ownConversations = project?.conversations ?? [];
+  const linked = search.get("chat");
+  const chatId = (linked && ownConversations.some((c) => String(c.id) === linked) ? linked : null)
+    ?? (ownConversations[0] ? String(ownConversations[0].id) : null);
   // A deep link (?chat=<id>, what the project history and the old assistant links use) selects the
   // conversation in the docked panel too, so the link opens what the user asked for.
   useEffect(() => {
@@ -224,10 +235,10 @@ export function ProjectWorkspace() {
     if (!chatId) { setSession(null); return; }
     let cancelled = false;
     api.get<AssistantSession>(`/api/assistant/sessions/${chatId}`)
-      .then((s) => !cancelled && setSession(s))
+      .then((s) => !cancelled && setSession(s.project?.slug === slug ? s : null))
       .catch(() => !cancelled && setSession(null));
     return () => { cancelled = true; };
-  }, [chatId]);
+  }, [chatId, slug]);
 
   useLeaveGuard(dirty, setLeaving);
 

@@ -27,24 +27,24 @@ afterEach(async () => {
 const joins: ProjectIssue = {
   code: "unjoined_sets",
   message: "Conjuntos sin unión: altseason",
-  file: "projects/cripto/reports/panorama.yaml",
+  file: "reports/panorama-cripto/report.yaml",
   line: 12,
   fix: "declara joins: [{left: assets.snapshot_at, right: altseason.snapshot_at}]",
   fix_data: {
-    file: "projects/cripto/reports/panorama.yaml",
+    file: "reports/panorama-cripto/report.yaml",
     json_path: "/joins",
     op: "append",
     value: { left: "assets.snapshot_at", right: "altseason.snapshot_at" },
   },
-  problem_id: "unjoined_sets:projects/cripto/reports/panorama.yaml:/joins",
+  problem_id: "unjoined_sets:reports/panorama-cripto/report.yaml:/joins",
 };
 const date: ProjectIssue = {
   code: "date_missing",
   message: "Falta date",
-  file: "projects/cripto/reports/altseason.yaml",
+  file: "reports/panorama-cripto/altseason.yaml",
   line: 3,
-  fix_data: { file: "projects/cripto/reports/altseason.yaml", json_path: "/date", op: "set", value: "snapshot_at" },
-  problem_id: "date_missing:projects/cripto/reports/altseason.yaml:/date",
+  fix_data: { file: "reports/panorama-cripto/altseason.yaml", json_path: "/date", op: "set", value: "snapshot_at" },
+  problem_id: "date_missing:reports/panorama-cripto/altseason.yaml:/date",
 };
 
 function validation(errors: ProjectIssue[]): ProjectValidation {

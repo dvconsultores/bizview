@@ -1425,7 +1425,20 @@ def _remember(session: Any, shas: dict[str, str]) -> None:
     session.working_state = state
 
 
+def _reject_foreign(path: str) -> None:
+    """A path that names another project, or an absolute one, is not a path of this project (037).
+
+    The validator composes every project under `projects/<slug>/…`, and a stale fix or a model can
+    carry one of those paths back. Reporting it as "missing" taught the agent the file was not
+    there; the truth is that it is out of scope.
+    """
+    parts = path.replace("\\", "/").split("/")
+    if path.startswith("/") or "\\" in path or parts[:1] == ["projects"]:
+        raise ToolError(t("projects.path_outside_project", path=path))
+
+
 def _check_path(path: str) -> None:
+    _reject_foreign(path)
     if not layout.is_allowed(path):
         raise ToolError(
             f"{path}: ruta no permitida en el proyecto. Rutas permitidas: {layout.ALLOWED_TEXT}"
@@ -1730,6 +1743,12 @@ def _apply_fix(db: Session, actor: Any, session: Any,
     fix = match.get("fix_data")
     if not isinstance(fix, dict):
         raise ToolError("Ese problema no tiene un arreglo determinista: corrígelo con edit_draft.")
+    # Feature 037: a fix is a path of this project or it is not applied at all.
+    _check_path(str(fix.get("file") or ""))
+    try:
+        fs.resolve_project_path(project.id, str(fix["file"]), db=db)
+    except fs.ProjectPathError as err:
+        raise ToolError(str(err)) from err
     state = project_fixes.apply_fixes(db, actor, project, [{**fix, "problem_id": problem_id}],
                                       None, installation_palette=preset_of(db))
     session.refresh()
@@ -1845,6 +1864,7 @@ def _read_draft(
     truncated: list[str] = []
     total = 0
     for path in paths:
+        _reject_foreign(path)
         if path not in files:
             missing.append(path)
             continue

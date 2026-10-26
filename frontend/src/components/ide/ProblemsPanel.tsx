@@ -46,14 +46,28 @@ export function ProblemsPanel(props: {
   const t = useT();
   const errors = props.validation?.errors ?? [];
   const warnings = props.validation?.warnings ?? [];
+  // Feature 037: a problem of another project is never rendered here — not as a link, not as a fix.
+  // The payload is already scoped by the server; this keeps an older payload, a cached one or a
+  // future bug from putting another project's file in front of «Aplicar arreglo».
+  const mine = (issue: ProjectIssue) => !issue.project || issue.project === props.slug;
+  const ownFile = (file: string | null | undefined) =>
+    !!file && !file.startsWith("/") && !file.replace(/\\/g, "/").split("/").includes("projects")
+    && !file.split("/").includes("..");
+  const otherProjects = Object.entries(props.validation?.other_projects ?? {})
+    .filter(([, counts]) => (counts?.errors ?? 0) > 0)
+    .map(([slug]) => slug);
   const [dismissed, setDismissed] = useState<string[]>([]);
   useEffect(() => setDismissed(readDismissed(props.slug)), [props.slug]);
 
   const hidden = new Set(dismissed);
-  const shownErrors = errors.filter((issue) => !hidden.has(signature(issue)));
-  const shownWarnings = warnings.filter((issue) => !hidden.has(signature(issue)));
-  const dismissedHere = errors.length + warnings.length - shownErrors.length - shownWarnings.length;
-  const fixable = [...shownErrors, ...shownWarnings].filter((issue) => issue.fix_data);
+  const mineErrors = errors.filter(mine);
+  const mineWarnings = warnings.filter(mine);
+  const shownErrors = mineErrors.filter((issue) => !hidden.has(signature(issue)));
+  const shownWarnings = mineWarnings.filter((issue) => !hidden.has(signature(issue)));
+  const dismissedHere = mineErrors.length + mineWarnings.length
+    - shownErrors.length - shownWarnings.length;
+  const fixable = [...shownErrors, ...shownWarnings]
+    .filter((issue) => issue.fix_data && ownFile(issue.fix_data.file));
 
   const dismiss = (issue: ProjectIssue) => {
     const next = [...new Set([...dismissed, signature(issue)])];
@@ -66,7 +80,7 @@ export function ProblemsPanel(props: {
   };
 
   const item = (issue: ProjectIssue, error: boolean, key: string) => {
-    const own = !!issue.file && (!issue.project || issue.project === props.slug);
+    const own = ownFile(issue.file);
     const body = (
       <span className="flex items-start gap-2">
         {error ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
@@ -75,9 +89,6 @@ export function ProblemsPanel(props: {
           <span className="flex flex-wrap gap-x-2 text-xs text-ink-muted">
             {issue.file && <span className="break-all font-mono">{issue.file}</span>}
             {issue.line != null && <span>{t.projects.line(issue.line)}</span>}
-            {issue.project && issue.project !== props.slug && (
-              <span>{t.projects.otherProject(issue.project)}</span>
-            )}
           </span>
           <span className="mt-0.5 block text-sm text-ink">{issue.message}</span>
           {issue.fix && (
@@ -88,8 +99,9 @@ export function ProblemsPanel(props: {
         </span>
       </span>
     );
-    // Outside the row's own button: a button inside a button is not valid markup.
-    const fixButton = issue.fix_data && props.onApplyFix ? (
+    // Outside the row's own button: a button inside a button is not valid markup. Feature 037: a
+    // fix is offered only for a project-relative file of this project.
+    const fixButton = issue.fix_data && ownFile(issue.fix_data.file) && props.onApplyFix ? (
       <div className="px-9 pb-2">
         <button
           type="button"
@@ -137,7 +149,9 @@ export function ProblemsPanel(props: {
     <section className={collapsed ? "" : "flex h-full min-h-0 flex-col"}
              aria-labelledby="problems-heading">
       <h2 id="problems-heading" className="flex flex-wrap items-center gap-2 border-b border-line bg-subtle px-3 py-2 text-sm font-semibold text-ink">
-        {t.projects.problemsPanel}
+        <span>{t.projects.problemsPanel}</span>
+        <span className="font-mono text-xs font-normal text-ink-muted"
+              title={t.projects.problemsOf(props.slug)}>{props.slug}</span>
         {shownErrors.length > 0 && <span className="text-xs font-normal text-danger">{t.projects.problemsCount(shownErrors.length)}</span>}
         {shownWarnings.length > 0 && <span className="text-xs font-normal text-warning-deep">{t.projects.warningsCount(shownWarnings.length)}</span>}
         {props.onApplyFix && fixable.length > 1 ? (
@@ -199,6 +213,11 @@ export function ProblemsPanel(props: {
                     className="rounded px-1.5 py-0.5 underline hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
               {t.projects.showDismissed}
             </button>
+          </p>
+        )}
+        {otherProjects.length > 0 && (
+          <p role="note" className="mx-1 mt-1 rounded-card border border-line bg-subtle px-3 py-2 text-xs text-ink-2">
+            {t.projects.blockedByOthers(otherProjects.join(", "))}
           </p>
         )}
         </div>

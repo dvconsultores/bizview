@@ -18,6 +18,13 @@ from app.errors import ApiError
 from app.i18n import M
 
 MAX_FIXES = 50
+SCOPE_CODES = ("path_outside_project", "path_not_allowed", "path_unsafe")
+
+
+def _path_error(e) -> ApiError:
+    """A path that is not this project's own: a client error, never «the file is gone» (037)."""
+    status = 422 if e.code in SCOPE_CODES else 404
+    return ApiError(status, e.code, e.message)
 
 
 def _normalise(fixes: list[dict]) -> list[dict]:
@@ -36,6 +43,13 @@ def _normalise(fixes: list[dict]) -> list[dict]:
             raise ApiError(422, "validation", M("projects.fix_malformed"))
         if not isinstance(fix.get("json_path"), str):
             raise ApiError(422, "validation", M("projects.fix_malformed"))
+        problem = fix.get("problem_id")
+        if isinstance(problem, str) and problem:
+            # `problem_id` is `code:file:json_path`: a fix must carry the id of the problem it
+            # belongs to, so an id of another file (or another project) cannot be attached (037).
+            parts = problem.split(":", 2)
+            if len(parts) != 3 or (parts[1] and parts[1] != fix["file"]):
+                raise ApiError(422, "validation", M("projects.fix_malformed"))
         out.append({"file": fix["file"], "json_path": fix["json_path"], "op": fix["op"],
                     "value": fix.get("value"), "base_sha256": fix.get("base_sha256"),
                     "problem_id": fix.get("problem_id")})
@@ -61,9 +75,18 @@ def apply_fixes(db, actor, project, fixes: list[dict], ip: str | None,
 
     before_text: dict[str, str] = {}
     for path, items in per_file.items():
+        # Feature 037: the path comes from a validation payload, so it is data, not a promise. It is
+        # resolved from the project's own row and must be a path *of this project*: a composed
+        # `projects/<other>/…` is refused as outside the project (it used to be reported as a
+        # missing file, which is what «El archivo … ya no existe» said on the artemisa page).
         try:
+            fs.resolve_project_path(project.id, path, db=db)
             text = fs.read_text(project.slug, path)
-        except Exception:
+        except FileNotFoundError:
+            raise ApiError(409, "fix_not_applicable", M("projects.fix_gone", file=path)) from None
+        except fs.ProjectPathError as e:
+            raise _path_error(e) from None
+        except OSError:
             raise ApiError(409, "fix_not_applicable", M("projects.fix_gone", file=path)) from None
         current = history.sha(text)
         for item in items:

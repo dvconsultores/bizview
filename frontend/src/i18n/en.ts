@@ -1134,6 +1134,7 @@ export const en: Catalogue = {
     overwrite: "Overwrite",
     discardMine: "Discard my changes",
     problemsPanel: "Problems",
+    problemsOf: (slug: string) => `Problems of project ${slug}`,
     problemsCount: (n: number) => (n === 1 ? "1 problem" : `${n} problems`),
     warningsCount: (n: number) => (n === 1 ? "1 warning" : `${n} warnings`),
     recheck: "Check again",
@@ -1147,7 +1148,7 @@ export const en: Catalogue = {
     dismissedCount: (n: number) => (n === 1 ? "1 dismissed" : `${n} dismissed`),
     showDismissed: "Show",
 
-    otherProject: (slug: string) => `in project ${slug}`,
+    blockedByOthers: (projects: string) => `The workspace has problems in other projects (${projects}); they are not fixed from here.`,
     fix: "How to fix",
     expected: "Expected",
     line: (n: number) => `line ${n}`,

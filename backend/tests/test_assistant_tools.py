@@ -188,11 +188,13 @@ def test_propose_draft_rejects_bad_paths(db, superuser, workspace):
     bad_cases = {
         "../x": "content",
         "/abs": "content",
+        "projects/otro/reports/x/report.yaml": "content",     # 037: another project's composed path
         "reports/ventas/../../x": "content",
         "other/file.txt": "content",
         "reports/ventas/extra.txt": "content",
         "integrations/x/queries/../../a.sql": "content",
     }
+    outside = ("/abs", "projects/otro/reports/x/report.yaml")
     for path, content in bad_cases.items():
         with pytest.raises(tools.ToolError) as exc_info:
             run_tool(
@@ -203,7 +205,11 @@ def test_propose_draft_rejects_bad_paths(db, superuser, workspace):
                 {"files": {path: content}, "summary": "test"},
                 get_settings(),
             )
-        assert "integrations/<id>/integration.yaml" in exc_info.value.message
+        if path in outside:
+            # 037: a path of another project (or an absolute one) is out of scope, and says so.
+            assert "fuera del proyecto" in exc_info.value.message
+        else:
+            assert "integrations/<id>/integration.yaml" in exc_info.value.message
 
     # 020: the 40-file draft cap became the project limit (test_projects_fs.py).
     too_big = {"reports/big/report.yaml": "x" * (512 * 1024 + 1),     # with a spec: not a probe
