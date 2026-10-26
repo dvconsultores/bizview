@@ -308,6 +308,12 @@ def confirm_contract(session_id: int, body: ContractIn, request: Request,
         raise ApiError(422, "contract_invalid", M("assistant.contract.invalid"),
                        fields=getattr(exc, "fields", {}) or {"contract": "invalid"}) from exc
     _verify_sources(db, contract)
+    blocked = service.ai_blocked_code()
+    if blocked is not None:
+        # 035 FR-007: no contract, no provider call — and the reason the reader can act on.
+        raise ApiError(409, "ai_blocked", M("assistant.ai_blocked_notice", code=blocked),
+                       extra={"ai": {"code": blocked,
+                                     "action": service.ai_errors.action_for(blocked)}})
     ip = client_ip(request)
     if get_settings().ai_auto_require_step_up and body.password:
         _step_up(db, actor, auth, body, ip)

@@ -403,7 +403,10 @@ def test_context_too_long_twice_reports_error(superuser, db):
     fake.SHARED.queue(_raise_context)
     sid = _new_session(client)
     resp = _send(client, sid, "hola")
-    assert resp["messages"][-1]["content"] == AIError("context_too_long").message
+    # 035: the reason comes first and the work already done is kept under it (015 US5).
+    last = resp["messages"][-1]["content"]
+    assert last.startswith(AIError("context_too_long").message)
+    assert service.t(service._CONTINUE_HINT) in last
     assert len(fake.SHARED.requests) == 2
 
 
@@ -895,4 +898,4 @@ def test_english_user_gets_english_prompt(superuser, db):
     assert len(fake.SHARED.requests) == 1
     assert fake.SHARED.requests[0]["system"] == service.system_prefix("en")
     assert service.SYSTEM_PREFIX_EN != service.SYSTEM_PREFIX
-    assert "respond always in English" in " ".join(service.SYSTEM_PREFIX_EN.split())
+    assert "respond always in english" in " ".join(service.SYSTEM_PREFIX_EN.lower().split())

@@ -6,6 +6,7 @@ import logging
 import re
 import threading
 import time
+import uuid
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -27,8 +28,10 @@ from app.ai import (
     ToolCall,
     ToolSpec,
     get_provider,
+    state,
     vision_enabled,
 )
+from app.ai import errors as ai_errors
 from app.assistant import activity, auto, origin, readiness
 from app.assistant import attachments as _attachments
 from app.assistant import tools as _tools
@@ -1116,6 +1119,45 @@ _HUMAN_INSTRUCTION = (
     re.compile(r"(?:press|click)\s+(?:the\s+)?[«\"]?apply", re.IGNORECASE),
 )
 
+# 035: never wait longer than this between two attempts at the same request.
+MAX_AI_RETRY_WAIT = 60.0
+# Codes where trying the identical request again is worth it: the provider was merely busy.
+_RETRY_CODES = frozenset({"rate_limited", "provider_down", "provider_error"})
+# Codes where a second identical request cannot help.
+_NO_RETRY_CODES = frozenset({"refused", "invalid_tool_call", "not_configured", "no_credit",
+                             "bad_key", "model_not_found"})
+
+
+def _provider_error(exc: AIError, request_id: str) -> dict:
+    """The failure as the bubble shows it (feature 035): code, words, model, action, id."""
+    settings = get_settings()
+    return {"code": exc.code, "detail": exc.detail, "provider": settings.ai_provider,
+            "model": settings.ai_model_effective,
+            "at": datetime.now(UTC).isoformat(), "request_id": request_id,
+            "action": ai_errors.action_for(exc.code), "retry_after": exc.retry_after,
+            # These three block the following turns until someone fixes them, so say it now.
+            "blocked": ai_errors.blocking(exc.code)}
+
+
+def ai_blocked_code() -> str | None:
+    """The code that makes a provider call pointless right now, or None (feature 035, FR-007)."""
+    return state.blocked_reason()
+
+
+def ai_blocked_payload(code: str, request_id: str) -> dict:
+    """A refusal that looks like any other provider failure, so the bubble is the same."""
+    settings = get_settings()
+    return {"code": code, "detail": None, "provider": settings.ai_provider,
+            "model": settings.ai_model_effective,
+            "at": datetime.now(UTC).isoformat(), "request_id": request_id,
+            "action": ai_errors.action_for(code), "retry_after": None,
+            "blocked": True}
+
+
+def ai_blocked_text(code: str) -> str:
+    return t("assistant.ai_blocked", code=code, reason=t(f"ai.error.{code}"))
+
+
 _AUTO_END = {
     "done": ("applied", "completed"),
     "ready": ("applied", "completed"),
@@ -2019,6 +2061,19 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
     definition = registry.REGISTRY.get(run.command) if run is not None else None
     finished = False
 
+    blocked_code = ai_blocked_code()
+    if blocked_code is not None:
+        # No provider call, no tokens, no contract: the installation has to be fixed first, and the
+        # reader is told exactly that (035 FR-007/FR-010). Editing, validating and the deterministic
+        # fixes keep working — they never touch the provider.
+        refusal = _add(db, session, role="assistant",
+                       content=ai_blocked_text(blocked_code),
+                       tool_payload={"error": ai_blocked_payload(blocked_code,
+                                                                uuid.uuid4().hex[:8])})
+        session.updated_at = datetime.now(UTC)
+        db.flush()
+        return [refusal]
+
     def end(status: str, error: str | None = None) -> None:
         """End of the turn: activity run, command run (plan §6) and the turn's suggestions."""
         if run is not None and run.command == "speckit-converge":
@@ -2039,6 +2094,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                       if m.role == "assistant" and m.content), None))
             if blocked:
                 reason = blocked
+            if str(error or "").startswith("blocked:ai_"):
+                reason = error          # 035: the outage is why it stopped
             summary = finish_auto_run(db, session, kind=kind, reason=reason)
             if summary is not None:
                 new_messages.append(_add(db, session, role="assistant",
@@ -2065,8 +2122,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
     turn_summaries: list[str] = []
     invalid_rounds = 0
     context_retried = False
-    timeout_retried = False
     images_dropped = False
+    failures: dict[str, int] = {}          # 035: consecutive failures per code
+    ok_recorded = False                    # 035: one status write per turn, not per round
+    request_id = uuid.uuid4().hex[:8]      # 035: one id for the log line and the bubble
     rounds = 0
     was_ready = readiness.compute(view)["ready"]
     last_failed = None
@@ -2135,11 +2194,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 context_retried = True
                 history = _latest_round(history)
                 continue
-            if exc.code == "timeout" and not timeout_retried:
-                timeout_retried = True
-                _commit_round(db, session, claim)
-                continue
-            if images and not images_dropped and exc.code == "provider_error":
+            if images and not images_dropped \
+                    and exc.code in ("provider_error", "invalid_tool_call"):
                 # The model refused the picture itself (feature 024, US2): answer the text, and
                 # say what happened instead of quietly answering as if it had seen it.
                 images_dropped = True
@@ -2147,27 +2203,38 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                                          content=t("attachments.vision")))
                 _commit_round(db, session, claim)
                 continue
-            if exc.code == "timeout":
-                progress = _composed_progress(session.working_state, turn_summaries,
-                                              exc.message)
-                working = dict(session.working_state or {})
-                working["progress"] = progress[:PROGRESS_CHARS]
-                session.working_state = working
-                new_messages.append(
-                    _add(db, session, role="assistant",
-                         content=f"{progress}\n\n{t(_CONTINUE_HINT)}")
-                )
-                session.updated_at = datetime.now(UTC)
-                db.flush()
-                end("error", exc.code)
-                return new_messages
-            log.warning("assistant provider failure in session %s: %s (%s)",
-                        session.id, exc.code, exc.detail or "-")
-            new_messages.append(_add(db, session, role="assistant", content=exc.message))
+            failures[exc.code] = failures.get(exc.code, 0) + 1
+            state.record_error(exc.code, exc.detail, app_settings.ai_model_effective)
+            log.warning("assistant provider failure %s (session %s): %s (%s)",
+                        request_id, session.id, exc.code, exc.detail or "-")
+            # One retry at most, and only when trying the same request again can help: a rate limit
+            # or a restarting endpoint may answer in a minute, a missing balance never will.
+            if exc.code in _RETRY_CODES and exc.code not in _NO_RETRY_CODES \
+                    and failures[exc.code] == 1:
+                wait = min(exc.retry_after or (3.0 if exc.transitory else 1.0),
+                           MAX_AI_RETRY_WAIT)
+                _commit_round(db, session, claim)
+                time.sleep(wait)
+                continue
+            blocked = f"blocked:ai_{exc.code}"
+            # 015 US5: an outage must not cost the work — the summary still says what was done and
+            # what comes next, with the reason on top.
+            progress = _composed_progress(session.working_state, turn_summaries, exc.message)
+            working = dict(session.working_state or {})
+            working["progress"] = progress[:PROGRESS_CHARS]
+            session.working_state = working
+            new_messages.append(_add(
+                db, session, role="assistant",
+                content=f"{progress}\n\n{t(_CONTINUE_HINT)}",
+                tool_payload={"error": _provider_error(exc, request_id)}))
             session.updated_at = datetime.now(UTC)
             db.flush()
-            end("error", exc.code)
+            end("error", blocked)
             return new_messages
+
+        if not ok_recorded:
+            ok_recorded = True
+            state.record_ok(reply.model)          # clears the installation's error, once per turn
 
         rounds += 1
         activity.begin_round(session, rounds)
@@ -2389,7 +2456,7 @@ def message_json(m: AssistantMessage) -> dict:
         data["tool_name"] = m.tool_name
     payload = m.tool_payload if isinstance(m.tool_payload, dict) else {}
     if m.role == "assistant":
-        for key in ("suggestions", "scope", "contract"):   # 021 §5/§7, 028 FR-006
+        for key in ("suggestions", "scope", "contract", "error"):   # 021 §5/§7, 028, 035
             if payload.get(key):
                 data[key] = payload[key]
     return data

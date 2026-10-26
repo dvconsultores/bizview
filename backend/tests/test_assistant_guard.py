@@ -443,7 +443,8 @@ def test_direct_check_query_request_file_memo_respects_content(
 
 
 def _raise_timeout(messages, tools, system):
-    raise AIError("timeout")
+    # 035: a timeout and a connection failure are the same code (provider_down).
+    raise AIError("provider_down")
 
 
 def test_timeout_retry_once_then_success(superuser, db, api_source):
@@ -471,13 +472,13 @@ def test_timeout_twice_stops_with_progress(superuser, db):
     assert r.status_code == 202
     assert len(fake.SHARED.requests) == 2
     last = _last_assistant(sid)
-    assert last.startswith("El proveedor de IA no respondió a tiempo.")
+    assert last.startswith("No se pudo hablar con el proveedor de IA")
     assert "Hecho: describí la tabla facturas" in last
     assert "Siguiente: comprobar la consulta" in last
     assert t(service._CONTINUE_HINT) in last
     db.expire_all()
     s = db.get(AssistantSession, sid)
-    assert s.working_state["progress"].startswith("El proveedor de IA no respondió a tiempo.")
+    assert s.working_state["progress"].startswith("No se pudo hablar con el proveedor de IA")
 
 
 def test_timeout_retry_is_once_per_run(superuser, db, api_source):
@@ -493,7 +494,7 @@ def test_timeout_retry_is_once_per_run(superuser, db, api_source):
     assert r.status_code == 202
     assert len(fake.SHARED.requests) == 3
     last = _last_assistant(sid)
-    assert last.startswith("El proveedor de IA no respondió a tiempo.")
+    assert last.startswith("No se pudo hablar con el proveedor de IA")
 
 
 def test_direct_check_query_memo_follows_integration_yaml(
