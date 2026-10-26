@@ -2331,6 +2331,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             pending_results.append({
                 "content": summary,
                 "tool_name": call.name,
+                # 036: the pairing is stored, not inferred from the row order.
+                "call_id": call.id,
+                "assistant_message_id": asked.id,
+                "round": rounds,
                 "tool_payload": {
                     "call_id": call.id,
                     "args": args_for_payload,

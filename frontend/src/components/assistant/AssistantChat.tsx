@@ -113,6 +113,8 @@ export function AssistantChat(props: {
   const [pending, setPending] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 036: repairing rebuilds the stored pairing; the conversation sends again right after. */
+  const [repairing, setRepairing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   // Feature 024: the image briefs waiting to be sent with the message.
   const [images, setImages] = useState<Attachment[]>([]);
@@ -406,6 +408,29 @@ export function AssistantChat(props: {
     void send(undefined, true);
   }
 
+  /** Feature 036: pair the stored tool results with their calls, then reload the conversation. */
+  const repairConversation = async () => {
+    if (!session) return;
+    setRepairing(true);
+    setError(null);
+    try {
+      const report = await api.post<{ paired: number; orphans: number; replayable: boolean }>(
+        `/api/assistant/sessions/${session.id}/repair`, {});
+      onSession(await api.get<AssistantSession>(`/api/assistant/sessions/${session.id}`));
+      setError(
+        report.paired || report.orphans
+          ? t.ai.repairDone(report.paired, report.orphans)
+          : t.ai.repairNothing,
+      );
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? t.ai.repairFailed(err.message) : t.common.unexpected,
+      );
+    } finally {
+      setRepairing(false);
+    }
+  };
+
   async function send(override?: string, noticeClicked = false) {
     const trimmed = (override ?? text).trim();
     if ((!trimmed && images.length === 0) || sending || !ai_enabled || busy) return;
@@ -635,7 +660,8 @@ export function AssistantChat(props: {
                 <div className="flex min-w-0 flex-col gap-2">
                   {m.error ? (
                     // 035: a failed turn says why, with the action and the log command.
-                    <ProviderError error={m.error} onRetry={() => {
+                    <ProviderError error={m.error} onRepair={repairConversation}
+                                   repairing={repairing} onRetry={() => {
                       const last = [...(session?.messages ?? [])].reverse()
                         .find((item) => item.role === "user");
                       if (last?.content) void send(last.content);

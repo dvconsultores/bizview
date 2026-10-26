@@ -497,6 +497,7 @@ export const en: Catalogue = {
     integration_run_stopped: "Integration run stopped",
     assistant_draft_applied: "Assistant draft applied",
     assistant_session_archived: "Assistant session archived",
+    assistant_conversation_repaired: "Conversation repaired",
     assistant_session_deleted: "Assistant session deleted",
     assistant_budget_extended: "Assistant budget extended",
     assistant_mode_changed: "Assistant mode changed",
@@ -557,6 +558,7 @@ export const en: Catalogue = {
       provider_down: "The AI provider does not answer or returns a server error.",
       invalid_tool_call: "The model returned a malformed tool call.",
       refused: "The provider refused the request.",
+      history_invalid: "The stored conversation cannot be sent to the provider again.",
       provider_error: "The AI provider returned an error.",
     } as Record<string, string>,
     details: {
@@ -577,6 +579,15 @@ export const en: Catalogue = {
     modelsUnavailable: "This endpoint does not publish its model list",
     lastError: "Last error",
     lastOk: "Last good answer",
+    // 036: a conversation whose stored results lost their call is repaired, never retried.
+    historyInvalidHint:
+      "The stored history has a tool result without its call; repair it to keep talking. Nothing you wrote is lost.",
+    repair: "Repair conversation",
+    repairing: "Repairing…",
+    repairDone: (paired: number, orphans: number) => `Conversation repaired: ${paired} results paired, ${orphans} dropped.`,
+    repairNothing: "The conversation could be sent already; nothing to repair.",
+    repairFailed: (reason: string) => `Could not repair: ${reason}`,
+    repairMenu: "More conversation actions",
     pillOff: "AI not configured",
     pillOk: "AI working",
     pillError: "AI failing",

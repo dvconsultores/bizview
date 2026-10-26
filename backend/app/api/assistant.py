@@ -530,6 +530,21 @@ def finish_command(session_id: int, actor: AppUser = Depends(require_superuser),
     return service.session_json(session, _messages(db, session))
 
 
+@router.post("/sessions/{session_id}/repair")
+def repair_session(session_id: int, request: Request,
+                   actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """Make a stored conversation replayable again (feature 036).
+
+    The conversation's owner or a super user: it is their transcript, and the repair only rewrites
+    bookkeeping — which result belongs to which call — never a message the reader wrote.
+    """
+    session = db.get(AssistantSession, session_id)
+    if session is None or (session.created_by != actor.id and not actor.is_superuser):
+        raise not_found(t("assistant.conversation_not_found"))
+    service.ensure_idle(db, session, get_settings())
+    return service.repair_history(db, actor, session, client_ip(request))
+
+
 @router.post("/sessions/{session_id}/archive")
 def archive_session(session_id: int, request: Request,
                     actor: AppUser = Depends(require_superuser), db: Session = DB):

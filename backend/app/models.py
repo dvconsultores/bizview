@@ -60,6 +60,8 @@ AUDIT_KINDS = (
     "project_created", "project_updated", "project_deleted", "project_purged", "project_applied",
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
     "project_fix_applied",
+    # feature 036
+    "assistant_conversation_repaired",
     # feature 024
     "assistant_attachment_uploaded", "assistant_attachment_deleted",
     # feature 027
@@ -733,6 +735,13 @@ class AssistantMessage(Base):
     content: Mapped[str] = mapped_column(Text, server_default=text("''"))
     tool_name: Mapped[str | None] = mapped_column(Text)
     tool_payload: Mapped[dict | None] = mapped_column(JSONB)
+    # 036: a tool row belongs to the assistant turn that asked for it — by id, never by adjacency.
+    call_id: Mapped[str | None] = mapped_column(Text)
+    assistant_message_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("assistant_message.id", ondelete="SET NULL"), index=True)
+    round: Mapped[int | None] = mapped_column(Integer)
+    # 036: cannot be replayed (a preview notice, a result whose call is gone): transcript only.
+    orphan: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

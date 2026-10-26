@@ -477,6 +477,7 @@ export const es = {
     integration_run_stopped: "Ejecución de integración detenida",
     assistant_draft_applied: "Borrador del asistente aplicado",
     assistant_session_archived: "Sesión del asistente archivada",
+    assistant_conversation_repaired: "Conversación reparada",
     assistant_session_deleted: "Sesión del asistente eliminada",
     assistant_budget_extended: "Presupuesto del asistente ampliado",
     assistant_mode_changed: "Cambio de modo del asistente",
@@ -538,6 +539,7 @@ export const es = {
       provider_down: "El proveedor de IA no responde o devuelve un error del servidor.",
       invalid_tool_call: "El modelo devolvió una llamada a herramienta mal formada.",
       refused: "El proveedor rechazó la solicitud.",
+      history_invalid: "La conversación guardada no se puede reenviar al proveedor.",
       provider_error: "El proveedor de IA devolvió un error.",
     } as Record<string, string>,
     details: {
@@ -558,6 +560,15 @@ export const es = {
     modelsUnavailable: "Este endpoint no publica su lista de modelos",
     lastError: "Último error",
     lastOk: "Última respuesta correcta",
+    // 036: a conversation whose stored results lost their call is repaired, never retried.
+    historyInvalidHint:
+      "El historial guardado tiene un resultado de herramienta sin su llamada; repárala para seguir hablando. No se pierde nada de lo escrito.",
+    repair: "Reparar conversación",
+    repairing: "Reparando…",
+    repairDone: (paired: number, orphans: number) => `Conversación reparada: ${paired} resultados emparejados, ${orphans} descartados.`,
+    repairNothing: "La conversación ya se podía reenviar; no hubo nada que reparar.",
+    repairFailed: (reason: string) => `No se pudo reparar: ${reason}`,
+    repairMenu: "Más acciones de la conversación",
     pillOff: "IA sin configurar",
     pillOk: "IA funcionando",
     pillError: "IA con error",

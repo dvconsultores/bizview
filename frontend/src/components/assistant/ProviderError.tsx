@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, RefreshCw, Terminal } from "lucide-react";
+import { AlertTriangle, ArrowRight, RefreshCw, Terminal, Wrench } from "lucide-react";
 import { Link } from "react-router";
 import type { ProviderErrorPayload } from "../../api/types";
 import { useT } from "../../i18n";
@@ -10,12 +10,16 @@ import { useT } from "../../i18n";
  * The reader used to see «El proveedor de IA devolvió un error» and had to guess which container
  * held the reason.
  */
-export function ProviderError({ error, onRetry }: {
+export function ProviderError({ error, onRetry, onRepair, repairing = false }: {
   error: ProviderErrorPayload;
   onRetry?: () => void;
+  /** 036: the stored conversation cannot be replayed; repairing it is the only way forward. */
+  onRepair?: () => void;
+  repairing?: boolean;
 }) {
   const t = useT();
   const reason = t.ai.errorCodes[error.code] ?? t.ai.errorCodes.provider_error;
+  const unrepairable = error.code === "history_invalid";
   return (
     <div role="alert"
          className="w-full rounded-card border border-danger-soft bg-danger-soft/40 px-3.5 py-3 text-sm text-ink">
@@ -29,6 +33,9 @@ export function ProviderError({ error, onRetry }: {
         {error.provider ? <span>({error.provider})</span> : null}
         {error.blocked ? <span className="text-danger">{t.ai.blockedTag}</span> : null}
       </p>
+      {unrepairable ? (
+        <p className="mt-2 text-xs text-ink-2">{t.ai.historyInvalidHint}</p>
+      ) : null}
       {error.detail ? (
         <p className="mt-2 max-h-32 overflow-auto break-words rounded-lg bg-surface/70 p-2 font-mono text-xs text-ink-2">
           {error.detail}
@@ -46,6 +53,13 @@ export function ProviderError({ error, onRetry }: {
             {t.ai.action.admin_ai}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
+        ) : null}
+        {unrepairable && onRepair ? (
+          <button type="button" onClick={onRepair} disabled={repairing}
+                  className="inline-flex min-h-tap items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            <Wrench className="h-4 w-4" aria-hidden />
+            {repairing ? t.ai.repairing : t.ai.repair}
+          </button>
         ) : null}
         {error.action === "retry" && onRetry ? (
           <button type="button" onClick={onRetry}

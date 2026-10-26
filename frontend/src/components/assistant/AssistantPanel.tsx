@@ -1,9 +1,11 @@
 import {
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   Network,
   Plus,
   Sparkles,
+  Wrench,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -13,6 +15,7 @@ import { projectsApi } from "../../api/projects";
 import type { AssistantSession, ProjectFix } from "../../api/types";
 import { useBranding } from "../../config/BrandingContext";
 import { useT } from "../../i18n";
+import { Alert } from "../Alert";
 import { Badge } from "../Badge";
 import { useShellChrome } from "../ShellChrome";
 import { AgentMapOverlay, useAgentMapToggle } from "./AgentMap";
@@ -46,6 +49,10 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
   const [chatActive, setChatActive] = useState(false);
   // 035: applying a deterministic fix from the conversation's problem list.
   const [fixing, setFixing] = useState(false);
+  // 036: the conversation's stored tool results can lose their call; repairing pairs them again.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairNotice, setRepairNotice] = useState<string | null>(null);
   // Feature 020: the first message of a new chat waits for its project (inline proposal).
   const [proposal, setProposal] = useState<{
     text: string;
@@ -73,6 +80,30 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
       console.error(e);
     } finally {
       setFixing(false);
+    }
+  };
+
+  /** 036: repair from the header menu — same call the error bubble offers. */
+  const repairConversation = async () => {
+    if (!session || repairing) return;
+    setMenuOpen(false);
+    setRepairing(true);
+    setRepairNotice(null);
+    try {
+      const report = await api.post<{ paired: number; orphans: number }>(
+        `/api/assistant/sessions/${session.id}/repair`, {});
+      setSession(await api.get<AssistantSession>(`/api/assistant/sessions/${session.id}`));
+      setRepairNotice(
+        report.paired || report.orphans
+          ? t.ai.repairDone(report.paired, report.orphans)
+          : t.ai.repairNothing,
+      );
+    } catch (e) {
+      setRepairNotice(
+        e instanceof ApiError ? t.ai.repairFailed(e.message) : t.common.unexpected,
+      );
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -237,6 +268,44 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
             <Network className="h-5 w-5" aria-hidden />
           </button>
         ) : null}
+        {session ? (
+          <div className="relative">
+            <button
+              type="button"
+              className={ICON_BUTTON}
+              aria-label={t.ai.repairMenu}
+              title={t.ai.repairMenu}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              data-conversation-menu=""
+            >
+              {repairing ? (
+                <Wrench className="h-5 w-5 animate-pulse" aria-hidden />
+              ) : (
+                <MoreHorizontal className="h-5 w-5" aria-hidden />
+              )}
+            </button>
+            {menuOpen ? (
+              <div
+                role="menu"
+                aria-label={t.ai.repairMenu}
+                className="absolute right-0 z-30 mt-1 w-60 rounded-xl border border-line bg-surface p-1 shadow-raised"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={repairing}
+                  onClick={() => void repairConversation()}
+                  className="flex min-h-tap w-full items-center rounded-lg px-3 text-left text-sm font-medium text-ink hover:bg-subtle disabled:opacity-50"
+                >
+                  <Wrench className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                  {repairing ? t.ai.repairing : t.ai.repair}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <AssistantHistory
           currentId={session?.id ?? null}
           onSelect={selectConversation}
@@ -343,6 +412,19 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
             setProposal(null);
           }}
         />
+      ) : null}
+
+      {repairNotice ? (
+        <div className="px-3 pt-2 sm:px-4" role="status">
+          <Alert tone="success" action={
+            <button type="button" onClick={() => setRepairNotice(null)}
+                    className="rounded px-1.5 py-0.5 text-xs underline hover:bg-subtle">
+              {t.common.close}
+            </button>
+          }>
+            {repairNotice}
+          </Alert>
+        </div>
       ) : null}
 
       <div data-chat-area="" className="flex min-h-0 flex-1 flex-col">
