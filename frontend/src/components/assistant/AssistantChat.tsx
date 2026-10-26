@@ -27,6 +27,8 @@ import {
   X,
 } from "lucide-react";
 import { api, ApiError } from "../../api/client";
+import { useAIHealth } from "../../api/ai";
+import { ProviderError } from "./ProviderError";
 import { projectsApi } from "../../api/projects";
 import {
   acceptAttachmentsNotice,
@@ -50,6 +52,7 @@ import { ChatText } from "./ChatText";
 import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { CommandMenu, filterCommands, menuQuery } from "./CommandMenu";
 import { CommandRunChip } from "./CommandRunChip";
+import { AIPill } from "./AIPill";
 import { ModePill, ModeSelector } from "./ModeSelector";
 import { CommandSuggestions, inlineSuggestions } from "./CommandSuggestion";
 import { SpecPicker } from "./SpecPicker";
@@ -105,6 +108,7 @@ export function AssistantChat(props: {
   const { ai_enabled, vision_enabled, attachments_max_mb, attachments_max_per_message } =
     useBranding();
   const user = useOptionalUser();
+  const health = useAIHealth();
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -629,8 +633,17 @@ export function AssistantChat(props: {
                   <Sparkles className="h-4 w-4" aria-hidden />
                 </span>
                 <div className="flex min-w-0 flex-col gap-2">
-                  <ChatText text={m.content} />
-                  <CommandSuggestions items={suggestions} onInsert={insertCommand} />
+                  {m.error ? (
+                    // 035: a failed turn says why, with the action and the log command.
+                    <ProviderError error={m.error} onRetry={() => {
+                      const last = [...(session?.messages ?? [])].reverse()
+                        .find((item) => item.role === "user");
+                      if (last?.content) void send(last.content);
+                    }} />
+                  ) : (
+                    <ChatText text={m.content} />
+                  )}
+                  {m.error ? null : <CommandSuggestions items={suggestions} onInsert={insertCommand} />}
                 </div>
               </div>
             );
@@ -841,6 +854,8 @@ export function AssistantChat(props: {
           {session ? (
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <ModePill session={session} />
+              {/* 035: the provider is unhealthy — say it here, before the next dead turn. */}
+              <AIPill health={health} />
             </div>
           ) : null}
           <div

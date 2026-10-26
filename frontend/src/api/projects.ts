@@ -9,6 +9,8 @@ import type {
   ProjectCheck,
   ProjectDetail,
   ProjectDiff,
+  ProjectFix,
+  FixResult,
   ProjectFile,
   ProjectHistory,
   ProjectImportResult,
@@ -46,6 +48,10 @@ export const projectsApi = {
   changes: (slug: string, after: number) =>
     api.get<ProjectChanges>(`${base(slug)}/changes${qs({ after })}`),
   validate: (slug: string) => api.post<ProjectCheck>(`${base(slug)}/validate`),
+  /** 035: apply the validator's deterministic corrections (works with the AI off). */
+  applyFixes: (slug: string, fixes: (ProjectFix & { problem_id?: string | null
+                                                   base_sha256?: string | null })[]) =>
+    api.post<FixResult>(`${base(slug)}/fix`, { fixes }),
   apply: (slug: string) =>
     api.post<{ version: WorkspaceVersion; revalidated: boolean; project: ProjectDetail }>(
       `${base(slug)}/apply`),

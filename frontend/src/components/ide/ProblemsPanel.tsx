@@ -1,6 +1,6 @@
-import { AlertTriangle, ChevronDown, ChevronUp, RotateCw, X, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, RotateCw, Wand2, X, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ProjectIssue, ProjectValidation } from "../../api/types";
+import type { ProjectFix, ProjectIssue, ProjectValidation } from "../../api/types";
 import { useT } from "../../i18n";
 
 /** Problems the user put aside for this project (kept per browser; nothing is deleted). */
@@ -38,6 +38,10 @@ export function ProblemsPanel(props: {
   checking?: boolean;
   collapsed?: boolean;
   onToggle?: () => void;
+  /** 035: apply the validator's deterministic corrections, with or without an AI. */
+  onApplyFix?: (fix: ProjectFix & { problem_id?: string | null }, all: ProjectIssue[]) => Promise<void>;
+  applying?: boolean;
+  lastDiff?: string | null;
 }) {
   const t = useT();
   const errors = props.validation?.errors ?? [];
@@ -49,6 +53,7 @@ export function ProblemsPanel(props: {
   const shownErrors = errors.filter((issue) => !hidden.has(signature(issue)));
   const shownWarnings = warnings.filter((issue) => !hidden.has(signature(issue)));
   const dismissedHere = errors.length + warnings.length - shownErrors.length - shownWarnings.length;
+  const fixable = [...shownErrors, ...shownWarnings].filter((issue) => issue.fix_data);
 
   const dismiss = (issue: ProjectIssue) => {
     const next = [...new Set([...dismissed, signature(issue)])];
@@ -83,6 +88,20 @@ export function ProblemsPanel(props: {
         </span>
       </span>
     );
+    // Outside the row's own button: a button inside a button is not valid markup.
+    const fixButton = issue.fix_data && props.onApplyFix ? (
+      <div className="px-9 pb-2">
+        <button
+          type="button"
+          disabled={props.applying}
+          onClick={() => void props.onApplyFix?.({ ...issue.fix_data!, problem_id: issue.problem_id }, [issue])}
+          className="inline-flex min-h-tap items-center gap-1 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-deep hover:bg-accent-soft/70 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          <Wand2 className="h-3.5 w-3.5" aria-hidden />
+          {t.projects.applyFix}
+        </button>
+      </div>
+    ) : null;
     return (
       <li key={key} className="group relative">
         <button
@@ -102,6 +121,7 @@ export function ProblemsPanel(props: {
         ) : (
           <div className="px-3 py-2">{body}</div>
         )}
+        {fixButton}
         {issue.expected != null && (
           <details className="px-9 pb-2">
             <summary className="cursor-pointer text-xs text-ink-muted">{t.projects.expected}</summary>
@@ -120,6 +140,19 @@ export function ProblemsPanel(props: {
         {t.projects.problemsPanel}
         {shownErrors.length > 0 && <span className="text-xs font-normal text-danger">{t.projects.problemsCount(shownErrors.length)}</span>}
         {shownWarnings.length > 0 && <span className="text-xs font-normal text-warning-deep">{t.projects.warningsCount(shownWarnings.length)}</span>}
+        {props.onApplyFix && fixable.length > 1 ? (
+          <button
+            type="button"
+            disabled={props.applying}
+            onClick={() => void props.onApplyFix?.({ ...fixable[0].fix_data!,
+                                                     problem_id: fixable[0].problem_id },
+                                                   fixable)}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold text-accent-deep hover:bg-accent-soft disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <Wand2 className="h-3.5 w-3.5" aria-hidden />
+            {t.projects.applyAllFixes(fixable.length)}
+          </button>
+        ) : null}
         {props.onRevalidate && (
           <button
             type="button"

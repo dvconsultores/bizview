@@ -28,6 +28,9 @@ vi.mock("../../src/config/BrandingContext", () => ({ useBranding: () => ({ ai_en
 
 import { api, ApiError } from "../../src/api/client";
 
+/** The fetches that are data, without the AI health probe (feature 035 asks it once on mount). */
+const dataGets = () => vi.mocked(api.get).mock.calls.filter(([url]) => url !== "/api/health");
+
 const ts = "2026-10-05T12:00:00Z";
 const base = {
   id: 7,
@@ -142,7 +145,7 @@ describe("autonomous runs (T043)", () => {
     const busyLine = container.querySelector(busyStatusSelector);
     expect(busyLine?.textContent).toContain("El asistente sigue trabajando…");
     expect(buttonByText("Detener")).toBeTruthy();
-    expect(api.get).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
 
     vi.mocked(api.get).mockResolvedValue({
       ...base,
@@ -156,7 +159,7 @@ describe("autonomous runs (T043)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(BUSY_POLL_MS);
     });
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(dataGets()).toHaveLength(1);
     expect(api.get).toHaveBeenCalledWith("/api/assistant/sessions/7");
     expect(container.textContent).toContain("Listo, añadí el IVA.");
     expect(textarea.disabled).toBe(false);
@@ -166,7 +169,7 @@ describe("autonomous runs (T043)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3 * BUSY_POLL_MS);
     });
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(dataGets()).toHaveLength(1);
   });
 
   it("Detener stops the run", async () => {
@@ -192,7 +195,7 @@ describe("autonomous runs (T043)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3 * BUSY_POLL_MS);
     });
-    expect(api.get).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
   });
 
   it("Detener on 409 not_running just refreshes", async () => {

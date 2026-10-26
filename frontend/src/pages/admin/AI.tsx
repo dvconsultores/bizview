@@ -69,22 +69,100 @@ function TestResult({ result }: { result: AITestResult }) {
             <p className="mt-1 break-words rounded-lg bg-subtle p-2 font-mono text-xs text-ink-2">{result.reply}</p>
           </div>
         ) : null}
+        {result.tool_call ? (
+          <p className="mt-2 text-sm">
+            <span className="font-medium">{t.ai.toolCall}: </span>
+            {result.tool_call.ok
+              ? t.ai.toolCallOk
+              : (result.tool_call.error?.message ?? t.ai.toolCallFail)}
+          </p>
+        ) : null}
+        <Models result={result} />
       </Alert>
     );
   }
+  const code = result.error?.code ?? "provider_error";
   return (
     <Alert tone="error">
       <p className="font-semibold">{t.ai.testFail}</p>
-      {result.error ? <p className="mt-1">{result.error.message}</p> : null}
+      <p className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="font-mono text-xs">{code}</span>
+        <span>{t.ai.errorCodes[code] ?? result.error?.message}</span>
+      </p>
+      {result.error?.action === "admin_ai" ? (
+        <p className="mt-1 text-xs text-ink-muted">{t.ai.action.admin_ai}</p>
+      ) : null}
       {/* The provider's own words: «devolvió un error» cannot be acted on. */}
       {result.error?.detail ? (
         <div className="mt-2">
           <p className="font-medium">{t.ai.detail}</p>
-          <p className="mt-1 max-h-40 overflow-auto break-words rounded-lg bg-subtle p-2 font-mono text-xs text-ink-2">{result.error.detail}</p>
+          <p className="mt-1 max-h-40 overflow-auto break-words rounded-lg bg-subtle p-2 font-mono text-xs text-ink-2">
+            {result.error.detail}
+          </p>
         </div>
       ) : null}
+      <details className="mt-2 text-xs text-ink-muted">
+        <summary className="cursor-pointer font-medium">{t.ai.details.title}</summary>
+        <p className="mt-1">{t.ai.details.at}: {new Date().toLocaleString()}</p>
+        <p className="mt-1">{t.ai.details.log}</p>
+        <p className="mt-1 overflow-x-auto rounded bg-subtle p-2 font-mono text-[11px]">
+          {t.ai.details.cmd}
+        </p>
+      </details>
       {result.latency_ms !== null ? <p className="mt-1">{t.ai.latency(result.latency_ms)}</p> : null}
+      <Models result={result} />
     </Alert>
+  );
+}
+
+/** 035: what the last real call did, recorded by the installation (not by this page). */
+function RecordedOutcome({ status }: { status: AIStatus }) {
+  const t = useT();
+  if (!status.last_error_code && !status.last_ok_at) return null;
+  return (
+    <dl className="grid gap-1 text-xs text-ink-muted sm:grid-cols-2">
+      {status.last_ok_at ? (
+        <div className="flex flex-wrap gap-1">
+          <dt className="font-semibold">{t.ai.lastOk}:</dt>
+          <dd>{new Date(status.last_ok_at).toLocaleString()}</dd>
+        </div>
+      ) : null}
+      {status.last_error_code ? (
+        <div className="flex flex-wrap gap-1">
+          <dt className="font-semibold">{t.ai.lastError}:</dt>
+          <dd className="font-mono">{status.last_error_code}</dd>
+          {status.last_error_at ? <dd>({new Date(status.last_error_at).toLocaleString()})</dd> : null}
+        </div>
+      ) : null}
+      {status.last_error_detail ? (
+        <div className="sm:col-span-2">
+          <dd className="max-h-24 overflow-auto break-words rounded bg-subtle p-2 font-mono">
+            {status.last_error_detail}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
+/** 035: the model ids the endpoint reports, so a wrong AI_MODEL is visible at a glance. */
+function Models({ result }: { result: AITestResult }) {
+  const t = useT();
+  if (result.models === undefined || result.models === null) {
+    return <p className="mt-2 text-xs text-ink-muted">{t.ai.modelsUnavailable}</p>;
+  }
+  return (
+    <div className="mt-2 text-xs">
+      <p className="font-medium">{t.ai.models}</p>
+      <ul className="mt-1 flex flex-wrap gap-1">
+        {result.models.map((id) => (
+          <li key={id} className="rounded bg-subtle px-1.5 py-0.5 font-mono text-ink-2">{id}</li>
+        ))}
+      </ul>
+      {result.model && !result.models.includes(result.model) ? (
+        <p className="mt-1 text-danger-deep">{t.ai.modelsMissing}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -152,6 +230,7 @@ export function AI() {
             {testing ? t.ai.testing : t.ai.test}
           </Button>
         </div>
+        <RecordedOutcome status={status} />
         <div aria-live="polite" className="empty:hidden">
           {result ? <TestResult result={result} /> : null}
           {testError ? <Alert tone="error">{testError}</Alert> : null}

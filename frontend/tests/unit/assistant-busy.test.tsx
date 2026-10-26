@@ -29,6 +29,9 @@ vi.mock("../../src/config/BrandingContext", () => ({ useBranding: () => ({ ai_en
 
 import { api, ApiError } from "../../src/api/client";
 
+/** The fetches that are data, without the AI health probe (feature 035 asks it once on mount). */
+const dataGets = () => vi.mocked(api.get).mock.calls.filter(([url]) => url !== "/api/health");
+
 const ts = "2026-10-05T12:00:00Z";
 const base = {
   id: 7,
@@ -84,11 +87,14 @@ describe("AssistantChat busy handling", () => {
       busy: true,
       messages: [...base.messages, { id: 2, role: "assistant", content: "Ronda 1 lista.", created_at: ts }],
     };
-    vi.mocked(api.get).mockResolvedValueOnce(busySession).mockResolvedValueOnce({
+    const done = {
       ...base,
       busy: false,
       messages: [...base.messages, { id: 2, role: "assistant", content: "Listo.", created_at: ts }],
-    });
+    };
+    let polls = 0;
+    vi.mocked(api.get).mockImplementation((async (url: string) =>
+      url === "/api/health" ? { ai: null } : polls++ === 0 ? busySession : done) as never);
 
     await act(async () => {
       root.render(<Harness initial={busySession} />);
@@ -98,12 +104,12 @@ describe("AssistantChat busy handling", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(true);
     expect(container.querySelector('[role="status"]:not([data-session-indicator])')?.textContent).toContain("El asistente sigue trabajando…");
-    expect(vi.mocked(api.get)).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(BUSY_POLL_MS);
     });
-    expect(vi.mocked(api.get)).toHaveBeenCalledTimes(1);
+    expect(dataGets()).toHaveLength(1);
     expect(vi.mocked(api.get)).toHaveBeenCalledWith("/api/assistant/sessions/7");
     expect(container.textContent).toContain("Ronda 1 lista.");
     expect(textarea.disabled).toBe(true);
@@ -111,7 +117,7 @@ describe("AssistantChat busy handling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(BUSY_POLL_MS);
     });
-    expect(vi.mocked(api.get)).toHaveBeenCalledTimes(2);
+    expect(dataGets()).toHaveLength(2);
     expect(textarea.disabled).toBe(false);
     expect(container.querySelector('[role="status"]:not([data-session-indicator])')).toBeNull();
     expect(container.textContent).toContain("Listo.");
@@ -119,7 +125,7 @@ describe("AssistantChat busy handling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(BUSY_POLL_MS * 3);
     });
-    expect(vi.mocked(api.get)).toHaveBeenCalledTimes(2);
+    expect(dataGets()).toHaveLength(2);
   });
 
   it("409 assistant_busy on send enters busy state", async () => {
@@ -167,7 +173,7 @@ describe("AssistantChat busy handling", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(BUSY_POLL_MS * 3);
     });
-    expect(vi.mocked(api.get)).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
   });
 });
 

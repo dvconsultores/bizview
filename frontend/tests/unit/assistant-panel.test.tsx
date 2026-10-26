@@ -22,6 +22,9 @@ vi.mock("../../src/auth/AuthContext", () => ({
 }));
 
 import { api } from "../../src/api/client";
+
+/** The fetches that are data, without the AI health probe (feature 035 asks it once on mount). */
+const dataGets = () => vi.mocked(api.get).mock.calls.filter(([url]) => url !== "/api/health");
 import { AssistantPanel } from "../../src/components/assistant/AssistantPanel";
 import { AssistantPanelProvider } from "../../src/components/assistant/AssistantPanelContext";
 import { AssistantToggle } from "../../src/components/assistant/AssistantToggle";
@@ -75,7 +78,7 @@ describe("assistant panel (Customer A-style, docked)", () => {
     expect(panel).not.toBeNull();
     expect(panel!.textContent).toContain("Hola, soy el asistente de BizView");
     expect(toggle().getAttribute("aria-expanded")).toBe("true");
-    expect(api.get).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
   });
 
   it("asks for the project on the first message, then creates the conversation and remembers it", async () => {

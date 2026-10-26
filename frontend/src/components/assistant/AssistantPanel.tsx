@@ -9,7 +9,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, ApiError } from "../../api/client";
-import type { AssistantSession } from "../../api/types";
+import { projectsApi } from "../../api/projects";
+import type { AssistantSession, ProjectFix } from "../../api/types";
 import { useBranding } from "../../config/BrandingContext";
 import { useT } from "../../i18n";
 import { Badge } from "../Badge";
@@ -43,6 +44,8 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
   const [loadError, setLoadError] = useState(false);
   const [chatKey, setChatKey] = useState(0);
   const [chatActive, setChatActive] = useState(false);
+  // 035: applying a deterministic fix from the conversation's problem list.
+  const [fixing, setFixing] = useState(false);
   // Feature 020: the first message of a new chat waits for its project (inline proposal).
   const [proposal, setProposal] = useState<{
     text: string;
@@ -54,6 +57,24 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
   const asideRef = useRef<HTMLElement | null>(null);
   const loadedId = useRef<number | null>(null);
   const docked = placement === "docked";
+
+  /** Apply the validator's fix from the conversation's list; reload the session to show the result. */
+  const applyProblemFix = async (problem: { fix_data?: ProjectFix | null;
+                                            problem_id?: string | null }) => {
+    const slug = session?.project?.slug;
+    if (!slug || fixing || !problem.fix_data) return;
+    setFixing(true);
+    try {
+      await projectsApi.applyFixes(slug, [{ ...problem.fix_data, problem_id: problem.problem_id }]);
+      const fresh = await api.get<AssistantSession>(`/api/assistant/sessions/${session!.id}`);
+      setSession(fresh);
+    } catch (e) {
+      setLoadError(true);
+      console.error(e);
+    } finally {
+      setFixing(false);
+    }
+  };
 
   useEffect(() => {
     mapOpenRef.current = map.open;
@@ -302,7 +323,8 @@ export function AssistantView({ placement }: { placement: "docked" | "page" }) {
                 )}
               </summary>
               <div className="mt-1 max-h-48 overflow-y-auto">
-                <ProblemList problems={session.validation.errors} dense />
+                <ProblemList problems={session.validation.errors} dense
+                             onApplyFix={applyProblemFix} applying={fixing} />
               </div>
             </details>
           ) : null}

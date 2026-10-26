@@ -160,6 +160,9 @@ export function ProjectWorkspace() {
 
   const [checking, setChecking] = useState(false);
   const [problemsOpen, setProblemsOpen] = useState(true);   // the panel can be put away
+  // 035: applying the validator's own corrections, with or without an AI.
+  const [fixing, setFixing] = useState(false);
+  const [fixDiff, setFixDiff] = useState<string | null>(null);
   const revalidate = useCallback(async () => {
     setChecking(true);
     try {
@@ -170,6 +173,33 @@ export function ProjectWorkspace() {
       setChecking(false);
     }
   }, [slug]);
+
+  /** Apply one problem's fix — or every fixable problem when `all` carries more than one. */
+  const applyFix = useCallback(async (first: { file: string; json_path: string;
+                                               op: "set" | "append" | "insert" | "remove";
+                                               value?: unknown; problem_id?: string | null },
+                                     all: { fix?: string | null; fix_data?: unknown;
+                                            problem_id?: string | null }[]) => {
+    setFixing(true);
+    setFixDiff(null);
+    try {
+      const batch = all.length > 1
+        ? all.map((issue) => ({ ...(issue.fix_data as object), problem_id: issue.problem_id }))
+        : [first];
+      const res = await projectsApi.applyFixes(
+        slug, batch as Parameters<typeof projectsApi.applyFixes>[1]);
+      setCheck({ validation: res.validation, readiness: res.readiness });
+      setFixDiff(res.results.map((r) => r.diff).join("\n"));
+      setResult({ tone: "success", text: t.projects.fixApplied(res.results[0]?.file ?? first.file) });
+      setTree(await projectsApi.tree(slug));
+    } catch (e) {
+      setResult({ tone: "error",
+                  text: t.projects.fixFailed(e instanceof ApiError ? e.message : t.common.unexpected) });
+      void revalidate();
+    } finally {
+      setFixing(false);
+    }
+  }, [slug, t, revalidate, setTree]);
 
   useEffect(() => {
     let cancelled = false;
@@ -492,7 +522,8 @@ export function ProjectWorkspace() {
         <ProblemsPanel validation={check?.validation ?? null} slug={slug}
                        onOpen={(file, line) => void openFile(file, line)}
                        onRevalidate={() => void revalidate()} checking={checking}
-                       collapsed={!problemsOpen} onToggle={() => setProblemsOpen((open) => !open)} />
+                       collapsed={!problemsOpen} onToggle={() => setProblemsOpen((open) => !open)}
+                       onApplyFix={applyFix} applying={fixing} lastDiff={fixDiff} />
       </div>
     </div>
   );

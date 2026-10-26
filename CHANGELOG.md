@@ -16,6 +16,26 @@ All notable changes to this project are documented here. The format follows
   and the generic message points at Administración → IA. The turn now logs the code and the redacted
   provider answer, and the connection test **shows** that answer instead of keeping it in the log.
 
+- **Every provider failure now has a code, and the code says what to do (2026-10-25)**: the first
+  fix named the three commonest causes; this one gives the whole vocabulary a stable code —
+  `not_configured`, `no_credit`, `bad_key`, `model_not_found`, `rate_limited` (carrying the
+  provider's `retry-after`), `context_too_long`, `provider_down`, `invalid_tool_call`, `refused`,
+  `provider_error` — and maps it the same way in the Anthropic provider, the OpenAI-compatible one
+  and the Anthropic-compatible endpoints of third parties (DeepSeek's `/anthropic` answers with
+  non-standard bodies; the recorded ones are in the tests).
+  - Every error bubble shows the code, the provider's own message (keys and ids redacted, 300
+    characters at most), the configured provider and model, and one action: **Ir a Administración →
+    IA** for a key, credit or model problem, **Reintentar** for a transient one.
+  - `/api/health` gains an `ai` block (`configured`, `provider`, `model`, `last_ok_at`,
+    `last_error_code`, `last_error_at`; never the key, never the text) fed by the new `ai_status`
+    table (migration `0028_ai_status`), and the administration home wears the **IA** pill from it.
+  - **Probar conexión** now runs a one-token completion *and* a one-round tool call, reports both,
+    records the outcome, and lists the models the provider reports (`GET /models`, `GET
+    /v1/models`) so a wrong `AI_MODEL` is caught by eye.
+  - Covered by `backend/tests/test_ai.py` (a table of recorded Anthropic, OpenAI-compatible and
+    DeepSeek bodies) and `backend/tests/test_ai_status.py` (transitions, the blocking rule, the
+    detail cap, the health block without a key).
+
 - **Applying one project no longer marks the others as changed (2026-10-25)**: the version stored
   only the parsed definition of each integration and report, and composing the next version dumped it
   back through `yaml.safe_dump`, so every project that was **not** being applied came out
@@ -114,6 +134,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Auto no longer dials a dead provider three times (2026-10-25)**: when the provider ran out of
+  credit the Auto mode retried the same failing call on every message and ended with «Auto ·
+  detenido» and nothing done — three times in one session — while the reason sat in the backend log.
+  Now `last_error_code` is read before a run starts (contract confirmation) and before each
+  `/speckit-*` command: if it is `no_credit`, `bad_key` or `model_not_found` and newer than
+  `last_ok_at`, the run is refused up front with the code and its action link, without a provider
+  call and without spending tokens. During a run, two consecutive errors of the same code stop it
+  with status `blocked:ai_<code>`; `rate_limited` and `provider_down` get one bounded retry
+  (honouring `retry-after`, at most 60 s) before stopping. The draft, the working state and the
+  summary are kept. A «continúa» or «corrige» while blocked gets the same refusal instead of a
+  provider call, and the composer shows the **IA** pill inline so the next dead turn is not a
+  surprise. Covered by `backend/tests/test_assistant_ai_outage.py`, where a transport spy asserts
+  zero calls.
 - **«Retirar del espacio» is gone; deleting an applied project does it (2026-10-25)**: two actions
   for taking a project out of the workspace was one too many. The button, its confirmation, its
   string and the `POST /api/projects/{slug}/withdraw` endpoint are removed; **Eliminar proyecto** is
@@ -168,6 +201,33 @@ All notable changes to this project are documented here. The format follows
     on its own for a budget that does not exist.
 
 ### Added
+
+- **Validation problems can be fixed without the AI (2026-10-25)**: the validator already knew the
+  answer («Conjuntos sin unión: altseason · Arreglo: declara joins: [{left:
+  assets.snapshot_at, right: altseason.snapshot_at}]») but the only way to apply it was asking the
+  assistant, which was down — the project stayed broken for days. A problem now carries its fix as
+  data (`{file, json_path, op: set|append|insert|remove, value}`), the problems panel offers
+  **Aplicar arreglo** on that problem and **Aplicar los N arreglos** in its header, and it works in
+  every mode, Ask included, with the provider down: the same path as `edit_draft`, it re-validates,
+  shows the diff and is audited as `project_fix_applied`.
+  - Seven rules ship with a structured fix: a missing `joins` between two `uses` sets, a missing
+    `date`, a missing `label`/`label_en`, an unknown chart type (with a suggested one), a missing
+    `schedule` (with the default), a missing `layout.theme.palette` (installation default) and a
+    filter referenced by a layout but never declared. Each is a pure function with a before/after
+    YAML test in `cli/tests/test_validate.py`.
+  - `POST /api/projects/{slug}/fix` applies one or many (super user, recent re-authentication,
+    `base_sha256` staleness check), and the Assistant calls the same functions through
+    `apply_fix(problem_id)` instead of rewriting YAML by hand.
+  - `backend/tests/test_project_fixes.py` takes the session-23 fixture (`report.yaml` without
+    `joins`) from one problem to zero with one click, then applies, with the provider stubbed as
+    down; the scripted agent run asserts the tool call and no `edit_draft` for the same file.
+
+- **Where to look is written on the screen (2026-10-25)**: an outage was diagnosed by reading the
+  wrong container's log. Every error bubble and the Probar card now carry a **Detalles técnicos**
+  block with the command that reads the right one (`docker logs --tail 200 bizview-backend | grep -i
+  "AI"`), the timestamp and the request reference. The app guide (*Inteligencia artificial →
+  Problemas frecuentes*) lists every code with its meaning and its fix, and the help agent answers
+  «la IA devolvió un error» from it.
 
 - **The report page uses the app's width and puts its controls behind one sheet (feature 030)**:
   the report and the shared view now span the same container as Tableros and Administración (the

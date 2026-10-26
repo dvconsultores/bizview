@@ -109,6 +109,24 @@ export interface AIStatus {
   key_configured: boolean;
   timeout_seconds: number;
   missing: string[];
+  /** Feature 035: how the last call went (no key, no provider text beyond the redacted detail). */
+  last_ok_at: string | null;
+  last_error_code: string | null;
+  last_error_at: string | null;
+  last_error_detail: string | null;
+  last_model: string | null;
+  healthy: boolean;
+  blocking_code: string | null;
+}
+
+/** 035: the unauthenticated AI block of `/api/health`, read by the pills. */
+export interface AIHealth {
+  configured: boolean;
+  provider: AIProvider;
+  model: string | null;
+  last_ok_at: string | null;
+  last_error_code: string | null;
+  last_error_at: string | null;
 }
 
 export interface AITestResult {
@@ -117,7 +135,11 @@ export interface AITestResult {
   model: string | null;
   latency_ms: number | null;
   reply: string | null;
-  error: { code: string; message: string; detail?: string | null } | null;
+  error: { code: string; message: string; detail?: string | null;
+           action?: "admin_ai" | "retry" | null } | null;
+  tool_call?: { ok: boolean; name: string | null; latency_ms: number | null;
+                error?: { code: string; message: string; detail?: string | null } | null } | null;
+  models?: string[] | null;
 }
 
 // --- feature 004: data sources and security -----------------------------------------------
@@ -754,6 +776,20 @@ export interface AssistantMessage {
   scope?: { path: string; rule: string | null };
   /** Feature 024: the image briefs this message carries (metadata only). */
   attachments?: Attachment[];
+  /** Feature 035: why a turn failed — code, provider words, model, action, request id. */
+  error?: ProviderErrorPayload;
+}
+
+export interface ProviderErrorPayload {
+  code: string;
+  detail: string | null;
+  provider: string;
+  model: string | null;
+  at: string;
+  request_id: string;
+  action: "admin_ai" | "retry" | null;
+  retry_after?: number | null;
+  blocked?: boolean;
 }
 
 /** Feature 024: an image brief of the chat; `url` serves the bytes back. */
@@ -826,6 +862,9 @@ export interface AssistantIssue {
   path?: string | null;
   expected?: Record<string, unknown> | null;
   fix?: string | null;
+  /** Feature 035: the correction the product can apply on its own. */
+  fix_data?: ProjectFix | null;
+  problem_id?: string | null;
 }
 
 export interface AssistantValidation {
@@ -1181,6 +1220,23 @@ export interface ProjectIssue {
   entry?: string;
   fix?: string | null;
   expected?: unknown;
+  /** Feature 035: the machine-applicable half of the correction, when the validator knows it. */
+  fix_data?: ProjectFix | null;
+  problem_id?: string | null;
+}
+
+/** Feature 035: a JSON Pointer operation the product applies without an AI. */
+export interface ProjectFix {
+  file: string;
+  json_path: string;
+  op: "set" | "append" | "insert" | "remove";
+  value?: unknown;
+}
+
+export interface FixResult {
+  results: { file: string; revision_id: number | null; diff: string; problems: string[] }[];
+  validation: ProjectValidation;
+  readiness: ProjectCheck["readiness"];
 }
 
 export interface ProjectValidation {

@@ -26,6 +26,9 @@ vi.mock("../../src/config/BrandingContext", () => ({
 }));
 
 import { api, ApiError } from "../../src/api/client";
+
+/** The fetches that are data, without the AI health probe (feature 035 asks it once on mount). */
+const dataGets = () => vi.mocked(api.get).mock.calls.filter(([url]) => url !== "/api/health");
 import type { AssistantSession, CommandDef, CommandRun } from "../../src/api/types";
 import { AssistantChat } from "../../src/components/assistant/AssistantChat";
 import { __resetCommandsCache } from "../../src/components/assistant/useCommands";
@@ -220,7 +223,7 @@ describe("command menu in the composer", () => {
   it("plain text never fetches the commands", async () => {
     await renderChat();
     await type("hola");
-    expect(api.get).not.toHaveBeenCalled();
+    expect(dataGets()).toEqual([]);
   });
 });
 
