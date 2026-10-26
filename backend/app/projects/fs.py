@@ -1,4 +1,11 @@
-"""Safe file access inside project folders (feature 020, research R2)."""
+"""Safe file access inside project folders (feature 020, research R2).
+
+Feature 037: this module is the only way code turns a project into disk. `check_rel` refuses the
+composed-tree prefix (`projects/<slug>/…`) that the validator speaks, so no call site — present or
+future — can address another project's folder as a folder of this one, and
+`resolve_project_path(project_id, relative)` resolves the root from the project row instead of from
+a slug a caller may have taken from anywhere.
+"""
 
 import hashlib
 import logging
@@ -17,6 +24,11 @@ MAX_FILES = 400
 MAX_PATH = 240
 CONSTITUTION = ".specify/memory/constitution.md"
 TRASH = ".papelera"
+# The validator composes every project under `projects/<slug>/…` (feature 020). Those paths belong
+# to the composition, never to a project's own tree (feature 037).
+COMPOSED_PREFIX = "projects"
+
+log = logging.getLogger(__name__)
 
 
 class ProjectPathError(Exception):
@@ -33,6 +45,12 @@ class ProjectPathError(Exception):
 
 def _unsafe(path: str) -> ProjectPathError:
     return ProjectPathError("path_unsafe", M("projects.path_unsafe", path=path))
+
+
+def _outside(path: str) -> ProjectPathError:
+    """A path that names another project (or an absolute one): it is not a path of this one."""
+    log.warning("refused a path outside the project: %s", path)
+    return ProjectPathError("path_outside_project", M("projects.path_outside_project", path=path))
 
 
 def projects_dir() -> Path:
@@ -68,6 +86,10 @@ def check_rel(rel: str) -> list[str]:
     parts = rel.split("/")
     if any(part in ("", ".", "..") for part in parts):
         raise _unsafe(rel)
+    if parts[0] == COMPOSED_PREFIX:
+        # `projects/<other>/…` is the composition's own namespace (feature 037): accepting it as a
+        # nested folder is exactly how a stale fix reached the wrong project.
+        raise _outside(rel)
     if any(part.startswith(".") for part in parts) and rel not in (
         CONSTITUTION,
         ".specify",
@@ -75,6 +97,43 @@ def check_rel(rel: str) -> list[str]:
     ):
         raise _unsafe(rel)
     return parts
+
+
+def project_folder(project_id: int, *, db=None) -> Path:
+    """Root folder of a project, resolved from its row (feature 037)."""
+    slug = project_slug(project_id, db=db)
+    return project_root(slug)
+
+
+def project_slug(project_id: int, *, db=None) -> str:
+    """Slug of a live project, read from the row so no caller can pass one of its own."""
+    if db is not None:
+        return _live_slug(db, project_id)
+    from app.db import get_sessionmaker
+
+    with get_sessionmaker()() as own:
+        return _live_slug(own, project_id)
+
+
+def _live_slug(db, project_id: int) -> str:
+    from sqlalchemy import select
+
+    from app.models import Project
+
+    slug = db.scalar(select(Project.slug).where(Project.id == project_id,
+                                                Project.deleted_at.is_(None)))
+    if not slug:
+        raise ProjectPathError("project_not_found", M("projects.not_found"))
+    return slug
+
+
+def resolve_project_path(project_id: int, rel: str, *, folder: bool = False, db=None) -> Path:
+    """The only sanctioned mapping from a project and a project-relative path to disk.
+
+    The root comes from `project_id` (never from a path a caller received), and `check_rel` refuses
+    absolute paths, `..`, symlinks leaving the root and the composed `projects/<slug>/…` prefix.
+    """
+    return resolve(project_slug(project_id, db=db), rel, folder=folder)
 
 
 def resolve(slug: str, rel: str, *, folder: bool = False) -> Path:
