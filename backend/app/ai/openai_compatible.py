@@ -26,6 +26,7 @@ from app.ai.errors import (  # noqa: F401  (re-exported: the Anthropic provider 
     code_for_body,
     detail_of,
 )
+from app.ai.history_rules import HistoryInvalid, assert_valid
 from app.config import Settings
 from app.i18n import t
 
@@ -98,6 +99,10 @@ class OpenAICompatibleProvider:
             body["tools"] = [{"type": "function",
                               "function": {"name": t.name, "description": t.description,
                                            "parameters": t.parameters}} for t in tools]
+        try:
+            assert_valid(body["messages"], "openai_compatible")   # 036
+        except HistoryInvalid as exc:
+            raise AIError("history_invalid", "; ".join(exc.problems)) from None
         data = self._post(body, timeout=self._chat_timeout)
         try:
             choice = data["choices"][0]

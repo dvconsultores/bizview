@@ -167,6 +167,8 @@ MESSAGES: dict[str, str] = {
                               "él o devuelve un error del servidor.",
     "ai.error.invalid_tool_call": "El modelo devolvió una llamada a herramienta mal formada.",
     "ai.error.refused": "El proveedor rechazó la solicitud.",
+    "ai.error.history_invalid": "La conversación guardada no se puede reenviar al proveedor; "
+                               "repárala y vuelve a intentarlo.",
     "ai.error.provider_error": "El proveedor de IA devolvió un error; revisa la clave, el saldo y "
                               "el modelo en Administración → IA.",
     "ai.action.admin_ai": "Ir a Administración → IA",
@@ -439,6 +441,13 @@ MESSAGES: dict[str, str] = {
     "assistant.chat.invalid_args": "Detuve la conversación: el modelo envió argumentos no válidos dos veces. El borrador se conservó; escribe «continúa» para seguir.",
     "assistant.busy": "El asistente sigue trabajando en esta conversación; espera a que termine.",
     "assistant.capacity": "Hay demasiadas conversaciones trabajando; intenta en un momento.",
+    # 036: a call with no stored result is kept as a note instead of an unanswerable tool_use.
+    "assistant.history.no_result": "[herramienta {name} sin resultado]",
+    "assistant.repair.done": "Conversación reparada: {paired} resultados emparejados, {dropped} descartados.",
+    "assistant.repair.nothing": "La conversación ya se podía reenviar; no hubo nada que reparar.",
+    "assistant.repair.action": "Reparar conversación",
+    "assistant.repair.failed": "No se pudo reparar: {reason}",
+    "assistant.history.invalid_hint": "El historial guardado tiene un resultado de herramienta sin su llamada; repáralo para seguir hablando.",
     "assistant.interrupted": "La respuesta anterior se interrumpió; lo hecho hasta la última ronda se guardó. Escribe «continúa».",
     "assistant.stopped": "Detenido por el usuario.",
     "assistant.unexpected": "Ocurrió un error inesperado; lo hecho hasta la última ronda se guardó.",

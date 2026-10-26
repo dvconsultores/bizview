@@ -177,6 +177,8 @@ MESSAGES: dict[str, str] = {
                               "reached, or returns a server error.",
     "ai.error.invalid_tool_call": "The model returned a malformed tool call.",
     "ai.error.refused": "The provider rejected the request.",
+    "ai.error.history_invalid": "The stored conversation cannot be sent to the provider again; "
+                                "repair it and try again.",
     "ai.error.provider_error": "The AI provider returned an error; check the key, the balance "
                                "and the model in Administration → AI.",
     "ai.action.admin_ai": "Go to Administration → AI",
@@ -449,6 +451,13 @@ MESSAGES: dict[str, str] = {
     "assistant.chat.invalid_args": "I stopped the conversation: the model sent invalid arguments twice. The draft was kept; type \"continue\" to go on.",
     "assistant.busy": "The assistant is still working on this conversation; wait until it finishes.",
     "assistant.capacity": "Too many conversations are working; try again in a moment.",
+    # 036: a call with no stored result is kept as a note instead of an unanswerable tool_use.
+    "assistant.history.no_result": "[tool {name} produced no result]",
+    "assistant.repair.done": "Conversation repaired: {paired} results paired, {dropped} dropped.",
+    "assistant.repair.nothing": "The conversation could be sent already; nothing to repair.",
+    "assistant.repair.action": "Repair conversation",
+    "assistant.repair.failed": "Could not repair: {reason}",
+    "assistant.history.invalid_hint": "The stored history has a tool result without its call; repair it to keep talking.",
     "assistant.interrupted": "The previous response was interrupted; work up to the last round was saved. Type \"continue\".",
     "assistant.stopped": "Stopped by the user.",
     "assistant.unexpected": "An unexpected error occurred; work up to the last round was saved.",

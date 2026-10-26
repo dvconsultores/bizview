@@ -16,6 +16,7 @@ from app.ai import (
     ToolSpec,
 )
 from app.ai.errors import code_for_body, code_for_status, detail_of
+from app.ai.history_rules import HistoryInvalid, assert_valid
 from app.ai.openai_compatible import retry_after_seconds
 from app.config import Settings
 
@@ -91,6 +92,10 @@ class AnthropicProvider:
         if tools:
             params["tools"] = [{"name": t.name, "description": t.description,
                                 "input_schema": t.parameters} for t in tools]
+        try:
+            assert_valid(params["messages"], "anthropic")   # 036: never send an orphan result
+        except HistoryInvalid as exc:
+            raise AIError("history_invalid", "; ".join(exc.problems)) from None
         response = self._create(params, timeout=self._chat_timeout, max_retries=0)
 
         text = "".join(b.text for b in response.content if b.type == "text").strip()

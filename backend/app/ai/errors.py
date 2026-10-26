@@ -11,11 +11,11 @@ from typing import Literal
 
 Code = Literal["not_configured", "no_credit", "bad_key", "model_not_found", "rate_limited",
                "context_too_long", "provider_down", "invalid_tool_call", "refused",
-               "provider_error"]
+               "history_invalid", "provider_error"]
 
 CODES: tuple[str, ...] = ("not_configured", "no_credit", "bad_key", "model_not_found",
                           "rate_limited", "context_too_long", "provider_down",
-                          "invalid_tool_call", "refused", "provider_error")
+                          "invalid_tool_call", "refused", "history_invalid", "provider_error")
 
 # Text of each code, in the default language, kept next to the catalogue for the docstring tests.
 MESSAGES: dict[str, str] = {
@@ -29,6 +29,10 @@ MESSAGES: dict[str, str] = {
                      "o devuelve un error del servidor.",
     "invalid_tool_call": "El modelo devolvió una llamada a herramienta mal formada.",
     "refused": "El proveedor rechazó la solicitud.",
+    # 036: the conversation itself cannot be replayed (a result whose tool_use is gone). Sending it
+    # again would fail identically: the reader repairs it, and nothing is retried automatically.
+    "history_invalid": "La conversación guardada no se puede reenviar al proveedor; "
+                       "repárala y vuelve a intentarlo.",
     "provider_error": "El proveedor de IA devolvió un error; revisa la clave, el saldo y "
                       "el modelo en Administración → IA.",
 }
