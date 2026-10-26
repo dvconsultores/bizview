@@ -8,6 +8,45 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Corrección crítica: aislamiento por proyecto (2026-10-26)**: la página de `artemisa` mostraba un
+  problema de `coinmarketcap` (`projects/coinmarketcap/reports/panorama-cripto/report.yaml#/uses ·
+  Conjuntos sin unión: altseason`) con su botón «Aplicar arreglo», que respondía
+  `El archivo projects/coinmarketcap/… ya no existe`; el chat listaba el mismo problema y la vista
+  previa fallaba cuatro veces con «no ve ningún archivo del proyecto». Las dos conversaciones eran
+  del mismo super usuario y la carpeta de `artemisa` estaba bien: el fallo no era de archivos, era de
+  **alcance**.
+  - `validate_project` seguía validando la composición del espacio (correcto: un id duplicado o una
+    referencia a otro proyecto son problemas reales) pero publicaba **todos** los hallazgos como
+    problemas del proyecto abierto. Ahora publica solo los suyos, con rutas relativas a su carpeta;
+    los demás se cuentan en `other_projects` y los del espacio en `workspace_errors`. `valid` es «este
+    proyecto» y el nuevo `composed_valid` es «todo el espacio»: «Listo para aplicar» exige los dos y
+    nombra al proyecto que bloquea, sin ofrecer un arreglo que no se puede escribir.
+  - El panel de problemas solo dibuja los problemas de su proyecto; una ruta que no es relativa al
+    proyecto (otro `projects/<x>/…` o una absoluta) nunca lleva botón de arreglo.
+  - `POST /api/projects/{slug}/fix` resuelve cada archivo desde la fila del proyecto
+    (`fs.resolve_project_path(project_id, relative)`) y responde `422 path_outside_project` («ruta
+    fuera del proyecto») en vez de `409 fix_gone`; un `problem_id` de otro archivo se rechaza. Ningún
+    arreglo cruzado escribió nunca: la lista de rutas permitidas ya lo impedía, pero el mensaje lo
+    contaba como «el archivo ya no existe».
+  - `fs.check_rel` rechaza el prefijo `projects` en **todas** las lecturas, escrituras, listados,
+    restauraciones y borrados: es el único punto por el que pasa una ruta de proyecto.
+  - Las herramientas del asistente (`read_draft`, `edit_draft`, `propose_draft`, `apply_fix`) rechazan
+    una ruta fuera del proyecto en vez de decir que el archivo «falta».
+  - `POST /api/projects/{slug}/preview` usa la conversación **del que llama** (antes tomaba la última
+    del proyecto, fuera de quien fuera) y el chat de una página ya no acepta un `?chat=` de otro
+    proyecto.
+  - `assistant_preview_request` guarda su `project_id` (migración `0030_project_scope`, con recuento
+    de lo que se atribuye y de lo que se descarta): el worker comprueba que coincida con la
+    conversación, resuelve la carpeta desde él, registra la raíz que lee y falla diciendo el slug y
+    la ruta montada cuando la carpeta está vacía o no existe (así un volumen que falta no se confunde
+    con un error de alcance). Aplicar un proyecto cuya carpeta no está se rechaza: la versión saldría
+    sin sus archivos.
+  - Regresión: `backend/tests/test_project_scope.py` (dos proyectos, un usuario: el problema de B no
+    llega a A ni al revés, el arreglo cruzado se rechaza, la vista previa resuelve su carpeta) y
+    `test_project_scope_guard.py` (ninguna consulta sobre una tabla con `project_id` sin filtrar por
+    proyecto, con la lista explícita de los casos de instalación). Guía:
+    `docs/guides/proyectos/aislamiento.md`.
+
 - **A conversation can be replayed again: no orphan `tool_result` (2026-10-26)**: every message of
   the `coinmarketcap` conversation answered
   `400 — unexpected tool_use_id found in tool_result blocks: call_00_g9JN…` while Probar passed and

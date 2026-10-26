@@ -318,6 +318,11 @@ files changed afterwards do nothing until the next apply. **Volver a la versión
 restores the previous version in seconds. Reports appear in the users' home as dashboards;
 access follows the usual grants.
 
+Each project is validated and applied on its own page: the problems it shows are its own (another
+project's problems are only counted, never offered as a fix), and applying one composes it with the
+rest of the workspace — if another project breaks the composition, the apply names it. See
+[proyectos/aislamiento.md](./guides/proyectos/aislamiento.md).
+
 ## The in-app assistant: Spec Kit commands
 
 When AI is enabled, each BI project has a chat (Proyectos → a project, or the Asistente panel)

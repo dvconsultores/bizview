@@ -41,15 +41,17 @@ def test_legacy_version_is_principal(applied, db):
     assert "integrations/ventas-prueba/integration.yaml" in trees["principal"]
 
 
-def test_duplicate_id_names_other_project(applied, db, superuser):
+def test_duplicate_id_is_published_on_the_project_that_owns_the_file(applied, db, superuser):
+    """Feature 037: the collision is real (it blocks the composition) but it is *principal's* file
+    that the validator flags, so it is reported as another project's problem and never as a fixable
+    entry of demo."""
     valid = dedent(integration_yaml()).lstrip().replace(
         "spec: specs/integrations/001-ventas-prueba", "spec: specs/001-ventas")
     project = _demo(db, superuser, "integrations/ventas-prueba/integration.yaml", valid)
     result = validate_project(db, project)
-    dup = [e for e in result["errors"] if e["code"] == "duplicate_id"]
-    assert dup, [(e["code"], e.get("file"), e["message"][:80]) for e in result["errors"]]
-    assert any("principal" in e["message"] for e in dup)
-    assert result["valid"] is False
+    assert result["other_projects"].get("principal", {}).get("errors", 0) >= 1
+    assert not any(e["code"] == "duplicate_id" for e in result["errors"])
+    assert result["composed_valid"] is False
 
 
 def test_problem_mapped_to_file_and_line(db, superuser):
