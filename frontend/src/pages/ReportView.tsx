@@ -391,7 +391,7 @@ export function ReportView() {
   const ready = fresh && !loading;
   const pdfAvailable = !!def?.pdf;
   const csvAvailable = fresh && !!data?.views.some(
-    (v) => v.type === "table" || v.type === "ranking",
+    (v) => !v.error && !v.empty && (v.type === "table" || v.type === "ranking"),
   );
 
   const exportSection = (

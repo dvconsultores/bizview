@@ -240,7 +240,8 @@ function KpiComponent({
 
 function trendPoints(metric: string, data: ReportData): TrendPoint[] | null {
   const trend = data.views.find((view) => view.type === "trend" && view.metric === metric);
-  return trend && trend.type === "trend" ? trend.points : null;
+  // Feature 038: a trend with an error card carries no series to spark.
+  return trend && trend.type === "trend" && !trend.error ? trend.points : null;
 }
 
 function viewTitle(view: ReportView): string | undefined {

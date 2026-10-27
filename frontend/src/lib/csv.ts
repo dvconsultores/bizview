@@ -125,6 +125,8 @@ export function toCsvSections(tables: CsvTable[]): string {
 }
 
 export function viewCsvTable(view: ReportView): CsvTable | null {
+  // Feature 038: a view that failed (or has no data) has nothing to export.
+  if (view.error || view.empty) return null;
   if (view.type === "table") {
     return {
       title: localized(view, "title") ?? t.reportParams.detailTitle,

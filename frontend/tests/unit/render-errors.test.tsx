@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ReportData, ReportDefinition, ReportView, WebLayout } from "../../src/api/types";
 import { LayoutRenderer } from "../../src/components/report/LayoutRenderer";
 import { ReportViews } from "../../src/components/report/ReportViews";
+import { viewCsvTable } from "../../src/lib/csv";
 
 // Feature 038 — FR-003/FR-007/FR-009: a tile that cannot render is its own card and the rest of the
 // dashboard still draws.
@@ -156,5 +157,24 @@ describe("report render error cards (038)", () => {
     };
     render(<ReportViews data={empty} def={def} />);
     expect(container.textContent).toContain("Sin datos: mercado-cripto.altcoin_season");
+  });
+});
+
+describe("exporting a report with a failed view (038)", () => {
+  it("has nothing to export for a view that failed or came back empty", () => {
+    expect(viewCsvTable(failed)).toBeNull();
+    expect(viewCsvTable({ ...failed, error: undefined, empty: card })).toBeNull();
+  });
+
+  it("still exports the views that rendered", () => {
+    const table: ReportView = {
+      type: "table",
+      id: "detalle",
+      title: "Detalle",
+      summary: "",
+      columns: [{ id: "asset", label: "Activo", kind: "dimension" }],
+      rows: [{ asset: "BTC" }],
+    };
+    expect(viewCsvTable(table)?.rows).toEqual([{ asset: "BTC" }]);
   });
 });
