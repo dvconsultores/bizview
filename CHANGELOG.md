@@ -8,6 +8,39 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Un tablero que no se puede pintar dice qué pieza falló, y una vista previa que ya no existe lo
+  dice (2026-10-26, feature 038)**: en el proyecto `coinmarketcap`, con la versión 22 aplicada a las
+  15:15, pulsar `panorama-cripto` en **Vista previa** (y `PDF de vista previa: panorama-cripto`)
+  respondía `Ocurrió un error inesperado (referencia e8c808976283)`. La validación había pasado: el
+  fallo era al pintar. Tres defectos, los tres arreglados:
+  - **La vista previa sobrevivía a sus datos.** `apply_project` borra los esquemas
+    `preview_<sesión>__ds_*` pero dejaba `project.preview` en `succeeded`, así que la página seguía
+    ofreciendo los enlaces de **Vista previa**; al pulsarlos la consulta apuntaba a tablas que ya no
+    existían y el manejador genérico respondía 500. Ahora aplicar deja la vista previa en `replaced`
+    con la versión aplicada (en la misma transacción), la página muestra «Vista previa reemplazada
+    por la versión N» junto al tablero publicado y deja de ofrecer los enlaces; una pestaña vieja
+    recibe `409 preview_expired`, y si los esquemas desaparecieron por la limpieza la primera lectura
+    retira la vista previa (`expired`) para que los enlaces se vayan solos. Nunca un 500.
+  - **Una pieza mala tumbaba el tablero entero.** `run_views` calculaba todas las vistas en un lote
+    y dejaba escapar la primera excepción: una tabla ausente, una métrica que divide entre cero o un
+    `format` fuera del catálogo daban el mismo 500 anónimo para todo el reporte, y también para el
+    PDF, que comparte el payload. Ahora hay un catálogo de códigos con la pieza que falló —
+    `preview_expired`, `dataset_missing`, `join_failed`, `empty_dataset`, `metric_error`,
+    `layout_component_unknown`, `format_unknown`, `pdf_render` —, cada vista falla por separado (una
+    fila de KPIs reintenta métrica por métrica para que solo la mala muestre su tarjeta), un período
+    sin datos pinta «Sin datos» con `empty_dataset` y los conjuntos vacíos, y un bloque del PDF que
+    no se puede dibujar se sustituye por su tarjeta con el id del bloque. El resto del tablero y del
+    PDF se pinta igual.
+  - **La tarjeta trae los detalles técnicos** (035): código, referencia, reporte, conjunto, columna,
+    uniones y clave, métrica, vista, componente, bloque y motivo, más el comando que encuentra la
+    línea del servidor (`docker logs --tail 500 bizview-backend | grep -n "<referencia>" -A 60`). El
+    registro va a ERROR con los mismos campos; los valores de fila nunca viajan (VIII).
+  - El proyecto de regresión vive en `backend/tests/fixtures/projects/coinmarketcap/` (cuatro
+    conjuntos unidos por `snapshot_at`, reporte `panorama-cripto` con layout web y PDF) y se pinta en
+    JSON y PDF desde la vista previa y desde la versión aplicada, con datos completos, un conjunto
+    vacío y sin período de comparación; cada código tiene su prueba. La guía está en
+    [docs/guides/tableros/errores.md](docs/guides/tableros/errores.md).
+
 - **Un run deja de quedarse atascado, y el resumen se puede leer (2026-10-26)**: tres runs seguidos
   del proyecto `coinmarketcap` terminaron igual —«Me detengo y no aplico: … no puedo leer el
   contenido real de integration.yaml»— con 20 M de tokens y `limit:rounds`. Dos defectos, los dos
