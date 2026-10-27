@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from importlib import resources
 
+from app.assistant.commands import pipeline
 from app.assistant.commands.registry import INSPECTION_TOOLS, CommandDef
 from app.i18n import M
 
@@ -271,6 +272,30 @@ class _Checker:
             return False
         return op["content"].startswith(self.ctx.files[path].rstrip("\n") + "\n")
 
+    def run_report(self, op: dict) -> bool:
+        """The run report of `/speckit-all` (039): one file, only for a spec that exists."""
+        if op["op"] != "write" or not self.ctx.spec:
+            return False
+        return op["path"] == f"specs/{self.ctx.spec}/run-report.md"
+
+    def decisions_append(self, op: dict) -> bool:
+        """Only additions inside «Decisiones tomadas (modo autónomo)» (039, plan §8)."""
+        path = self._doc("spec.md")
+        if op["op"] != "write" or op["path"] != path or path not in self.ctx.files:
+            return False
+        old, new = self.ctx.files[path], op["content"]
+        if pipeline.without_decisions(old) != pipeline.without_decisions(new):
+            return False
+        before = pipeline.decisions_section(old)
+        after = pipeline.decisions_section(new)
+        if before and not after.startswith(before):
+            return False
+        added = after[len(before):] if before else after
+        lines = [line for line in added.splitlines() if line.strip()]
+        if not after or after == before:
+            return False
+        return all(pipeline.is_decision(line) for line in lines)
+
     def hints(self) -> list[str]:
         ctx, spec = self.ctx, self.ctx.spec or "<spec>"
         out: list[str] = []
@@ -289,6 +314,11 @@ class _Checker:
                 out.append(f"specs/{spec}/plan.md|research.md|data-model.md|quickstart.md")
             elif rule in ("tasks_doc", "tasks_ticks", "tasks_append"):
                 out.append(f"specs/{spec}/tasks.md")
+            elif rule == "run_report":
+                out.append(f"specs/{spec}/run-report.md")
+            elif rule == "decisions_append":
+                out.append(f"specs/{spec}/spec.md "
+                           f"(solo «{pipeline.DECISIONS_HEADING}»)")
             elif rule == "custom_checklist":
                 out.append(f"specs/{spec}/checklists/<nombre>.md")
             elif rule == "existing_artifacts":

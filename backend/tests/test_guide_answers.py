@@ -63,7 +63,7 @@ def test_tool_result_body_equals_the_file_and_unknown_topics(chat, db, superuser
                               get_settings())
         assert missing["found"] is False and "note" in missing
         index, _ = run_tool(db, actor, view, "get_app_guide", {}, get_settings())
-        assert len(index["index"]) == 53
+        assert len(index["index"]) == 56
 
 
 def test_ayuda_without_arguments_needs_no_provider(chat):

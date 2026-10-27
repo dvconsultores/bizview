@@ -58,14 +58,17 @@ def test_parse_errors(commands_dir, text, code):
 
 
 def test_registry_and_menu(commands_dir):
-    assert next(iter(registry.REGISTRY)) == "speckit-constitution"
+    # 039 puts `/speckit-all` first: it is the entry point of the whole authoring flow.
+    assert next(iter(registry.REGISTRY)) == "speckit-all"
     assert list(registry.REGISTRY)[-1] == "ayuda"
     menu = registry.list_commands("en")
-    assert len(menu) == 11          # the ten spec-kit ones plus /fix
+    assert len(menu) == 13          # the eleven spec-kit ones (039 adds all + verify) plus /fix
     plan = next(c for c in menu if c["name"] == "speckit-plan")
     assert plan == {"name": "speckit-plan", "description": "Desc speckit-plan",
                     "argument_hint": "<texto>", "needs_spec": True, "needs_args": False}
     assert registry.REGISTRY["speckit-analyze"].tools == frozenset()
+    assert registry.REGISTRY["speckit-verify"].writes == ()
+    assert registry.REGISTRY["speckit-all"].writes == ("run_report", "decisions_append")
     assert registry.REGISTRY["ayuda"].provider is True    # 023: `/ayuda <tema>` asks the model
 
 

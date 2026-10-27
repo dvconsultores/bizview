@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Un comando recorre la spec entera y termina con el informe (2026-10-27, feature 039)**:
+  `/speckit-all <petición | NNN-nombre> [--until <etapa>] [--force]` recorre especificar → aclarar →
+  planificar → tareas → analizar → implementar → converger → verificar en un solo run, sin
+  preguntar después del contrato. Cada etapa sigue siendo un comando auditado con su propio alcance
+  (`run_command`), y el orden lo impone el producto: una etapa no se salta ni se repite. Las dudas
+  se resuelven con una precedencia fija (constitución → spec → otras specs → valores del paquete) y
+  quedan escritas como `- [etapa] decisión — porqué` en «Decisiones tomadas (modo autónomo)» de la
+  spec. Al terminar se escribe `run-report.md` en la carpeta de la spec y se muestra como tarjeta:
+  etapas, decisiones, verificación por historia, tokens y «Pendiente para el humano» (solo Aplicar
+  cuando el contrato no lo permite). Se detiene únicamente por un conflicto de constitución, una
+  verificación que falla tres ciclos, una acción que el contrato no permite o una fuente o
+  credencial que falta; en cualquier otro caso decide. `--until tasks` es el «dry run» documentado,
+  `--force` ignora lo ya hecho y `/speckit-all <spec>` reanuda en la etapa donde se detuvo: un
+  límite del contrato, «Detener» o un cambio de modo escriben el informe con el motivo y devuelven el
+  cursor a la etapa que quedó a medias, para que la reanudación la repita en vez de saltarla.
+- **La etapa de verificación comprueba de verdad (`/speckit-verify`, feature 039)**: validación del
+  borrador, una comprobación por consulta o petición de la integración de la spec, una vista previa
+  (contada al contrato) y un veredicto por historia de usuario; es de solo lectura, así que un fallo
+  se arregla volviendo a implementar o converger (máximo 3 ciclos). El comando también sirve para
+  re-verificar una spec ya implementada.
+- **El mismo recorrido para el agente del repositorio (feature 039)**: `/speckit-all` existe también
+  como skill del repositorio (`.claude/skills/speckit-all`) con las mismas ocho etapas y las mismas
+  seis reglas de autonomía, usando las herramientas del repo (`pytest`, `npm run build`,
+  `npx vitest run`) para verificar; una prueba falla si los prompts y la skill dejan de coincidir.
+
 ### Fixed
 
 - **Un tablero que no se puede pintar dice qué pieza falló, y una vista previa que ya no existe lo

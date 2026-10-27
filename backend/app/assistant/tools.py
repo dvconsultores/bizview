@@ -11,7 +11,7 @@ from bizview_cli import authoring, layout, sqlsafety
 from sqlalchemy.orm import Session
 
 from app.assistant import auto, origin, preview, readiness
-from app.assistant.commands import guard, registry, resolve, runs
+from app.assistant.commands import guard, pipeline, registry, resolve, runs
 from app.assistant.commands.registry import REGISTRY
 from app.engine import direct
 from app.i18n import t
@@ -32,6 +32,7 @@ _STAGE_OF_COMMAND = {
     "speckit-tasks": "tasks",
     "speckit-implement": "implement",
     "speckit-converge": "converge",
+    "speckit-verify": "verify",
 }
 MAX_TOOL_RESULT_CHARS = 60_000
 _MAX_STRING_CHARS = 200
@@ -413,7 +414,8 @@ TOOL_SPECS: list[dict[str, Any]] = [
                 "command": {
                     "type": "string",
                     "enum": ["speckit-specify", "speckit-clarify", "speckit-plan",
-                             "speckit-tasks", "speckit-implement", "speckit-converge"],
+                             "speckit-tasks", "speckit-implement", "speckit-converge",
+                             "speckit-verify"],
                     "description": "Comando de la etapa a abrir.",
                 },
                 "spec": {
@@ -1165,6 +1167,17 @@ def _run_command(db: Session, session: Any,
     folders = [item["folder"] for item in listed]
     resolution = resolve.resolve(listed, target, session.current_spec)
     spec = resolution.spec if resolution.spec in folders else None
+
+    # 039: inside `/speckit-all` the plan decides the next stage; the model only opens it.
+    plan = pipeline.state_of(db, session.id)
+    plan_at: tuple[int, int] | None = None
+    if plan is not None:
+        if name == "speckit-all":
+            raise ToolError(t("pipeline.no_restart"))
+        plan = _plan_grow(db, session, plan, spec)
+        plan_at = _plan_position(db, plan, name, spec)
+        index, _cursor = plan_at
+        spec = plan["specs"][index] if plan.get("specs") else None
     if spec is not None and spec != session.current_spec:
         session.current_spec = spec
     if definition.needs_spec and spec is None:
@@ -1174,16 +1187,30 @@ def _run_command(db: Session, session: Any,
     current = command_run(session)
     if current is not None and current.status in ("running", "waiting"):
         runs.finish(current, "completed")
+    if plan is not None:
+        # 039 FR-003: a stage is not opened once the contract has spent its token budget, even
+        # inside the turn that is spending it.
+        live = auto.live_contract(session)
+        refusal = auto.limit_refusal(auto.contract_of(session), live,
+                                     tokens=int(getattr(live, "tokens", 0) or 0))
+        if refusal is not None:
+            raise ToolError(refusal.message)
     # Feature 028 (FR-004): in Auto the contract answers the stage's gates; the run never waits
     # for a "yes" from the human.
     preflight = runs.preflight(definition, spec, session.files())
     if preflight.missing:
         raise ToolError(preflight.message)
+    if plan is not None and plan_at is not None:
+        plan = pipeline.advance(plan, *plan_at)
     stage = runs.create(
         db, session_id=session.id, project_id=session.project_id, definition=definition,
         arguments=arguments, locale=getattr(session, "command_locale", None) or "es",
         spec=spec, resolved_from=resolution.source or "current",
-        reserved_number=session.next_spec() if name == "speckit-specify" else None)
+        reserved_number=session.next_spec() if name == "speckit-specify" else None,
+        pipeline=plan)
+    if plan is not None and plan.get("id") is None:
+        plan = {**plan, "id": stage.id}
+        stage.result = {**(stage.result or {}), pipeline.PIPELINE_KEY: plan}
     if preflight.pending and spec:
         _approve_without_asking(db, session, stage, spec, preflight.pending)
     session.command_run = stage
@@ -1191,13 +1218,104 @@ def _run_command(db: Session, session: Any,
     if auto_run is not None:
         auto_run.stage = _STAGE_OF_COMMAND.get(name)
     summary = t("commands.auto_stage", command=name, spec=spec or "-")
-    return {
+    payload = {
         "stage": name,
         "spec": spec,
         "resolved_from": resolution.source,
         "instruction": registry.prompt_body(name, getattr(session, "command_locale", None) or "es"),
         "files": sorted(folders),
-    }, summary
+    }
+    if plan is not None:
+        payload["pipeline"] = pipeline.position(plan)
+    return payload, summary
+
+
+def _plan_position(db: Session, plan: dict[str, Any], name: str,
+                   spec: str | None) -> tuple[int, int]:
+    """(spec_index, stage_index) the model asked for, refused when it is not the plan's next one.
+
+    The two judging stages (`analyze`, `verify`) have no writers, so the only way to fix what they
+    find is to re-open the stage that owns the file (US2 AC3, US4 AC2). That rewind is allowed, and
+    only from those two, with the cycle caps of the contract.
+    """
+    at = pipeline.next_position(plan)
+    if at is None:
+        if plan.get("until") in pipeline.STAGES:
+            raise ToolError(t("pipeline.until", stage=plan["until"]))
+        raise ToolError(t("pipeline.finished"))
+    index, cursor = at
+    requested = pipeline.COMMAND_STAGES.get(name)
+    current_index = int(plan.get("cursor") or 0)
+    current = pipeline.STAGES[current_index - 1] if current_index else None
+    if (requested is not None and requested != pipeline.STAGES[cursor]
+            and current in _JUDGING_STAGES
+            and pipeline.STAGES.index(requested) < current_index):
+        target_spec = plan["specs"][index] if plan.get("specs") else None
+        _repair_cycle(db, plan, target_spec, current, requested)
+        return index, pipeline.STAGES.index(requested)
+    expected = pipeline.STAGES[cursor]
+    if not plan.get("specs"):
+        if name != "speckit-specify":
+            raise ToolError(t("pipeline.order", expected="/speckit-specify", stage="specify",
+                              step=f"{cursor + 1}/{pipeline.TOTAL}"))
+        return index, cursor
+    expected_spec = plan["specs"][index]
+    if pipeline.STAGE_COMMANDS[expected] != name:
+        raise ToolError(t("pipeline.order", expected=f"/{pipeline.STAGE_COMMANDS[expected]} "
+                                                     f"{expected_spec}",
+                          stage=name, step=f"{cursor + 1}/{pipeline.TOTAL}"))
+    if spec is not None and spec != expected_spec:
+        raise ToolError(t("pipeline.order", expected=f"/{name} {expected_spec}",
+                          stage=name, step=f"{cursor + 1}/{pipeline.TOTAL}"))
+    _verify_cycle(db, plan, expected_spec, expected)
+    return index, cursor
+
+
+_JUDGING_STAGES = ("analyze", "verify")
+MAX_ANALYZE_ROUNDS = 1
+
+
+def _repair_cycle(db: Session, plan: dict[str, Any], spec: str | None, stage: str,
+                  requested: str) -> None:
+    """The caps of the rewind: analyze re-runs once, verify three times, converge twice."""
+    if spec is None:
+        return
+    if stage == "analyze":
+        rounds = len(pipeline.stage_runs(db, plan, "speckit-analyze", spec))
+        if rounds > MAX_ANALYZE_ROUNDS:
+            raise ToolError(t("pipeline.analyze_failed", rounds=rounds, spec=spec))
+    if requested == "converge":
+        rounds = len(pipeline.stage_runs(db, plan, "speckit-converge", spec))
+        if rounds >= pipeline.MAX_ROUNDS:
+            raise ToolError(t("pipeline.converge_failed", rounds=rounds, spec=spec))
+
+
+def _verify_cycle(db: Session, plan: dict[str, Any], spec: str, stage: str) -> None:
+    """Verify is capped at 3 cycles: the fourth attempt is not a stage, it is a stop (US4 AC2)."""
+    if stage != "verify":
+        return
+    done = pipeline.verify_runs(db, plan, spec)
+    if len(done) >= pipeline.MAX_VERIFY_CYCLES:
+        verdict = pipeline.last_verify(db, plan, spec) or {}
+        if not verdict.get("ok", False):
+            raise ToolError(t("pipeline.verify_failed", cycles=pipeline.MAX_VERIFY_CYCLES,
+                              spec=spec))
+
+
+def _plan_grow(db: Session, session: Any, plan: dict[str, Any],
+               spec: str | None) -> dict[str, Any]:
+    """Fill the pipeline's spec list the first time its specify run establishes one."""
+    if plan.get("specs"):
+        return plan
+    created = pipeline.specs_from_runs(db, plan.get("id"))
+    if spec is not None:
+        created.append(spec)
+    if not created:
+        return plan
+    rows = project_specs.list_specs(db, session.project)
+    keep = set(created)
+    return {**plan, "specs": pipeline.ordered_specs([row for row in rows
+                                                     if row["folder"] in keep])}
 
 
 def _approve_without_asking(db: Session, session: Any, stage: Any, spec: str,

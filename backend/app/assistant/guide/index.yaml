@@ -674,11 +674,25 @@ topics:
     roles: [superuser]
     routes: []
     tiles: []
-    commands: ["/speckit-implement", "/speckit-converge"]
+    commands: ["/speckit-implement", "/speckit-converge", "/fix"]
     aliases:
       es: ["implementar", "converger", "construir", "artefactos"]
       en: ["implement", "converge", "build", "artifacts"]
     related: [metodo-spec-kit, comandos-planificar, aplicar-proyecto]
+  - id: todo-el-recorrido
+    section: agente
+    title: {es: "Todo el recorrido con un comando", en: "The whole run with one command"}
+    summary:
+      es: "Qué hace /speckit-all: recorre las ocho etapas sin preguntar, decide en tu lugar y termina con el informe y la vista previa."
+      en: "What /speckit-all does: run the eight stages without asking, decide for you and end with the report and the preview."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: ["/speckit-all", "/speckit-verify"]
+    aliases:
+      es: ["todo el recorrido", "todo de una vez", "autónomo", "sin preguntas", "verificar"]
+      en: ["whole run", "all at once", "autonomous", "no questions", "verify"]
+    related: [metodo-spec-kit, comandos-construir, aplicar-proyecto]
   - id: tipos-de-spec
     section: agente
     title: {es: "Tipos de spec", en: "Spec kinds"}

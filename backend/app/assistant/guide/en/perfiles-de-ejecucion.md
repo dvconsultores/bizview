@@ -9,7 +9,7 @@ which limits— so a routine run does not have to be typed again.
 
 The super user only, like the whole Assistant.
 
-## How it is done
+## How to
 
 1. Open Administration → AI → Run profiles.
 2. Type the profile's name and its limits: applies per run, previews and minutes.

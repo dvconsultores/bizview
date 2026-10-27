@@ -61,7 +61,10 @@ def _with_spec(c, project, sid, superuser, files):
 def test_command_list(chat):
     c, _, _ = chat
     items = c.get("/api/assistant/commands").json()["items"]
-    assert [i["name"] for i in items][:2] == ["speckit-constitution", "speckit-specify"]
+    # 039: `/speckit-all` heads the menu; the authoring commands keep their 021 order.
+    assert [i["name"] for i in items][:3] == ["speckit-all", "speckit-constitution",
+                                              "speckit-specify"]
+    assert "speckit-verify" in {i["name"] for i in items}
     assert all(i["description"] for i in items)
     assert next(i for i in items if i["name"] == "speckit-plan")["needs_spec"] is True
 

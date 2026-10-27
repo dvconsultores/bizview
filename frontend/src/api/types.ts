@@ -817,6 +817,8 @@ export interface AssistantMessage {
   attachments?: Attachment[];
   /** Feature 035: why a turn failed — code, provider words, model, action, request id. */
   error?: ProviderErrorPayload;
+  /** Feature 039: the run report of a finished `/speckit-all` plan. */
+  run_report?: RunReport;
 }
 
 export interface ProviderErrorPayload {
@@ -857,6 +859,30 @@ export type CommandRunStatus =
   | "interrupted"
   | "failed";
 export interface CommandRunFile { path: string; action: string; revision_id: number | null; }
+
+/** Feature 039: where a `/speckit-all` run stands in its eight-stage plan. */
+export interface Pipeline {
+  id: number | null;
+  cursor: number;
+  total: number;
+  stage: string | null;
+  until: string | null;
+  spec: string | null;
+  spec_index: number;
+}
+
+/** Feature 039: the run report card the last message of a pipeline carries. */
+export interface RunReport {
+  spec: string;
+  path: string;
+  result: "ready" | "applied" | "stopped";
+  stop_reason: string | null;
+  stages: { stage: string; run_id: number; status: CommandRunStatus }[];
+  pending: string[];
+  decisions: string[];
+  verify: { check: string; ok: boolean; detail?: string }[];
+  stories: { story: string; title?: string; test?: string; ok: boolean }[];
+}
 export interface CommandRun {
   id: number;
   message_id: number | null;
@@ -868,6 +894,8 @@ export interface CommandRun {
   status: CommandRunStatus;
   files: CommandRunFile[];
   misrouted_to?: string | null;
+  /** Feature 039: present on every run of a `/speckit-all` plan. */
+  pipeline?: Pipeline | null;
   ceiling?: number;
   tokens: number;
   started_at: string;

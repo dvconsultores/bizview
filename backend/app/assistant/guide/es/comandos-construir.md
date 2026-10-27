@@ -30,3 +30,5 @@ Solo el **Superusuario**, sobre la **Spec actual**.
 
 - Si no está **Listo para aplicar** al terminar, mira **Pendiente para aplicar** o ejecuta
   `/speckit-converge`.
+- `/fix <qué cambiar>`: corrige un artefacto que ya existe (un reporte, una consulta, una
+  distribución) sin escribir una spec nueva. La validación y la vista previa siguen mandando.

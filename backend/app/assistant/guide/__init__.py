@@ -21,8 +21,9 @@ TOPIC_ID = re.compile(r"^[a-z][a-z0-9-]{1,48}$")
 MAX_BODY = 6000
 MAX_SUMMARY = 140
 # The system-prompt index grows with the guide (one short line per topic; the Spanish summaries
-# are the longest). It was 8000 with 52 topics; feature 024 added the 53rd.
-INDEX_MAX = 8400
+# are the longest). It was 8000 with 52 topics (feature 024 added the 53rd); feature 039 added the
+# 65th, the whole-run command.
+INDEX_MAX = 8800
 
 
 class GuideError(Exception):

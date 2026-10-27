@@ -337,6 +337,7 @@ composer to pick a command:
 
 | Command | What it changes |
 |---|---|
+| `/speckit-all <request \| spec> [--until <stage>] [--force]` | the whole plan in one run: the eight stages without asking, plus `run-report.md`. `--until tasks` is the dry run |
 | `/speckit-constitution <principles>` | the project constitution (the installation rules block stays) |
 | `/speckit-specify <description>` | a new `specs/NNN-<name>/spec.md` and its quality checklist |
 | `/speckit-clarify` | `spec.md` (answers under `## Clarifications`) |
@@ -346,6 +347,7 @@ composer to pick a command:
 | `/speckit-checklist <topic>` | a new or extended `checklists/<topic>.md` |
 | `/speckit-implement` | the spec's artifacts, task ticks and `**Status**: Implemented` |
 | `/speckit-converge` | appends a convergence phase to `tasks.md` |
+| `/speckit-verify` | nothing: validation, one check per query and one preview, with a verdict per user story |
 | `/fix <what to change>` | an artifact that **already exists** — no new spec, no plan (small adjustments) |
 
 In a project the chat lives in the docked panel (the **Asistente** button in the project header,

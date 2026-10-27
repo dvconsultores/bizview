@@ -67,8 +67,13 @@ def create(db, *, session_id: int, project_id: int, definition: CommandDef, argu
            resolved_from: str | None = None, forced: bool = False,
            reserved_number: int | None = None, status: str = "running",
            pending: dict | None = None, resumed_from: int | None = None,
-           result: dict | None = None) -> AssistantCommandRun:
+           result: dict | None = None, pipeline: dict | None = None) -> AssistantCommandRun:
     """Insert a run; a second active run in the conversation is refused (409 command_active)."""
+    if pipeline is not None:
+        # 039: every stage run carries the pipeline cursor, so a resume reads one row.
+        from app.assistant.commands.pipeline import PIPELINE_KEY
+
+        result = {**(result or {}), PIPELINE_KEY: pipeline}
     run = AssistantCommandRun(
         session_id=session_id, project_id=project_id, message_id=message_id,
         command=definition.name, arguments=arguments, spec=spec,

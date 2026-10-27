@@ -68,6 +68,8 @@ export function RunStatus({
 
   // Feature 028 (FR-006): the contract's stage, spend and elapsed time, live while the run lasts.
   const contract = session.contract;
+  // Feature 039: the eight-stage plan, when one is running.
+  const pipeline = session.command_runs?.find((run) => run.pipeline)?.pipeline ?? null;
   const liveContract =
     session.mode === "auto" && contract && (contract.status === "running" ||
       contract.status === "confirmed");
@@ -80,11 +82,16 @@ export function RunStatus({
             data-run-status=""
             className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted"
           >
-            {contract.stage ? (
+            {contract.stage || pipeline ? (
               <div className="flex items-center gap-1">
                 <dt className="sr-only">{t.assistant.runStatus.stage}</dt>
                 <dd className="inline-flex items-center rounded-full border border-line bg-surface px-2 py-0.5 font-medium text-ink-2">
-                  {contract.stage}
+                  {pipeline
+                    ? `${t.assistant.runReport.stagePosition
+                        .replace("{step}", String(Math.min(pipeline.cursor + 1, pipeline.total)))
+                        .replace("{total}", String(pipeline.total))}${
+                        pipeline.stage ? ` · ${pipeline.stage}` : ""}`
+                    : contract?.stage}
                 </dd>
               </div>
             ) : null}

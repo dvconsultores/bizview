@@ -1279,6 +1279,17 @@ export const es = {
         budget: "presupuesto de la conversación",
       },
     },
+    runReport: {
+      title: "Informe del run de {spec}",
+      ready: "Listo para aplicar",
+      applied: "Aplicado",
+      stopped: "Detenido: {reason}",
+      decisions: "Decisiones tomadas",
+      verification: "Verificación por historia",
+      pending: "Pendiente para el humano",
+      openFile: "Abrir {path}",
+      stagePosition: "Etapa {step}/{total}",
+    },
     refusals: {
       askMode: "Modo Preguntar: cambia a Editar para escribir.",
     },

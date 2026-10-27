@@ -31,3 +31,5 @@ Only the **Superuser**, on the **Current spec**.
 
 - If it is not **Ready to apply** at the end, look at **Pending before applying** or run
   `/speckit-converge`.
+- `/fix <what to change>`: corrects an artifact that already exists (a report, a query, a
+  distribution) without writing a new spec. Validation and the preview still gate it.

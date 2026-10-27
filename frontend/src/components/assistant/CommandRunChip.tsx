@@ -45,6 +45,12 @@ export function CommandRunChip(props: {
   const c = t.assistant.commands;
   const { run, onFinish, finishing, onRerun, onOpenFile } = props;
   const active = run.status === "running" || run.status === "waiting";
+  const pipeline = run.pipeline;
+  const position = pipeline
+    ? t.assistant.runReport.stagePosition
+        .replace("{step}", String(Math.min(pipeline.cursor + 1, pipeline.total)))
+        .replace("{total}", String(pipeline.total))
+    : null;
   const title = (
     run.status === "misrouted"
       ? c.chipMisrouted
@@ -67,6 +73,14 @@ export function CommandRunChip(props: {
       <div className="flex flex-wrap items-center gap-2">
         <Icon className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
         <span className="min-w-0 font-medium text-ink">{title}</span>
+        {position ? (
+          <span
+            data-pipeline-step=""
+            className="rounded-full border border-line px-2 py-0.5 text-xs text-ink-2"
+          >
+            {position}
+          </span>
+        ) : null}
         <span
           data-status={run.status}
           className={`ml-auto rounded-full px-2 py-0.5 text-xs ${PILL[run.status]}`}

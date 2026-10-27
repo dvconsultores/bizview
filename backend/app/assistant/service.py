@@ -37,7 +37,7 @@ from app.assistant import activity, auto, origin, readiness
 from app.assistant import attachments as _attachments
 from app.assistant import history as history_module
 from app.assistant import tools as _tools
-from app.assistant.commands import registry, resolve, runs, scope
+from app.assistant.commands import pipeline, registry, resolve, runs, scope
 from app.assistant.commands.prompt import context_for, system_for
 from app.assistant.history import compact_args
 from app.assistant.personal import query_tables
@@ -1684,6 +1684,134 @@ def _fix_command(db, waiting_run):
     return registry.parse(f"/speckit-clarify {spec or ''}".strip())
 
 
+def _pipeline_start(db, session, view, plan_args, spec: str | None,
+                    rows: list[dict], forced: bool) -> tuple[dict, str | None]:
+    """The cursor `/speckit-all` starts from (039): resume a stopped plan, else detect the stage."""
+    facts = pipeline.facts_for(db, session, view, rows)
+    previous = pipeline.state_of(db, session.id)
+    plan = None
+    if previous is not None and not pipeline.finished(previous) and not forced:
+        plan = {**previous}
+        if plan_args.until:
+            plan["until"] = plan_args.until
+        if spec is not None and spec not in (plan.get("specs") or []):
+            plan = {**plan, "specs": [spec], "spec_index": 0, "cursor": 0, "round": 0,
+                    "verify_cycles": 0}
+            plan = pipeline.detect(plan, facts)
+    if plan is None:
+        plan = pipeline.seed(None, plan_args, [spec] if spec else [])
+        if spec is not None:
+            plan = pipeline.detect(plan, facts)
+    first = pipeline.open_stage(plan)
+    return plan, (first[0] if first else spec)
+
+
+def _pipeline_block(state: dict) -> str:
+    """The `Etapa i/8` line the model reads instead of re-deriving the plan."""
+    at = pipeline.position(state)
+    step = min(int(at.get("cursor") or 0) + 1, pipeline.TOTAL)
+    lines = [t("pipeline.block", step=step, total=pipeline.TOTAL,
+               stage=at.get("stage") or "—", spec=at.get("spec") or "—")]
+    pending = [f"/{pipeline.STAGE_COMMANDS[stage]}" for stage in pipeline.STAGES[step - 1:]]
+    if pending:
+        lines.append(t("pipeline.remaining", stages=" → ".join(pending)))
+    if at.get("until"):
+        lines.append(t("pipeline.stop_at", stage=at["until"]))
+    return "\n".join(lines)
+
+
+def _verify_stage(db, actor, view, session: AssistantSession, run, app_settings,
+                  ip) -> None:
+    """Run the verify checks once per stage run, without a provider call (039 US4)."""
+    live = auto.live_contract(session)
+    contract = auto.contract_of(session)
+    limit = contract.limits.previews if contract is not None else None
+    allowed = limit is None or int(getattr(live, "previews", 0) or 0) < limit
+    result = pipeline.verify(db, actor, view, run.spec or "", app_settings=app_settings,
+                             ip=ip, preview_allowed=allowed)
+    run.result = {**(run.result or {}), "verify": result}
+    if allowed:
+        _bump(session, "previews")              # the verify preview counts for the contract
+        if live is not None:
+            live.previews = int(live.previews or 0) + 1
+    db.flush()
+    lines = [t("pipeline.verify_result", spec=run.spec or "—",
+               value="ok" if result["ok"] else "fail")]
+    for check in result.get("checks") or []:
+        lines.append(f"- {check.get('check')}: {'ok' if check.get('ok') else 'fail'}"
+                     + (f" · {check.get('detail')}" if check.get("detail") else ""))
+    for story in result.get("stories") or []:
+        lines.append(f"- {story.get('story')}: {'pass' if story.get('ok') else 'fail'}")
+    message = _add(db, session, role="assistant", content="\n".join(lines))
+    db.flush()
+    return message
+
+
+STOPPED_STATUSES = ("limit", "stopped", "error")
+
+
+def _report_on_stop(db, session: AssistantSession, reason: str) -> dict | None:
+    """The run report of a pipeline stopped from the outside ("Detener", mode switched down).
+
+    The worker thread may still be unwinding, so this writes from the caller's session with the
+    last state the product committed; a later report from the turn's own `end()` replaces it with
+    the same bytes (the report is deterministic) or with the newer cursor, never the other way.
+    """
+    state = pipeline.state_of(db, session.id)
+    if state is None or not state.get("specs"):
+        return None
+    state = pipeline.rewind(db, state)
+    spec = (state["specs"] or [None])[pipeline.position(state)["spec_index"] or 0]
+    card = pipeline.write_report(
+        db, for_session(db, session), spec, state, result="stopped", stop=reason,
+        verify_result=pipeline.last_verify(db, state, spec),
+        actor={"kind": "agent", "user_id": None, "session_id": session.id,
+               "command": "/speckit-all", "command_run_id": state.get("id")})
+    if card is not None:
+        db.flush()
+    return card
+
+
+def _report_at_end(db, actor, view, session: AssistantSession,
+                   status: str) -> dict | None:
+    """Write the run report when the plan ends — or when it stops — and return its card.
+
+    A stop keeps the cursor where it was (US3 AC1), so the report is also written mid-plan with the
+    reason, which is what makes `/speckit-all <spec>` resumable.
+    """
+    state = pipeline.state_of(db, session.id)
+    if state is None:
+        return None
+    if status in STOPPED_STATUSES:
+        state = pipeline.rewind(db, state)
+    over = pipeline.ends_here(state)
+    stopped = status in STOPPED_STATUSES and not over
+    if not stopped and not over:
+        return None
+    spec = (state.get("specs") or [None])[pipeline.position(state)["spec_index"] or 0] \
+        if state.get("specs") else None
+    verify_result = pipeline.last_verify(db, state, spec)
+    contract = live_auto_run(db, session) or last_auto_run(db, session)
+    if stopped or (verify_result and not verify_result.get("ok")):
+        result = "stopped"
+    elif contract is not None and getattr(contract, "status", "") == "applied":
+        result = "applied"
+    else:
+        result = "ready"
+    stop = None
+    if result == "stopped":
+        if verify_result and not verify_result.get("ok"):
+            stop = pipeline.stop_reason("verify", "failed")
+        else:
+            stop = (getattr(contract, "stop_reason", None)
+                    or pipeline.stop_reason(status or "stopped"))
+    card = pipeline.write_report(db, view, spec or "", state, result=result, stop=stop,
+                                verify_result=verify_result)
+    if card is not None:
+        db.flush()
+    return card
+
+
 def _command_turn(db, actor, session: AssistantSession, parsed,
                   text: str) -> tuple[object | None, list[Reply] | None]:
     """Command handling of a new message (021 plan §6): the run the provider turn works for,
@@ -1722,6 +1850,10 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     definition = parsed.definition
     if not definition.provider:
         return None, [(registry.HANDLERS[definition.name](current()), None)]
+    if definition.name == "speckit-all" and auto.mode_of(session) != "auto":
+        # 039 FR-001: text never switches the mode (028). Offer the switch, start nothing.
+        return None, [(t("assistant.mode.offer_auto"), _suggestion("speckit-all",
+                                                                  parsed.args))]
     if definition.name == "ayuda" and not parsed.args:
         # 023 plan §6: the fixed reply, no provider call; recorded as a completed run.
         from app.assistant.guide import ayuda
@@ -1751,7 +1883,11 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     if refusal:
         return None, [refusal]
     view = for_session(db, session)
-    arguments, forced = resolve.strip_force(parsed.args)
+    plan_args = pipeline.parse_args(parsed.args) if definition.name == "speckit-all" else None
+    if plan_args is not None:
+        arguments, forced = plan_args.text, plan_args.force
+    else:
+        arguments, forced = resolve.strip_force(parsed.args)
     specs = _spec_rows(db, view)
     spec = None
     source = None
@@ -1780,6 +1916,12 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
             spec_line = None
     else:
         spec_line = None
+        if definition.name == "speckit-all":
+            # 039: the spec is optional (a brief creates it), but when the argument or the
+            # conversation names one, the plan runs on it — and stops skipping what is done.
+            resolution = resolve.resolve(specs, arguments, session.current_spec)
+            if resolution.spec:
+                spec, source = resolution.spec, resolution.source
     already = _idempotence(db, session, view, definition, spec, forced)
     if already:
         return None, [*([spec_line] if spec_line else []),
@@ -1791,6 +1933,10 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     previous = runs.latest_for(db, session.id, definition.name, spec)
     result = ({"revisions": _revisions(db, view.project.id, spec)}
               if definition.name == "speckit-converge" and spec else None)
+    plan = None
+    if plan_args is not None:
+        plan, spec = _pipeline_start(db, session, view, plan_args, spec, specs, forced)
+        result = None
     # Feature 028 FR-004: in Auto with a live contract the gates are answered by the contract, also
     # when the super user typed the command instead of the agent calling `run_command` (the run
     # used to stop with "¿La apruebo y continúo?"). `session.auto_run` is not attached yet here.
@@ -1799,12 +1945,16 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     run = runs.create(
         db, session_id=session.id, project_id=session.project_id, definition=definition,
         arguments=arguments, locale=current(), spec=spec, resolved_from=source,
-        forced=forced, result=result,
-        reserved_number=view.next_spec() if definition.name == "speckit-specify" else None,
+        forced=forced, result=result, pipeline=plan,
+        reserved_number=view.next_spec()
+        if definition.name in ("speckit-specify", "speckit-all") else None,
         status="waiting" if check.pending and not answered else "running",
         pending=None if answered else check.pending,
         resumed_from=(previous.id if previous is not None and previous.status == "interrupted"
                       else None))
+    if plan is not None and plan.get("id") is None:
+        plan = {**plan, "id": run.id}
+        run.result = {**(run.result or {}), pipeline.PIPELINE_KEY: plan}
     if answered:
         _tools._approve_without_asking(db, view, run, spec, answered)
         auto_run.stage = _tools._STAGE_OF_COMMAND.get(definition.name)
@@ -1991,6 +2141,12 @@ def stop(db, session: AssistantSession, settings, reason: str = "stopped:user"
                             f"{t('commands.interrupted_resume', command=running.command)}"))
     else:
         msg = _add(db, session, role="assistant", content=t(_STOPPED_TEXT))
+    # 039 US3 AC1/AC2: a `/speckit-all` stopped by hand keeps its cursor and says where it stopped;
+    # nothing is applied afterwards (the contract is spent above).
+    card = _report_on_stop(db, session, reason)
+    if card is not None:
+        msg.tool_payload = {**(msg.tool_payload or {}), "run_report": card}
+        msg.content = f"{msg.content}\n\n{t('pipeline.report_written', path=card['path'])}"
     if summary is not None:
         msg = _add(db, session, role="assistant",
                    content=f"{msg.content}\n\n{_summary_text(summary, reason)}")
@@ -2026,12 +2182,18 @@ def repair_history(db, actor, session: AssistantSession, ip: str | None) -> dict
 
 
 def _command_extra(run) -> str:
-    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023)."""
+    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023) and,
+    in a `/speckit-all` run, where the plan stands (039)."""
+    parts: list[str] = []
     if run.command == "ayuda" and run.arguments:
         from app.assistant.guide import ayuda
 
-        return ayuda.topic_block(run.arguments, run.locale)
-    return ""
+        parts.append(ayuda.topic_block(run.arguments, run.locale))
+    state = (run.result or {}).get(pipeline.PIPELINE_KEY) \
+        if isinstance(run.result, dict) else None
+    if isinstance(state, dict):
+        parts.append(_pipeline_block(state))
+    return "\n\n".join(part for part in parts if part)
 
 
 def _attach_suggestions(session: AssistantSession, new_messages: list[AssistantMessage]) -> None:
@@ -2101,6 +2263,15 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 db, session, role="assistant",
                 tool_payload=_suggestion(run.command, spec=run.spec),
                 content=t("commands.interrupted_resume", command=run.command)))
+        card = _report_at_end(db, actor, view, session, status)
+        if card is not None:
+            target = next((m for m in reversed(new_messages) if m.role == "assistant"), None)
+            if target is not None:
+                target.tool_payload = {**(target.tool_payload or {}), "run_report": card}
+            else:
+                new_messages.append(_add(db, session, role="assistant",
+                                         content=t("pipeline.report_written", path=card["path"]),
+                                         tool_payload={"run_report": card}))
 
     _tools.reset_run(session)
     view = for_session(db, session)
@@ -2140,6 +2311,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             run = fresh
             definition = registry.REGISTRY.get(run.command)
             view.command_run = run
+        if (run is not None and run.command == "speckit-verify"
+                and not ((run.result or {}).get("verify"))):
+            new_messages.append(_verify_stage(db, actor, view, session, run, app_settings,
+                                              ip))
         if auto_run is not None and auto_run.status in auto.LIVE_STATUSES:
             refusal = auto.limit_refusal(auto.contract_of(session), auto_run,
                                          tokens=int(auto_run.tokens or 0), wall_clock=True,
@@ -2465,7 +2640,7 @@ def message_json(m: AssistantMessage) -> dict:
         data["tool_name"] = m.tool_name
     payload = m.tool_payload if isinstance(m.tool_payload, dict) else {}
     if m.role == "assistant":
-        for key in ("suggestions", "scope", "contract", "error"):   # 021 §5/§7, 028, 035
+        for key in ("suggestions", "scope", "contract", "error", "run_report"):
             if payload.get(key):
                 data[key] = payload[key]
     return data
@@ -2473,11 +2648,14 @@ def message_json(m: AssistantMessage) -> dict:
 
 def _run_json(run) -> dict:
     result = run.result if isinstance(run.result, dict) else {}
+    pipeline_state = result.get(pipeline.PIPELINE_KEY)
     return {"id": run.id, "message_id": run.message_id, "command": run.command,
             "arguments": run.arguments or "", "spec": run.spec,
             "resolved_from": run.resolved_from, "forced": bool(run.forced),
             "status": run.status, "files": run.files or [],
             "misrouted_to": result.get("misrouted_to"),
+            "pipeline": (pipeline.position(pipeline_state)
+                         if isinstance(pipeline_state, dict) else None),
             "tokens": run.tokens or 0, "started_at": run.started_at.isoformat(),
             "ended_at": run.ended_at.isoformat() if run.ended_at else None}
 

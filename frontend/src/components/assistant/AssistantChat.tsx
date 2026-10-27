@@ -52,6 +52,7 @@ import { ChatText } from "./ChatText";
 import { useAssistantPanelOptional } from "./AssistantPanelContext";
 import { CommandMenu, filterCommands, menuQuery } from "./CommandMenu";
 import { CommandRunChip } from "./CommandRunChip";
+import { RunReportCard } from "./RunReportCard";
 import { AIPill } from "./AIPill";
 import { ModePill, ModeSelector } from "./ModeSelector";
 import { CommandSuggestions, inlineSuggestions } from "./CommandSuggestion";
@@ -670,6 +671,9 @@ export function AssistantChat(props: {
                     <ChatText text={m.content} />
                   )}
                   {m.error ? null : <CommandSuggestions items={suggestions} onInsert={insertCommand} />}
+                  {m.run_report ? (
+                    <RunReportCard report={m.run_report} onOpenFile={onOpenFile} />
+                  ) : null}
                 </div>
               </div>
             );

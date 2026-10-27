@@ -41,6 +41,10 @@ _ALL_DOCS = ("constitution", "spec", "plan", "tasks", "research", "data-model", 
 
 # Menu order (plan §1 table).
 REGISTRY: dict[str, CommandDef] = dict([
+    # 039: one command runs the whole plan. Its own run writes only the report and the decision
+    # log; every stage is a real command run opened through `run_command` (028 FR-004).
+    _def("speckit-all", False, True, False, True, {"edit_draft", "run_preview"},
+         ["run_report", "decisions_append"], ["constitution", *_ALL_DOCS], []),
     _def("speckit-constitution", False, True, True, True, {"edit_draft"}, ["constitution"],
          ["constitution"], []),
     _def("speckit-specify", False, True, True, True, {"propose_draft", "edit_draft"},
@@ -64,6 +68,10 @@ REGISTRY: dict[str, CommandDef] = dict([
          ["kind_artifacts", "tasks_ticks", "status_implemented"], _ALL_DOCS, ["tasks"]),
     _def("speckit-converge", True, False, False, True,
          {"edit_draft", "check_query", "run_preview"}, ["tasks_append"],
+         ["constitution", "spec", "plan", "tasks"], ["spec", "plan", "tasks"]),
+    # 039: the verify stage of `/speckit-all`, and a re-check on its own. Read-only by design, so
+    # its verdicts are product-computed and nothing can be "fixed" by the stage that judges it.
+    _def("speckit-verify", True, False, False, True, {"check_query", "run_preview"}, [],
          ["constitution", "spec", "plan", "tasks"], ["spec", "plan", "tasks"]),
     # 023: without arguments a fixed reply (no provider); with a topic, a read-only run.
     _def("ayuda", False, False, False, True, set(), [], [], []),

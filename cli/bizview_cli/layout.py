@@ -13,7 +13,8 @@ _SPEC = r"[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}"
 PROJECT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"project\.yaml"),
     re.compile(r"\.specify/memory/constitution\.md"),
-    re.compile(rf"specs/{_SPEC}/(spec|plan|tasks|research|data-model|quickstart)\.md"),
+    re.compile(rf"specs/{_SPEC}/"
+               r"(spec|plan|tasks|research|data-model|quickstart|run-report)\.md"),
     re.compile(rf"specs/{_SPEC}/checklists/[a-z0-9][a-z0-9._-]{{0,60}}\.md"),
     re.compile(rf"integrations/{_ID}/integration\.yaml"),
     re.compile(rf"integrations/{_ID}/queries/[a-z0-9][a-z0-9._-]{{0,59}}\.sql"),
@@ -52,7 +53,7 @@ def is_allowed_folder(path: str) -> bool:
 
 ALLOWED_TEXT: str = (
     "project.yaml; .specify/memory/constitution.md; specs/NNN-nombre/"
-    "{spec,plan,tasks,research,data-model,quickstart}.md; "
+    "{spec,plan,tasks,research,data-model,quickstart,run-report}.md; "
     "specs/NNN-nombre/checklists/<nombre>.md; integrations/<id>/integration.yaml; "
     "integrations/<id>/queries/<nombre>.sql; integrations/<id>/requests/<nombre>.yaml; "
     "reports/<id>/report.yaml; distributions/<id>.yaml"

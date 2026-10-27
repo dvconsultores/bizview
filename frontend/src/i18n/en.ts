@@ -1295,6 +1295,17 @@ export const en: Catalogue = {
         budget: "the conversation's budget",
       },
     },
+    runReport: {
+      title: "Run report for {spec}",
+      ready: "Ready to apply",
+      applied: "Applied",
+      stopped: "Stopped: {reason}",
+      decisions: "Decisions taken",
+      verification: "Verification per story",
+      pending: "Pending for the human",
+      openFile: "Open {path}",
+      stagePosition: "Stage {step}/{total}",
+    },
     refusals: {
       askMode: "Ask mode: switch to Edit to write.",
     },

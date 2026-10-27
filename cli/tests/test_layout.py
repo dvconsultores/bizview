@@ -16,6 +16,7 @@ from bizview_cli.layout import ALLOWED_TEXT, is_allowed, is_allowed_folder, spec
         "specs/001-facturas/research.md",
         "specs/001-facturas/data-model.md",
         "specs/001-facturas/quickstart.md",
+        "specs/001-facturas/run-report.md",
         "specs/001-facturas/checklists/requirements.md",
         "integrations/abc/integration.yaml",
         "integrations/abc/queries/facturas.sql",
