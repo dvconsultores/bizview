@@ -426,6 +426,12 @@ export function ProjectWorkspace() {
         setProject(res.project);
         setResult({ tone: "success", text: `${t.projects.applied(res.version.id)}${res.revalidated ? ` ${t.projects.revalidated}` : ""}` });
         setAppliedReports(res.version.projects?.[slug]?.reports ?? []);
+        // 038: the apply replaced the preview. The page must stop offering its links now, not on
+        // the next reload.
+        if (session) {
+          const fresh = await api.get<AssistantSession>(`/api/assistant/sessions/${session.id}`);
+          setSession(fresh.project?.slug === slug ? fresh : null);
+        }
       } else if (kind === "convert") {
         setProject(await projectsApi.convert(slug));
         setResult({ tone: "success", text: t.projects.converted });
@@ -854,6 +860,15 @@ export function ProjectWorkspace() {
             />
           </div>
         </details>
+      )}
+      {/* 038: an applied version dropped the preview schemas, so the links point at the dashboard. */}
+      {session?.preview?.status === "replaced" && (
+        <div className="flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface-2 p-3 text-sm text-ink-2">
+          <span>{t.projects.previewReplaced(session.preview.version ?? project.last_applied?.version ?? 0)}</span>
+          {(appliedReports ?? []).map((id) => (
+            <Link key={id} to={`/r/${encodeURIComponent(id)}`} className="font-mono text-accent underline">{id}</Link>
+          ))}
+        </div>
       )}
       {project.last_applied && project.status === "aplicado" && (
         <p className="text-xs text-ink-muted">

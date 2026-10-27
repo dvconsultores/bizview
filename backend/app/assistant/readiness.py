@@ -488,9 +488,12 @@ def compute(session, user_texts: list[str] | None = None) -> dict:
     preview = session.preview or {}
     fp = fingerprint(files)
     status = preview.get("status")
-    if status == "succeeded" and preview.get("fingerprint") == fp:
+    # Feature 038: applying a project retires its preview (`replaced`) because the schemas are
+    # gone. It ran on exactly these files, so it still counts as «previewed»: the gate asks for a
+    # preview before an apply, and re-applying identical files needs none.
+    if status in ("succeeded", "replaced") and preview.get("fingerprint") == fp:
         pass
-    elif status == "succeeded":
+    elif status in ("succeeded", "replaced"):
         pending.append({
             "code": "preview", "file": None,
             "message": t("readiness.preview_stale"),

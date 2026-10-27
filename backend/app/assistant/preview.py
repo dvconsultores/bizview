@@ -16,8 +16,9 @@ from sqlalchemy import select
 from app.assistant import readiness
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker, lock_key
-from app.engine import datasets, direct, runner
+from app.engine import datasets, direct, render_errors, runner
 from app.engine import report as engine
+from app.engine.render_errors import RenderError
 from app.errors import ApiError
 from app.i18n import M, t, use_locale
 from app.models import (
@@ -306,7 +307,15 @@ def _render_direct(session, rid: str, definition: dict) -> dict:
         sel, filters = engine.selection(
             ctx, {}, datetime.now(ZoneInfo(tz)).date()
         )
-        engine.run_views(ctx, sel, filters, tz)
+        views = engine.run_views(ctx, sel, filters, tz)
+        # A view that cannot render is a failed preview check (038): the card names the piece.
+        broken = next((v["error"] for v in views if v.get("error")), None)
+        if broken:
+            return {
+                "status": "failed",
+                "message": broken["message"],
+                "duration_ms": int((time.monotonic() - start) * 1000),
+            }
         return {
             "status": "succeeded",
             "message": None,
@@ -576,10 +585,37 @@ def cleanup_stale(db) -> int:
     return count
 
 
+def _is_preview_schema(name: str) -> bool:
+    """`preview_7__ds_x` (and the test schema in front of it) is a preview schema (feature 014)."""
+    return any(part.startswith("preview_") for part in name.split("__"))
+
+
+def _missing_preview_schemas(ctx: engine.Context) -> list[str]:
+    """Schemas the report needs that are gone: an applied/expired preview dropped them (038)."""
+    expected = {schema for schema, _ in ctx.tables.values() if _is_preview_schema(schema)}
+    if not expected:
+        return []
+    from sqlalchemy import text
+
+    with get_engine().connect() as conn:
+        found = {row[0] for row in conn.execute(
+            text("SELECT nspname FROM pg_namespace WHERE nspname = ANY(:names)"),
+            {"names": sorted(expected)})}
+    return sorted(expected - found)
+
+
 def _context(db, session, report_id):
     session = _view(db, session)
     preview = session.preview or {}
-    if preview.get("status") != "succeeded":
+    status = preview.get("status")
+    if status == "replaced":
+        version = preview.get("version")
+        raise RenderError(
+            render_errors.PREVIEW_EXPIRED,
+            str(M("render.preview_replaced", version=version or "?")), status=409,
+            report_id=report_id, version=version,
+        )
+    if status != "succeeded":
         raise ApiError(409, "preview_not_ready", M("preview.run_preview_first"))
     active = workspace_service.active(db)
     active_artifacts = (active.artifacts if active
@@ -602,9 +638,21 @@ def _context(db, session, report_id):
         artifacts={"workspace": active_artifacts.get("workspace") or {},
                    "integrations": integrations, "reports": reports},
     )
-    return engine.preview_context(version_like, report_id, rep["definition"], integrations,
-                                  set(preview.get("preview_integrations") or []),
-                                  _schemas_of(session))
+    ctx = engine.preview_context(version_like, report_id, rep["definition"], integrations,
+                                 set(preview.get("preview_integrations") or []),
+                                 _schemas_of(session))
+    missing = _missing_preview_schemas(ctx)
+    if missing:
+        # The preview ran, but its schemas went away (an apply, or the stale cleanup). Saying so
+        # also retires the links: the page stops offering a preview that cannot be read (038).
+        session.preview = {**preview, "status": "expired", "expired_reason": "schemas_dropped"}
+        log.error("preview %s of report %s lost its schemas: %s", _schemas_of(session),
+                  report_id, ", ".join(missing))
+        raise RenderError(
+            render_errors.PREVIEW_EXPIRED, str(M("render.preview_expired")), status=409,
+            report_id=report_id, datasets=", ".join(missing),
+        )
+    return ctx
 
 
 def report_definition(db, session, report_id) -> dict:
@@ -615,15 +663,17 @@ def report_data(db, session, report_id, params, today, tz) -> dict:
     session = _view(db, session)
     ctx = _context(db, session, report_id)
     sel, filters = engine.selection(ctx, params, today)
+    reference = engine.render_reference()
     if ctx.direct is not None:
         queried_at = datetime.now(UTC).isoformat()
         try:
-            views = engine.run_views(ctx, sel, filters, tz)
+            views = engine.run_views(ctx, sel, filters, tz, reference=reference)
         except direct.DirectError as e:
             raise direct.api_error(e) from None
         return {
             "selection": sel.to_json(),
             "filters": filters,
+            "render_reference": reference,
             "freshness": {
                 "updated_at": queried_at,
                 "data_version": "preview",
@@ -638,7 +688,8 @@ def report_data(db, session, report_id, params, today, tz) -> dict:
     return {
         "selection": sel.to_json(),
         "filters": filters,
+        "render_reference": reference,
         "freshness": {"updated_at": (session.preview or {}).get("finished_at"),
                       "data_version": "preview"},
-        "views": engine.run_views(ctx, sel, filters, tz),
+        "views": engine.run_views(ctx, sel, filters, tz, reference=reference),
     }

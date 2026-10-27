@@ -625,6 +625,11 @@ export function AssistantSession() {
                     )}
                 </>
               )}
+              {session.preview.status === "replaced" && (
+                <Alert tone="info">
+                  {t.assistant.previewReplaced(session.preview.version ?? 0)}
+                </Alert>
+              )}
               {(session.preview.status === "failed" ||
                 session.preview.status === "expired") && (
                 <Alert tone="error">

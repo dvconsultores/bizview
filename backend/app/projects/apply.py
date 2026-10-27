@@ -151,9 +151,18 @@ def apply_project(db, actor, project: Project, ip, *, session=None):
                          "session": session.id if session is not None else None,
                          "version": version.id, "files": sorted(files)})
     db.flush()
-    preview = (view.preview or {}).get("session_id")
-    if preview:
-        drop_for_session(preview)
+    previous_preview = view.preview or {}
+    preview_session = previous_preview.get("session_id")
+    if preview_session:
+        drop_for_session(preview_session)
+    if previous_preview and previous_preview.get("status") != "expired":
+        # Feature 038: the preview read from schemas that just went away, so the page must point at
+        # the applied dashboard instead of offering a preview that cannot be read. The row is
+        # written in this transaction: a second session would wait on its own update to `project`.
+        replaced = {**previous_preview, "status": "replaced", "version": version.id,
+                    "replaced_at": now.isoformat()}
+        db.execute(update(Project).where(Project.id == project.id).values(preview=replaced))
+        view.project.preview = replaced
     return version, changed
 
 
