@@ -35,6 +35,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Un brief largo ya cabe en el comando (2026-10-27, feature 039)**: pegar el prompt real del
+  panorama cripto (7 629 caracteres) en `/speckit-all` respondía «Los argumentos del comando no
+  pueden superar 4000 caracteres», aunque el compositor admite mensajes más largos: el comando
+  tenía un techo propio más bajo que el del mensaje que lo contiene. Ahora hay un solo techo —
+  `MAX_USER_TEXT`, 20 000 caracteres, replicado en `registry.MAX_ARGS`, en el `maxLength` del
+  compositor, en el `CHECK` de `assistant_command_run.arguments` (migración `0031`) y cubierto por
+  una prueba que fija la igualdad entre los dos primeros.
+
 - **Un tablero que no se puede pintar dice qué pieza falló, y una vista previa que ya no existe lo
   dice (2026-10-26, feature 038)**: en el proyecto `coinmarketcap`, con la versión 22 aplicada a las
   15:15, pulsar `panorama-cripto` en **Vista previa** (y `PDF de vista previa: panorama-cripto`)

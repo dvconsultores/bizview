@@ -80,7 +80,11 @@ REGISTRY: dict[str, CommandDef] = dict([
 DOCS = {"spec": "spec.md", "plan": "plan.md", "tasks": "tasks.md", "research": "research.md",
         "data-model": "data-model.md", "quickstart": "quickstart.md"}
 
-MAX_ARGS = 4000
+# A command's arguments are the message minus the command token, so they share the message
+# ceiling (`service.MAX_USER_TEXT`, and the composer's own `maxLength`). A real brief is a
+# page of text: the 4 000 of feature 021 refused the `coinmarketcap` panorama prompt at
+# 7 629 characters (feature 039 defect fix). `test_commands_registry` keeps the two equal.
+MAX_ARGS = 20000
 MAX_BODY = 12 * 1024
 PLACEHOLDERS = ("spec_template", "plan_template", "tasks_template")
 

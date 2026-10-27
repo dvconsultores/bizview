@@ -986,7 +986,7 @@ class AssistantCommandRun(Base):
     __tablename__ = "assistant_command_run"
     __table_args__ = (
         CheckConstraint("command ~ '^(speckit-[a-z]+|ayuda)$'", name="command"),
-        CheckConstraint("char_length(arguments) <= 4000", name="arguments_len"),
+        CheckConstraint("char_length(arguments) <= 20000", name="arguments_len"),
         CheckConstraint("spec IS NULL OR spec ~ '^[0-9]{3}-[a-z0-9-]{1,60}$'", name="spec"),
         CheckConstraint("locale IN ('es', 'en')", name="locale"),
         CheckConstraint(_in("status", COMMAND_RUN_STATUSES), name="status"),

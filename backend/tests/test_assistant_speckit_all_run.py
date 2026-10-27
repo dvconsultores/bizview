@@ -239,3 +239,23 @@ def test_detener_writes_the_report_and_resumes_at_the_same_stage(chat, superuser
     state = pipeline.state_of(db, sid)
     # The implement run never finished, so a resume repeats implement — not converge.
     assert pipeline.open_stage(state) == ("001-ventas", "implement")
+
+
+def test_a_page_long_brief_is_accepted_and_stored_whole(superuser, db):
+    """The reported defect: pasting a real brief into `/speckit-all` answered
+    «Los argumentos del comando no pueden superar 4000 caracteres» (the prompt is 7 629 chars)."""
+    from app.models import AssistantCommandRun
+
+    client = signed_in("root@example.com")
+    sid = new_chat(client)
+    brief = ("Panorama cripto: un tablero de mercado sobre la fuente REST coinmarketcap. "
+             "Dos specs, integración y reporte. ") * 60
+    assert 4000 < len(brief) <= 20000                      # the size that used to be refused
+    fake.SHARED.queue(_open("speckit-specify", call_id="rc1"), _text())
+
+    sent = _send(client, sid, f"/speckit-all {brief}")
+    # `command_runs` is newest first: the plan's own run is the parent, the stage comes after it.
+    run = next(item for item in sent["command_runs"] if item["command"] == "speckit-all")
+    stored = db.get(AssistantCommandRun, run["id"])
+    assert stored.arguments == brief.strip()               # nothing truncated on the way to the DB
+    assert len(stored.arguments) > 4000

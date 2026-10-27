@@ -62,7 +62,9 @@ from app.projects.workview import WorkView, for_session
 from app.services.audit import record as audit_record
 
 HISTORY_LIMIT = 30
-MAX_USER_TEXT = 8000
+# A brief is a page of text: the `coinmarketcap` panorama prompt is 7 629 characters, and the
+# composer's `maxLength` plus `registry.MAX_ARGS` and the DB check all mirror this number.
+MAX_USER_TEXT = 20000
 
 STATE_MAX_PROBLEMS = 30
 STATE_MAX_CHARS = 12000

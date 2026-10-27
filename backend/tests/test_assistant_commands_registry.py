@@ -45,7 +45,7 @@ def test_parse_variants(commands_dir):
 
 @pytest.mark.parametrize(("text", "code"), [
     ("/no-existe", "unknown_command"),
-    ("/speckit-plan " + "a" * 4001, "command_args_too_long"),
+    ("/speckit-plan " + "a" * (registry.MAX_ARGS + 1), "command_args_too_long"),
     ("/speckit-specify", "command_needs_args"),
     ("/speckit-specify    ", "command_needs_args"),
 ])
@@ -55,6 +55,25 @@ def test_parse_errors(commands_dir, text, code):
     assert (exc.value.status, exc.value.code) == (422, code)
     if code == "unknown_command":
         assert "speckit-plan" in exc.value.extra["commands"]
+
+
+def test_a_command_argument_is_as_long_as_a_message(commands_dir):
+    """039 defect fix: a brief pasted as a command's argument may fill the composer.
+
+    The `coinmarketcap` panorama prompt is 7 629 characters and answered "no pueden superar 4000";
+    a command's arguments are the message minus the command token, so they share its ceiling.
+    """
+    from app.assistant import service
+
+    assert registry.MAX_ARGS == service.MAX_USER_TEXT
+    brief = "Panorama cripto: tablero de mercado. " * 210      # ≈ 7 770 characters
+    brief = brief.strip()                        # `parse` trims the arguments
+    assert 7000 < len(brief) <= registry.MAX_ARGS
+    assert _pair(f"/speckit-all {brief}") == ("speckit-all", brief)
+    with pytest.raises(ApiError) as exc:
+        registry.parse("/speckit-all " + "a" * (registry.MAX_ARGS + 1))
+    assert (exc.value.status, exc.value.code) == (422, "command_args_too_long")
+    assert exc.value.extra["limit"] == registry.MAX_ARGS
 
 
 def test_registry_and_menu(commands_dir):

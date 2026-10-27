@@ -925,7 +925,7 @@ export function AssistantChat(props: {
               id={composerId}
               ref={textareaRef}
               rows={2}
-              maxLength={8000}
+              maxLength={20000}
               disabled={!ai_enabled || busy}
               value={text}              role="combobox"
               aria-autocomplete="list"
