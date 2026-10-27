@@ -287,3 +287,75 @@ def test_fuzz_every_generated_history_passes_for_both_providers():
             problems = validate_messages(built.messages, provider)
             assert problems == [], (provider, window, problems, rows)
             assert check_payload(payload_for(built.messages, provider), provider) == []
+
+
+# --------------------------------------------------------------------------- compaction (039)
+
+def _turn_history(rounds=12, tool_chars=60_000):
+    """A long turn: one assistant call + its result per round, each result at the 035 cap."""
+    messages = [ChatMessage(role="user", content="Panorama cripto, dos specs.")]
+    for index in range(rounds):
+        messages.append(ChatMessage(
+            role="assistant", content=f"Ronda {index}: escribo el borrador.",
+            tool_calls=(ToolCall(id=f"c{index}", name="edit_draft",
+                                 args={"ops": [{"op": "write", "path": f"reports/r{index}.yaml",
+                                                "content": "x" * 4_000}]}),)))
+        messages.append(ChatMessage(role="tool", content="y" * tool_chars,
+                                    tool_call_id=f"c{index}"))
+    return messages
+
+
+def test_compress_shrinks_without_dropping_or_reordering():
+    messages = _turn_history()
+    summaries = {f"c{index}": f"escribí reports/r{index}.yaml" for index in range(12)}
+    out, saved = history.compress(messages, summaries)
+    assert len(out) == len(messages)                       # nothing dropped...
+    assert [m.role for m in out] == [m.role for m in messages]   # ...nor reordered
+    assert saved > 0
+    assert history.estimate_chars(out) < history.estimate_chars(messages) / 3
+    # An older result keeps its one-line summary; a call keeps its identity, not the file contents.
+    assert out[2].content == "escribí reports/r0.yaml"
+    assert out[1].tool_calls[0].args == {"ops": [{"op": "write", "path": "reports/r0.yaml"}],
+                                         "summary": None}
+
+
+def test_compress_keeps_the_last_exchanges_verbatim():
+    messages = _turn_history()
+    out, _saved = history.compress(messages, {})
+    assert out[-1].content == messages[-1].content          # the result it is working on
+    assert out[-2].content == messages[-2].content
+    # The tail is bounded by size, and one message may cross the bound on its own (a 60 KB result
+    # is still the thing the model is looking at).
+    assert history.estimate_chars(out) <= 2 * 60_000
+
+
+def test_compress_keeps_every_result_paired_with_its_call():
+    """Nothing is dropped, so a `tool_result` can never lose its `tool_use` (036 R1/R2)."""
+    messages = _turn_history(rounds=3, tool_chars=100)
+    for keep in range(1, 7):
+        out, _saved = history.compress(messages, {}, keep=keep)
+        assert len(out) == len(messages)
+        calls = {call.id for message in out for call in message.tool_calls or ()}
+        results = {message.tool_call_id for message in out if message.role == "tool"}
+        assert results <= calls, keep
+
+
+def test_compress_is_idempotent_and_cheap_on_a_short_turn():
+    messages = [ChatMessage(role="user", content="hola"),
+                ChatMessage(role="assistant", content="buenas")]
+    out, saved = history.compress(messages, {})
+    assert (out, saved) == (messages, 0)
+    long_turn = _turn_history()
+    once, _ = history.compress(long_turn, {})
+    twice, saved_twice = history.compress(once, {})
+    assert saved_twice == 0 and twice == once
+
+
+def test_compress_output_still_passes_the_provider_rules():
+    messages = _turn_history(rounds=6, tool_chars=2_000)
+    compressed, _saved = history.compress(messages, {f"c{i}": f"ok {i}" for i in range(6)})
+    rows = history.from_chat(compressed)
+    for provider in ("openai_compatible", "anthropic"):
+        built = history.for_provider(rows, provider, summaries={})
+        assert built.messages
+        assert not validate_messages(built.messages, provider)

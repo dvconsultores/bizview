@@ -25,7 +25,7 @@ import dataclasses
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from app.ai import ChatMessage, ToolCall
@@ -368,3 +368,68 @@ def _repair(messages: list[ChatMessage]) -> tuple[list[ChatMessage], list[str]]:
             continue
         out.append(message)
     return _merge(out), extra
+
+
+# --------------------------------------------------------------------------- compaction
+
+# Kept verbatim at the tail of one turn: the exchanges the model is still working on, bounded by
+# both a message count and a size (four results of 60 KB would otherwise fill the window alone).
+COMPACT_KEEP = 8
+COMPACT_TAIL_CHARS = 60_000
+COMPACT_TEXT_CHARS = 400
+
+
+def _message_chars(message: ChatMessage) -> int:
+    total = len(message.content or "")
+    for call in message.tool_calls or ():
+        total += len(json.dumps(call.args or {}, ensure_ascii=False, default=str))
+    return total
+
+
+def estimate_chars(messages: Sequence[ChatMessage]) -> int:
+    """Rough size of a payload in characters (about tokens x 4), tool args included."""
+    return sum(_message_chars(message) for message in messages)
+
+
+def compress(messages: Sequence[ChatMessage], summaries: dict[str, str] | None = None,
+             *, keep: int = COMPACT_KEEP, tail_chars: int = COMPACT_TAIL_CHARS,
+             text_chars: int = COMPACT_TEXT_CHARS) -> tuple[list[ChatMessage], int]:
+    """Compact one turn's history without dropping a message: only what it *carries* shrinks.
+
+    Like the compaction of other coding agents, the last exchanges stay verbatim and the older ones
+    keep their meaning: a tool result keeps its stored one-line summary, an assistant turn keeps its
+    first line, and a call keeps its identity (name, `op`/`path`) instead of the file contents it
+    wrote. Nothing is reordered or removed, so the `tool_use`/`tool_result` pairing that 036
+    validates still holds and the model keeps the thread of the turn.
+
+    Returns the compacted list and the characters saved (0 when there was nothing to do).
+    """
+    summaries = summaries or {}
+    before = estimate_chars(messages)
+    cut = len(messages)
+    kept = 0
+    total = 0
+    while cut > 0 and kept < keep:
+        size = _message_chars(messages[cut - 1])
+        if total + size > tail_chars and kept > 0:
+            break
+        total += size
+        kept += 1
+        cut -= 1
+    while cut > 0 and messages[cut].role == "tool":
+        cut -= 1                       # never start the verbatim tail with an orphan result
+    if cut <= 0:
+        return list(messages), 0
+    out: list[ChatMessage] = []
+    for index, message in enumerate(messages):
+        if index >= cut:
+            out.append(message)
+            continue
+        text = (message.content or "").strip()
+        content = text.splitlines()[0][:text_chars] if text else ""
+        if message.role == "tool":
+            content = summaries.get(message.tool_call_id or "") or _no_result("")
+        calls = tuple(replace(call, args=compact_args(call.name, call.args))
+                      for call in message.tool_calls or ())
+        out.append(replace(message, content=content, tool_calls=calls))
+    return out, max(0, before - estimate_chars(out))

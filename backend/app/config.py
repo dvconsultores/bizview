@@ -88,7 +88,17 @@ class Settings(BaseSettings):
 
     # Feature 028: the run contract of one autonomous run. A contract stores the numbers it was
     # confirmed with, so changing these never alters a run already under way.
-    ai_auto_max_rounds: int = Field(default=200, ge=1, le=500)
+    # Owner, 2026-10-27: an Auto run has no round cap. A real feature (eight stages, two specs)
+    # went past 200 rounds and stopped at `limit:rounds` with 3.9M tokens spent. `None` is the
+    # default — unlimited; an installation may still set a ceiling, and "Detener", the contract
+    # limits and the provider errors keep their own stops.
+    ai_auto_max_rounds: int | None = Field(default=None, ge=1, le=100_000)
+    # In-turn history budget (characters, about tokens x 4). Past it the loop compacts what it
+    # already carries instead of stopping: the last exchanges stay verbatim (up to
+    # `history.COMPACT_TAIL_CHARS`, capped by this budget), older tool results keep their
+    # one-line summary. Keep it above the tail, or the newest result is summarised too.
+    # A chat turn keeps its own `ai_chat_max_rounds`.
+    ai_context_compact_chars: int = Field(default=200_000, ge=20_000, le=2_000_000)
     # The owner waived the step-up for Auto ("do not need auth to auto mode"): selecting the mode is
     # the authorisation. Set to true to ask for the password again when a run is confirmed.
     ai_auto_require_step_up: bool = False

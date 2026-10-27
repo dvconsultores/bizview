@@ -35,6 +35,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Un run en Auto ya no se detiene por número de rondas, y su contexto se comprime (2026-10-27,
+  feature 039)**: `/speckit-all` sobre el panorama de `coinmarketcap` terminó con «El run se detuvo
+  al alcanzar el límite: rondas» y 3 927 419 tokens gastados, con `implement` a medias. Las rondas
+  de un run son del run: `ai_auto_max_rounds` pasa a ser *ilimitado* por defecto (`None`; una
+  instalación puede fijar un tope) y el run termina cuando termina su plan, cuando lo paran el
+  contrato o la persona, o ante un error del proveedor. Para que un run largo no muera por su propio
+  contexto, el turno se **comprime** en vez de crecer: el último tramo de intercambios queda
+  literal, y lo anterior conserva su resumen de una línea y la identidad de cada llamada
+  (`op`/`path`) sin el contenido de los archivos que escribió; la conversación avisa «Comprimí el
+  contexto de la conversación (N caracteres menos)» y el modelo sigue donde iba. Presupuesto:
+  `ai_context_compact_chars` (200 000 caracteres por defecto). Un turno de chat sin contrato
+  conserva su tope de rondas (`ai_chat_max_rounds`).
+
 - **Un brief largo ya cabe en el comando (2026-10-27, feature 039)**: pegar el prompt real del
   panorama cripto (7 629 caracteres) en `/speckit-all` respondía «Los argumentos del comando no
   pueden superar 4000 caracteres», aunque el compositor admite mensajes más largos: el comando

@@ -2286,6 +2286,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         new_messages.append(_add(db, session, role="assistant",
                                  content=t("commands.spec_current", spec=run.spec)))
     images = _turn_images(db, session, app_settings)
+    # None in Auto: the run ends when its plan ends (039), when the contract or the human stops it,
+    # or on a provider error — never because a round counter ran out (owner, 2026-10-27).
     max_rounds = (app_settings.ai_auto_max_rounds if auto_run is not None
                   else app_settings.ai_chat_max_rounds)
     turn_summaries: list[str] = []
@@ -2299,7 +2301,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
     was_ready = readiness.compute(view)["ready"]
     last_failed = None
 
-    while rounds < max_rounds:
+    while max_rounds is None or rounds < max_rounds:
         _bump(session, "rounds")
         # Feature 028: `run_command` switches the stage mid-turn, and the first stage/preview/apply
         # opens the contract, so the round re-reads both.
@@ -2307,7 +2309,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             fresh_contract = auto.live_contract(session)
             if fresh_contract is not None:
                 auto_run = fresh_contract
-                max_rounds = max(max_rounds, app_settings.ai_auto_max_rounds)
+                max_rounds = app_settings.ai_auto_max_rounds      # None: unlimited
         fresh = runs.active(db, session.id)
         if fresh is not None and fresh.status == "running" and fresh is not run:
             run = fresh
@@ -2352,6 +2354,21 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 state=context, extra=_command_extra(run))
         if restricted:
             context = f"{context}\n\n{_tools.DISCOVERY_DONE_TEXT}"
+        budget = app_settings.ai_context_compact_chars
+        if history_module.estimate_chars(history) > budget:
+            # An unlimited run must not be stopped by its own context: compact what it carries and
+            # keep going (owner, 2026-10-27; the same idea as the compaction of other agents).
+            history, saved = history_module.compress(
+                history, summaries,
+                tail_chars=min(history_module.COMPACT_TAIL_CHARS, budget))
+            if saved:
+                _bump(session, "compactions")
+                log.info("compacted session %s history: %s chars saved", session.id, saved)
+                new_messages.append(_add(
+                    db, session, role="assistant",
+                    content=t("assistant.context_compacted", chars=f"{saved:,}".replace(",", " "))))
+                session.updated_at = datetime.now(UTC)
+                db.flush()
         try:
             # 036: the payload is built and validated in one place before every call.
             try:
@@ -2371,7 +2388,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         except AIError as exc:
             if exc.code == "context_too_long" and not context_retried:
                 context_retried = True
-                history = _latest_round(history)
+                history, saved = history_module.compress(history, summaries, keep=2)
+                if not saved:
+                    history = _latest_round(history)
+                log.info("context too long on session %s: compacted %s chars", session.id, saved)
                 continue
             if images and not images_dropped \
                     and exc.code in ("provider_error", "invalid_tool_call"):
@@ -2625,7 +2645,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
 
     if auto_run is None:
         new_messages.append(
-            _progress(db, view, provider, app_settings, text, turn_summaries, max_rounds)
+            _progress(db, view, provider, app_settings, text, turn_summaries,
+                      max_rounds or app_settings.ai_chat_max_rounds)
         )
     end("limit")
     return new_messages

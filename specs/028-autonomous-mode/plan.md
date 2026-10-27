@@ -290,7 +290,7 @@ cli/bizview_cli/authoring.py  # the documented defaults of FR-005
 
 | Key | Default | Meaning |
 |---|---|---|
-| `ai_auto_max_rounds` | 200 | rounds allowed inside one Auto run (the loop's safety valve) |
+| `ai_auto_max_rounds` | `None` | rounds allowed inside one Auto run; `None` = no cap (owner, 2026-10-27: a real feature passed 200 rounds and stopped at `limit:rounds`). An installation may still set one; the context is compacted instead of the run being stopped |
 | `ai_auto_require_step_up` | `False` | ask for the password (and the TOTP code on `internet`) when a run is confirmed |
 
 Revision 2026-10-20 (owner: "do not limit it"): the three cap settings this table first listed
