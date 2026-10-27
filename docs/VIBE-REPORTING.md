@@ -323,6 +323,12 @@ project's problems are only counted, never offered as a fix), and applying one c
 rest of the workspace — if another project breaks the composition, the apply names it. See
 [proyectos/aislamiento.md](./guides/proyectos/aislamiento.md).
 
+When a dashboard cannot be painted (a dataset is gone, a metric divides by zero, a format is outside
+the catalogue, a PDF block cannot be drawn) the tile shows a card with its code and the piece that
+failed, and the rest of the dashboard still renders; a preview that an apply replaced answers
+`preview_expired` instead of an anonymous error. See
+[tableros/errores.md](./guides/tableros/errores.md).
+
 ## The in-app assistant: Spec Kit commands
 
 When AI is enabled, each BI project has a chat (Proyectos → a project, or the Asistente panel)
