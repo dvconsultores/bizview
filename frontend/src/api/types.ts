@@ -279,6 +279,8 @@ export interface KpiItem {
   value: number | null;
   previous: number | null;
   change: Change | null;
+  /** Feature 038: this metric could not be computed; the tile shows its card, the row goes on. */
+  error?: RenderErrorCard;
 }
 
 export interface TrendPoint {
@@ -286,6 +288,37 @@ export interface TrendPoint {
   value: number | null;
   previous?: number | null;
   previous_bucket?: string;
+}
+
+/** Feature 038: the code of a report failure and the piece that failed — never a row value. */
+export interface RenderErrorCard {
+  code:
+    | "preview_expired"
+    | "dataset_missing"
+    | "join_failed"
+    | "empty_dataset"
+    | "metric_error"
+    | "layout_component_unknown"
+    | "format_unknown"
+    | "pdf_render";
+  message: string;
+  /** The id of the report the failing piece belongs to. */
+  report?: string;
+  /** Short reference of the payload: the same one the server logged. */
+  reference?: string;
+  dataset?: string;
+  datasets?: string;
+  column?: string;
+  sets?: string;
+  key?: string;
+  metric?: string;
+  view?: string;
+  component?: string;
+  type?: string;
+  block?: string;
+  reason?: string;
+  format?: string;
+  version?: number;
 }
 
 /** Facts the engine derives per request (feature 026, data-model §7): `summary` is always sent,
@@ -296,6 +329,10 @@ interface DerivedViewFacts {
   summary: string;
   summary_en?: string;
   totals?: Record<string, number>;
+  /** Feature 038: the view could not be built; it carries the card and nothing else. */
+  error?: RenderErrorCard;
+  /** Feature 038: the period has no data; the tile says «Sin datos» instead of failing. */
+  empty?: RenderErrorCard;
 }
 
 export type ReportView =
@@ -348,6 +385,8 @@ export interface ReportData {
   filters: Record<string, string[]>;
   freshness: ReportFreshness;
   views: ReportView[];
+  /** Feature 038: the reference this payload's error cards carry in the server log. */
+  render_reference?: string;
   /** Advisory layout warnings (feature 026); errors are refused before a version is applied. */
   layout_problems?: LayoutProblem[];
 }
@@ -880,12 +919,14 @@ export interface AssistantPreviewResult {
 }
 
 export interface AssistantPreview {
-  status: "pending" | "succeeded" | "failed" | "expired";
+  status: "pending" | "succeeded" | "failed" | "expired" | "replaced";
   finished_at?: string;
   requested_at?: string;
   integrations?: Record<string, AssistantPreviewResult>;
   preview_integrations?: string[];
   message?: string;
+  /** Feature 038: the applied version that replaced this preview. */
+  version?: number;
 }
 
 // Feature 017 (agentic chat)

@@ -10,6 +10,7 @@
     "data_version": "<volatile>",
     "updated_at": "<volatile>"
    },
+   "render_reference": "<volatile>",
    "selection": {
     "compare": "none",
     "current": {
@@ -96,6 +97,7 @@
     "data_version": "<volatile>",
     "updated_at": "<volatile>"
    },
+   "render_reference": "<volatile>",
    "selection": {
     "compare": "previous_period",
     "current": {

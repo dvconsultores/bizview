@@ -1,0 +1,1 @@
+- [X] T001 unir los cuatro conjuntos por la captura

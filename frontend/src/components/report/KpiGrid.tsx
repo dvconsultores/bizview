@@ -3,6 +3,7 @@ import type { ColorRole, KpiItem, TrendPoint } from "../../api/types";
 import { changeTone, formatChange, formatValue } from "../../lib/numbers";
 import { StatTile } from "../StatTile";
 import { Sparkline } from "./charts/Sparkline";
+import { RenderErrorCard } from "./RenderErrorCard";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
 
@@ -66,6 +67,14 @@ export function KpiGrid({
         }
       >
         {shown.map((k) => {
+          // Feature 038: the metric that failed shows its own card; the other tiles still render.
+          if (k.error) {
+            return (
+              <li key={k.metric} className="min-w-0">
+                <RenderErrorCard error={k.error} />
+              </li>
+            );
+          }
           const Icon = ICONS[k.format] ?? Hash;
           const points = sparkline?.find((entry) => entry.metric === k.metric)?.points;
           return (

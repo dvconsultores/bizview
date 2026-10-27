@@ -17,6 +17,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, contextmanager
@@ -32,7 +33,8 @@ from sqlalchemy import func, select, text
 from sqlglot import exp
 
 from app.db import get_engine
-from app.engine import datasets, direct, periods
+from app.engine import datasets, direct, periods, render_errors
+from app.engine.render_errors import RenderError
 from app.errors import ApiError
 from app.i18n import M, localized, t, tn, use_locale
 from app.models import IntegrationRun, ReportCache, WorkspaceVersion
@@ -110,6 +112,9 @@ class Context:
     runner: Runner = BI_RUNNER
     direct: DirectSpec | None = None
     rollup: "Route | None" = None
+    #: The tables come from an assistant preview schema (feature 014/038): a missing table then
+    #: means the preview expired, not that the published integration lost a dataset.
+    preview: bool = False
 
     @property
     def metrics(self) -> dict:
@@ -166,7 +171,7 @@ def _build_direct_context(report_id: str, d: dict, version) -> Context:
 
 
 def _build_context(report_id: str, d: dict, version, integrations: dict,
-                   schema_for) -> Context:
+                   schema_for, *, preview: bool = False) -> Context:
     if "direct" in d:
         return _build_direct_context(report_id, d, version)
     tables, columns, used = {}, {}, []
@@ -174,13 +179,15 @@ def _build_context(report_id: str, d: dict, version, integrations: dict,
         iid, name = ref.split(".", 1)
         integ = integrations.get(iid)
         if integ is None or name not in integ["definition"]["datasets"]:
-            raise ReportError(M("report.set_missing", ref=ref), 409,
-                              "unknown_dataset")
+            raise RenderError(
+                render_errors.DATASET_MISSING, str(M("render.dataset_missing", dataset=ref)),
+                status=409, report_id=report_id, dataset=ref, alias=alias,
+            )
         tables[alias] = (schema_for(iid), name)
         columns[alias] = integ["definition"]["datasets"][name]["columns"]
         if iid not in used:
             used.append(iid)
-    return Context(report_id, d, version, tables, columns, used)
+    return Context(report_id, d, version, tables, columns, used, preview=preview)
 
 
 def context(version: WorkspaceVersion, report_id: str) -> Context:
@@ -219,7 +226,8 @@ def preview_context(version_like, report_id: str, report_def: dict, integrations
                 return datasets.schema_name(iid)
         return datasets.schema_name(iid)
 
-    return _build_context(report_id, report_def, version_like, integrations, schema_for)
+    return _build_context(report_id, report_def, version_like, integrations, schema_for,
+                          preview=bool(preview_iids))
 
 
 # --- SQL building --------------------------------------------------------------------------------
@@ -236,9 +244,15 @@ def expression(ctx: Context, text: str) -> sql.SQL:
 
 
 def _column(ctx: Context, ref: str) -> tuple[sql.Composed, dict]:
-    alias, col = ref.split(".", 1)
-    return sql.SQL("{}.{}").format(sql.Identifier(alias), sql.Identifier(col)), \
-        ctx.columns[alias][col]
+    alias, _, col = ref.partition(".")
+    contract = ctx.columns.get(alias, {}).get(col)
+    if contract is None:
+        raise RenderError(
+            render_errors.DATASET_MISSING,
+            str(M("render.column_missing", column=col or ref, dataset=alias or ref)),
+            status=409, report_id=ctx.report_id, dataset=alias or ref, column=col or ref,
+        )
+    return sql.SQL("{}.{}").format(sql.Identifier(alias), sql.Identifier(col)), contract
 
 
 def date_expression(ctx: Context) -> sql.Composable:
@@ -291,8 +305,13 @@ def from_clause(ctx: Context) -> sql.Composed:
             elif right in joined and left not in joined:
                 new = left
             elif left in joined and right in joined:
-                raise ReportError(M("report.repeated_joins"), 409,
-                                  "invalid_reference")
+                raise RenderError(
+                    render_errors.JOIN_FAILED,
+                    str(M("render.join_failed", sets=f"{left}, {right}",
+                          on=f"{j['left']} = {j['right']}")),
+                    status=409, report_id=ctx.report_id, sets=f"{left}, {right}",
+                    key=f"{j['left']} = {j['right']}", reason="repeated",
+                )
             else:
                 continue
             kind = "LEFT JOIN" if (j.get("type") or "left") == "left" else "JOIN"
@@ -303,14 +322,22 @@ def from_clause(ctx: Context) -> sql.Composed:
             pending.remove(j)
             progressed = True
         if not progressed:
-            raise ReportError(M("report.disconnected_joins"), 409,
-                              "invalid_reference")
+            sets = ", ".join(sorted({a for j in pending for a in
+                                     (j["left"].split(".")[0], j["right"].split(".")[0])}))
+            key = f"{pending[0]['left']} = {pending[0]['right']}"
+            raise RenderError(
+                render_errors.JOIN_FAILED,
+                str(M("render.join_failed", sets=sets, on=key)),
+                status=409, report_id=ctx.report_id, sets=sets, key=key,
+                reason="disconnected",
+            )
     missing = set(ctx.tables) - joined
     if missing:
-        raise ReportError(
-            M("report.unjoined_sets", aliases=", ".join(sorted(missing))),
-            409,
-            "invalid_reference",
+        aliases = ", ".join(sorted(missing))
+        raise RenderError(
+            render_errors.JOIN_FAILED,
+            str(M("render.join_failed", sets=aliases, on="—")),
+            status=409, report_id=ctx.report_id, sets=aliases, reason="unjoined",
         )
     return sql.SQL(" ").join(parts)
 
@@ -386,6 +413,55 @@ def _number(v) -> float | None:
         return None
 
 
+def _query_failure(ctx: Context, exc: Exception, metric_ids: list[str]) -> RenderError | None:
+    """A database failure while reading a report, as the code that names the piece at fault.
+
+    Only identifiers and fixed reason tokens travel (constitution VIII): psycopg's text can quote
+    the value that broke a cast, so `str(exc)` never reaches a message.
+    """
+    diag = getattr(exc, "diag", None)
+    table = getattr(diag, "table_name", None) or None
+    column = getattr(diag, "column_name", None) or None
+    refs = ", ".join(sorted(ctx.definition.get("uses", {}).values()))
+    if isinstance(exc, pg_errors.InvalidSchemaName | pg_errors.UndefinedTable):
+        if ctx.preview:
+            return RenderError(render_errors.PREVIEW_EXPIRED,
+                               str(M("render.preview_expired")), status=409,
+                               report_id=ctx.report_id, dataset=table)
+        name = table or refs
+        return RenderError(render_errors.DATASET_MISSING,
+                           str(M("render.dataset_missing", dataset=name)), status=409,
+                           report_id=ctx.report_id, dataset=name)
+    if isinstance(exc, pg_errors.UndefinedColumn):
+        return RenderError(render_errors.DATASET_MISSING,
+                           str(M("render.column_missing", column=column or "?",
+                                 dataset=refs)), status=409, report_id=ctx.report_id,
+                           dataset=refs, column=column)
+    if isinstance(exc, pg_errors.AmbiguousColumn):
+        joins = ctx.definition.get("joins") or []
+        key = f"{joins[0]['left']} = {joins[0]['right']}" if joins else "—"
+        sets = ", ".join(sorted({a for j in joins for a in
+                                 (j["left"].split(".")[0], j["right"].split(".")[0])})) or refs
+        return RenderError(render_errors.JOIN_FAILED,
+                           str(M("render.join_failed", sets=sets, on=key)), status=409,
+                           report_id=ctx.report_id, sets=sets, key=key, reason="ambiguous")
+    reason = None
+    if isinstance(exc, pg_errors.DivisionByZero):
+        reason = "division_by_zero"
+    elif isinstance(exc, pg_errors.NumericValueOutOfRange):
+        reason = "numeric_overflow"
+    elif isinstance(exc, pg_errors.DataError):
+        reason = "invalid_value"
+    elif isinstance(exc, pg_errors.ProgrammingError):
+        reason = "invalid_expression"
+    if reason is None:
+        return None
+    metrics = ", ".join(metric_ids) or "?"
+    return RenderError(render_errors.METRIC_ERROR,
+                       str(M("render.metric_error", metric=metrics, reason=reason)),
+                       report_id=ctx.report_id, metric=metrics, reason=reason)
+
+
 def _query(statement: sql.Composed, tz: str) -> list[tuple]:
     """Read-only transaction with a time limit, sent with its query as one batch: a single round
     trip (the product database may be remote, ~200 ms each)."""
@@ -435,11 +511,17 @@ def aggregate(ctx: Context, metric_ids: list[str], r: periods.Range, filters: di
             stmt += sql.SQL(" ORDER BY 1")
     if limit and (not order_metric or "sql" in ctx.metrics[order_metric]):
         stmt += sql.SQL(" LIMIT {}").format(sql.Literal(limit))
-    if session is not None:
-        result_rows = session.query(stmt, tz)
-    else:
-        with ctx.runner.session() as s:
-            result_rows = s.query(stmt, tz)
+    try:
+        if session is not None:
+            result_rows = session.query(stmt, tz)
+        else:
+            with ctx.runner.session() as s:
+                result_rows = s.query(stmt, tz)
+    except pg_errors.Error as exc:
+        error = _query_failure(ctx, exc, metric_ids)
+        if error is None:
+            raise
+        raise error from None
     out = []
     for row in result_rows:
         values = {m: _number(v) for m, v in zip(need, row[len(group):], strict=True)}
@@ -461,6 +543,9 @@ def _bucket_expr(ctx: Context, grain: str) -> sql.Composed:
 
 def view_kpis(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
               *, session=None) -> dict:
+    for mid in view["metrics"]:
+        render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
+                                   report_id=ctx.report_id)
     cur = aggregate(ctx, view["metrics"], sel.current, filters, tz, session=session)[0]
     prev = aggregate(ctx, view["metrics"], sel.previous, filters, tz,
                      session=session)[0] if sel.previous else {}
@@ -481,6 +566,8 @@ def view_trend(ctx: Context, view: dict, sel: periods.Selection, filters: dict, 
     grain = view.get("grain") or "auto"
     grain = sel.grain if grain == "auto" else grain
     mid = view["metric"]
+    render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
+                               report_id=ctx.report_id)
     group = [("bucket", _bucket_expr(ctx, grain))]
     cur = {r["bucket"]: r[mid] for r in aggregate(ctx, [mid], sel.current, filters, tz,
                                                    group=group, session=session)}
@@ -513,6 +600,8 @@ def _view_id(vdef: dict) -> dict:
 def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
                  *, session=None) -> dict:
     mid, did = view["metric"], view["dimension"]
+    render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
+                               report_id=ctx.report_id)
     limit = view.get("limit") or 10
     group = [("key", _dim(ctx, did))]
     rows = aggregate(ctx, [mid], sel.current, filters, tz, group=group, order_metric=mid,
@@ -546,6 +635,9 @@ def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict
 
 def view_table(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
                *, session=None) -> dict:
+    for mid in view["metrics"]:
+        render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
+                                   report_id=ctx.report_id)
     group = [(d, _dim(ctx, d)) for d in view["dimensions"]]
     limit = view.get("limit") or 100
     if ctx.direct is not None:
@@ -745,6 +837,8 @@ def _view_facts(ctx: Context, vdefs: list[dict], views: list[dict], sel: periods
     request language (`localized()` picks `summary_en` for English, like every other text)."""
     wanted = _totals_views(ctx)
     for vdef, view in zip(vdefs, views, strict=True):
+        if view.get("error"):
+            continue
         with use_locale("es"):
             view["summary"] = view_summary(ctx, vdef, view, sel)
         with use_locale("en"):
@@ -1012,7 +1106,10 @@ def _raw_on_missing(ctx: Context, fn):
     """Run fn(ctx); if the rollup is missing, mark it stale and retry on the raw path."""
     try:
         return fn(ctx)
-    except (pg_errors.UndefinedTable, pg_errors.UndefinedColumn):
+    except (pg_errors.UndefinedTable, pg_errors.UndefinedColumn, RenderError) as exc:
+        if isinstance(exc, RenderError) and exc.code not in (
+                render_errors.DATASET_MISSING, render_errors.PREVIEW_EXPIRED):
+            raise
         if ctx.rollup is None:
             raise
         from app.engine import rollup
@@ -1026,19 +1123,146 @@ def _raw_on_missing(ctx: Context, fn):
         return fn(replace(ctx, rollup=None))
 
 
-def _run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str) -> list[dict]:
-    vdefs = ctx.definition["views"]
+def render_reference() -> str:
+    """Short reference that ties one payload's error cards to its lines in the server log."""
+    return uuid.uuid4().hex[:12]
+
+
+def _failed_view(ctx: Context, vdef: dict, error: RenderError, reference: str | None) -> dict:
+    """A view that could not be built: its own error card, the rest of the dashboard unaffected."""
+    card = render_errors.card(error.code, error.text, report_id=ctx.report_id,
+                              reference=reference,
+                              view=vdef.get("id"), **error.detail)
+    log.error("report render failed code=%s report=%s view=%s ref=%s",
+              error.code, ctx.report_id, vdef.get("id"), reference)
+    return {"type": vdef["type"], **_view_id(vdef), "error": card}
+
+
+def _kpis_one_by_one(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
+                     *, session=None) -> dict:
+    """A KPI row whose combined query failed: retry metric by metric so only the bad one fails."""
+    items = []
+    for mid in view["metrics"]:
+        m = ctx.metrics[mid]
+        try:
+            cur = aggregate(ctx, [mid], sel.current, filters, tz, session=session)[0]
+            prev = (aggregate(ctx, [mid], sel.previous, filters, tz, session=session)[0]
+                    if sel.previous else {})
+        except RenderError as exc:
+            items.append({"metric": mid, "label": m["label"], **_en(m, "label"),
+                          "format": m.get("format", "number"),
+                          "better": m.get("better", "higher"),
+                          "error": render_errors.card(
+                              exc.code, exc.text, report_id=ctx.report_id,
+                              view=view.get("id"), **exc.detail)})
+            continue
+        items.append({"metric": mid, "label": m["label"], **_en(m, "label"),
+                      "format": m.get("format", "number"),
+                      "better": m.get("better", "higher"), "value": cur.get(mid),
+                      "previous": prev.get(mid) if sel.previous else None,
+                      "change": periods.change(cur.get(mid), prev.get(mid))
+                      if sel.previous else None})
+    return {"type": "kpis", **_view_id(view), "items": items}
+
+
+def _run_view(ctx: Context, vdef: dict, sel: periods.Selection, filters: dict, tz: str,
+              reference: str | None, *, session=None) -> dict:
+    """One view, never the whole dashboard: a failure becomes that view's error card (FR-006)."""
+    try:
+        return VIEWS[vdef["type"]](ctx, vdef, sel, filters, tz, session=session)
+    except RenderError as exc:
+        if (exc.code == render_errors.METRIC_ERROR and vdef["type"] == "kpis"
+                and len(vdef.get("metrics") or []) > 1):
+            view = _kpis_one_by_one(ctx, vdef, sel, filters, tz, session=session)
+            if any(item.get("value") is not None or item.get("error") for item in view["items"]):
+                return view
+        return _failed_view(ctx, vdef, exc, reference)
+
+
+def _leaf_values(view: dict) -> list:
+    """Every number a view carries, to tell «empty period» from «nothing to show»."""
+    if view.get("error"):
+        return [None]
+    kind = view.get("type")
+    if kind == "kpis":
+        return [i.get("value") for i in view.get("items") or []]
+    if kind == "trend":
+        return [p.get("value") for p in view.get("points") or []]
+    if kind == "ranking":
+        return [i.get("value") for i in view.get("items") or []]
+    return [r for r in view.get("rows") or []] or [None]
+
+
+def _empty_refs(ctx: Context, tz: str) -> list[str]:
+    """Datasets of the report with no row at all (asked only when a view came back empty)."""
+    empty = []
+    for alias, (schema, table) in ctx.tables.items():
+        try:
+            rows = _query(sql.SQL("SELECT EXISTS (SELECT 1 FROM {}.{})").format(
+                sql.Identifier(schema), sql.Identifier(table)), tz)
+        except pg_errors.Error:
+            continue
+        if rows and not rows[0][0]:
+            empty.append((ctx.definition.get("uses") or {}).get(alias, alias))
+    return sorted(empty)
+
+
+def _mark_empty(ctx: Context, views: list[dict], tz: str) -> None:
+    """A view with no data says so («Sin datos») instead of failing or looking broken (research R3).
+
+    The datasets that are actually empty are named only when some view came back without data, so
+    a report with data pays no extra query.
+    """
+    if not any(all(v is None for v in _leaf_values(view)) for view in views):
+        return
+    refs = _empty_refs(ctx, tz) if ctx.direct is None else []
+    for view in views:
+        if view.get("error") or not all(v is None for v in _leaf_values(view)):
+            continue
+        view["empty"] = render_errors.card(
+            render_errors.EMPTY_DATASET,
+            str(M("render.empty_dataset", datasets=", ".join(refs) or "?")) if refs
+            else str(M("render.empty_period")),
+            report_id=ctx.report_id, datasets=", ".join(refs) or None)
+
+
+def _sort_facts(ctx: Context, vdefs: list[dict], views: list[dict], sel: periods.Selection,
+                filters: dict, tz: str, *, session=None) -> None:
+    """Derived facts are cosmetic (a sentence, a totals row): a failure drops them, not the view."""
+    try:
+        _view_facts(ctx, vdefs, views, sel, filters, tz, session=session)
+    except Exception:       # never break a dashboard for a sentence
+        log.warning("derived view facts failed for report %s", ctx.report_id, exc_info=True)
+
+
+def _run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str,
+               reference: str | None = None) -> list[dict]:
+    vdefs = [v for v in ctx.definition["views"] if v.get("type") in VIEWS]
     if ctx.direct is not None:
         with ctx.runner.session() as s:
-            views = [VIEWS[v["type"]](ctx, v, sel, filters, tz, session=s) for v in vdefs]
-            _view_facts(ctx, vdefs, views, sel, filters, tz, session=s)
-            return views
-    with ThreadPoolExecutor(max_workers=min(PARALLEL_VIEWS, len(vdefs))) as pool:
-        views = list(pool.map(lambda v: VIEWS[v["type"]](ctx, v, sel, filters, tz), vdefs))
-    _view_facts(ctx, vdefs, views, sel, filters, tz)
+            views = [_run_view(ctx, v, sel, filters, tz, reference, session=s) for v in vdefs]
+            _sort_facts(ctx, vdefs, views, sel, filters, tz, session=s)
+        _mark_empty(ctx, views, tz)
+        return views
+    with ThreadPoolExecutor(max_workers=min(PARALLEL_VIEWS, max(len(vdefs), 1))) as pool:
+        views = list(pool.map(
+            lambda v: _run_view(ctx, v, sel, filters, tz, reference), vdefs))
+    # A routed (rollup) payload that lost its table is not a dashboard with five cards: the raw
+    # path is the answer, and `_raw_on_missing` handles it (feature 005 rollups, 038).
+    if ctx.rollup is not None:
+        broken = next((v["error"] for v in views if v.get("error")
+                       and v["error"]["code"] in (render_errors.DATASET_MISSING,
+                                                  render_errors.PREVIEW_EXPIRED)), None)
+        if broken:
+            raise RenderError(broken["code"], broken["message"], status=409,
+                              report_id=ctx.report_id, reference=reference)
+    _sort_facts(ctx, vdefs, views, sel, filters, tz)
+    _mark_empty(ctx, views, tz)
     return views
 
 
-def run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str) -> list[dict]:
+def run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str, *,
+              reference: str | None = None) -> list[dict]:
     """Views are independent: computed in parallel (each on its own pooled connection)."""
-    return _raw_on_missing(ctx, lambda c: _run_views(c, sel, filters, tz))
+    reference = reference or render_reference()
+    return _raw_on_missing(ctx, lambda c: _run_views(c, sel, filters, tz, reference))

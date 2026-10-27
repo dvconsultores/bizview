@@ -757,6 +757,33 @@ export const en: Catalogue = {
     },
     detailTitle: "Details",
   },
+  // Feature 038: the card of a tile or block that could not render names the failing piece.
+  report: {
+    errors: {
+      title: "Technical details",
+      code: "Code",
+      report: "Report",
+      reference: "Reference",
+      dataset: "Dataset",
+      column: "Column",
+      sets: "Joins",
+      key: "Key",
+      metric: "Metric",
+      view: "View",
+      component: "Component",
+      type: "Type",
+      block: "Block",
+      reason: "Reason",
+      format: "Format",
+      version: "Version",
+      log: "The server log has the detail. Read it in the backend container:",
+      cmd: (reference?: string) =>
+        reference
+          ? `docker logs --tail 500 bizview-backend | grep -n "${reference}" -A 60`
+          : "docker logs --tail 500 bizview-backend | grep -i \"report\"",
+      noData: "No data in the period.",
+    },
+  },
   layout: {
     errorCard: (id: string, type: string) =>
       `Cannot render “${id}”: type “${type}” is not in the layout catalogue.`,
@@ -1076,6 +1103,8 @@ export const en: Catalogue = {
     history: "History",
     apply: "Apply project",
     preview: "Preview",
+    previewReplaced: (version: number) =>
+      `Preview replaced by version ${version}. The published figures are the dashboard's.`,
     fullscreen: "Full screen",
     exitFullscreen: "Leave full screen",
     deleteProject: "Delete project",
@@ -1413,6 +1442,7 @@ export const en: Catalogue = {
     files: "Files",
     previewInProgress: "Preview in progress…",
     previewReady: "Preview ready",
+    previewReplaced: (version: number) => `Preview replaced by version ${version}.`,
     previewFailed: "Preview failed",
     appliedAsVersion: "Applied as version {id}",
     previewNote: "Only you see these figures; published data doesn't change.",

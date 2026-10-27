@@ -1,0 +1,138 @@
+id: panorama-cripto
+spec: specs/002-panorama-cripto
+title: Panorama cripto
+description: Mercado de criptomonedas en la última captura
+icon: chart-line
+uses:
+  assets: mercado-cripto.assets
+  global_metrics: mercado-cripto.global_metrics
+  fear_greed: mercado-cripto.fear_greed
+  altseason: mercado-cripto.altcoin_season
+joins:
+  - left: assets.snapshot_at
+    right: global_metrics.snapshot_at
+    type: left
+  - left: global_metrics.snapshot_at
+    right: fear_greed.snapshot_at
+    type: left
+  - left: fear_greed.snapshot_at
+    right: altseason.snapshot_at
+    type: left
+date: assets.snapshot_at
+metrics:
+  market_cap:
+    label: Capitalización
+    format: currency
+    better: higher
+    sql: sum(assets.market_cap)
+  volume:
+    label: Volumen 24 h
+    format: currency
+    better: higher
+    sql: sum(assets.volume_24h)
+  total_market_cap:
+    label: Capitalización total
+    format: currency
+    better: higher
+    sql: max(global_metrics.total_market_cap)
+  dominance:
+    label: Dominio de la cartera
+    formula: market_cap / total_market_cap * 100
+    format: percent
+    better: higher
+  fear_greed_value:
+    label: Miedo y codicia
+    format: integer
+    better: higher
+    sql: max(fear_greed.value)
+  altseason_index:
+    label: Índice altseason
+    format: integer
+    better: higher
+    sql: max(altseason.index)
+dimensions:
+  asset:
+    label: Activo
+    sql: assets.symbol
+periods:
+  default: mtd
+  allowed: [mtd, last_7_days, last_12_months, custom]
+compare:
+  default: previous_period
+  allowed: [none, previous_period, previous_year]
+views:
+  - id: resumen
+    type: kpis
+    metrics: [market_cap, volume, dominance, fear_greed_value, altseason_index]
+  - id: capitalizacion
+    type: trend
+    metric: market_cap
+    grain: auto
+  - id: activos
+    type: ranking
+    dimension: asset
+    metric: market_cap
+    limit: 5
+  - id: detalle
+    type: table
+    dimensions: [asset]
+    metrics: [market_cap, volume]
+    limit: 20
+filters: [asset]
+pdf:
+  enabled: true
+layout:
+  web:
+    gutter: md
+    components:
+      - id: resumen_kpi
+        type: kpi
+        view: resumen
+        metric: market_cap
+        span: 12
+      - id: grafico
+        type: line
+        view: capitalizacion
+        x: day
+        series: [market_cap]
+        span: 8
+      - id: ranking
+        type: bar
+        view: activos
+        x: asset
+        series: [market_cap]
+        orientation: horizontal
+        span: 4
+      - id: tabla
+        type: table
+        view: detalle
+        columns: [asset, market_cap, volume]
+        span: 12
+  pdf:
+    page:
+      size: a4
+      orientation: portrait
+    blocks:
+      - id: cabecera
+        type: header
+        title: true
+        subtitle: true
+        period: true
+      - id: kpis
+        type: kpi_row
+        view: resumen
+        items: [market_cap, volume, dominance]
+      - id: grafico
+        type: chart
+        view: capitalizacion
+        kind: line
+        x: day
+        series: [market_cap]
+      - id: tabla
+        type: table
+        view: detalle
+        columns: [asset, market_cap, volume]
+        totals: true
+      - id: pie
+        type: footer
+        page_numbers: true

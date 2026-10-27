@@ -1,0 +1,51 @@
+id: mercado-cripto
+spec: specs/001-mercado-cripto
+source: Origen prueba
+schedule: "*/30 * * * *"
+timezone: America/Caracas
+time_limit_minutes: 5
+datasets:
+  assets:
+    primary_key: [snapshot_at, symbol]
+    date_column: snapshot_at
+    columns:
+      snapshot_at: {type: timestamptz, nullable: false}
+      symbol: {type: text, nullable: false}
+      price: {type: numeric}
+      market_cap: {type: numeric}
+      volume_24h: {type: numeric}
+      change_24h: {type: numeric}
+    extract: {query: queries/assets.sql}
+    incremental: {mode: full}
+    checks: [{type: not_null, columns: [snapshot_at]}]
+  global_metrics:
+    primary_key: [snapshot_at]
+    date_column: snapshot_at
+    columns:
+      snapshot_at: {type: timestamptz, nullable: false}
+      total_market_cap: {type: numeric}
+      btc_dominance: {type: numeric}
+      eth_dominance: {type: numeric}
+      volume_24h: {type: numeric}
+    extract: {query: queries/global_metrics.sql}
+    incremental: {mode: full}
+    checks: [{type: not_null, columns: [snapshot_at]}]
+  fear_greed:
+    primary_key: [snapshot_at]
+    date_column: snapshot_at
+    columns:
+      snapshot_at: {type: timestamptz, nullable: false}
+      value: {type: integer}
+      classification: {type: text}
+    extract: {query: queries/fear_greed.sql}
+    incremental: {mode: full}
+    checks: [{type: not_null, columns: [snapshot_at]}]
+  altcoin_season:
+    primary_key: [snapshot_at]
+    date_column: snapshot_at
+    columns:
+      snapshot_at: {type: timestamptz, nullable: false}
+      index: {type: integer}
+    extract: {query: queries/altcoin_season.sql}
+    incremental: {mode: full}
+    checks: [{type: not_null, columns: [snapshot_at]}]

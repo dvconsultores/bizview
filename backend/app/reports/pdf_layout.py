@@ -9,6 +9,7 @@ palette and the fonts live here, with the ones the fixed story already uses.
 keeps the fixed story for every report that does not (FR-009).
 """
 import io
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,7 +39,8 @@ from reportlab.platypus import (
 )
 
 from app.config import get_settings
-from app.i18n import localized, t, tn
+from app.engine import render_errors
+from app.i18n import M, localized, t, tn
 from app.reports.palette import ReportPalette, resolve
 
 FONTS = {"sans": "Helvetica", "sans_bold": "Helvetica-Bold",
@@ -55,6 +57,8 @@ DEFAULT_KIND = {"trend": "line", "ranking": "bar", "table": "bar", "kpis": "bar"
 LINK_RE = re.compile(r"\[([^\]\n]+)\]\((https?://[^)\s]+)\)")
 BOLD_RE = re.compile(r"\*\*([^*\n]+)\*\*")
 ITALIC_RE = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
+
+log = logging.getLogger("app.reports")
 
 
 def _pdf():
@@ -230,9 +234,13 @@ class PageNumber(Flowable):
 def render_layout(*, definition: dict, payload: dict, styles, organization: str, product: str,
                   viewer: str | None, preview: bool, locale: str,
                   palette: ReportPalette | None = None) -> list:
-    """Historia de flowables para definition["layout"]["pdf"]."""
+    """Historia de flowables para definition["layout"]["pdf"].
+
+    Feature 038: a block that cannot be drawn becomes its own error card — with the code and the
+    block id — and the rest of the document still renders. Nothing here may leave the report
+    without a page for one bad block."""
     pdf_doc = pdf_document(definition) or {}
-    blocks = _blocks(pdf_doc)
+    blocks = _declared_blocks(pdf_doc)
     pal = palette if palette is not None else resolve(definition)
     story = Story(definition.get("layout") or {}, _styles(styles, pal))
     ctx = Layout(definition=definition, payload=payload, styles=story.styles,
@@ -241,12 +249,74 @@ def render_layout(*, definition: dict, payload: dict, styles, organization: str,
                  width=story.width, blocks=blocks, palette=pal)
     for index, block in enumerate(blocks):
         ctx.index = index
-        _BLOCKS[block["type"]](ctx, block, story)
+        _render_block(ctx, block, story, payload)
     return story.flowables
 
 
+def _declared_blocks(pdf_doc: dict) -> list[dict]:
+    """Declared blocks in declared order, unknown types included so they can name themselves."""
+    blocks = pdf_doc.get("blocks")
+    if not isinstance(blocks, list):
+        return []
+    return [b for b in blocks if isinstance(b, dict)]
+
+
+def _block_card(styles: dict, title: str, message: str, detail: str | None = None) -> list:
+    """The card that replaces one block: its title, what happened, and the technical line."""
+    out = [Paragraph(escape(title), styles["heading"]),
+           Paragraph(escape(message), styles["text"])]
+    if detail:
+        out.append(Paragraph(escape(detail), styles["text_caption"]))
+    return out
+
+
+def _render_block(ctx: Layout, block: dict, story: Story, payload: dict) -> None:
+    name = str(block.get("id") or block.get("type") or "?")
+    kind = str(block.get("type") or "?")
+    if kind not in BLOCK_TYPES:
+        card = render_errors.card(
+            render_errors.LAYOUT_COMPONENT_UNKNOWN,
+            str(M("render.layout_component_unknown", component=name, type=kind)),
+            report_id=ctx.definition.get("id"), reference=payload.get("render_reference"),
+            component=name, type=kind)
+        log.error("pdf block %s: unknown type %s (report %s, ref %s)", name, kind,
+                  ctx.definition.get("id"), payload.get("render_reference"))
+        story.add(*_block_card(ctx.styles, t("render.card_title", component=name),
+                               card["message"], _card_detail(card)))
+        return
+    view = _view(ctx, block)
+    if isinstance(view, dict) and view.get("error"):
+        card = view["error"]
+        story.add(*_block_card(ctx.styles, t("render.card_title", component=name),
+                               str(card.get("message") or ""), _card_detail(card)))
+        return
+    if isinstance(view, dict) and view.get("empty"):
+        story.add(*_block_card(ctx.styles, t("render.card_title", component=name),
+                               str(view["empty"].get("message") or t("render.card_no_data")),
+                               _card_detail(view["empty"])))
+        return
+    try:
+        _BLOCKS[kind](ctx, block, story)
+    except Exception as exc:     # one block never takes the document down
+        reason = type(exc).__name__
+        card = render_errors.card(
+            render_errors.PDF_RENDER, str(M("render.pdf_block", block=name, reason=reason)),
+            report_id=ctx.definition.get("id"), reference=payload.get("render_reference"),
+            block=name, reason=reason)
+        log.error("pdf block %s failed (report %s, ref %s): %s", name,
+                  ctx.definition.get("id"), payload.get("render_reference"), reason)
+        story.add(*_block_card(ctx.styles, t("render.card_title", component=name),
+                               card["message"], _card_detail(card)))
+
+
+def _card_detail(card: dict) -> str:
+    """The technical line of a card: the code and the ids, never a row value."""
+    parts = [f"{k}={v}" for k, v in card.items() if k != "message" and v not in (None, "")]
+    return " · ".join(parts)
+
+
 def _blocks(pdf_doc: dict) -> list[dict]:
-    """Declared blocks in declared order; an unknown type is never rendered."""
+    """Declared blocks of known types, in declared order (validation refuses the rest)."""
     blocks = pdf_doc.get("blocks")
     if not isinstance(blocks, list):
         return []

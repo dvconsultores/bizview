@@ -1,5 +1,6 @@
 import type { ReportData, ReportDefinition } from "../../api/types";
 import { DataTable } from "./DataTable";
+import { NoDataCard, RenderErrorCard } from "./RenderErrorCard";
 import { KpiGrid } from "./KpiGrid";
 import { LayoutRenderer } from "./LayoutRenderer";
 import { RankingTable } from "./RankingTable";
@@ -39,6 +40,9 @@ export function ReportViews({
   }
 
   return data.views.map((v, i) => {
+    // Feature 038: a view that failed (or came back empty) is its own card; the rest still draws.
+    if (v.error) return <RenderErrorCard key={i} error={v.error} />;
+    if (v.empty) return <NoDataCard key={i} error={v.empty} />;
     if (v.type === "kpis")
       return (
         <KpiGrid key={i} items={v.items} currency={def.currency} compared={compared} size={kpiSize} />

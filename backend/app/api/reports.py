@@ -88,10 +88,13 @@ def _data(db: Session, ctx: engine.Context, params: Iterable[tuple[str, str]]) -
                 else f'"{fr.get("data_version")}-{key}"')
         return {**payload, "etag": etag}
     version, updated, hit = engine.data_version_and_cached(db, ctx, key, "data")
+    reference = engine.render_reference()
     payload = _cached(db, ctx, key, version, "data", lambda: {
         "selection": sel.to_json(), "filters": filters,
+        "render_reference": reference,
         "freshness": {"updated_at": updated, "data_version": version},
-        "views": engine.run_views(engine.routed(db, ctx), sel, filters, tz)},
+        "views": engine.run_views(engine.routed(db, ctx), sel, filters, tz,
+                                  reference=reference)},
         looked_up=True, hit=hit)
     return {**payload, "etag": f'"{version}-{key}"'}
 

@@ -1369,14 +1369,16 @@ def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine) -> dict:
             if hit is not None:
                 return hit
             queried_at = datetime.now(UTC)
+            reference = engine.render_reference()
             token = _deadline_override.set(deadline)
             try:
-                views = engine.run_views(ctx, sel, filters, tz)
+                views = engine.run_views(ctx, sel, filters, tz, reference=reference)
             finally:
                 _deadline_override.reset(token)
             payload = jsonable_encoder({
                 "selection": sel.to_json(),
                 "filters": filters,
+                "render_reference": reference,
                 "freshness": {
                     "updated_at": queried_at,
                     "data_version": version,

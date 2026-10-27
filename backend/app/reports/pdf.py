@@ -285,6 +285,12 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
                   Paragraph("<br/>".join(meta), st["meta"]), Spacer(1, 3 * mm)]
         compare = bool(sel.get("previous"))
         for view in _layout_views(payload["views"], legacy.get("views")):
+            if view.get("error") or view.get("empty"):
+                # Feature 038: one view that cannot render is a card here too, never a failed PDF.
+                card = view.get("error") or view.get("empty") or {}
+                story.append(Paragraph(escape(str(card.get("message") or t("render.card_no_data"))),
+                                       st["meta"]))
+                continue
             if view["type"] == "kpis":
                 head = [t("pdf.indicator"), t("pdf.value")] + (
                     [t("pdf.previous"), t("pdf.change")] if compare else [])

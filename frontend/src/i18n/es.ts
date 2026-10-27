@@ -738,6 +738,33 @@ export const es = {
     },
     detailTitle: "Detalle",
   },
+  // Feature 038: the card of a tile or block that could not render names the failing piece.
+  report: {
+    errors: {
+      title: "Detalles técnicos",
+      code: "Código",
+      report: "Reporte",
+      reference: "Referencia",
+      dataset: "Conjunto",
+      column: "Columna",
+      sets: "Uniones",
+      key: "Clave",
+      metric: "Métrica",
+      view: "Vista",
+      component: "Componente",
+      type: "Tipo",
+      block: "Bloque",
+      reason: "Motivo",
+      format: "Formato",
+      version: "Versión",
+      log: "El registro del servidor tiene el detalle. Léelo en el contenedor del backend:",
+      cmd: (reference?: string) =>
+        reference
+          ? `docker logs --tail 500 bizview-backend | grep -n "${reference}" -A 60`
+          : "docker logs --tail 500 bizview-backend | grep -i \"report\"",
+      noData: "Sin datos en el período.",
+    },
+  },
   layout: {
     errorCard: (id: string, type: string) =>
       `No se puede mostrar «${id}»: el tipo «${type}» no está en el catálogo del layout.`,
@@ -1057,6 +1084,8 @@ export const es = {
     history: "Historial",
     apply: "Aplicar proyecto",
     preview: "Vista previa",
+    previewReplaced: (version: number) =>
+      `Vista previa reemplazada por la versión ${version}. Las cifras publicadas son las del tablero.`,
     fullscreen: "Pantalla completa",
     exitFullscreen: "Salir de pantalla completa",
     deleteProject: "Eliminar proyecto",
@@ -1397,6 +1426,8 @@ export const es = {
     files: "Archivos",
     previewInProgress: "Vista previa en curso…",
     previewReady: "Vista previa lista",
+    previewReplaced: (version: number) =>
+      `Vista previa reemplazada por la versión ${version}.`, 
     previewFailed: "La vista previa falló",
     appliedAsVersion: "Aplicado como versión {id}",
     previewNote: "Solo tú ves estas cifras; los datos publicados no cambian.",

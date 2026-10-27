@@ -11,11 +11,11 @@ import type {
 import { formatBucket } from "../../lib/numbers";
 import { localized } from "../../lib/labels";
 import { useT } from "../../i18n";
-import { Alert } from "../Alert";
 import { DataTable } from "./DataTable";
 import { KpiGrid } from "./KpiGrid";
 import { FiltersBlock, SpacerBlock, TextBlock, type LayoutParamsWiring } from "./LayoutBlocks";
 import { componentRoles, roleAt } from "./layoutRoles";
+import { NoDataCard, RenderErrorCard } from "./RenderErrorCard";
 import { AreaChart } from "./charts/AreaChart";
 import { BarChart } from "./charts/BarChart";
 import { LineChart } from "./charts/LineChart";
@@ -104,8 +104,16 @@ function resolveView(component: WebComponent, data: ReportData): ReportView | nu
   return data.views.find((view) => view.id === component.view) ?? null;
 }
 
-function ErrorCard({ message }: { message: string }) {
-  return <Alert tone="error">{message}</Alert>;
+function ErrorCard({ message, component, code = "dataset_missing", type, reference }: {
+  message: string;
+  component: string;
+  code?: "layout_component_unknown" | "dataset_missing";
+  type?: string;
+  reference?: string;
+}) {
+  return (
+    <RenderErrorCard error={{ code, message, reference, component, type }} />
+  );
 }
 
 /** Validation warnings travel with the payload; they are a quiet note, never a failure. */
@@ -148,11 +156,23 @@ function Component({
     return <FiltersBlock component={component} def={def} data={data} params={params} />;
   }
   if (!VIEW_TYPES.includes(component.type)) {
-    return <ErrorCard message={t.layout.errorCard(component.id, component.type)} />;
+    return (
+      <ErrorCard code="layout_component_unknown" component={component.id} type={component.type}
+                 reference={data.render_reference}
+                 message={t.layout.errorCard(component.id, component.type)} />
+    );
   }
 
   const view = resolveView(component, data);
-  if (!view) return <ErrorCard message={t.layout.missingView(component.id, component.view ?? "")} />;
+  if (!view) {
+    return (
+      <ErrorCard component={component.id} reference={data.render_reference}
+                 message={t.layout.missingView(component.id, component.view ?? "")} />
+    );
+  }
+  // Feature 038: the engine names what failed; the component shows that card, not a blank cell.
+  if (view.error) return <RenderErrorCard error={view.error} />;
+  if (view.empty) return <NoDataCard error={view.empty} />;
 
   switch (component.type) {
     case "kpi":
@@ -166,7 +186,11 @@ function Component({
     case "table":
       return <TableComponent component={component} view={view} def={def} csvBase={csvBase} size={size} />;
     default:
-      return <ErrorCard message={t.layout.errorCard(component.id, component.type)} />;
+      return (
+        <ErrorCard code="layout_component_unknown" component={component.id} type={component.type}
+                   reference={data.render_reference}
+                   message={t.layout.errorCard(component.id, component.type)} />
+      );
   }
 }
 
@@ -184,9 +208,13 @@ function KpiComponent({
   size: "normal" | "tv";
 }) {
   const t = useT();
-  if (view.type !== "kpis") return <ErrorCard message={t.layout.viewShape(component.id, component.view ?? "")} />;
+  if (view.type !== "kpis") {
+    return <ErrorCard component={component.id} reference={data.render_reference}
+                      message={t.layout.viewShape(component.id, component.view ?? "")} />;
+  }
   if (component.metric && !view.items.some((item) => item.metric === component.metric)) {
-    return <ErrorCard message={t.layout.missingMetric(component.id, component.metric)} />;
+    return <ErrorCard component={component.id} reference={data.render_reference}
+                      message={t.layout.missingMetric(component.id, component.metric)} />;
   }
 
   // The sparkline needs a series, which a KPI view does not carry: the trend view of the same
@@ -349,10 +377,12 @@ function ChartComponent({
   const roles = componentRoles(component);
   const built = buildChartData(component, view, roles, t.reportParams.display.previous);
   if ("shape" in built) {
-    return <ErrorCard message={t.layout.viewShape(component.id, component.view ?? "")} />;
+    return <ErrorCard component={component.id}
+                      message={t.layout.viewShape(component.id, component.view ?? "")} />;
   }
   if ("problem" in built) {
-    return <ErrorCard message={t.layout.missingMetric(component.id, built.problem)} />;
+    return <ErrorCard component={component.id}
+                      message={t.layout.missingMetric(component.id, built.problem)} />;
   }
 
   const frame = chartFrame(component, view, def, component.id);
@@ -428,14 +458,21 @@ function TableComponent({
   size: "normal" | "tv";
 }) {
   const t = useT();
-  if (view.type !== "table") return <ErrorCard message={t.layout.viewShape(component.id, component.view ?? "")} />;
+  if (view.type !== "table") {
+    return <ErrorCard component={component.id}
+                      message={t.layout.viewShape(component.id, component.view ?? "")} />;
+  }
   const table: Table = view;
   const emitted = table.columns.map((column) => column.id);
   const requested = component.columns && component.columns.length > 0 ? component.columns : emitted;
   const missing = requested.find((id) => !emitted.includes(id));
-  if (missing) return <ErrorCard message={t.layout.missingMetric(component.id, missing)} />;
+  if (missing) {
+    return <ErrorCard component={component.id}
+                      message={t.layout.missingMetric(component.id, missing)} />;
+  }
   if (component.sort && !requested.includes(component.sort.by)) {
-    return <ErrorCard message={t.layout.missingMetric(component.id, component.sort.by)} />;
+    return <ErrorCard component={component.id}
+                      message={t.layout.missingMetric(component.id, component.sort.by)} />;
   }
 
   return (

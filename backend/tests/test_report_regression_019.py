@@ -21,6 +21,8 @@ SELECTION_2 = "period=custom&from=2026-09-27&to=2026-09-27&compare=none&filter.p
 VOLATILE_KEYS = {
     "data_version", "updated_at", "generated_at", "queried_at", "computed_at",
     "run_id", "last_run_at", "finished_at", "started_at",
+    # Feature 038: the reference of the render cards is new on every payload.
+    "render_reference",
 }
 TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)?")
 TIME_RE = re.compile(r"\b\d{1,2}:\d{2}(:\d{2})?\b")

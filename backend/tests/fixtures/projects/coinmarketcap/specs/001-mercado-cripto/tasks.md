@@ -1,0 +1,1 @@
+- [X] T001 integrar los cuatro conjuntos
