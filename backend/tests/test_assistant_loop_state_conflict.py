@@ -119,3 +119,26 @@ def test_an_integrity_error_keeps_the_pipeline_cursor(monkeypatch, superuser):
         state = pipeline.state_of(db, sid)
     # The plan exists but did not advance past the stage that failed.
     assert state is None or state["cursor"] == 0
+
+
+def test_every_command_stage_fits_the_auto_run_constraint():
+    """The 039 defect: `/speckit-verify` mapped to a stage `ck_assistant_auto_run_stage` refused."""
+    from app.assistant.tools import _STAGE_OF_COMMAND
+    from app.models import AUTO_RUN_STAGES
+
+    assert set(_STAGE_OF_COMMAND.values()) <= set(AUTO_RUN_STAGES)
+
+
+def test_the_verify_stage_is_stored_in_the_run_contract(db, superuser, chat):
+    from app.assistant import auto, service
+    from app.models import AssistantSession, Project
+
+    _c, project_row, sid = chat
+    session = db.get(AssistantSession, sid)
+    project = db.get(Project, project_row["id"])
+    contract = auto.parse_contract({"goal": "el recorrido", "stages": ["draft", "preview"]})
+    run = service.create_contract(db, session, project, contract, superuser, None)
+    run.stage = "verify"
+    db.flush()          # the CHECK constraint would refuse anything AUTO_RUN_STAGES lacks
+    db.refresh(run)
+    assert run.stage == "verify"

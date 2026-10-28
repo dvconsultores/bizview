@@ -90,8 +90,10 @@ ASSISTANT_ROLES = ("user", "assistant", "tool")
 # Feature 028: the composer selector and the run contract of one autonomous run.
 ASSISTANT_MODES = ("ask", "edit", "auto")
 AUTO_RUN_STATUSES = ("confirmed", "running", "applied", "stopped", "failed")
-AUTO_RUN_STAGES = ("discover", "specify", "clarify", "plan", "tasks", "implement", "converge",
-                   "preview", "apply")
+# Feature 040: `analyze` and `verify` are plan stages too. 039 mapped `speckit-verify` to a stage
+# this CHECK rejected, and the run died with an IntegrityError on `ck_assistant_auto_run_stage`.
+AUTO_RUN_STAGES = ("discover", "specify", "clarify", "plan", "tasks", "analyze", "implement",
+                   "converge", "verify", "preview", "apply")
 AUTO_WATCH_STATES = ("pending", "ok", "failed", "rolled_back")
 # Feature 024: media types decided by magic bytes (app/assistant/attachments.py).
 ATTACHMENT_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
