@@ -49,6 +49,7 @@ class StoredMessage:
     orphan: bool = False
     reasoning: str | None = None
     data: str = ""                                # tool rows: the data block, for the newest turn
+    at: Any = None                                # `created_at` of the row (feature 040, scoping)
 
 
 @dataclass
@@ -86,6 +87,7 @@ def from_rows(rows: Sequence[Any]) -> list[StoredMessage]:
             calls=calls,
             owner_id=getattr(row, "assistant_message_id", None),
             orphan=bool(getattr(row, "orphan", False)),
+            at=getattr(row, "created_at", None),
         ))
     return out
 

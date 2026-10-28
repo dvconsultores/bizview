@@ -167,13 +167,15 @@ def add_tokens(session: Any, amount: int) -> None:
     _put_run(session, run)
 
 
-def begin_round(session: Any, n: int) -> None:
+def begin_round(session: Any, n: int, *, tools: int | None = None,
+                chars: int | None = None, stage: str | None = None) -> None:
+    """Start round `n`; `tools`, `chars` and `stage` are what the round cost (feature 040)."""
     run = _get_run(session)
     if run is None or run.get("status") != "running":
         return
     run["round"] = n
     rounds = [r for r in run.get("rounds", []) if isinstance(r, dict)]
-    rounds.append({"n": n, "tools": []})
+    rounds.append({"n": n, "tools": [], "tool_count": tools, "chars": chars, "stage": stage})
     run["rounds"] = rounds[-ACTIVITY_ROUNDS:]
     _put_run(session, run)
 
@@ -333,7 +335,10 @@ def activity_json(db: Any, session_id: int, owner_id: int, settings: Any) -> dic
                         "ms": tool_ms,
                     }
                 )
-            rounds_out.append({"n": round_data.get("n"), "tools": tools_out})
+            rounds_out.append({"n": round_data.get("n"), "tools": tools_out,
+                               "tool_count": round_data.get("tool_count"),
+                               "chars": round_data.get("chars"),
+                               "stage": round_data.get("stage")})
 
         run_out = {
             "id": run.get("id"),
