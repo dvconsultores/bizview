@@ -1098,6 +1098,9 @@ def run_check(db, session, source, secrets: dict, app, *, path: str | None = Non
             "error": result.get("error"),
             "at": datetime.now(UTC).isoformat(),
         }
+        if REQUEST_FILE.match(path):
+            # 041: `recheck_draft` replaced the entry and wiped the keys the wrapper had stored.
+            entry["keys"] = [str(key) for key in result.get("keys") or []]
         if result.get("skipped"):
             entry["skipped"] = result["skipped"]
         checks[path] = entry

@@ -1847,11 +1847,13 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
 
 
 def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
-    """Feature 040 (E): `fields` are written from a shape `check_request` actually read.
+    """Feature 041: a check that READ the shape is authority enough to write its `fields`.
 
-    The production defect wrote `global-metrics` fields without checking the response, and the run
-    only found out at the preview («columnas o campos que no coinciden», without the actual keys).
-    Only the stages that write artifacts are held to it; authoring a spec is not.
+    `check_query` can only check the CURRENT draft content, so demanding `ok` made a broken
+    request file impossible to correct: the agent was told to check before writing `fields`, and
+    the check could only fail while the file was still wrong (the 041 deadlock). A check that read
+    the shape (its `keys`), skipped, or already passed allows the write; the columns are then
+    validated against those keys, so a wrong name names the real ones.
     """
     definition = command_def(session)
     if definition is None or definition.name not in ("speckit-implement", "fix"):
@@ -1861,9 +1863,9 @@ def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
         if op.get("op") != "write" or not origin.REQUEST_FILE.match(str(path)):
             continue
         entry = dict((session.query_checks or {}).get(path) or {})
-        if entry.get("ok") is not True:
-            raise ToolError(t("assistant.check_request_first", path=path))
         keys = [str(key) for key in entry.get("keys") or []]
+        if not keys and not entry.get("skipped") and entry.get("ok") is not True:
+            raise ToolError(t("assistant.check_request_first", path=path))
         try:
             document = yaml.safe_load(op.get("content") or "")
         except yaml.YAMLError:
