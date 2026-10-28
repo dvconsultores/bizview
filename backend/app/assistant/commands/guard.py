@@ -21,6 +21,8 @@ _NEW_SPEC = re.compile(
     r"^specs/(?P<num>\d{3})-(?P<short>[a-z0-9]+(?:-[a-z0-9]+){0,5})/"
     r"(?:spec\.md|checklists/requirements\.md)$")
 _CHECKBOX = re.compile(r"^(\s*[-*]\s+)\[([ xX])\](.*)$")
+_TASK_ID = re.compile(r"\bT\d{3,}\b")
+_TASK_REFERENCE = re.compile(r"`((?:integrations|reports|distributions)/[^`\s]+)`")
 _STATUS = re.compile(r"^\s*[-*]?\s*\*\*Status\*\*:\s*(.*?)\s*$")
 _PLAN_IDS = (re.compile(r"`(?:integrations|reports)/([a-z0-9][a-z0-9-]*)/"),
              re.compile(r"`distributions/([a-z0-9][a-z0-9-]*)\.yaml`"))
@@ -117,6 +119,7 @@ class Context:
     plan_text: str
     installation_block: str          # protected block of the installation template
     files: dict[str, str]            # current project files
+    only: tuple[str, ...] = ()       # feature 040: the tasks `/speckit-implement --only` names
 
 
 def protected_block(text: str) -> str:
@@ -244,14 +247,30 @@ class _Checker:
         return op["op"] == "write" or (op["op"] == "delete" and op["path"] in self.ctx.files)
 
     def tasks_ticks(self, op: dict) -> bool:
+        """A task is ticked only with evidence (feature 040, FR-005/US2 AC3).
+
+        Three conditions, all product-side: the write is a tick of an open box in this spec's
+        `tasks.md`; the task names an artifact that already exists in the project (or names none,
+        as a documentation task does); and, when `/speckit-implement --only T…` was used, the
+        task is one of those named.
+        """
         path = self._doc("tasks.md")
         if op["op"] != "write" or op["path"] != path or path not in self.ctx.files:
             return False
         changed = _lines_changed(self.ctx.files[path], op["content"])
-        return changed is not None and all(
-            "- [ ]" in old and new in (old.replace("- [ ]", "- [X]", 1),
-                                       old.replace("- [ ]", "- [x]", 1))
-            for old, new in changed)
+        if changed is None:
+            return False
+        for old, new in changed:
+            if not ("- [ ]" in old
+                    and new in (old.replace("- [ ]", "- [X]", 1), old.replace("- [ ]", "- [x]", 1))):
+                return False
+            task = _TASK_ID.search(old)
+            if self.ctx.only and (task is None or task.group(0) not in self.ctx.only):
+                return False
+            if any(reference not in self.ctx.files
+                   for reference in _TASK_REFERENCE.findall(old)):
+                return False
+        return True
 
     def status_implemented(self, op: dict) -> bool:
         path = self._doc("spec.md")
@@ -330,6 +349,20 @@ class _Checker:
         return list(dict.fromkeys(out))
 
 
+def _is_task_tick(ctx: Context, op: dict) -> bool:
+    """Whether a refused write is a `- [ ]` → `- [X]` change of this spec's `tasks.md`."""
+    path = f"specs/{ctx.spec}/tasks.md" if ctx.spec else None
+    if op.get("op") != "write" or not path or op.get("path") != path:
+        return False
+    before = ctx.files.get(path)
+    if before is None:
+        return False
+    changed = _lines_changed(before, op.get("content") or "")
+    if not changed:
+        return False
+    return any("- [ ]" in old and ("- [X]" in new or "- [x]" in new) for old, new in changed)
+
+
 def created_folders(ctx: Context, ops: list[dict]) -> list[str]:
     """Every new spec folder the ops establish, in the order they appear (a brief may make N)."""
     checker = _Checker(ctx)
@@ -347,6 +380,21 @@ def check_ops(ctx: Context, ops: list[dict]) -> str | None:
         rules = [getattr(checker, rule) for rule in ctx.definition.writes]
         if not any(rule(op) for rule in rules):
             path = op.get("path", "")
+            if _is_task_tick(ctx, op):
+                # Feature 040 (B): task status is evidence, never an edit. Only the implement
+                # stage ticks, and only for a task with its artifact (and inside `--only`).
+                if "tasks_ticks" in ctx.definition.writes:
+                    raise GuardError(
+                        "tasks_tick_needs_evidence",
+                        {"path": path, "command": ctx.definition.name, "spec": ctx.spec,
+                         "only": list(ctx.only)},
+                        M("commands.tasks_tick_needs_evidence", spec=ctx.spec or "<spec>",
+                          only=", ".join(ctx.only) or "—"))
+                raise GuardError(
+                    "tasks_tick_needs_implement",
+                    {"path": path, "command": ctx.definition.name, "spec": ctx.spec},
+                    M("commands.tasks_tick_needs_implement", spec=ctx.spec or "<spec>",
+                      command=ctx.definition.name))
             owner = owner_spec(ctx.files, path)
             if (ctx.spec and ctx.reserved_number is None and owner and owner != ctx.spec):
                 # A write meant for another spec: name it and offer the right command instead of

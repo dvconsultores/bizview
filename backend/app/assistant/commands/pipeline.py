@@ -32,6 +32,8 @@ DECISIONS_HEADING = "## Decisiones tomadas (modo autónomo)"
 MAX_STOP_REASON = 120
 
 _DECISION = re.compile(r"^\s*[-*]\s*\[(?P<stage>[a-z]+)\]\s*(?P<text>\S.*)$")
+_OPEN_TASK = re.compile(r"^\s*[-*]\s*\[\s\]\s*(?P<id>T\d+)\b", re.M)
+_TASK_ID = re.compile(r"\bT\d{3,}\b")
 _STORY = re.compile(r"^###\s+User Story\s+(?P<number>\d+)\s*[\u2014\u2013-]\s*"
                     r"(?P<title>.+?)"
                     r"(?:\s*\(Priority.*)?$", re.M)
@@ -88,7 +90,8 @@ def seed(run_id: int | None = None, args: Args | None = None,
     """A brand-new cursor for this run."""
     return {"id": run_id, "stages": list(STAGES), "cursor": 0,
             "until": args.until if args is not None else None,
-            "specs": list(specs), "spec_index": 0, "round": 0, "verify_cycles": 0}
+            "specs": list(specs), "spec_index": 0, "round": 1, "verify_cycles": 0,
+            "after_implement": None}
 
 
 def state_of(db, session_id: int) -> dict[str, Any] | None:
@@ -116,8 +119,10 @@ def _validated(state: dict[str, Any]) -> dict[str, Any]:
     clean["stages"] = list(STAGES)
     clean["cursor"] = _clamp(state.get("cursor"), 0, TOTAL)
     clean["spec_index"] = _clamp(state.get("spec_index"), 0, max(0, len(clean["specs"]) - 1))
-    clean["round"] = _clamp(state.get("round"), 0, MAX_ROUNDS)
+    clean["round"] = _clamp(state.get("round"), 1, MAX_ROUNDS)
     clean["verify_cycles"] = _clamp(state.get("verify_cycles"), 0, MAX_VERIFY_CYCLES)
+    after = state.get("after_implement")
+    clean["after_implement"] = after if after in ("converge", "verify") else None
     until = state.get("until")
     clean["until"] = until if until in STAGES else None
     return clean
@@ -139,8 +144,9 @@ def advance(state: dict[str, Any], spec_index: int, stage_index: int) -> dict[st
         new["spec_index"], new["cursor"] = spec_index, stage_index + 1
     elif spec_index + 1 < len(new["specs"]):
         new["spec_index"], new["cursor"] = spec_index + 1, 0
-        new["round"] = 0
+        new["round"] = 1
         new["verify_cycles"] = 0
+        new["after_implement"] = None
     else:
         new["spec_index"], new["cursor"] = spec_index, TOTAL
     return new
@@ -159,7 +165,7 @@ def position(state: dict[str, Any]) -> dict[str, Any]:
             "stage": STAGES[index] if index < TOTAL else None,
             "until": state.get("until"),
             "spec": specs[spec_index] if 0 <= spec_index < len(specs) else None,
-            "spec_index": spec_index}
+            "spec_index": spec_index, "round": int(state.get("round") or 1)}
 
 
 # --------------------------------------------------------------------------- completion
@@ -588,6 +594,94 @@ def last_verify(db, state: dict[str, Any], spec: str | None = None) -> dict[str,
         if isinstance(stored, dict):
             return stored
     return None
+
+
+# --------------------------------------------------------------------------- state machine
+
+def open_task_ids(text: str | None) -> list[str]:
+    """The ids of the open tasks of a `tasks.md` (`- [ ] T025 …`), in order."""
+    found: list[str] = []
+    for match in _OPEN_TASK.finditer(text or ""):
+        if match.group("id") not in found:
+            found.append(match.group("id"))
+    return found
+
+
+def open_tasks(files: dict[str, str] | None, spec: str | None) -> list[str]:
+    if not spec:
+        return []
+    return open_task_ids((files or {}).get(f"specs/{spec}/tasks.md"))
+
+
+def task_ids(text: str | None) -> list[str]:
+    """Every task id a text names, in order (the `--only` list is checked against these)."""
+    return list(dict.fromkeys(_TASK_ID.findall(text or "")))
+
+
+def routed_state(db, state: dict[str, Any] | None,
+                 files: dict[str, str] | None) -> dict[str, Any] | None:
+    """The 040 state machine: the only place that decides where the plan goes next.
+
+    The 039 cursor was a one-way index, so after `converge` added the gap tasks T025–T028 the only
+    reachable stage was `verify` and the run told the human to "open it in that order". These
+    transitions are product code instead (spec A):
+
+    - `converge` with open tasks → `implement` (the next convergence round) → `converge` again,
+      at most `MAX_ROUNDS` convergence runs, then `verify`;
+    - `verify` with open tasks → `implement` (a verify cycle) → `verify` again — never a failure
+      and never a question (FR-003);
+    - `verify` failed → `implement` (a verify cycle) → `verify`, at most `MAX_VERIFY_CYCLES`;
+    - an `implement` opened by a verify cycle is followed by `verify`, not by `converge`.
+    """
+    if state is None:
+        return None
+    new = {**state, "specs": list(state.get("specs") or [])}
+    specs = new["specs"]
+    if not specs:
+        return new
+    index = _clamp(new.get("spec_index"), 0, len(specs) - 1)
+    cursor = _clamp(new.get("cursor"), 0, TOTAL)
+    new["spec_index"], new["cursor"] = index, cursor
+    if cursor >= TOTAL:
+        return new
+    spec, stage = specs[index], STAGES[cursor]
+    limit = TOTAL if new.get("until") is None else STAGES.index(new["until"]) + 1
+    target: str | None = None
+    after: str | None = None
+    if stage == "verify":
+        if open_tasks(files, spec):
+            converges = len(stage_runs(db, new, STAGE_COMMANDS["converge"], spec))
+            rounds = int(new.get("round") or 1)
+            if converges and rounds < MAX_ROUNDS and STAGES.index("implement") < limit:
+                target, after = "implement", "converge"
+            elif len(verify_runs(db, new, spec)) < MAX_VERIFY_CYCLES \
+                    and STAGES.index("implement") < limit:
+                target, after = "implement", "verify"
+        else:
+            verdict = last_verify(db, new, spec) or {}
+            if (verdict and verdict.get("ok") is False
+                    and len(verify_runs(db, new, spec)) < MAX_VERIFY_CYCLES
+                    and STAGES.index("implement") < limit):
+                target, after = "implement", "verify"
+    elif stage == "converge":
+        if new.get("after_implement") == "verify" and STAGES.index("verify") < limit:
+            target = "verify"
+        new["after_implement"] = None
+    if target is None:
+        return new
+    new["cursor"] = STAGES.index(target)
+    new["after_implement"] = after
+    if after == "converge":
+        new["round"] = _clamp(int(new.get("round") or 1) + 1, 1, MAX_ROUNDS)
+    elif after == "verify":
+        new["verify_cycles"] = _clamp(int(new.get("verify_cycles") or 0) + 1,
+                                      0, MAX_VERIFY_CYCLES)
+    return new
+
+
+def is_round_reentry(state: dict[str, Any] | None) -> bool:
+    """Whether the plan is past its first convergence round (the chip shows «ronda N»)."""
+    return bool(state) and int((state or {}).get("round") or 1) > 1
 
 
 def rewind(db, state: dict[str, Any]) -> dict[str, Any]:

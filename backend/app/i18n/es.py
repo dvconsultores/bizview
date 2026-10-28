@@ -187,6 +187,7 @@ MESSAGES: dict[str, str] = {
                               "el modelo en Administración → IA.",
     "ai.action.admin_ai": "Ir a Administración → IA",
     "projects.fix_malformed": "La petición de arreglo no es válida.",
+    "projects.fix_not_content": "El arreglo en {path} cambiaría el estado o la evidencia del trabajo, no el contenido: las tareas se marcan al implementarlas.",
     "projects.fix_too_many": "Demasiados arreglos de una vez (máximo {max}).",
     "projects.fix_gone": "El archivo {file} ya no existe.",
     "projects.fix_stale": "El archivo cambió desde la validación; vuelve a comprobar los problemas.",
@@ -650,6 +651,8 @@ MESSAGES: dict[str, str] = {
     "commands.write_needs_command": "Usa un comando /speckit-… para cambiar archivos.",
     "commands.tool_not_allowed": "La herramienta {tool} no está permitida en /{command}; permitidas: {allowed}",
     "commands.path_not_allowed": "/{command} no puede cambiar {path}; rutas permitidas: {allowed}",
+    "commands.tasks_tick_needs_implement": "Las tareas se marcan al implementarlas: /{command} no cambia el estado de {spec}; usa /speckit-implement (o su botón «Implementar tareas pendientes»).",
+    "commands.tasks_tick_needs_evidence": "No puedo marcar una tarea de {spec}: el artefacto que la tarea nombra no existe todavía, o no está en las tareas de --only ({only}). Implementa primero lo que falta y vuelve a marcarla.",
     "commands.path_not_allowed_artifact": "/{command} no puede cambiar {path} (solo toca {allowed}). Para corregir un artefacto, pasa a la etapa que sí lo escribe con run_command: speckit-implement {spec} (o termina este comando y ejecuta /fix).",
     "commands.missing_prereq": "Falta {doc}; ejecuta {command} primero.",
     "commands.confirm_open_clarifications": "La spec tiene puntos marcados [NEEDS CLARIFICATION]; se recomienda /speckit-clarify. ¿Continuar igual?",
@@ -743,6 +746,9 @@ MESSAGES: dict[str, str] = {
 
     "commands.approved_by_run": "El contrato aprobó la spec {spec} por ti; sigo con la etapa.",
     "commands.auto_stage": "Etapa /{command} sobre {spec}.",
+    "commands.auto_stage_round": "Etapa /{command} sobre {spec} · ronda {round}.",
+    "commands.only_block": "Tareas de --only: {tasks}. Implementa y marca solo esas tareas en esta etapa.",
+    "commands.only_unknown": "--only nombra tareas que no están en la spec {spec}: {tasks}. Tareas existentes: {known}.",
     "assistant.summary.applied": "Aplicó la versión {version}.",
 
     "assistant.watch.failed": "El primer run programado de la integración {integration} falló: {reason}.",

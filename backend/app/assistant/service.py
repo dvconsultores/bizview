@@ -1886,10 +1886,14 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
         return None, [refusal]
     view = for_session(db, session)
     plan_args = pipeline.parse_args(parsed.args) if definition.name == "speckit-all" else None
+    only: tuple[str, ...] = ()
     if plan_args is not None:
         arguments, forced = plan_args.text, plan_args.force
     else:
         arguments, forced = resolve.strip_force(parsed.args)
+        if definition.name == "speckit-implement":
+            # 040 (B): the honest action of the problems panel implements the open tasks only.
+            arguments, only = resolve.strip_only(arguments)
     specs = _spec_rows(db, view)
     spec = None
     source = None
@@ -1935,6 +1939,15 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     previous = runs.latest_for(db, session.id, definition.name, spec)
     result = ({"revisions": _revisions(db, view.project.id, spec)}
               if definition.name == "speckit-converge" and spec else None)
+    if only:
+        known = pipeline.task_ids(view.files().get(f"specs/{spec}/tasks.md")) if spec else []
+        unknown = [task for task in only if task not in known]
+        if unknown:
+            raise ApiError(422, "only_unknown",
+                           M("commands.only_unknown", tasks=", ".join(unknown),
+                             spec=spec or "-", known=", ".join(known) or "—"),
+                           extra={"tasks": unknown, "known": known})
+        result = {**(result or {}), "only": list(only)}
     plan = None
     if plan_args is not None:
         plan, spec = _pipeline_start(db, session, view, plan_args, spec, specs, forced)
@@ -2194,17 +2207,23 @@ def repair_history(db, actor, session: AssistantSession, ip: str | None) -> dict
     return {**report, "replayable": not problems, "problems": problems[:5]}
 
 
-def _command_extra(run) -> str:
-    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023) and,
-    in a `/speckit-all` run, where the plan stands (039)."""
+def _command_extra(run, db=None, files: dict[str, str] | None = None) -> str:
+    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023), the
+    `--only` tasks of `/speckit-implement` (040) and, in a `/speckit-all` run, where the plan
+    stands (039/040)."""
     parts: list[str] = []
     if run.command == "ayuda" and run.arguments:
         from app.assistant.guide import ayuda
 
         parts.append(ayuda.topic_block(run.arguments, run.locale))
-    state = (run.result or {}).get(pipeline.PIPELINE_KEY) \
-        if isinstance(run.result, dict) else None
+    stored = run.result if isinstance(run.result, dict) else {}
+    only = stored.get("only") or []
+    if only:
+        parts.append(t("commands.only_block", tasks=", ".join(only)))
+    state = stored.get(pipeline.PIPELINE_KEY)
     if isinstance(state, dict):
+        if db is not None:
+            state = pipeline.routed_state(db, state, files) or state
         parts.append(_pipeline_block(state))
     return "\n\n".join(part for part in parts if part)
 
@@ -2362,7 +2381,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 current_spec=view.current_spec, next_spec=view.next_spec(), run=run,
                 definition=definition, files=view.files(), locale=run.locale,
                 resume=runs.resume_info(db, run, (session.working_state or {}).get("progress")),
-                state=context, extra=_command_extra(run))
+                state=context, extra=_command_extra(run, db, view.files()))
         if restricted:
             context = f"{context}\n\n{_tools.DISCOVERY_DONE_TEXT}"
         budget = app_settings.ai_context_compact_chars

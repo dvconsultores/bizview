@@ -1159,6 +1159,10 @@ def _run_command(db: Session, session: Any,
         raise ToolError(f"Etapa desconocida: {name or '-'}.")
     arguments = args.get("arguments")
     arguments = arguments.strip() if isinstance(arguments, str) else ""
+    only: tuple[str, ...] = ()
+    if name == "speckit-implement":
+        # 040 (B): the stage may be opened for the open tasks only.
+        arguments, only = resolve.strip_only(arguments)
     requested = args.get("spec")
     requested = requested.strip() if isinstance(requested, str) else ""
     target = arguments or requested
@@ -1168,13 +1172,15 @@ def _run_command(db: Session, session: Any,
     resolution = resolve.resolve(listed, target, session.current_spec)
     spec = resolution.spec if resolution.spec in folders else None
 
-    # 039: inside `/speckit-all` the plan decides the next stage; the model only opens it.
+    # 039/040: inside `/speckit-all` the plan decides the next stage; the model only opens it.
     plan = pipeline.state_of(db, session.id)
     plan_at: tuple[int, int] | None = None
     if plan is not None:
         if name == "speckit-all":
             raise ToolError(t("pipeline.no_restart"))
         plan = _plan_grow(db, session, plan, spec)
+        # 040: the state machine decides where the plan goes before the model's request is read.
+        plan = pipeline.routed_state(db, plan, session.files()) or plan
         plan_at = _plan_position(db, plan, name, spec)
         index, _cursor = plan_at
         spec = plan["specs"][index] if plan.get("specs") else None
@@ -1183,6 +1189,12 @@ def _run_command(db: Session, session: Any,
     if definition.needs_spec and spec is None:
         raise ToolError(t("commands.spec_not_found", spec=target or "-",
                           specs=", ".join(folders) or "-"))
+    if only:
+        known = pipeline.task_ids(session.files().get(f"specs/{spec}/tasks.md")) if spec else []
+        unknown = [task for task in only if task not in known]
+        if unknown:
+            raise ToolError(t("commands.only_unknown", tasks=", ".join(unknown), spec=spec or "-",
+                              known=", ".join(known) or "—"))
 
     current = command_run(session)
     if current is not None and current.status in ("running", "waiting"):
@@ -1207,6 +1219,7 @@ def _run_command(db: Session, session: Any,
         arguments=arguments, locale=getattr(session, "command_locale", None) or "es",
         spec=spec, resolved_from=resolution.source or "current",
         reserved_number=session.next_spec() if name == "speckit-specify" else None,
+        result={"only": list(only)} if only else None,
         pipeline=plan)
     if plan is not None and plan.get("id") is None:
         plan = {**plan, "id": stage.id}
@@ -1218,6 +1231,9 @@ def _run_command(db: Session, session: Any,
     if auto_run is not None:
         auto_run.stage = _STAGE_OF_COMMAND.get(name)
     summary = t("commands.auto_stage", command=name, spec=spec or "-")
+    round_ = int((plan or {}).get("round") or 0)
+    if round_:
+        summary = t("commands.auto_stage_round", command=name, spec=spec or "-", round=round_)
     payload = {
         "stage": name,
         "spec": spec,
@@ -1247,13 +1263,18 @@ def _plan_position(db: Session, plan: dict[str, Any], name: str,
     requested = pipeline.COMMAND_STAGES.get(name)
     current_index = int(plan.get("cursor") or 0)
     current = pipeline.STAGES[current_index - 1] if current_index else None
-    if (requested is not None and requested != pipeline.STAGES[cursor]
-            and current in _JUDGING_STAGES
+    expected = pipeline.STAGES[cursor]
+    if (requested is not None and requested != expected and current in _JUDGING_STAGES
             and pipeline.STAGES.index(requested) < current_index):
         target_spec = plan["specs"][index] if plan.get("specs") else None
         _repair_cycle(db, plan, target_spec, current, requested)
         return index, pipeline.STAGES.index(requested)
-    expected = pipeline.STAGES[cursor]
+    if (requested == "verify" and expected == "implement"
+            and plan.get("after_implement") in ("converge", "verify")):
+        # 040 FR-003: verify does not start while tasks are open (or while fixing a failed one);
+        # the state machine already routed to implement, so the request opens that instead of
+        # failing the run for it.
+        return index, cursor
     if not plan.get("specs"):
         if name != "speckit-specify":
             raise ToolError(t("pipeline.order", expected="/speckit-specify", stage="specify",
@@ -1714,13 +1735,15 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
     if run is None or definition is None:
         raise ToolError(t("commands.write_needs_command"))
     spec_text = current.get(f"specs/{run.spec}/spec.md", "") if run.spec else ""
+    stored = run.result if isinstance(run.result, dict) else {}
     ctx = guard.Context(
         definition=definition, spec=run.spec,
         kind=layout.spec_kind(spec_text) if spec_text else None,
         reserved_number=run.reserved_number,
         plan_text=current.get(f"specs/{run.spec}/plan.md", "") if run.spec else "",
         installation_block=guard.installation_block(),
-        files=current)
+        files=current,
+        only=tuple(stored.get("only") or ()))
     try:
         folder = guard.check_ops(ctx, [{"op": op["op"], "path": op["path"],
                                         "content": op.get("content", "")} for op in ops])

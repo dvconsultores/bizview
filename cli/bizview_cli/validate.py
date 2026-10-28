@@ -78,6 +78,7 @@ def direct_reserved(schema: str, table: str) -> bool:
 STATUS_RE = re.compile(r"^\*\*Status\*\*:\s*(.+?)\s*$", re.M | re.I)
 TYPE_RE = re.compile(r"^\*\*Spec type\*\*:\s*(integration|report)\b", re.M | re.I)
 OPEN_TASK_RE = re.compile(r"^\s*- \[ \]", re.M)
+OPEN_TASK_ID_RE = re.compile(r"^\s*- \[ \]\s*(T\d+)\b", re.M)
 SOURCE_LINE_RE = re.compile(r"^\s*[-*]?\s*\*\*(?:Fuente|Source)\*\*:\s*(\S.*?)\s*$", re.M)
 APPROVED = ("approved", "implemented", "aprobado", "aprobada", "implementado", "implementada")
 MAX_ISSUES_PER_FILE = 200
@@ -640,10 +641,12 @@ def _check_spec(root: Path, entry: Entry, issues: list[Issue]) -> None:
         title = re.search(r"^#\s+(.+)$", spec_text, re.M)
         entry.spec["title"] = title.group(1).strip() if title else None
         if not status or not status.group(1).lower().startswith(APPROVED):
+            # Feature 040 (B): approving a spec is a human decision (the gate of
+            # /speckit-implement asks for it), so the advice names it and no fix writes it.
             issues.append(Issue(entry.key, "spec_not_approved",
                                 t("validate.spec_status"),
                                 file=f"{doc_prefix}/spec.md",
-                                fix=t("validate.fix_status_approved")))
+                                fix=t("validate.fix_status_needs_approval", spec=rel)))
         if v2:
             expected = {"integration": "integracion", "report": "reporte",
                         "distribution": "distribucion"}[entry.kind]
@@ -668,11 +671,19 @@ def _check_spec(root: Path, entry: Entry, issues: list[Issue]) -> None:
                                     fix=t("validate.fix_spec_type", kind=entry.kind)))
     tasks_text = texts.get("tasks.md")
     if tasks_text is not None:
-        open_tasks = len(OPEN_TASK_RE.findall(tasks_text))
-        if open_tasks:
-            issues.append(Issue(entry.key, "open_tasks", t("validate.open_tasks", count=open_tasks),
+        open_ids = OPEN_TASK_ID_RE.findall(tasks_text)
+        if open_ids:
+            # Feature 040 (B): there is no deterministic fix for an open task, because ticking one
+            # is evidence and only the implement stage can produce it. The advice names the honest
+            # action instead of "mark every task as - [X]" (the 039 defect).
+            shown = open_ids[:12]
+            more = (t("validate.tasks_more", count=len(open_ids) - len(shown))
+                    if len(open_ids) > len(shown) else "")
+            issues.append(Issue(entry.key, "open_tasks",
+                                t("validate.open_tasks", count=len(open_ids)),
                                 file=f"{doc_prefix}/tasks.md",
-                                fix=t("validate.fix_tasks")))
+                                fix=t("validate.fix_tasks_implement", spec=rel,
+                                      tasks=", ".join(shown) + more)))
 
 
 def _read_artifact_file(root: Path, entry: Entry, rel: str, issues: list[Issue]) -> str | None:
