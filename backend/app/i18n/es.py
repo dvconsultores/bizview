@@ -759,6 +759,7 @@ MESSAGES: dict[str, str] = {
     "assistant.loop_state_conflict": "La base rechazó un cambio de estado de la ejecución ({constraint}); lo hecho hasta la última ronda se guardó y el plan puede retomarse desde la etapa en curso.",
     "assistant.context_exhausted": "El contexto de la conversación ya no cabe en el modelo y comprimirlo no libera suficiente espacio. Lo hecho hasta la última ronda se guardó; escribe `/speckit-all <spec>` para retomar desde la etapa en curso.",
     "assistant.stage_budget": "La etapa gastó su presupuesto de tokens ({tokens} de {limit}). Lo hecho hasta la última ronda se guardó; escribe `/speckit-all <spec>` para retomar desde la etapa en curso.",
+    "assistant.no_progress": "La conversación repitió {rounds} rondas idénticas ({tools}) sin cambiar ningún archivo; se detiene para no gastar el presupuesto. Lo hecho hasta la última ronda se guardó.",
     "assistant.check_request_first": "Antes de escribir `fields` en {path}, ejecuta check_query sobre ese archivo: los campos se derivan de la forma real de la respuesta.",
     "assistant.check_request_missing": "Los campos {columns} no están en la respuesta de {path}; las claves reales son: {keys}. Corrige los `fields` (o el mapeo) antes de continuar.",
     "assistant.auto.next_stage": "Etapa {done} terminada. El contrato permite {stages}: abre la siguiente con run_command y continúa; no pidas confirmación al usuario.",

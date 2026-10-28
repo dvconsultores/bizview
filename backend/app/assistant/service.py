@@ -2448,6 +2448,8 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
     rounds = 0
     was_ready = readiness.compute(view)["ready"]
     last_failed = None
+    no_progress_rounds = 0                 # 041: identical rounds that changed no file
+    last_round_signature = None
 
     while max_rounds is None or rounds < max_rounds:
         _bump(session, "rounds")
@@ -2732,6 +2734,31 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _record_recent_files(session, round_touched)
         session.updated_at = datetime.now(UTC)
         _commit_round(db, session, claim)
+
+        # 041: the per-call brake (`last_failed`) resets on any successful read between failures,
+        # which is exactly how the production loop burned the stage budget. Three identical rounds
+        # that wrote nothing are a dead end: stopped by evidence, not by a round counter. Call ids
+        # are excluded on purpose — only names and args prove the round repeated.
+        signature = tuple(sorted(
+            (call.name, json.dumps(call.args, sort_keys=True, ensure_ascii=False, default=str))
+            for call in reply.tool_calls
+        ))
+        if round_touched or signature != last_round_signature:
+            no_progress_rounds = 1
+            last_round_signature = signature
+        else:
+            no_progress_rounds += 1
+        if no_progress_rounds >= 3:
+            tools_used = ", ".join(sorted({call.name for call in reply.tool_calls}))
+            new_messages.append(
+                _add(db, session, role="assistant",
+                     content=t("assistant.no_progress", rounds=no_progress_rounds,
+                               tools=tools_used))
+            )
+            session.updated_at = datetime.now(UTC)
+            db.flush()
+            end("error", "blocked:no_progress")
+            return new_messages
 
         if finished:
             if auto_run is None or auto_run.status not in auto.LIVE_STATUSES:
