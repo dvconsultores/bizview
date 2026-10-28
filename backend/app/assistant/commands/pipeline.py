@@ -756,7 +756,10 @@ def write_report(db, session, spec: str, state: dict[str, Any], *, result: str,
                               tokens=tokens, started=started, ended=ended)
     path = f"specs/{spec}/{REPORT_FILE}"
     if files.get(path) != markdown:
-        fs.apply_ops(session.project_id, [{"op": "write", "path": path, "content": markdown}],
+        # 041: the report is generated and pipeline-owned; a write without base over the first
+        # report raised FileChanged and killed the turn. Revisions still record every version.
+        fs.apply_ops(session.project_id,
+                     [{"op": "write", "path": path, "content": markdown, "force": True}],
                      actor or {"kind": "agent", "user_id": None, "session_id": session.id,
                                "command": "/speckit-all", "command_run_id": state.get("id")})
         session.refresh()
