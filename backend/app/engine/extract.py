@@ -12,7 +12,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import pairwise
 from typing import TypeVar
@@ -383,6 +383,26 @@ def _substitute(value, params: dict):
     return value
 
 
+def _field_text(value, unit: str | None) -> str | None:
+    """`timestamp_units` applied at extraction (041): a declared epoch becomes ISO-8601 UTC.
+
+    Anything that is not a plain number under `seconds`/`milliseconds` passes through raw, so
+    PostgreSQL still names genuinely bad data; `iso8601` and undeclared columns are untouched.
+    """
+    if unit not in ("seconds", "milliseconds") or value is None or isinstance(value, bool):
+        return text_value(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return text_value(value)
+    if unit == "milliseconds":
+        number /= 1000
+    try:
+        return datetime.fromtimestamp(number, UTC).isoformat()
+    except (OverflowError, OSError, ValueError):
+        return text_value(value)
+
+
 def _records(payload, request: dict, columns: list[str]) -> list[dict]:
     records = json_path(payload, request["records"])
     if records is None:
@@ -393,7 +413,13 @@ def _records(payload, request: dict, columns: list[str]) -> list[dict]:
     missing = [c for c in columns if c not in fields]
     if missing:
         raise ExtractError(M("extract.missing_fields", fields=", ".join(sorted(missing))))
-    return [{c: text_value(json_path(r, fields[c])) for c in columns} for r in records]
+    units = request.get("timestamp_units")
+    if not isinstance(units, dict):
+        units = {}
+    return [
+        {c: _field_text(json_path(r, fields[c]), units.get(c)) for c in columns}
+        for r in records
+    ]
 
 
 def _paginate(fetch: Callable[[dict, str | None], tuple[object, dict]], request: dict,
