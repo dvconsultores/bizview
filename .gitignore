@@ -37,3 +37,4 @@ deploy/caddy/certs/*
 
 # A project downloaded with the workspace's Download button (kept out of the repo).
 /artemisa/
+tmp/
