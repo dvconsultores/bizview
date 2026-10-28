@@ -21,6 +21,10 @@ Solo el **Superusuario**, sobre la **Spec actual**.
 
 ## Opciones
 
+- `/speckit-implement <spec> --only T025,T026`: implementa y marca solo esas tareas. Es la
+  acción honesta del panel de problemas cuando quedan tareas sin marcar («Implementar tareas
+  pendientes»): una tarea se marca al implementarla, con su archivo escrito; ningún arreglo, ni
+  ningún otro comando, cambia el estado de una tarea.
 - Antes de implementar, el chat pregunta si hay listas de verificación con elementos sin marcar o
   si la spec aún no está aprobada; tu «sí» aprueba la spec.
 - Si un comando se interrumpe (lo detienes o se acaba el presupuesto), lo hecho se conserva; al

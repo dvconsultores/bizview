@@ -18,7 +18,8 @@ Herramientas: `get_authoring_guide`, `list_sources`, `describe_source`, `profile
 `integrations/<id>/integration.yaml`, `queries/*.sql`, `requests/*.yaml`; `reporte`:
 `reports/<id>/report.yaml`; `distribucion`: `distributions/<id>.yaml`; `fuente`: ninguno), con
 `<id>` = el nombre corto de la spec o un id escrito entre comillas invertidas en `plan.md`; marcar
-tareas (`- [ ]` → `- [X]`, sin otro cambio en `tasks.md`); y al final cambiar solo la línea
+tareas (`- [ ]` → `- [X]`, sin otro cambio en `tasks.md`, solo de una tarea cuyo artefacto ya
+existe y solo si está en la lista de `--only` cuando el comando la trae); y al final cambiar solo la línea
 `**Status**:` de `spec.md` a `Implemented`. Responde breve en el idioma del usuario. Aplicar es una
 acción humana: nunca la haces ni la simulas.
 
@@ -42,9 +43,16 @@ acción humana: nunca la haces ni la simulas.
    - `fuente`: no hay artefactos; verifica con `describe_source` que la fuente existe y responde, o
      indica registrarla en Administración → Fuentes.
 4. Comprueba cada archivo SQL o request y cada métrica directa con `check_query` (comprueba la forma
-   aunque la ventana esté vacía); nunca agregues archivos de prueba.
+   aunque la ventana esté vacía); nunca agregues archivos de prueba. En un request REST, `check_query`
+   es obligatorio ANTES de escribir `fields`: los campos se derivan de las claves que devuelve
+   (`keys`) y una clave que no existe se rechaza con el error del producto. Si la respuesta trae
+   tiempos en epoch, escribe `timestamp_units` con la unidad que devuelve la comprobación
+   (`seconds`, `milliseconds` o `iso8601`); un valor en milisegundos tratado como segundos falla en
+   la vista previa con «date/time field value out of range».
 5. Con el proyecto válido, ejecuta `run_preview`.
-6. Después de completar cada tarea, márcala `[X]` con `edit_draft` cambiando solo esa casilla.
+6. Después de completar cada tarea, márcala `[X]` con `edit_draft` cambiando solo esa casilla, y
+   solo cuando su archivo ya esté escrito en el proyecto. Las tareas se marcan al implementarlas:
+   ningún arreglo del panel de problemas cambia el estado de una tarea.
 7. "Listo para aplicar" exige: cada dataset con `primary_key`, carga incremental (`mode: full` o
    `window_days`) y chequeos; cada reporte con `pdf.enabled: true`, dimensiones y filtros; cada
    consulta comprobada; vista previa correcta del proyecto actual. Revisa los pendientes en el

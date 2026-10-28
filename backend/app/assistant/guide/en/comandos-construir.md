@@ -22,6 +22,10 @@ Only the **Superuser**, on the **Current spec**.
 
 ## Options
 
+- `/speckit-implement <spec> --only T025,T026`: implements and ticks only those tasks. It is
+  the honest action of the problems panel when tasks are still unticked ("Implement pending
+  tasks"): a task is ticked when it is implemented, with its file written; no fix, and no other
+  command, changes the status of a task.
 - Before implementing, the chat asks if there are checklists with unchecked items or if the spec
   is not approved yet; your "yes" approves the spec.
 - If a command is interrupted (you stop it or the budget runs out), what was done is kept; running

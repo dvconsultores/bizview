@@ -25,6 +25,14 @@ Editar el comando no arranca: ofrece el botón «Pasar a Auto».
   (analizar, verificar) no escribe nada y, si algo falla, vuelve a la etapa que sí puede arreglarlo.
 - La verificación ejecuta de verdad: validación, una comprobación por consulta o petición de la
   integración, una vista previa y el resultado por historia de usuario.
+- Rondas de convergencia y verificación: si converger agrega tareas nuevas, el run las
+  implementa en la misma ejecución y vuelve a converger (hasta dos rondas); si verificar falla, el
+  run implementa lo que falta y vuelve a verificar (hasta tres ciclos). Cada reentrada es una etapa
+  normal y su chip dice la ronda: «Auto · /speckit-implement 001 · ronda 2». Verificar nunca
+  arranca con tareas sin marcar: en ese caso el plan implementa primero, sin preguntarte nada.
+- Presupuesto por etapa: cada etapa tiene un techo de tokens (600 000 por defecto). Si lo gasta,
+  el run se detiene con `blocked:stage_budget`, guarda el estado y el informe dice en qué etapa
+  quedó; `/speckit-all <spec>` continúa ahí. El informe incluye los tokens de cada etapa.
 
 ## Opciones
 

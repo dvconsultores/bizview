@@ -18,7 +18,8 @@ The server only allows: the artifacts of the spec's kind (`integration`:
 `integrations/<id>/integration.yaml`, `queries/*.sql`, `requests/*.yaml`; `report`:
 `reports/<id>/report.yaml`; `distribution`: `distributions/<id>.yaml`; `source`: none), with
 `<id>` = the spec's short name or an id written in backticks in `plan.md`; ticking tasks (`- [ ]` →
-`- [X]`, no other change in `tasks.md`); and, at the end, changing only the `**Status**:` line of
+`- [X]`, no other change in `tasks.md`, only for a task whose artifact already exists and only when
+it is in the `--only` list if the command carries one); and, at the end, changing only the `**Status**:` line of
 `spec.md` to `Implemented`. Reply briefly in the user's language. Applying is a human action: you
 never do it or pretend to.
 
@@ -42,9 +43,15 @@ never do it or pretend to.
    - `source`: no artifacts; check with `describe_source` that the source exists and answers, or say
      to register it in Administration → Sources.
 4. Check every SQL file or request and every direct metric with `check_query` (it checks the shape
-   even when the window is empty); never add probe files.
+   even when the window is empty); never add probe files. For a REST request, `check_query` is
+   mandatory BEFORE writing `fields`: the fields come from the keys the response returns (`keys`),
+   and a key that does not exist is refused by the product. When the response carries epoch times,
+   write `timestamp_units` with the unit the check reports (`seconds`, `milliseconds` or `iso8601`);
+   a millisecond value read as seconds fails the preview with "date/time field value out of range".
 5. With the project valid, run `run_preview`.
-6. After finishing each task, tick it `[X]` with `edit_draft`, changing only that checkbox.
+6. After finishing each task, tick it `[X]` with `edit_draft`, changing only that checkbox, and
+   only once its file is written in the project. Tasks are ticked when they are implemented: no fix
+   in the problems panel changes the status of a task.
 7. "Ready to apply" requires: each dataset with `primary_key`, incremental load (`mode: full` or
    `window_days`) and checks; each report with `pdf.enabled: true`, dimensions and filters; every
    query checked; a correct preview of the current project. Review the pending items in the Estado

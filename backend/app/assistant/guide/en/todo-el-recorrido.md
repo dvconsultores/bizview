@@ -25,6 +25,14 @@ command does not start: it offers the "Switch to Auto" button.
   it.
 - Verification really runs: validation, one check per query or request of the integration, one
   preview and the result per user story.
+- Convergence and verification rounds: when converge adds new tasks the run implements them in
+  the same execution and converges again (at most two rounds); when verify fails the run implements
+  what is missing and verifies again (at most three cycles). Every re-entry is a normal stage and
+  its chip names the round: "Auto · /speckit-implement 001 · round 2". Verify never starts while
+  tasks are unticked: the plan implements first, without asking you anything.
+- Per-stage budget: each stage has a token ceiling (600 000 by default). When it is spent the
+  run stops with `blocked:stage_budget`, saves its state and the report says where it stopped;
+  `/speckit-all <spec>` continues there. The report lists the tokens of every stage.
 
 ## Options
 

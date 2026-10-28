@@ -8,6 +8,47 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **El plan de `/speckit-all` vuelve a implementar por sí solo (2026-10-28, feature 040)**: las
+  etapas ya no son un índice de ida. Si converger agrega o reabre tareas, el run las implementa en
+  la misma ejecución y vuelve a converger (máximo dos rondas de convergencia); si verificar falla,
+  implementa lo que falta y vuelve a verificar (máximo tres ciclos), y verificar nunca arranca con
+  tareas sin marcar: el plan implementa primero, sin preguntar. Cada reentrada es una etapa normal
+  cuyo chip dice la ronda («Auto · /speckit-implement 001 · ronda 2»). El defecto reportado: tras
+  converger y agregar T025–T028, el run exigía `/speckit-verify` y le pedía a la persona «ábrela en
+  ese orden».
+- **`/speckit-implement <spec> --only T025,T026` (feature 040)**: implementa y marca solo esas
+  tareas. Es la acción honesta del panel de problemas cuando quedan tareas sin marcar («Implementar
+  tareas pendientes», con los ids ya escritos en el chip). Una tarea se marca solo al implementarla,
+  con su archivo ya escrito, y solo dentro de esa etapa; cualquier otro comando que intente cambiar
+  una casilla es rechazado con «las tareas se marcan al implementarlas».
+- **Cada etapa tiene grupo de herramientas y techo de tokens (feature 040)**: el modelo recibe solo
+  las herramientas de la etapa en curso (≤ 25 por ronda; la guía de la app sigue entrando por
+  `get_app_guide(tema)`, una sola herramienta) y la etapa se detiene con `blocked:stage_budget`
+  cuando gasta su presupuesto (600 000 tokens por defecto, `AI_STAGE_TOKEN_BUDGET`), con el estado
+  guardado. El informe incluye los tokens de cada etapa y «Detalles técnicos» muestra las
+  herramientas y el tamaño del prompt de cada ronda.
+- **Mapeo de tiempos comprobado en las peticiones REST (feature 040)**: `check_query` sobre una
+  petición devuelve las claves reales de la respuesta y la unidad de cada campo de tiempo
+  (`timestamp_units`: `seconds`, `milliseconds` o `iso8601`). Implementar exige esa comprobación
+  antes de escribir `fields`, y una clave que la respuesta no tiene se rechaza nombrando las claves
+  reales. Un epoch en milisegundos leído como segundos ya no llega a la vista previa: se detecta y
+  se corrige el contenido (`timestamp_units`), no el síntoma.
+
+### Fixed
+
+- **Un conflicto de estado del run es una parada con nombre, no «error inesperado» (feature 040)**:
+  el run de producción terminó con «Ocurrió un error inesperado (IntegrityError)» después de
+  comprimir el contexto tres veces. Ahora cualquier `IntegrityError` del bucle se informa como
+  `loop_state_conflict:<restricción>` con el cursor intacto, y la reentrada de una etapa libera el
+  hueco de «run activo» antes de insertar el siguiente run (el INSERT se escribía antes del UPDATE
+  que liberaba el índice parcial `ux_command_run_active`).
+- **La compresión del contexto ocurre una vez por run y no hace thrashing (feature 040)**: la clave
+  `(sesión, run, n)` queda en `working_state` junto con el mensaje de resumen, en la misma
+  transacción de la ronda; si la compresión libera menos del 20 % o hace falta una tercera, el run
+  se detiene con `blocked:context_exhausted` y el estado guardado en vez de repetir. Además, cada
+  etapa de `/speckit-all` se envía con su propio contexto: el prompt del sistema, el estado de
+  trabajo, los mensajes de la etapa en curso y la línea `✔ <etapa> — …` de la etapa anterior, nunca
+  los resultados de herramientas de las etapas previas.
 - **Un comando recorre la spec entera y termina con el informe (2026-10-27, feature 039)**:
   `/speckit-all <petición | NNN-nombre> [--until <etapa>] [--force]` recorre especificar → aclarar →
   planificar → tareas → analizar → implementar → converger → verificar en un solo run, sin

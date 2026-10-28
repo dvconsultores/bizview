@@ -38,7 +38,11 @@ specify → clarify → plan → tasks → analyze → implement → converge �
    Use `TodoWrite`/the task list for the eight stages so the position is visible.
 4. **Analyze fixes itself.** CRITICAL/HIGH findings go back once to the stage that owns the file;
    MEDIUM/LOW are recorded as decisions.
-5. **Converge executes its gaps** in the same run, at most 2 rounds.
+5. **The plan loops back.** When `converge` adds or reopens tasks, run `implement` on exactly those
+   tasks and then `converge` again — at most 2 convergence rounds, then `verify`. When `verify`
+   fails, run `implement` of the fixing tasks and `verify` again — at most 3 cycles. `verify` never
+   starts while `tasks.md` has unticked tasks: implement first. Every re-entry is a normal stage and
+   its chip names the round ("Auto · /speckit-implement 001 · round 2").
 6. **Verify with the repo's own tools**: targeted `pytest`, `npm run build`, `npx vitest run`, plus
    the feature's quickstart checks. A failure goes back to `implement`/`converge`; at 3 cycles the
    run stops and the report names the failing story.
@@ -54,8 +58,8 @@ specify → clarify → plan → tasks → analyze → implement → converge �
 - Every decision is written as `- [stage] decision — why` under
   "## Decisiones tomadas (modo autónomo)" in `specs/<spec>/spec.md`. Never change any other
   line of that file.
-- The stage order is fixed and only advanced with `run_command`; a stage is neither skipped nor
-  repeated.
+- The stage order is fixed and only advanced with `run_command`; only the transitions above
+  re-open a stage — never a jump, never a stage without the evidence the plan asks for.
 - An artifact that is already written is not rewritten the same: the same stage twice produces no
   change unless its inputs changed.
 - You stop only for: a constitution conflict that needs an amendment, verification still failing
@@ -65,5 +69,8 @@ specify → clarify → plan → tasks → analyze → implement → converge �
   (Apply when the contract does not allow it). Never give instructions on how to continue.
 <!-- /bizview:contrato-autonomo -->
 
-In this repository `run_command` is the stage you open with the matching skill; the product's
-version of the contract is enforced by product code, this one by the list of stages above.
+A task is ticked only when it is implemented and its file exists; `/speckit-implement --only
+T025,T026` implements the tasks a fix names, and no fix, fix message or other stage changes the
+status of a task. In this repository `run_command` is the stage you open with the matching skill;
+the product's version of the contract is enforced by product code, this one by the list of stages
+above.
