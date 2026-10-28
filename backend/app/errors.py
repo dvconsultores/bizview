@@ -1,5 +1,6 @@
 """API error envelope: {"error": {"code", "message", "fields"?}} (contracts/api.md)."""
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -36,6 +37,39 @@ def error_body(code: str, message: 'M | str', fields=None, extra=None) -> dict:
         err["fields"] = fields
     err.update(extra or {})
     return {"error": err}
+
+
+class StateConflict(Exception):
+    """A write the database refused because the run's state moved under it (feature 040).
+
+    An `IntegrityError` in the middle of a `/speckit-all` turn used to end the conversation with
+    «Ocurrió un error inesperado (IntegrityError)»: the constraint name is the only thing that says
+    *what* conflicted, so it is carried out instead of the exception type (Step 0 of 040).
+    """
+
+    def __init__(self, constraint: str | None, detail: str = "") -> None:
+        self.constraint = constraint or "unknown"
+        self.detail = detail
+        super().__init__(f"loop_state_conflict:{self.constraint}")
+
+    @property
+    def stop_reason(self) -> str:
+        return f"blocked:loop_state_conflict:{self.constraint}"[:120]
+
+
+_CONSTRAINT = re.compile(r'(?:constraint|index) "([^"]+)"')
+
+
+def constraint_of(exc: BaseException | None) -> str | None:
+    """The database constraint an `IntegrityError` violated, from psycopg's diagnostics."""
+    if exc is None:
+        return None
+    orig = getattr(exc, "orig", None)
+    name = getattr(getattr(orig, "diag", None), "constraint_name", None)
+    if name:
+        return str(name)
+    match = _CONSTRAINT.search(str(orig or exc))
+    return match.group(1) if match else None
 
 
 def unauthenticated() -> ApiError:

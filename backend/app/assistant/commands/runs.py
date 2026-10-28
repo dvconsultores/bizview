@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.assistant.commands.registry import DOCS, CommandDef
 from app.errors import ApiError
+from app.errors import constraint_of as constraint_name
 from app.i18n import M, t
 from app.models import AssistantCommandRun
 from app.projects.history import sha
@@ -81,15 +82,23 @@ def create(db, *, session_id: int, project_id: int, definition: CommandDef, argu
         reserved_number=reserved_number, locale=locale, status=status, pending=pending,
         resumed_from=resumed_from, files=[], result=result, tokens=0)
     try:
+        # Feature 040 (Step 0): the run that this one replaces was marked finished by the caller,
+        # but SQLAlchemy flushes INSERTs before UPDATEs, so a single flush wrote this INSERT while
+        # the old row still held the partial unique index `ux_command_run_active`. That is the
+        # IntegrityError a `/speckit-all` re-entry (converge → implement) hit. Freeing the slot in
+        # its own flush first is what makes the transition legal.
+        db.flush()
         with db.begin_nested():
             db.add(run)
             db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
+        constraint = constraint_name(exc)
         existing = active(db, session_id)
         command = existing.command if existing else definition.name
         raise ApiError(409, "command_active", M("commands.active", command=command),
                        extra={"command": command, "spec": existing.spec if existing else None,
-                              "status": existing.status if existing else "running"}) from None
+                              "status": existing.status if existing else "running",
+                              "constraint": constraint}) from None
     return run
 
 

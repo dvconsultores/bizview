@@ -16,7 +16,7 @@ import yaml
 from bizview_cli import authoring
 from sqlalchemy import func, select, update
 from sqlalchemy import text as sql_text
-from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import IntegrityError, InterfaceError, OperationalError
 from sqlalchemy.orm import object_session
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -44,7 +44,7 @@ from app.assistant.personal import query_tables
 from app.assistant.tools import ToolError, _bump, run_tool
 from app.config import get_settings
 from app.db import get_sessionmaker
-from app.errors import ApiError, not_found, validation
+from app.errors import ApiError, StateConflict, constraint_of, not_found, validation
 from app.i18n import M, current, t, use_locale
 from app.models import (
     AppUser,
@@ -2027,6 +2027,13 @@ def _attempt_turn(session_id: int, actor_id: int, ip: str | None, claim: _TurnCl
             db.rollback()
             log.info("assistant claim lost for session %s", session_id)
             return False
+        except IntegrityError as exc:
+            # Feature 040 (Step 0): a state conflict is a named stop, not an unexpected error.
+            db.rollback()
+            constraint = constraint_of(exc)
+            log.error("assistant loop state conflict in session %s: %s", session_id,
+                      constraint)
+            raise StateConflict(constraint, str(getattr(exc, "orig", exc))) from None
         except Exception as exc:
             db.rollback()
             if (not _is_transient_db_error(exc) or attempt >= TRANSIENT_ATTEMPTS
@@ -2058,6 +2065,8 @@ def _error_text(exc: BaseException | None) -> str:
     """
     if exc is None:
         return t(_UNEXPECTED_TEXT)
+    if isinstance(exc, StateConflict):
+        return t("assistant.loop_state_conflict", constraint=exc.constraint)
     if isinstance(exc, (OperationalError, psycopg.OperationalError)):
         return t("assistant.unexpected_db")
     tool = getattr(exc, "tool_name", None)          # set where the tool is called
@@ -2085,7 +2094,9 @@ def _post_error(session_id: int, claimed_at: datetime, exc: BaseException | None
             session = s.get(AssistantSession, session_id)
             activity.end_run(session, "error")
             runs.mark_stale_interrupted(s, session_id, status="failed",
-                                        error=type(exc).__name__ if exc else "unexpected")
+                                        error=(exc.stop_reason if isinstance(exc, StateConflict)
+                                               else (type(exc).__name__ if exc
+                                                     else "unexpected")))
             owner = s.get(AppUser, session.created_by)
             with use_locale(_owner_locale(owner)):
                 _add(s, session, role="assistant", content=_error_text(exc))

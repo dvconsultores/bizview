@@ -749,6 +749,7 @@ MESSAGES: dict[str, str] = {
     "assistant.watch.rolled_back": "Se restauró la versión anterior del espacio de trabajo.",
 
     "assistant.context_compacted": "Comprimí el contexto de la conversación ({chars} caracteres menos); sigo desde donde iba.",
+    "assistant.loop_state_conflict": "La base rechazó un cambio de estado de la ejecución ({constraint}); lo hecho hasta la última ronda se guardó y el plan puede retomarse desde la etapa en curso.",
     "assistant.auto.next_stage": "Etapa {done} terminada. El contrato permite {stages}: abre la siguiente con run_command y continúa; no pidas confirmación al usuario.",
     "assistant.auto.approved": "El contrato autoriza aprobar la spec {spec} sin preguntar.",
     "assistant.auto.apply_now": "El borrador está listo. El contrato autoriza aplicar: ejecuta la vista previa si falta y llama apply_draft; no pidas al usuario pulsar Aplicar.",
