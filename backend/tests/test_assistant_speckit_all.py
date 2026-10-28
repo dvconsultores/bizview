@@ -104,8 +104,10 @@ def test_ordered_specs_puts_the_integration_first():
 
 def test_position_is_what_the_status_bar_reads():
     state = pipeline.advance(pipeline.seed(7, None, ["002-x"]), 0, 2)
+    # Feature 040: the status bar also reads the convergence round (1 until converge re-enters).
     assert pipeline.position(state) == {"id": 7, "cursor": 3, "total": 8, "stage": "tasks",
-                                        "until": None, "spec": "002-x", "spec_index": 0}
+                                        "until": None, "spec": "002-x", "spec_index": 0,
+                                        "round": 1}
 
 
 # --------------------------------------------------------------------------- decisions
