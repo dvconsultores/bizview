@@ -12,7 +12,7 @@ from app.models import AssistantMessage
 from tests.conftest import signed_in
 from tests.test_assistant_api import _chat_reply
 from tests.test_assistant_auto_mode import _send
-from tests.test_assistant_commands_service import chat as chat  # noqa: F401
+from tests.test_assistant_commands_service import chat as chat
 
 
 @pytest.fixture(autouse=True)

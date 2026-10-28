@@ -1,6 +1,6 @@
 """Feature 040 (A and B): the state machine loops back, `--only` and the task write guard.
 
-The production run stayed at `verify` after `converge` had added T025–T028, told the human to
+The production run stayed at `verify` after `converge` had added T025-T028, told the human to
 "open it in that order", and offered a fake fix that marked every task `[X]`.
 """
 import pytest
@@ -9,10 +9,10 @@ from app.ai import fake
 from app.assistant.commands import pipeline, runs
 from app.assistant.commands.registry import REGISTRY
 from app.config import get_settings
-from tests.conftest import signed_in
 from tests.test_assistant_api import _chat_reply, _tool_call
 from tests.test_assistant_auto_mode import _send
-from tests.test_assistant_commands_service import _with_spec, chat as chat  # noqa: F401
+from tests.test_assistant_commands_service import _with_spec
+from tests.test_assistant_commands_service import chat as chat
 from tests.test_assistant_speckit_all_run import _finish, _open, _text
 
 

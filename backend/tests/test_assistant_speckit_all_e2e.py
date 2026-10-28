@@ -6,8 +6,8 @@ fixture and asserts the properties the defect report asked for.
 """
 import pytest
 
-from app.assistant import service
 from app.ai import fake
+from app.assistant import service
 from app.config import get_settings
 from app.projects import fs
 from tests import coinmarketcap_fixture as cmc
@@ -74,7 +74,7 @@ def test_the_run_stages_carry_their_round_and_their_own_context(superuser):
     client = signed_in("root@example.com")
     slug = cmc.create_project(client)
     files = cmc.fixture_files()
-    # The defect's shape: converge left four tasks open (T025–T028 of the production run).
+    # The defect's shape: converge left four tasks open (T025-T028 of the production run).
     files[f"specs/{SPEC}/tasks.md"] = (
         "- [X] T001 integrar los cuatro conjuntos\n"
         "- [ ] T025 mapear `snapshot_at` en fear_greed\n"
