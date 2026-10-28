@@ -196,11 +196,16 @@ def test_extract_converts_declared_epoch_units():
 def test_three_identical_rounds_without_progress_stop_the_stage(superuser):
     client = signed_in("root@example.com")
     sid = new_chat(client)
-    # Distinct call ids on purpose: the detector must compare names and args only.
+    # Each stuck round fails the edit and succeeds a read, which keeps the per-call brake quiet;
+    # distinct call ids on purpose — the detector must compare names and args only.
+    ops = [{"op": "replace", "path": "specs/001-x/no-existe.md", "old": "a", "new": "b"}]
     fake.SHARED.queue(
         *[
             _chat_reply(
-                tool_calls=[_tool_call("list_sources", {}, call_id=f"c{i}")],
+                tool_calls=[
+                    _tool_call("list_sources", {}, call_id=f"a{i}"),
+                    _tool_call("edit_draft", {"ops": ops}, call_id=f"b{i}"),
+                ],
                 stop_reason="tool_use",
             )
             for i in range(1, 6)
@@ -210,7 +215,7 @@ def test_three_identical_rounds_without_progress_stop_the_stage(superuser):
     response = client.post(f"/api/assistant/sessions/{sid}/messages", json={"text": "hola"})
     assert response.status_code == 202
 
-    # The third identical round with no file written ends the turn.
+    # The third identical stuck round with no file written ends the turn.
     assert len(fake.SHARED.requests) == 3
 
     rows = sql(
@@ -219,4 +224,5 @@ def test_three_identical_rounds_without_progress_stop_the_stage(superuser):
         i=sid,
     )
     # "assistant.no_progress" is added by the fix.
-    assert rows[0][0] == t("assistant.no_progress", rounds=3, tools="list_sources")
+    assert rows[0][0] == t("assistant.no_progress", rounds=3,
+                           tools="edit_draft, list_sources")

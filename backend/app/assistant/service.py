@@ -2736,18 +2736,27 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         _commit_round(db, session, claim)
 
         # 041: the per-call brake (`last_failed`) resets on any successful read between failures,
-        # which is exactly how the production loop burned the stage budget. Three identical rounds
-        # that wrote nothing are a dead end: stopped by evidence, not by a round counter. Call ids
-        # are excluded on purpose — only names and args prove the round repeated.
+        # which is exactly how the production loop burned the stage budget. Identical rounds alone
+        # are a working pattern the discovery limit already bounds; the dead end is an identical
+        # round that also FAILED and wrote nothing — stopped by evidence, not by a round counter.
+        # Call ids are excluded on purpose — only names and args prove the round repeated.
         signature = tuple(sorted(
             (call.name, json.dumps(call.args, sort_keys=True, ensure_ascii=False, default=str))
             for call in reply.tool_calls
         ))
-        if round_touched or signature != last_round_signature:
+        round_errored = any(
+            (item.get("tool_payload") or {}).get("result", {}).get("error")
+            for item in pending_results
+        )
+        stuck = round_errored and not round_touched
+        if not stuck:
+            no_progress_rounds = 0
+            last_round_signature = None
+        elif signature == last_round_signature:
+            no_progress_rounds += 1
+        else:
             no_progress_rounds = 1
             last_round_signature = signature
-        else:
-            no_progress_rounds += 1
         if no_progress_rounds >= 3:
             tools_used = ", ".join(sorted({call.name for call in reply.tool_calls}))
             new_messages.append(
