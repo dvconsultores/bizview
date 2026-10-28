@@ -12,9 +12,9 @@ Commit 1 — Step 0: the `IntegrityError` is a state conflict, never "error ines
 
 Commit 2 — A + B: the state machine, `--only` and honest fixes.
 
-- [X] T004 `pipeline.next_stage()`: converge → implement (round+1) → converge (max 2), then verify;
+- [X] T004 `pipeline.routed_state()`: converge → implement (round+1) → converge (max 2), then verify;
       verify → implement → verify (max 3); verify with unchecked tasks → implement.
-- [X] T005 `_plan_position` reads `next_stage`; the chip carries `· ronda N`.
+- [X] T005 `_plan_position` reads `routed_state`; the chip carries `· ronda N`.
 - [X] T006 `--only T025,T026` on `/speckit-implement` (parse, carry, guard, refuse unknown ids).
 - [X] T007 Remove `validate.fix_tasks`; add the honest action text and the
       "Implementar tareas pendientes" suggestion (`/speckit-implement <spec> --only …`).

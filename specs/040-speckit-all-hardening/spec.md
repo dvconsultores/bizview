@@ -44,8 +44,9 @@ ends. Nobody is told to "open a stage in that order".
    opened: the plan routes to `implement`. The run never fails nor asks for that reason.
 4. **Given** any re-entry, **Then** it is an ordinary `run_command` whose chip carries the round
    ("Auto · /speckit-implement 001 · ronda 2").
-5. **Given** the plan's cursor is read from any cursor position, **Then** `next_stage(state)` is
-   the only place that decides where it goes — there is no "stage 8/8" hard check.
+5. **Given** the plan's cursor is read from any cursor position, **Then**
+   `routed_state(state, files)` is the only place that decides where it goes — there is no
+   "stage 8/8" hard check.
 
 ### User Story 2 - No fix may fake evidence (Priority: P1)
 
@@ -114,7 +115,7 @@ The problems panel offers honest actions only.
 
 ## Requirements *(mandatory)*
 
-- **FR-001 (A)**: `pipeline.next_stage()` is a state machine over `(spec, stage, round,
+- **FR-001 (A)**: `pipeline.routed_state()` is a state machine over `(spec, stage, round,
   verify_cycles, evidence)`; the transitions of US1 are product code, not prompt text.
 - **FR-002 (A)**: a re-entry opens a normal command run whose chip shows the round.
 - **FR-003 (A)**: `verify` routes to `implement` while `tasks.md` has unchecked tasks.

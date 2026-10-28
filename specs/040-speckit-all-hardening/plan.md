@@ -17,7 +17,7 @@
 
 ## Decisions
 
-1. **`next_stage()` owns every transition.** `advance()` keeps the stored cursor shape, but the
+1. **`routed_state()` owns every transition.** `advance()` keeps the stored cursor shape, but the
    target is computed from evidence: the newest converge/verify run of the spec, `tasks.md` and the
    round counters. `_plan_position` asks it and refuses only what the state machine cannot reach.
 2. **The compression key lives in `working_state`.** `{"run": <id>, "n": 1, "freed": [pct]}` is
