@@ -124,6 +124,29 @@ call failing twice *consecutively*. One successful `read_draft` in between reset
 error). With `max_rounds = None` in Auto, nothing else stops the C1/C3 loops before the stage
 budget (`blocked:stage_budget`, service.py:2613).
 
+### C5 — the guard deadlock survived the first fix when the check reads NO shape (run 133)
+
+Production DB evidence (session 24; runs 129 `FileChanged`, 130/132/133 `blocked:stage_budget`,
+~600k tokens each, still on pre-fix images). Run 133's transcript (messages 7546–7594): the agent
+checks `fear-and-greed.yaml`, the checker answers `'$.data' no es una lista en la respuesta` with
+`keys: []` (origin.py returns the error **before** reading any shape when `records` resolves to an
+object), and from then on every corrective `edit_draft` — including the ones that fix `records:`
+— is refused with «Antes de escribir `fields`…» until the stage budget kills the run. The first
+041 guard fix accepted a failed check **with keys**; a structural failure stores an entry with no
+keys, which the guard treated like no check at all. Unsatisfiable again: only a fixed file could
+produce keys, and only keys allowed fixing the file. Fix: a stored check entry for the path —
+whatever it found — authorizes the write; keys, when present, still validate plain field tokens.
+
+### C6 — the platform cannot read an object-shaped endpoint at all (the deepest cause)
+
+Both endpoints this spec needs return `data` as a single JSON object. The engine
+(`extract._records`) and the checker (`origin._run_check_request`, both occurrences) rejected any
+`records` path that resolves to a dict — so datasets `global_metrics` and `fear_greed` were
+**impossible to implement** no matter what the agent wrote; every run could only loop until a
+budget or a guard stopped it. Fix: a dict at the records path counts as a one-record list in the
+engine and the checker, and the `records` schema description says so. With C6 fixed the checker
+reads the object's real keys, which also feeds the C5 guard the information it wants.
+
 ## 3. Ruled out
 
 - **H1 as stated** (guard demands a tool that doesn't exist for REST): `check_query` accepts
@@ -168,20 +191,46 @@ budget (`blocked:stage_budget`, service.py:2613).
    `blocked:no_progress`, naming the repeating tools and the last error. Honors the owner's
    "no round counter" rule: it stops on proven lack of progress, not on a count.
 
-## 5. Verification plan
+## 5. Verification (ran 2026-10-28)
 
-- Replay tests (FakeProvider, scripted like test_assistant_loop.py): (a) guard deadlock —
-  before the fix the turn loops/errors, after it the corrected `fields` write lands; (b)
-  `write_report` twice → `FileChanged` before, replaced report after; (c) epoch conversion unit
-  test on `_records`; (d) three identical no-progress rounds → `blocked:no_progress`.
-- End to end: `/speckit-all` over the coinmarketcap fixture with recorded shapes reaches the
-  report for both specs with 0 unexpected errors.
-- Full backend + frontend suites.
+- `tests/test_assistant_root_cause_041.py` (7 tests): each cause reproduced failing for the
+  claimed reason first (guard ToolError `check_request_first`; `fs.FileChanged` from the second
+  `write_report`; raw epoch out of `_records`; 6 provider rounds instead of a stop), then green
+  after the fixes. Two are regression guards that already passed (keys stored by the 040 tool
+  wrapper; an **unchecked** request still blocks).
+- C5/C6 (added after the run-133 evidence, same file, now 10 tests): the structural-failure
+  entry blocked the `records` fix (ToolError, C5), `extract._records` raised on an object (C6),
+  and `check_query` read no keys from an object response — all three failed for the claimed
+  reason first, then green after the guard, engine and checker fixes.
+- `tests/test_assistant_root_cause_041_e2e.py`: the production transcript replayed in the real
+  `/speckit-implement` loop — unchecked write refused, failed check reads the shape, the same
+  write then lands, run `completed`, no «error inesperado», corrected `fields` +
+  `timestamp_units` on disk.
+- Detector refinement found by the suites: identical *successful* rounds are a working pattern
+  (the discovery limit's own test scripts three of them), so only an identical round that also
+  failed and wrote nothing counts; `blocked:no_progress` after three.
+- Affected suites green: test_assistant_request_shape, test_assistant_guard,
+  test_assistant_loop, test_assistant_speckit_all, test_assistant_commands_guard,
+  test_assistant_preview — except three failures that also fail on clean main f7feae3
+  (pre-existing, NOT from 041; verified in a worktree at that commit):
+  `test_assistant_guard.py::test_discovery_limit_restricts_then_returns_after_draft`,
+  `test_assistant_loop.py::test_context_too_long_retries_with_latest_round`,
+  `test_assistant_loop.py::test_context_too_long_twice_reports_error` (the two context tests
+  expect the old provider message; the code now answers with the 040 stage-resume text).
+- Frontend suite: green (vitest, exit 0). Full backend suite: result recorded below when done.
 
-## 6. Production steps (filled in after the fixes verify)
+## 6. Production steps
 
-- Deploy: rebuild backend image; no migration (no schema change — `query_checks` is JSONB).
-- The stuck conversation: resumable with `/speckit-all 001-mercado-cripto` after deploy; the
-  rewound cursor repeats the convergence stage, and the previously impossible writes (T025,
-  T026/T028) become possible. If its stage budget is exhausted, start a fresh conversation on
-  the same project; the project files and specs carry over.
+- Deploy: rebuild the backend image; no DB migration (`query_checks` is JSONB; no schema
+  change). The worker image shares the engine code (`timestamp_units`), so rebuild it too.
+- The stuck conversation IS resumable after deploy: `/speckit-all 001-mercado-cripto`. The
+  rewound cursor repeats the unfinished stage; the previously impossible writes become possible
+  (the guard accepts a checked file whatever the check found; `timestamp_units` is honored at
+  extraction; both object-shaped endpoints — `global-metrics/quotes/latest` and
+  `fear-and-greed/latest` — now extract as one record). The saved state is consistent (results
+  paired per round, 036), so nothing re-enters the dead end.
+- Note on the current draft: `fear-and-greed.yaml` carries an invalid scalar
+  `timestamp_units: seconds` (schema wants a map). The engine ignores a non-dict and the
+  validator flags it, so the agent will be told and can fix it — no manual edit needed.
+- If the conversation's token budget is spent, start a fresh conversation on the same project:
+  the files and specs carry over.

@@ -79,7 +79,7 @@
       }
     },
     "records": {
-      "description": "Ruta JSON de la lista de registros en la respuesta; usa \"$\" para un arreglo de nivel superior.",
+      "description": "Ruta JSON de la lista de registros en la respuesta; usa \"$\" para un arreglo de nivel superior. Un objeto en esa ruta se lee como un único registro.",
       "type": "string"
     },
     "fields": {

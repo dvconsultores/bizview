@@ -407,6 +407,9 @@ def _records(payload, request: dict, columns: list[str]) -> list[dict]:
     records = json_path(payload, request["records"])
     if records is None:
         return []
+    # 041: un objeto en la ruta de registros es un único registro.
+    if isinstance(records, dict):
+        records = [records]
     if not isinstance(records, list):
         raise ExtractError(f"'{request['records']}' no es una lista en la respuesta")
     fields = request["fields"]

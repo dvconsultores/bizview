@@ -140,9 +140,9 @@ def test_a_failed_check_with_a_wrong_column_names_the_real_keys():
     assert "symbol" in str(error.value)
 
 
-def test_a_check_that_read_no_shape_still_blocks():
+def test_an_unchecked_request_still_blocks():
     path = "integrations/cmc/requests/rates.yaml"
-    session = _session({path: {"ok": False, "keys": [], "error": "x"}})
+    session = _session({})
     ops = [
         {
             "op": "write",
@@ -153,6 +153,82 @@ def test_a_check_that_read_no_shape_still_blocks():
 
     with pytest.raises(tools.ToolError):
         tools._requests_checked(session, ops)
+
+
+def test_a_structural_failure_lets_the_agent_fix_records():
+    path = "integrations/cmc/requests/rates.yaml"
+    session = _session(
+        {
+            path: {
+                "sha256": "x",
+                "ok": False,
+                "keys": [],
+                "columns": [],
+                "error": "'$.data' no es una lista en la respuesta",
+                "at": None,
+            }
+        }
+    )
+    ops = [
+        {
+            "op": "write",
+            "path": path,
+            "content": "records: $\nfields:\n  value: $.data.value\n",
+        }
+    ]
+
+    # The check ran and read no shape (records points at an object), so the corrective write
+    # must land — blocking here was the production deadlock (run 133).
+    assert tools._requests_checked(session, ops) is None
+
+
+def test_extract_reads_an_object_as_one_record():
+    payload = {"data": {"value": 42, "classification": "Greed"}}
+    request = {
+        "records": "$.data",
+        "fields": {"value": "$.value", "classification": "$.classification"},
+    }
+
+    # An object at the records path is one record (production endpoints return a single object).
+    result = extract._records(payload, request, ["value", "classification"])
+
+    assert result == [{"value": "42", "classification": "Greed"}]
+
+
+OBJECT_REQUEST = """\
+method: GET
+path: facturas
+records: $.data
+fields:
+  id: id
+  total: total
+"""
+
+
+def test_check_query_reads_the_keys_of_an_object_response(
+    db, superuser, api_source, monkeypatch
+):
+    def fake_supabase_once(settings, secrets, app, request, params, **kwargs):
+        return {"data": {"id": 1, "total": 2.5}}, {}
+
+    monkeypatch.setattr(extract, "supabase_once", fake_supabase_once)
+    path = "integrations/facturas/requests/lista.yaml"
+    actor = db.get(AppUser, superuser.id)
+    session = project_view(db, superuser.id, {path: OBJECT_REQUEST})
+    tools.reset_run(session)
+
+    tools.run_tool(
+        db,
+        actor,
+        session,
+        "check_query",
+        {"source": "Origen API", "path": path},
+        get_settings(),
+    )
+
+    entry = session.query_checks[path]
+    assert entry["ok"] is True
+    assert entry["keys"] == ["id", "total"]
 
 
 def test_the_run_report_is_replaced_not_conflicted(db, superuser):

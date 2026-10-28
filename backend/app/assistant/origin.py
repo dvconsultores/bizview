@@ -907,6 +907,9 @@ def _run_check_request(source, secrets: dict, app, text: str,
     records = extract.json_path(payload, request["records"])
     if records is None:
         records = []
+    # 041: un objeto en la ruta de registros es un único registro.
+    if isinstance(records, dict):
+        records = [records]
     if not isinstance(records, list):
         return {**shape, "error": f"'{request['records']}' no es una lista en la respuesta"}
 
@@ -925,6 +928,8 @@ def _run_check_request(source, secrets: dict, app, text: str,
             records2 = extract.json_path(payload2, request_no_window["records"])
             if records2 is None:
                 records2 = []
+            if isinstance(records2, dict):
+                records2 = [records2]
             if not isinstance(records2, list):
                 return {**shape, "error": f"'{request['records']}' no es una lista en la respuesta"}
             first2 = records2[0] if records2 else None
