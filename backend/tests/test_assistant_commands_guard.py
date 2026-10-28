@@ -31,6 +31,14 @@ def refused(context, *ops):
     return exc.value
 
 
+def refused_with(context, code, *ops):
+    """Feature 040: a refused tick names why, so the model can act on it."""
+    with pytest.raises(GuardError) as exc:
+        check_ops(context, list(ops))
+    assert exc.value.code == code
+    return exc.value
+
+
 def test_tools_per_mode():
     with pytest.raises(GuardError) as exc:
         check_tool(None, "edit_draft")
@@ -129,7 +137,10 @@ def test_implement_ticks_status_and_artifacts():
              "reports/ventas/report.yaml": "id: ventas\n"}
     c = ctx("speckit-implement", kind="reporte", files=files)
     check_ops(c, [w(tasks, "# T\n- [X] T001 a\n- [ ] T002 b\n")])
-    refused(c, w(tasks, "# T\n- [X] T001 cambio\n- [ ] T002 b\n"))
+    # A tick is only a tick: nothing else changes, and the task must be one the stage can prove.
+    refused_with(c, "tasks_tick_needs_evidence",
+                 w(tasks, "# T\n- [X] T001 cambio\n- [ ] T002 b\n"))
+    # Adding a line is not a tick: the generic refusal keeps naming the allowed paths.
     refused(c, w(tasks, "# T\n- [X] T001 a\n- [ ] T002 b\n- [ ] T003 c\n"))
     check_ops(c, [w(spec, "# Ventas\n**Tipo**: reporte\n**Status**: Implemented\n")])
     refused(c, w(spec, "# Ventas\n**Tipo**: reporte\n**Status**: Draft\n"))

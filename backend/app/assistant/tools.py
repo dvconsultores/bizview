@@ -679,7 +679,11 @@ MAX_TOOLS_PER_ROUND = 25
 _PIPELINE_TOOLS = frozenset({"run_command", "finish_command", "set_current_spec"})
 
 TOOL_GROUPS: dict[str, frozenset[str]] = {
-    "default": guard.INSPECTION_TOOLS | {"suggest_command", "finish_command"},
+    # A plain Auto message keeps the whole execution channel (028: a spent contract must not leave
+    # the conversation with read tools only); a command narrows it.
+    "default": (guard.INSPECTION_TOOLS
+                | {"suggest_command", "finish_command", "run_command", "run_preview",
+                   "apply_draft"}),
     "speckit-all": guard.INSPECTION_TOOLS | {"edit_draft", "run_preview"} | _PIPELINE_TOOLS,
     "speckit-constitution": guard.INSPECTION_TOOLS | {"edit_draft"} | _PIPELINE_TOOLS,
     "speckit-specify": (guard.INSPECTION_TOOLS
