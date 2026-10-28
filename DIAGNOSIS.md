@@ -150,8 +150,11 @@ budget (`blocked:stage_budget`, service.py:2613).
 1. **Guard (C1)** — `run_check` stores `keys` (and keeps `skipped`) in `query_checks[path]`.
    `_requests_checked` accepts a write when the last check **read the shape** (`keys` non-empty,
    or `skipped`, or `ok is True`) and then validates the **new** content's `fields` against
-   those `keys` (this turns the dead 040 (E) check live, exactly as designed). A check that
-   errored (no shape) still blocks. Docstring names `check_query`.
+   those `keys`. A check that errored (no shape) still blocks. Docstring names `check_query`.
+   Refinement found while making the dead 040 (E) check live: it compared output **column
+   names** to response keys, which false-positives on any renamed column
+   (`snapshot_at: snapshot`). The live check judges the mapped **path** instead, and only when
+   it is a plain top-level key — nested or indexed paths are judged by the check itself.
 2. **Report write (C2)** — `write_report` sends `force: True` (the run report is generated,
    deterministic, pipeline-owned; a revision is still recorded for audit). Constitution IX is
    untouched: the report never marks tasks done.

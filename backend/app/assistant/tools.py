@@ -1846,6 +1846,9 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
         session.current_spec = folder
 
 
+_PLAIN_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
 def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
     """Feature 041: a check that READ the shape is authority enough to write its `fields`.
 
@@ -1870,8 +1873,18 @@ def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
             document = yaml.safe_load(op.get("content") or "")
         except yaml.YAMLError:
             continue                     # the validator reports the YAML error with its line
-        columns = list(document.get("fields") or {}) if isinstance(document, dict) else []
-        missing = [column for column in columns if keys and column not in keys]
+        # A renamed column is legal — what must exist in the shape is the mapped key, so only
+        # plain top-level paths are judged here; nested or indexed paths belong to the check.
+        fields = dict(document.get("fields") or {}) if isinstance(document, dict) else {}
+        missing: list[str] = []
+        for path_value in fields.values():
+            token = str(path_value)
+            if token.startswith("$"):
+                token = token[1:]
+            if token.startswith("."):
+                token = token[1:]
+            if keys and _PLAIN_KEY.match(token) and token not in keys:
+                missing.append(token)
         if missing:
             raise ToolError(t("assistant.check_request_missing",
                               columns=", ".join(missing), path=path,
