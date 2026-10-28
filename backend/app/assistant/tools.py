@@ -30,6 +30,7 @@ _STAGE_OF_COMMAND = {
     "speckit-clarify": "clarify",
     "speckit-plan": "plan",
     "speckit-tasks": "tasks",
+    "speckit-analyze": "analyze",
     "speckit-implement": "implement",
     "speckit-converge": "converge",
     "speckit-verify": "verify",
@@ -669,21 +670,64 @@ def _localized(spec: dict[str, Any]) -> dict[str, Any]:
     return {**spec, "description": t(spec["description"]), "parameters": params}
 
 
+# Feature 040 (D): the tools a stage may be sent. Offering the whole catalogue for every stage
+# (and letting one turn run all of them) is what produced 626 tool calls and 14 M tokens for one
+# integration. Guides and app topics are reached through `get_app_guide(topic)`, never one tool
+# per topic.
+MAX_TOOLS_PER_ROUND = 25
+
+_PIPELINE_TOOLS = frozenset({"run_command", "finish_command", "set_current_spec"})
+
+TOOL_GROUPS: dict[str, frozenset[str]] = {
+    "default": guard.INSPECTION_TOOLS | {"suggest_command", "finish_command"},
+    "speckit-all": guard.INSPECTION_TOOLS | {"edit_draft", "run_preview"} | _PIPELINE_TOOLS,
+    "speckit-constitution": guard.INSPECTION_TOOLS | {"edit_draft"} | _PIPELINE_TOOLS,
+    "speckit-specify": (guard.INSPECTION_TOOLS
+                        | {"propose_draft", "edit_draft"} | _PIPELINE_TOOLS),
+    "speckit-clarify": guard.INSPECTION_TOOLS | {"edit_draft"} | _PIPELINE_TOOLS,
+    "speckit-plan": guard.INSPECTION_TOOLS | {"propose_draft", "edit_draft"} | _PIPELINE_TOOLS,
+    "speckit-tasks": guard.INSPECTION_TOOLS | {"edit_draft"} | _PIPELINE_TOOLS,
+    "speckit-checklist": guard.INSPECTION_TOOLS | {"edit_draft"} | _PIPELINE_TOOLS,
+    "speckit-analyze": guard.INSPECTION_TOOLS | _PIPELINE_TOOLS,
+    "speckit-implement": (guard.INSPECTION_TOOLS
+                          | {"propose_draft", "edit_draft", "check_query", "run_preview"}
+                          | _PIPELINE_TOOLS),
+    "speckit-converge": (guard.INSPECTION_TOOLS
+                         | {"edit_draft", "check_query", "run_preview"} | _PIPELINE_TOOLS),
+    "speckit-verify": (guard.INSPECTION_TOOLS | {"check_query", "run_preview"}
+                       | _PIPELINE_TOOLS),
+    "fix": (guard.INSPECTION_TOOLS
+            | {"edit_draft", "check_query", "run_preview"} | _PIPELINE_TOOLS),
+    "ayuda": guard.INSPECTION_TOOLS | _PIPELINE_TOOLS,
+}
+
+
+def tool_group(definition: Any) -> frozenset[str]:
+    """The group of a command (a plain message gets the inspection group)."""
+    return TOOL_GROUPS.get(getattr(definition, "name", "") or "default") or TOOL_GROUPS["default"]
+
+
 def offered_tool_specs(session: Any, app_settings: Any) -> tuple[list[dict[str, Any]], bool]:
     """Devuelve las tool specs ofrecidas y si están restringidas a la fase de borrador.
 
     Feature 028: el modo de la conversación y el contrato vigente deciden el conjunto (FR-000,
-    FR-003); `edit` conserva exactamente el comportamiento anterior.
+    FR-003); `edit` conserva exactamente el comportamiento anterior. Feature 040: además, solo el
+    grupo de la etapa en curso, con un techo duro de `MAX_TOOLS_PER_ROUND`.
     """
-    base = guard.allowed_tools(command_def(session))
+    definition = command_def(session)
+    base = guard.allowed_tools(definition)
     contract = auto.contract_of(session)
     allowed = auto.offered_names(auto.mode_of(session), contract, frozenset(base))
+    group = tool_group(definition)
+    if auto.mode_of(session) == "ask":
+        group = frozenset(group | auto.ASK_TOOLS)
+    allowed = frozenset(allowed & group)
     offered = [_localized(spec) for spec in TOOL_SPECS if spec["name"] in allowed]
     if (not has_draft(session)
             and discovery_count(session) >= int(app_settings.ai_agent_discovery_limit)):
         specs = [t for t in offered if t["name"] in DRAFT_TOOLS or t["name"] in ALWAYS_OFFERED]
-        return specs, True
-    return offered, False
+        return specs[:MAX_TOOLS_PER_ROUND], True
+    return offered[:MAX_TOOLS_PER_ROUND], False
 
 
 def _brief(name: str, result: dict[str, Any]) -> str:
@@ -1098,6 +1142,11 @@ def _suggest_command(db: Session, session: Any,
                               specs=", ".join(folders)))
     arguments = args.get("arguments")
     arguments = arguments.strip() if isinstance(arguments, str) else ""
+    if name == "speckit-implement" and not arguments and spec:
+        # 040 (B): the honest action for unticked tasks is implementing them, named one by one.
+        open_ids = pipeline.open_tasks(session.files(), spec)
+        if open_ids:
+            arguments = f"--only {','.join(open_ids[:12])}"
     prior = (session.working_state or {}).get(SUGGESTIONS_KEY) or []
     if any(s.get("command") == name for s in prior):
         # The button is already on screen: another call adds nothing and used to loop the turn.
@@ -1159,6 +1208,10 @@ def _run_command(db: Session, session: Any,
         raise ToolError(f"Etapa desconocida: {name or '-'}.")
     arguments = args.get("arguments")
     arguments = arguments.strip() if isinstance(arguments, str) else ""
+    only: tuple[str, ...] = ()
+    if name == "speckit-implement":
+        # 040 (B): the stage may be opened for the open tasks only.
+        arguments, only = resolve.strip_only(arguments)
     requested = args.get("spec")
     requested = requested.strip() if isinstance(requested, str) else ""
     target = arguments or requested
@@ -1168,25 +1221,41 @@ def _run_command(db: Session, session: Any,
     resolution = resolve.resolve(listed, target, session.current_spec)
     spec = resolution.spec if resolution.spec in folders else None
 
-    # 039: inside `/speckit-all` the plan decides the next stage; the model only opens it.
+    # 039/040: inside `/speckit-all` the plan decides the next stage; the model only opens it.
     plan = pipeline.state_of(db, session.id)
     plan_at: tuple[int, int] | None = None
     if plan is not None:
         if name == "speckit-all":
             raise ToolError(t("pipeline.no_restart"))
         plan = _plan_grow(db, session, plan, spec)
+        # 040: the state machine decides where the plan goes before the model's request is read.
+        plan = pipeline.routed_state(db, plan, session.files()) or plan
         plan_at = _plan_position(db, plan, name, spec)
         index, _cursor = plan_at
         spec = plan["specs"][index] if plan.get("specs") else None
+        target = pipeline.STAGE_COMMANDS[pipeline.STAGES[_cursor]]
+        if target != name:
+            # 040: the state machine routed this request to another stage (verify → implement);
+            # the run is opened with the definition of the stage that will actually run.
+            definition, name = REGISTRY[target], target
     if spec is not None and spec != session.current_spec:
         session.current_spec = spec
     if definition.needs_spec and spec is None:
         raise ToolError(t("commands.spec_not_found", spec=target or "-",
                           specs=", ".join(folders) or "-"))
+    if only:
+        known = pipeline.task_ids(session.files().get(f"specs/{spec}/tasks.md")) if spec else []
+        unknown = [task for task in only if task not in known]
+        if unknown:
+            raise ToolError(t("commands.only_unknown", tasks=", ".join(unknown), spec=spec or "-",
+                              known=", ".join(known) or "—"))
 
     current = command_run(session)
     if current is not None and current.status in ("running", "waiting"):
         runs.finish(current, "completed")
+        if isinstance((current.result or {}).get(pipeline.PIPELINE_KEY), dict):
+            # 040 (C): the finished stage leaves one line, not its tool results (015 FR-012).
+            _stage_summary_message(db, session, current)
     if plan is not None:
         # 039 FR-003: a stage is not opened once the contract has spent its token budget, even
         # inside the turn that is spending it.
@@ -1207,6 +1276,9 @@ def _run_command(db: Session, session: Any,
         arguments=arguments, locale=getattr(session, "command_locale", None) or "es",
         spec=spec, resolved_from=resolution.source or "current",
         reserved_number=session.next_spec() if name == "speckit-specify" else None,
+        result={**({"only": list(only)} if only else {}),
+                # 040 (C): where this stage's own context starts.
+                "history_from": _history_mark(db, session.id)},
         pipeline=plan)
     if plan is not None and plan.get("id") is None:
         plan = {**plan, "id": stage.id}
@@ -1218,6 +1290,9 @@ def _run_command(db: Session, session: Any,
     if auto_run is not None:
         auto_run.stage = _STAGE_OF_COMMAND.get(name)
     summary = t("commands.auto_stage", command=name, spec=spec or "-")
+    round_ = int((plan or {}).get("round") or 0)
+    if round_:
+        summary = t("commands.auto_stage_round", command=name, spec=spec or "-", round=round_)
     payload = {
         "stage": name,
         "spec": spec,
@@ -1228,6 +1303,26 @@ def _run_command(db: Session, session: Any,
     if plan is not None:
         payload["pipeline"] = pipeline.position(plan)
     return payload, summary
+
+
+def _history_mark(db: Session, session_id: int) -> int:
+    """The id of the newest stored message: the start of the stage's own context (040 C)."""
+    from sqlalchemy import func, select
+
+    from app.models import AssistantMessage
+
+    return int(db.scalar(select(func.max(AssistantMessage.id))
+                         .where(AssistantMessage.session_id == session_id)) or 0)
+
+
+def _stage_summary_message(db: Session, session: Any, run: Any) -> None:
+    """One `✔ <stage> — …` line in the transcript, so the next stage need not replay the tools."""
+    from app.models import AssistantMessage
+
+    db.add(AssistantMessage(session_id=session.id, role="assistant",
+                            content=runs.stage_summary(run, getattr(session, "command_locale",
+                                                                    None))))
+    db.flush()
 
 
 def _plan_position(db: Session, plan: dict[str, Any], name: str,
@@ -1247,13 +1342,18 @@ def _plan_position(db: Session, plan: dict[str, Any], name: str,
     requested = pipeline.COMMAND_STAGES.get(name)
     current_index = int(plan.get("cursor") or 0)
     current = pipeline.STAGES[current_index - 1] if current_index else None
-    if (requested is not None and requested != pipeline.STAGES[cursor]
-            and current in _JUDGING_STAGES
+    expected = pipeline.STAGES[cursor]
+    if (requested is not None and requested != expected and current in _JUDGING_STAGES
             and pipeline.STAGES.index(requested) < current_index):
         target_spec = plan["specs"][index] if plan.get("specs") else None
         _repair_cycle(db, plan, target_spec, current, requested)
         return index, pipeline.STAGES.index(requested)
-    expected = pipeline.STAGES[cursor]
+    if (requested == "verify" and expected == "implement"
+            and plan.get("after_implement") in ("converge", "verify")):
+        # 040 FR-003: verify does not start while tasks are open (or while fixing a failed one);
+        # the state machine already routed to implement, so the request opens that instead of
+        # failing the run for it.
+        return index, cursor
     if not plan.get("specs"):
         if name != "speckit-specify":
             raise ToolError(t("pipeline.order", expected="/speckit-specify", stage="specify",
@@ -1714,13 +1814,15 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
     if run is None or definition is None:
         raise ToolError(t("commands.write_needs_command"))
     spec_text = current.get(f"specs/{run.spec}/spec.md", "") if run.spec else ""
+    stored = run.result if isinstance(run.result, dict) else {}
     ctx = guard.Context(
         definition=definition, spec=run.spec,
         kind=layout.spec_kind(spec_text) if spec_text else None,
         reserved_number=run.reserved_number,
         plan_text=current.get(f"specs/{run.spec}/plan.md", "") if run.spec else "",
         installation_block=guard.installation_block(),
-        files=current)
+        files=current,
+        only=tuple(stored.get("only") or ()))
     try:
         folder = guard.check_ops(ctx, [{"op": op["op"], "path": op["path"],
                                         "content": op.get("content", "")} for op in ops])
@@ -1740,8 +1842,39 @@ def _guard_writes(session: Any, ops: list[dict[str, Any]], current: dict[str, st
         session.current_spec = folder
 
 
+def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
+    """Feature 040 (E): `fields` are written from a shape `check_request` actually read.
+
+    The production defect wrote `global-metrics` fields without checking the response, and the run
+    only found out at the preview («columnas o campos que no coinciden», without the actual keys).
+    Only the stages that write artifacts are held to it; authoring a spec is not.
+    """
+    definition = command_def(session)
+    if definition is None or definition.name not in ("speckit-implement", "fix"):
+        return
+    for op in ops:
+        path = op.get("path") or ""
+        if op.get("op") != "write" or not origin.REQUEST_FILE.match(str(path)):
+            continue
+        entry = dict((session.query_checks or {}).get(path) or {})
+        if entry.get("ok") is not True:
+            raise ToolError(t("assistant.check_request_first", path=path))
+        keys = [str(key) for key in entry.get("keys") or []]
+        try:
+            document = yaml.safe_load(op.get("content") or "")
+        except yaml.YAMLError:
+            continue                     # the validator reports the YAML error with its line
+        columns = list(document.get("fields") or {}) if isinstance(document, dict) else []
+        missing = [column for column in columns if keys and column not in keys]
+        if missing:
+            raise ToolError(t("assistant.check_request_missing",
+                              columns=", ".join(missing), path=path,
+                              keys=", ".join(keys) or "—"))
+
+
 def _write_ops(db: Session, session: Any, ops: list[dict[str, Any]]) -> dict[str, Any]:
     """Write project files as the agent, then validate the project."""
+    _requests_checked(session, ops)
     _guard_writes(session, ops, session.files())
     rejected = _content_problems(ops, session.project.slug)
     if rejected:
@@ -2058,6 +2191,17 @@ def _check_query(
     except origin.OriginToolError as e:
         raise ToolError(e.message) from e
     cleaned = sanitize(result)
+    path = args.get("path")
+    if isinstance(path, str) and origin.REQUEST_FILE.match(path) and isinstance(cleaned, dict):
+        # 040 (E): the shape this check read is what `/speckit-implement` must write `fields` from.
+        checks = dict(session.query_checks or {})
+        entry = dict(checks.get(path) or {})
+        entry.update({"ok": bool(cleaned.get("ok")),
+                      "keys": [str(key) for key in cleaned.get("keys") or []]})
+        checks[path] = entry
+        session.query_checks = checks
+        db.add(real(session))
+        db.flush()
     if session.draft and args.get("path") and isinstance(cleaned, dict) and "ok" in cleaned:
         cleaned["readiness"] = readiness.compute(session)
     return cleaned, summary

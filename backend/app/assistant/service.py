@@ -854,20 +854,115 @@ def compact_history(messages: list[ChatMessage], summaries: dict[str, str]) -> l
 
 def _load_history_with_summaries(
     db, session_id: int
-) -> tuple[list[ChatMessage], dict[str, str]]:
-    """The replayed conversation and the stored one-line summary of every tool result.
+) -> tuple[list[ChatMessage], dict[str, str], list]:
+    """The replayed conversation, the stored one-line summary of every tool result, and its rows.
 
     Building is `app.assistant.history`'s job (feature 036): pairing a result with the `tool_use`
-    that asked for it by call id is what keeps a conversation replayable.
+    that asked for it by call id is what keeps a conversation replayable. The rows come back too
+    because the stage scoping of feature 040 filters them by id.
     """
     rows = history_module.load(db, session_id, window=HISTORY_LIMIT)
     built = history_module.build(rows)
     summaries = {row.call_id: row.content for row in rows if row.role == "tool" and row.call_id}
-    return built.messages, summaries
+    return built.messages, summaries, rows
 
 
 def _load_history(db, session_id: int) -> list[ChatMessage]:
     return _load_history_with_summaries(db, session_id)[0]
+
+
+def _scoped_history(db, session: AssistantSession, run) -> list[ChatMessage]:
+    """The context of one stage inside a plan (040 C, FR-008).
+
+    A 9-stage pipeline must not carry stage 1's tool results into stage 8: the provider receives
+    the current stage's exchange plus one `✔ <stage> — …` line per finished stage, and never the
+    results those lines replaced.
+    """
+    state = (run.result or {}).get(pipeline.PIPELINE_KEY)
+    if not isinstance(state, dict):
+        return _load_history(db, session.id)
+    from_id = (run.result or {}).get("history_from")
+    if not isinstance(from_id, int):
+        return _load_history(db, session.id)
+    rows = history_module.load(db, session.id, window=HISTORY_LIMIT)
+    # A payload starts with a user message (`history._trim_leading`): the anchor is the one that
+    # opened this stage, and the `✔ <stage> — …` lines the product wrote go in the stage block.
+    anchor = None
+    for row in rows:
+        if row.id <= from_id and row.role == "user" and (row.content or "").strip():
+            anchor = row
+    kept = ([anchor] if anchor is not None else []) + [row for row in rows if row.id > from_id]
+    built = history_module.build(kept)
+    return built.messages
+
+
+# Feature 040 (C): compression is bounded per run. The key is `(session, run, n)` so a retried or
+# replayed round cannot compress twice, and a run that needs a second one after freeing almost
+# nothing stops with `blocked:context_exhausted` instead of thrashing (the production run compacted
+# three times in one turn and then died).
+COMPACTION_KEY = "compaction"
+MAX_COMPACTIONS_PER_RUN = 2
+MIN_FREED_RATIO = 0.20
+
+
+def _run_key(session: AssistantSession, run, claim: Any) -> str:
+    """The identity of the run a compression belongs to: its pipeline, else the turn."""
+    state = (run.result or {}).get(pipeline.PIPELINE_KEY) if run is not None else None
+    if isinstance(state, dict) and state.get("id") is not None:
+        return f"pipeline:{state['id']}"
+    auto_run = getattr(session, "auto_run", None)
+    if auto_run is not None and getattr(auto_run, "id", None):
+        return f"auto:{auto_run.id}"
+    return f"turn:{getattr(claim, 'at', None)}"
+
+
+def _compact_once(db, session: AssistantSession, history: list[ChatMessage],
+                  summaries: dict[str, str], *, budget: int, run_key: str,
+                  new_messages: list[AssistantMessage], keep: int | None = None
+                  ) -> tuple[list[ChatMessage], str | None]:
+    """Compress the history at most once per run — or stop with `context_exhausted`.
+
+    One `working_state` update (the key with its run, n and freed ratio) and one summary message,
+    both in the round's own transaction, so a crash cannot leave half a compression behind.
+    """
+    working = dict(session.working_state or {})
+    mark = working.get(COMPACTION_KEY) if isinstance(working.get(COMPACTION_KEY), dict) else {}
+    same_run = mark.get("run") == run_key
+    done = int(mark.get("n") or 0) if same_run else 0
+    freed = list(mark.get("freed") or []) if same_run else []
+    if done and freed and freed[-1] < MIN_FREED_RATIO:
+        return history, "context_exhausted"
+    if done >= MAX_COMPACTIONS_PER_RUN:
+        return history, "context_exhausted"
+    before = history_module.estimate_chars(history)
+    compacted, saved = history_module.compress(
+        history, summaries, tail_chars=min(history_module.COMPACT_TAIL_CHARS, budget),
+        **({"keep": keep} if keep is not None else {}))
+    if not saved:
+        return history, "context_exhausted"
+    ratio = saved / max(1, before)
+    working[COMPACTION_KEY] = {"session": session.id, "run": run_key, "n": done + 1,
+                               "freed": [*freed, round(ratio, 4)]}
+    session.working_state = working
+    _bump(session, "compactions")
+    log.info("compacted session %s history (run %s, n=%s): %s chars saved (%.0f%%)",
+             session.id, run_key, done + 1, saved, ratio * 100)
+    new_messages.append(_add(db, session, role="assistant",
+                            content=t("assistant.context_compacted",
+                                      chars=f"{saved:,}".replace(",", " "))))
+    session.updated_at = datetime.now(UTC)
+    db.flush()
+    return compacted, None
+
+
+def _stop_exhausted(db, session: AssistantSession, new_messages: list[AssistantMessage],
+                    end) -> None:
+    """Stop the run with its state saved: `/speckit-all <spec>` resumes at the same stage."""
+    new_messages.append(_add(db, session, role="assistant",
+                             content=t("assistant.context_exhausted")))
+    session.updated_at = datetime.now(UTC)
+    db.flush()
+    end("error", "blocked:context_exhausted")
 
 
 def _latest_round(history: list[ChatMessage]) -> list[ChatMessage]:
@@ -1886,10 +1981,14 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
         return None, [refusal]
     view = for_session(db, session)
     plan_args = pipeline.parse_args(parsed.args) if definition.name == "speckit-all" else None
+    only: tuple[str, ...] = ()
     if plan_args is not None:
         arguments, forced = plan_args.text, plan_args.force
     else:
         arguments, forced = resolve.strip_force(parsed.args)
+        if definition.name == "speckit-implement":
+            # 040 (B): the honest action of the problems panel implements the open tasks only.
+            arguments, only = resolve.strip_only(arguments)
     specs = _spec_rows(db, view)
     spec = None
     source = None
@@ -1935,6 +2034,15 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
     previous = runs.latest_for(db, session.id, definition.name, spec)
     result = ({"revisions": _revisions(db, view.project.id, spec)}
               if definition.name == "speckit-converge" and spec else None)
+    if only:
+        known = pipeline.task_ids(view.files().get(f"specs/{spec}/tasks.md")) if spec else []
+        unknown = [task for task in only if task not in known]
+        if unknown:
+            raise ApiError(422, "only_unknown",
+                           M("commands.only_unknown", tasks=", ".join(unknown),
+                             spec=spec or "-", known=", ".join(known) or "—"),
+                           extra={"tasks": unknown, "known": known})
+        result = {**(result or {}), "only": list(only)}
     plan = None
     if plan_args is not None:
         plan, spec = _pipeline_start(db, session, view, plan_args, spec, specs, forced)
@@ -2194,19 +2302,44 @@ def repair_history(db, actor, session: AssistantSession, ip: str | None) -> dict
     return {**report, "replayable": not problems, "problems": problems[:5]}
 
 
-def _command_extra(run) -> str:
-    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023) and,
-    in a `/speckit-all` run, where the plan stands (039)."""
+def _command_extra(run, db=None, files: dict[str, str] | None = None) -> str:
+    """Context a command adds to `## Comando`: the resolved topic of `/ayuda <tema>` (023), the
+    `--only` tasks of `/speckit-implement` (040) and, in a `/speckit-all` run, where the plan
+    stands (039/040)."""
     parts: list[str] = []
     if run.command == "ayuda" and run.arguments:
         from app.assistant.guide import ayuda
 
         parts.append(ayuda.topic_block(run.arguments, run.locale))
-    state = (run.result or {}).get(pipeline.PIPELINE_KEY) \
-        if isinstance(run.result, dict) else None
+    stored = run.result if isinstance(run.result, dict) else {}
+    only = stored.get("only") or []
+    if only:
+        parts.append(t("commands.only_block", tasks=", ".join(only)))
+    state = stored.get(pipeline.PIPELINE_KEY)
     if isinstance(state, dict):
+        if db is not None:
+            state = pipeline.routed_state(db, state, files) or state
         parts.append(_pipeline_block(state))
+        if db is not None:
+            previous = _previous_stage_lines(db, run)
+            if previous:
+                parts.append(previous)
     return "\n\n".join(part for part in parts if part)
+
+
+def _previous_stage_lines(db, run, limit: int = 4) -> str:
+    """The `✔ <stage> — …` lines of the stages already done (040 C: they replace their results)."""
+    rows = db.scalars(
+        select(AssistantMessage)
+        .where(AssistantMessage.session_id == run.session_id,
+               AssistantMessage.role == "assistant")
+        .order_by(AssistantMessage.id.desc()).limit(limit * 4)
+    ).all()
+    lines = [row.content for row in rows
+             if (row.content or "").startswith(runs.STAGE_DONE_PREFIX)]
+    if not lines:
+        return ""
+    return "\n".join(reversed(lines[:limit]))
 
 
 def _attach_suggestions(session: AssistantSession, new_messages: list[AssistantMessage]) -> None:
@@ -2291,7 +2424,11 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
     view.command_run = run
 
     provider = get_provider(app_settings)
-    history, summaries = _load_history_with_summaries(db, session.id)
+    history, summaries, _rows = _load_history_with_summaries(db, session.id)
+    scoped_run = run.id if run is not None else None
+    if run is not None:
+        # 040 (C): a stage starts with its own context, not with the previous stages' results.
+        history = _scoped_history(db, session, run)
     if run is not None and run.spec and run.resolved_from not in (None, "current"):
         # Routing is visible: the user sees which spec the command runs on.
         new_messages.append(_add(db, session, role="assistant",
@@ -2326,6 +2463,10 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             run = fresh
             definition = registry.REGISTRY.get(run.command)
             view.command_run = run
+        if run is not None and run.id != scoped_run:
+            # A stage opened by `run_command` in this same turn: its context is its own (040 C).
+            scoped_run = run.id
+            history = _scoped_history(db, session, run)
         if (run is not None and run.command == "speckit-verify"
                 and not ((run.result or {}).get("verify"))):
             new_messages.append(_verify_stage(db, actor, view, session, run, app_settings,
@@ -2362,24 +2503,21 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                 current_spec=view.current_spec, next_spec=view.next_spec(), run=run,
                 definition=definition, files=view.files(), locale=run.locale,
                 resume=runs.resume_info(db, run, (session.working_state or {}).get("progress")),
-                state=context, extra=_command_extra(run))
+                state=context, extra=_command_extra(run, db, view.files()))
         if restricted:
             context = f"{context}\n\n{_tools.DISCOVERY_DONE_TEXT}"
         budget = app_settings.ai_context_compact_chars
+        run_key = _run_key(session, run, claim)
         if history_module.estimate_chars(history) > budget:
-            # An unlimited run must not be stopped by its own context: compact what it carries and
-            # keep going (owner, 2026-10-27; the same idea as the compaction of other agents).
-            history, saved = history_module.compress(
-                history, summaries,
-                tail_chars=min(history_module.COMPACT_TAIL_CHARS, budget))
-            if saved:
-                _bump(session, "compactions")
-                log.info("compacted session %s history: %s chars saved", session.id, saved)
-                new_messages.append(_add(
-                    db, session, role="assistant",
-                    content=t("assistant.context_compacted", chars=f"{saved:,}".replace(",", " "))))
-                session.updated_at = datetime.now(UTC)
-                db.flush()
+            # Feature 040 (C): once per run, with the (session, run, n) key; a run that would need
+            # it again after freeing almost nothing stops with its state saved.
+            history, exhausted = _compact_once(
+                db, session, history, summaries, budget=budget, run_key=run_key,
+                new_messages=new_messages)
+            if exhausted:
+                _stop_exhausted(db, session, new_messages, end)
+                return new_messages
+        prompt_chars = history_module.estimate_chars(history) + len(context or "")
         try:
             # 036: the payload is built and validated in one place before every call.
             try:
@@ -2399,10 +2537,15 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
         except AIError as exc:
             if exc.code == "context_too_long" and not context_retried:
                 context_retried = True
-                history, saved = history_module.compress(history, summaries, keep=2)
-                if not saved:
+                history, exhausted = _compact_once(
+                    db, session, history, summaries, budget=budget, run_key=run_key,
+                    new_messages=new_messages, keep=2)
+                if exhausted:
                     history = _latest_round(history)
-                log.info("context too long on session %s: compacted %s chars", session.id, saved)
+                    log.info("context too long on session %s and no compression left",
+                             session.id)
+                    _stop_exhausted(db, session, new_messages, end)
+                    return new_messages
                 continue
             if images and not images_dropped \
                     and exc.code in ("provider_error", "invalid_tool_call"):
@@ -2447,12 +2590,28 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
             state.record_ok(reply.model)          # clears the installation's error, once per turn
 
         rounds += 1
-        activity.begin_round(session, rounds)
         spent = _count_usage(session, reply.usage, app_settings)
         if auto_run is not None:
             auto_run.tokens = int(auto_run.tokens or 0) + int(spent)
         if run is not None:
             runs.add_tokens(run, reply.usage.input + reply.usage.output)
+        # 040 (D): what the round cost, in the log and in "Detalles técnicos".
+        activity.begin_round(session, rounds, tools=len(tools), chars=prompt_chars,
+                             stage=run.command if run is not None else None)
+        log.info("assistant round session=%s stage=%s tools=%d prompt_chars=%d stage_tokens=%d",
+                 session.id, run.command if run is not None else "-", len(tools), prompt_chars,
+                 int(getattr(run, "tokens", 0) or 0))
+        if (run is not None
+                and int(getattr(run, "tokens", 0) or 0) >= app_settings.ai_stage_token_budget):
+            new_messages.append(_add(
+                db, session, role="assistant",
+                content=t("assistant.stage_budget",
+                          tokens=f"{int(run.tokens or 0):,}".replace(",", " "),
+                          limit=f"{app_settings.ai_stage_token_budget:,}".replace(",", " "))))
+            session.updated_at = datetime.now(UTC)
+            db.flush()
+            end("error", "blocked:stage_budget")
+            return new_messages
         if not reply.tool_calls and (reply.stop_reason == "max_tokens" or not reply.text.strip()):
             text_out = (reply.text.rstrip() + "\n\n" + t(_CUT_TEXT)).strip() \
                 if reply.stop_reason == "max_tokens" else t(_EMPTY_TEXT)

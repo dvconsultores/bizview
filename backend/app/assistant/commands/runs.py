@@ -109,6 +109,27 @@ def finish(run, status: str, error: str | None = None) -> None:
     run.ended_at = _now()
 
 
+# Feature 040 (C): the product writes one `✔ <stage> — …` line when a stage ends, and the next
+# stage's context carries that line instead of the stage's tool results (015 FR-012/013).
+STAGE_DONE_PREFIX = "✔"
+
+
+def stage_summary(run, locale: str | None = None) -> str:
+    """`✔ <stage> — <what it wrote>`, one line, no provider call."""
+    from app.assistant.commands import pipeline
+    from app.i18n import use_locale
+
+    stage = pipeline.COMMAND_STAGES.get(run.command) or (run.command or "—")
+    files = [entry.get("path") for entry in (run.files or []) if entry.get("path")]
+    shown = ", ".join(f"`{path}`" for path in files[:6])
+    if len(files) > 6:
+        shown = f"{shown} (+{len(files) - 6})"
+    with use_locale(locale or getattr(run, "locale", None) or "es"):
+        body = (t("pipeline.stage_done", stage=stage, files=shown) if shown
+                else t("pipeline.stage_done_empty", stage=stage))
+    return f"{STAGE_DONE_PREFIX} {body}"[:400]
+
+
 def _complete(run) -> None:
     """A run that wrote nothing because its write went to another spec is `misrouted`."""
     stored = getattr(run, "result", None)

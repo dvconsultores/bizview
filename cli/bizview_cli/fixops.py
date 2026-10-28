@@ -14,9 +14,49 @@ and in the backend endpoint, so a fix that validates is a fix that applies.
 """
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from typing import Any
 
 OPS = ("set", "append", "insert", "remove")
+
+# A fix may only change *content*. Task status (`- [ ]`/`- [X]`) and the spec's `**Status**:`
+# line are evidence of work done, so no fix — and no fix message — may touch them (feature 040,
+# FR-004: the 039 validator offered «marca todas las tareas como - [X]», which faked the result).
+FORBIDDEN_FIX_PATHS = re.compile(r"^/(?:status|tasks?)(?:/|\b)", re.I)
+FORBIDDEN_FIX_TEXT = re.compile(r"\[\s*[xX ]\s*\]|\*\*status\*\*\s*:|mark (?:every|all) task",
+                                 re.I)
+
+
+@dataclass(frozen=True)
+class DeterministicFix:
+    """One registered deterministic correction: the problem code and the content it changes."""
+
+    code: str
+    content: str
+
+
+DETERMINISTIC_FIXES: tuple[DeterministicFix, ...] = (
+    DeterministicFix("unjoined_sets", "the report's joins"),
+    DeterministicFix("schedule_missing", "the integration's schedule"),
+    DeterministicFix("label_missing", "a metric or dimension label"),
+    DeterministicFix("view_type_unknown", "a view's type"),
+    DeterministicFix("invalid_reference", "a date reference"),
+    DeterministicFix("layout_palette_missing", "the installation's palette"),
+    DeterministicFix("layout_filter_missing", "a filter's column"),
+    DeterministicFix("timestamp_unit_mismatch", "a mapped time field's timestamp_unit"),
+)
+
+
+def is_content_fix(fix: dict) -> bool:
+    """Whether a `fix_data` payload changes content and only content (040, FR-004)."""
+    if not isinstance(fix, dict):
+        return False
+    if fix.get("op") not in OPS:
+        return False
+    if FORBIDDEN_FIX_PATHS.match(str(fix.get("json_path") or "")):
+        return False
+    return not FORBIDDEN_FIX_TEXT.search(str(fix.get("value") or ""))
 
 
 class FixError(ValueError):

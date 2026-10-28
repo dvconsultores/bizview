@@ -35,6 +35,9 @@ export function CommandSuggestions(props: {
         if (item.spec && !item.arguments.includes(item.spec)) parts.push(item.spec);
         if (item.arguments) parts.push(item.arguments);
         const text = parts.join(" ").trim();
+        // Feature 040 (B): the honest action for unticked tasks, named as what it does.
+        const pending = item.command === "speckit-implement"
+          && item.arguments.startsWith("--only");
         return (
           <button
             key={text}
@@ -44,7 +47,9 @@ export function CommandSuggestions(props: {
             aria-label={t.assistant.commands.insertLabel.replace("{command}", text)}
             className="inline-flex min-h-tap min-w-0 max-w-full items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 text-sm text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            <span className="shrink-0">{t.assistant.commands.insert}</span>
+            <span className="shrink-0">
+              {pending ? t.assistant.commands.implementPending : t.assistant.commands.insert}
+            </span>
             <code className="min-w-0 truncate font-mono" title={text}>{text}</code>
           </button>
         );

@@ -81,6 +81,14 @@ export function CommandRunChip(props: {
             {position}
           </span>
         ) : null}
+        {pipeline && (pipeline.round ?? 1) > 1 ? (
+          <span
+            data-pipeline-round=""
+            className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-xs text-accent-deep"
+          >
+            {c.round.replace("{round}", String(pipeline.round))}
+          </span>
+        ) : null}
         <span
           data-status={run.status}
           className={`ml-auto rounded-full px-2 py-0.5 text-xs ${PILL[run.status]}`}

@@ -1386,6 +1386,8 @@ export const en: Catalogue = {
       misrouted: "The command wrote nothing: its target spec was {spec}.",
       ceiling: "Command ceiling: {ceiling} tokens.",
       insert: "Insert",
+      round: "round {round}",
+      implementPending: "Implement pending tasks",
       insertLabel: "Insert {command} into the message",
       specPickerTitle: "Choose the current spec for /{command}",
       specPickerEmpty: "This project has no specs yet; start with /speckit-specify.",

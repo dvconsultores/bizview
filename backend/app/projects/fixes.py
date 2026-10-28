@@ -41,6 +41,11 @@ def _normalise(fixes: list[dict]) -> list[dict]:
             raise ApiError(422, "validation", M("projects.fix_malformed"))
         if fix.get("op") not in fixops.OPS:
             raise ApiError(422, "validation", M("projects.fix_malformed"))
+        if not fixops.is_content_fix(fix):
+            # Feature 040 (B): a fix changes content, never evidence — no fix marks a task or
+            # rewrites `**Status**:`, not even one hand-crafted by a client.
+            raise ApiError(422, "fix_not_content",
+                           M("projects.fix_not_content", path=fix.get("json_path") or "/"))
         if not isinstance(fix.get("json_path"), str):
             raise ApiError(422, "validation", M("projects.fix_malformed"))
         problem = fix.get("problem_id")

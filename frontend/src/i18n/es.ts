@@ -1370,6 +1370,8 @@ export const es = {
       misrouted: "El comando no escribió nada: la spec objetivo era {spec}.",
       ceiling: "Techo del comando: {ceiling} tokens.",
       insert: "Insertar",
+      round: "ronda {round}",
+      implementPending: "Implementar tareas pendientes",
       insertLabel: "Insertar {command} en el mensaje",
       specPickerTitle: "Elige la spec actual para /{command}",
       specPickerEmpty: "Este proyecto aún no tiene specs; empieza con /speckit-specify.",

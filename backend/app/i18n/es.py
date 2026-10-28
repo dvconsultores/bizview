@@ -187,6 +187,7 @@ MESSAGES: dict[str, str] = {
                               "el modelo en Administración → IA.",
     "ai.action.admin_ai": "Ir a Administración → IA",
     "projects.fix_malformed": "La petición de arreglo no es válida.",
+    "projects.fix_not_content": "El arreglo en {path} cambiaría el estado o la evidencia del trabajo, no el contenido: las tareas se marcan al implementarlas.",
     "projects.fix_too_many": "Demasiados arreglos de una vez (máximo {max}).",
     "projects.fix_gone": "El archivo {file} ya no existe.",
     "projects.fix_stale": "El archivo cambió desde la validación; vuelve a comprobar los problemas.",
@@ -558,6 +559,7 @@ MESSAGES: dict[str, str] = {
     "preview.ready": "Vista previa lista: {items}.",
     "preview.ready_empty": "Vista previa lista.",
     "preview.checks_not_passed": "comprobación no superada",
+    "preview.timestamp_unit_mismatch": "un campo de tiempo mapeado llega fuera de rango (1990-2100): revisa `timestamp_units` en la petición (seconds, milliseconds o iso8601) y usa la unidad del valor de muestra",
     "preview.failed_reason": "La vista previa falló: {reason}",
     "preview.invalid_integration_yaml": "la integración no tiene integration.yaml válido",
     "preview.empty_draft": "La vista previa no ve ningún archivo del proyecto {slug} en {root}. Comprueba que la carpeta de proyectos esté montada (PROJECTS_DIR) y vuelve a intentarlo.",
@@ -650,6 +652,8 @@ MESSAGES: dict[str, str] = {
     "commands.write_needs_command": "Usa un comando /speckit-… para cambiar archivos.",
     "commands.tool_not_allowed": "La herramienta {tool} no está permitida en /{command}; permitidas: {allowed}",
     "commands.path_not_allowed": "/{command} no puede cambiar {path}; rutas permitidas: {allowed}",
+    "commands.tasks_tick_needs_implement": "Las tareas se marcan al implementarlas: /{command} no cambia el estado de {spec}; usa /speckit-implement (o su botón «Implementar tareas pendientes»).",
+    "commands.tasks_tick_needs_evidence": "No puedo marcar una tarea de {spec}: el artefacto que la tarea nombra no existe todavía, o no está en las tareas de --only ({only}). Implementa primero lo que falta y vuelve a marcarla.",
     "commands.path_not_allowed_artifact": "/{command} no puede cambiar {path} (solo toca {allowed}). Para corregir un artefacto, pasa a la etapa que sí lo escribe con run_command: speckit-implement {spec} (o termina este comando y ejecuta /fix).",
     "commands.missing_prereq": "Falta {doc}; ejecuta {command} primero.",
     "commands.confirm_open_clarifications": "La spec tiene puntos marcados [NEEDS CLARIFICATION]; se recomienda /speckit-clarify. ¿Continuar igual?",
@@ -743,6 +747,9 @@ MESSAGES: dict[str, str] = {
 
     "commands.approved_by_run": "El contrato aprobó la spec {spec} por ti; sigo con la etapa.",
     "commands.auto_stage": "Etapa /{command} sobre {spec}.",
+    "commands.auto_stage_round": "Etapa /{command} sobre {spec} · ronda {round}.",
+    "commands.only_block": "Tareas de --only: {tasks}. Implementa y marca solo esas tareas en esta etapa.",
+    "commands.only_unknown": "--only nombra tareas que no están en la spec {spec}: {tasks}. Tareas existentes: {known}.",
     "assistant.summary.applied": "Aplicó la versión {version}.",
 
     "assistant.watch.failed": "El primer run programado de la integración {integration} falló: {reason}.",
@@ -750,6 +757,10 @@ MESSAGES: dict[str, str] = {
 
     "assistant.context_compacted": "Comprimí el contexto de la conversación ({chars} caracteres menos); sigo desde donde iba.",
     "assistant.loop_state_conflict": "La base rechazó un cambio de estado de la ejecución ({constraint}); lo hecho hasta la última ronda se guardó y el plan puede retomarse desde la etapa en curso.",
+    "assistant.context_exhausted": "El contexto de la conversación ya no cabe en el modelo y comprimirlo no libera suficiente espacio. Lo hecho hasta la última ronda se guardó; escribe `/speckit-all <spec>` para retomar desde la etapa en curso.",
+    "assistant.stage_budget": "La etapa gastó su presupuesto de tokens ({tokens} de {limit}). Lo hecho hasta la última ronda se guardó; escribe `/speckit-all <spec>` para retomar desde la etapa en curso.",
+    "assistant.check_request_first": "Antes de escribir `fields` en {path}, ejecuta check_query sobre ese archivo: los campos se derivan de la forma real de la respuesta.",
+    "assistant.check_request_missing": "Los campos {columns} no están en la respuesta de {path}; las claves reales son: {keys}. Corrige los `fields` (o el mapeo) antes de continuar.",
     "assistant.auto.next_stage": "Etapa {done} terminada. El contrato permite {stages}: abre la siguiente con run_command y continúa; no pidas confirmación al usuario.",
     "assistant.auto.approved": "El contrato autoriza aprobar la spec {spec} sin preguntar.",
     "assistant.auto.apply_now": "El borrador está listo. El contrato autoriza aplicar: ejecuta la vista previa si falta y llama apply_draft; no pidas al usuario pulsar Aplicar.",
@@ -775,4 +786,7 @@ MESSAGES: dict[str, str] = {
     "pipeline.preview_busy": "ya hay una vista previa en curso",
     "pipeline.preview_failed": "no se pudo ejecutar la vista previa",
     "pipeline.pending_apply": "Aplicar (el contrato no permite `apply`).",
+    "pipeline.stage_done": "{stage} terminada: {files}",
+    "pipeline.stage_done_empty": "{stage} terminada sin escribir archivos",
+    "pipeline.tokens_per_stage": "Tokens por etapa",
 }

@@ -869,6 +869,8 @@ export interface Pipeline {
   until: string | null;
   spec: string | null;
   spec_index: number;
+  /** Feature 040: the convergence round (2 for the re-entry after the first converge). */
+  round?: number;
 }
 
 /** Feature 039: the run report card the last message of a pipeline carries. */

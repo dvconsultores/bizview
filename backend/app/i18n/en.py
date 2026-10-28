@@ -197,6 +197,7 @@ MESSAGES: dict[str, str] = {
                                "and the model in Administration → AI.",
     "ai.action.admin_ai": "Go to Administration → AI",
     "projects.fix_malformed": "The fix request is not valid.",
+    "projects.fix_not_content": "The fix at {path} would change the status or the evidence of the work, not its content: tasks are ticked when they are implemented.",
     "projects.fix_too_many": "Too many fixes at once (max {max}).",
     "projects.fix_gone": "The file {file} no longer exists.",
     "projects.fix_stale": "The file changed since validation; check the problems again.",
@@ -568,6 +569,7 @@ MESSAGES: dict[str, str] = {
     "preview.ready": "Preview ready: {items}.",
     "preview.ready_empty": "Preview ready.",
     "preview.checks_not_passed": "check failed",
+    "preview.timestamp_unit_mismatch": "a mapped time field arrives out of range (1990-2100): check `timestamp_units` in the request (seconds, milliseconds or iso8601) and use the unit of the sample value",
     "preview.failed_reason": "Preview failed: {reason}",
     "preview.invalid_integration_yaml": "the integration has no valid integration.yaml",
     "preview.empty_draft": "The preview sees no files of project {slug} in {root}. Check that the projects folder is mounted (PROJECTS_DIR) and try again.",
@@ -660,6 +662,8 @@ MESSAGES: dict[str, str] = {
     "commands.write_needs_command": "Use a /speckit-… command to change files.",
     "commands.tool_not_allowed": "Tool {tool} is not allowed in /{command}; allowed: {allowed}",
     "commands.path_not_allowed": "/{command} cannot change {path}; allowed paths: {allowed}",
+    "commands.tasks_tick_needs_implement": "Tasks are ticked when they are implemented: /{command} does not change the status of {spec}; use /speckit-implement (or its «Implement pending tasks» button).",
+    "commands.tasks_tick_needs_evidence": "I cannot tick a task of {spec}: the artifact the task names does not exist yet, or it is not one of the --only tasks ({only}). Implement what is missing first and tick it again.",
     "commands.path_not_allowed_artifact": "/{command} cannot change {path} (it only touches {allowed}). To correct an artifact, switch to the stage that does write it with run_command: speckit-implement {spec} (or finish this command and run /fix).",
     "commands.missing_prereq": "{doc} is missing; run {command} first.",
     "commands.confirm_open_clarifications": "The spec has points marked [NEEDS CLARIFICATION]; /speckit-clarify is recommended. Continue anyway?",
@@ -752,6 +756,9 @@ MESSAGES: dict[str, str] = {
 
     "commands.approved_by_run": "The run contract approved spec {spec} for you; continuing the stage.",
     "commands.auto_stage": "Stage /{command} on {spec}.",
+    "commands.auto_stage_round": "Stage /{command} on {spec} · round {round}.",
+    "commands.only_block": "--only tasks: {tasks}. Implement and tick only those tasks in this stage.",
+    "commands.only_unknown": "--only names tasks that are not in spec {spec}: {tasks}. Existing tasks: {known}.",
     "assistant.summary.applied": "Applied version {version}.",
 
     "assistant.watch.failed": "The first scheduled run of integration {integration} failed: {reason}.",
@@ -759,6 +766,10 @@ MESSAGES: dict[str, str] = {
 
     "assistant.context_compacted": "Compacted the conversation context ({chars} characters less); continuing where I was.",
     "assistant.loop_state_conflict": "The database refused a state change of the run ({constraint}); the work up to the last round is saved and the plan can resume at the current stage.",
+    "assistant.context_exhausted": "The conversation's context no longer fits the model and compacting it does not free enough space. The work up to the last round is saved; write `/speckit-all <spec>` to resume at the current stage.",
+    "assistant.stage_budget": "The stage spent its token budget ({tokens} of {limit}). The work up to the last round is saved; write `/speckit-all <spec>` to resume at the current stage.",
+    "assistant.check_request_first": "Before writing `fields` in {path}, run check_query on that file: the fields are derived from the real shape of the response.",
+    "assistant.check_request_missing": "Fields {columns} are not in the response of {path}; the actual keys are: {keys}. Fix the `fields` (or the mapping) before continuing.",
     "assistant.auto.next_stage": "Stage {done} is done. The contract allows {stages}: open the next one with run_command and continue; do not ask the user to confirm.",
     "assistant.auto.approved": "The contract authorises approving spec {spec} without asking.",
     "assistant.auto.apply_now": "The draft is ready. The contract allows applying: run the preview if it is missing, then call apply_draft; never ask the user to press Apply.",
@@ -784,4 +795,7 @@ MESSAGES: dict[str, str] = {
     "pipeline.preview_busy": "a preview is already running",
     "pipeline.preview_failed": "the preview could not run",
     "pipeline.pending_apply": "Apply (the contract does not allow `apply`).",
+    "pipeline.stage_done": "{stage} finished: {files}",
+    "pipeline.stage_done_empty": "{stage} finished without writing files",
+    "pipeline.tokens_per_stage": "Tokens per stage",
 }

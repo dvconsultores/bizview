@@ -13,6 +13,8 @@ from typing import Any
 _EXPLICIT = re.compile(r"(?<![\w-])(\d{3}-[A-Za-z0-9][A-Za-z0-9-]*)(?![\w-])")
 _NUMBER = re.compile(r"(?<![\d-])(\d{3})(?!\d)")
 _FORCE = re.compile(r"(?:^|\s)--force(?=\s|$)", re.IGNORECASE)
+_ONLY = re.compile(r"(?:^|\s)--only(?:=|\s+)(?P<value>[Tt]\d+(?:[,\s]+[Tt]\d+)*)",
+                   re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,24 @@ def strip_force(arguments: str) -> tuple[str, bool]:
         return (arguments or "").strip(), False
     cleaned = _FORCE.sub(" ", arguments or "")
     return " ".join(cleaned.split()), True
+
+
+def strip_only(arguments: str) -> tuple[str, tuple[str, ...]]:
+    """The arguments without `--only T025,T026`, and the task ids it names (feature 040).
+
+    `/speckit-implement <spec> --only T025,T026` is the honest action of the problems panel:
+    the stage implements the tasks that are open instead of the whole spec again.
+    """
+    match = _ONLY.search(arguments or "")
+    if match is None:
+        return (arguments or "").strip(), ()
+    ids: list[str] = []
+    for item in re.split(r"[,\s]+", match.group("value") or ""):
+        value = item.strip().upper()
+        if value and value not in ids:
+            ids.append(value)
+    cleaned = f"{arguments[:match.start()]} {arguments[match.end():]}"
+    return " ".join(cleaned.split()), tuple(ids)
 
 
 def normalise(text: str | None) -> str:
