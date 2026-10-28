@@ -95,6 +95,21 @@
         "description": "Ruta JSON de la columna dentro de cada registro, p. ej. $.campo.",
         "type": "string"
       }
+    },
+    "timestamp_units": {
+      "description": "Unidad de cada campo de tiempo mapeado: seconds, milliseconds o iso8601. check_request la infiere del valor de muestra; el preview valida el rango.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "enum": [
+          "seconds",
+          "milliseconds",
+          "iso8601"
+        ]
+      }
     }
   }
 }

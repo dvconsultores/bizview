@@ -783,24 +783,66 @@ def _without_window(request: dict) -> dict | None:
     return result
 
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2}(\.\d+)?)?"
+                       r"(?:Z|[+-]\d{2}:?\d{2})?$")
+_UNIT_MIN = {"seconds": 631_152_000, "milliseconds": 631_152_000_000}   # 1990-01-01
+_UNIT_MAX = {"seconds": 4_102_444_800, "milliseconds": 4_102_444_800_000}  # 2100-01-01
+
+
+def timestamp_unit(value: Any) -> str | None:
+    """The unit a mapped time value is in, from its magnitude or format (feature 040, FR-012).
+
+    Postgres casts the value into a `timestamptz` column at load time, so a millisecond epoch sent
+    as seconds (or the other way round) is not a mapping detail: it fails with «date/time field
+    value out of range».
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, str):
+        return "iso8601" if _ISO_DATE.match(value.strip()) else None
+    if isinstance(value, (int, float)):
+        for unit in ("seconds", "milliseconds"):
+            low, high = _UNIT_MIN[unit], _UNIT_MAX[unit]
+            if low <= float(value) <= high:
+                return unit
+    return None
+
+
 def _shape_result(request: dict, first, columns_expected: list[str] | None) -> dict:
     """Field-check result shape for a single record (or None)."""
     fields = []
     missing = []
+    units: dict[str, str] = {}
+    mismatched: list[dict[str, str]] = []
+    raw_units = request.get("timestamp_units")
+    declared = raw_units if isinstance(raw_units, dict) else {}
     for col, fpath in request["fields"].items():
         if first is None:
             found, json_type = None, None
         else:
             found, value = _lookup(first, fpath)
             json_type = _json_type(value) if found else None
-        fields.append({"column": col, "found": found, "json_type": json_type})
+            unit = timestamp_unit(value) if found else None
+            if unit is not None:
+                units[col] = unit
+                if col in declared and declared[col] != unit:
+                    mismatched.append({"column": col, "declared": str(declared[col]),
+                                       "suggested": unit})
+        fields.append({"column": col, "found": found, "json_type": json_type,
+                       "timestamp_unit": units.get(col)})
         if first is not None and not found:
             missing.append(col)
     missing_columns = [c for c in columns_expected or [] if c not in request["fields"]]
+    # 040 (E): the keys the response actually carries, so a `fields` entry the shape does not have
+    # is named with the real ones instead of «columnas o campos que no coinciden».
+    keys = sorted(first) if isinstance(first, dict) else []
     return {
-        "ok": not missing and not missing_columns,
+        "ok": not missing and not missing_columns and not mismatched,
         "records": 0 if first is None else 1,
         "fields": fields,
+        "keys": keys,
+        "timestamp_units": units,
+        "unit_mismatch": mismatched,
         "missing": missing,
         "missing_columns": missing_columns,
         "error": None,
@@ -810,7 +852,7 @@ def _shape_result(request: dict, first, columns_expected: list[str] | None) -> d
 def _run_check_request(source, secrets: dict, app, text: str,
                        columns_expected: list[str] | None) -> dict:
     shape = {"ok": False, "error": None, "records": 0, "fields": [], "missing": [],
-             "missing_columns": []}
+             "missing_columns": [], "keys": [], "timestamp_units": {}, "unit_mismatch": []}
     if source.kind == "soap":
         return {**shape, "ok": True,
                 "skipped": "no comprobable (fuente SOAP)",

@@ -147,10 +147,19 @@ _CONNECTION_PATTERNS = (
 _CONNECTION_RE = re.compile("|".join(_CONNECTION_PATTERNS), re.IGNORECASE)
 
 
+_TIMESTAMP_RANGE_RE = re.compile(
+    r"date/time field value out of range|timestamp out of range|"
+    r"out of range for type timestamp|datetime field overflow", re.IGNORECASE)
+
+
 def ai_error_text(message: str) -> str:
     """Returns the safe connection error text for network failures, otherwise redacts values."""
     if _CONNECTION_RE.search(message):
         return CONNECT_TEXT
+    if _TIMESTAMP_RANGE_RE.search(message):
+        # 040 (E): the Postgres cast of a mapped epoch in the wrong unit. Named, with the content
+        # fix (`timestamp_units`) instead of a raw driver sentence.
+        return t("preview.timestamp_unit_mismatch")
     return redact_values(message)
 
 
