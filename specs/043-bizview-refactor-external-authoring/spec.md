@@ -29,7 +29,8 @@ everything built to avoid it.
 whose purpose was the in-app authoring agent). 003's AI provider layer is kept only for the
 read-only help agent (033) and off by default.
 
-**Constitution impact**: amendment **2.0.0** (MAJOR — principle IX is redefined). See "Constitution
+**Constitution impact**: amendment **3.0.0** (MAJOR — principle IX is redefined; the draft said
+2.0.0 against a stale copy, but the constitution was already at 2.1.0). See "Constitution
 amendment" at the end.
 
 ## Workstreams (each one is a plan)
@@ -263,7 +264,7 @@ Filtros uses the **same component**, replacing the right sheet (image 1).
 - **SC-007**: Backend and frontend suites green; image size and dependency count lower than
   0.1.x (reported in the release notes).
 
-## Constitution amendment (2.0.0, MAJOR)
+## Constitution amendment (3.0.0, MAJOR)
 
 - **VIII. AI Is Optional and Private** → unchanged in substance; add: "Bizview does not author
   artifacts with AI. AI inside the product is limited to read-only help and to connectors that

@@ -1,4 +1,32 @@
 <!--
+Sync Impact Report (amendment 2026-10-29)
+- Version change: 2.1.0 → 3.0.0 (MAJOR: principle IX is redefined incompatibly — the in-app
+  authoring agent is removed from the product). Feature 043 names this amendment "2.0.0"; that
+  number was written against an older copy of this file — the intent (MAJOR, IX redefined) is
+  what governs, and from 2.1.0 a MAJOR bump is 3.0.0.
+- Modified principles:
+  - VIII. AI Is Optional and Private: adds "Bizview does not author artifacts with AI. AI inside
+    the product is limited to read-only help and to connectors that consume approved reports."
+  - IX. Spec-Driven Reporting → redefined: projects are authored OUTSIDE Bizview — by people or
+    by any AI — against the published contract (schemas, preset, rules, structure packs) and
+    enter only through validation and import. The in-app agent and its Spec Kit commands are
+    removed. For imported projects only `spec.md` (kind + Status: Approved) is mandatory;
+    `plan.md`/`tasks.md` and the other artifacts are optional.
+  - IV. Separated Concerns by Folder: `cli/` gains offline request checking (`check-request`);
+    the workspace template now carries the full authoring skeleton (PROMPT.md, REQUEST.md,
+    schemas, rules, the golden example project `examples/ventas-basico/`).
+  - V. Fixed Technology Stack, AI: no component added or removed; the `anthropic` /
+    OpenAI-compatible client remains for the read-only help agent only; provider tool-calling
+    code is removed; `AI_PROVIDER` defaults to `none`.
+- Deprecated feature specs (purpose was the in-app authoring agent): 014, 015, 017, 021, 024,
+  028, 029, 035, 036, 039, 040. Feature 003's provider layer survives only for help (033);
+  the Claude connector (016) stays optional on the roadmap.
+- Trigger: owner request 2026-10-29 (feature 043, specs/043-bizview-refactor-external-authoring/
+  spec.md): "the in-app agent never worked; better to use a powerful AI dedicated to this,
+  externally."
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-10-18)
 - Version change: 2.0.1 → 2.1.0 (MINOR: principle V materially expanded — no principle removed or
   redefined incompatibly, so not MAJOR)
@@ -221,11 +249,12 @@ and must not put it at risk.
   branding assets. No application logic.
 - Customer projects (one folder per project with its numbered Spec Kit specs and artifacts) live
   in the installation's `projects/` folder, never in this repository.
-- `cli/` — `bizview-cli` (workspace init, validation, describe) and the artifact schemas shared
-  with the backend.
-- `cli/bizview_cli/workspace_template/` — the Spec Kit preset, extension, and agent rules for
-  customer workspaces (package data of the CLI). Customer workspaces themselves live in the
-  customer's private repository, never here.
+- `cli/` — `bizview-cli` (workspace init, validation, describe, offline request checking with
+  `check-request`) and the artifact schemas shared with the backend.
+- `cli/bizview_cli/workspace_template/` — the authoring skeleton for customer workspaces
+  (package data of the CLI): Spec Kit preset, extension and agent rules, `PROMPT.md`,
+  `REQUEST.md`, the validator schemas, and the golden example project `examples/ventas-basico/`.
+  Customer workspaces themselves live in the customer's private repository, never here.
 
 PDF report code belongs to the backend (`backend/app/reports/`), since reports are rendered from
 the same services as the JSON API.
@@ -260,8 +289,9 @@ API route quickly (see Success Criteria).
   Password sign-in MUST remain available whenever it is today, so an installation can never be
   locked out through its identity provider.
 
-- **AI:** optional provider layer in the backend — Claude through the official `anthropic` SDK
-  (default), or any OpenAI-compatible endpoint (including local models) over `httpx`.
+- **AI:** optional provider layer in the backend — Claude through the official `anthropic` SDK,
+  or any OpenAI-compatible endpoint (including local models) over `httpx` — used only by the
+  read-only help agent (completion only; no tool-calling); `AI_PROVIDER` defaults to `none`.
 - **Security & sources:** `cryptography` (AES-256-GCM for secrets at rest), `pyotp` + `segno`
   (two-step sign-in), origin connectors `psycopg` (PostgreSQL), `zeep` (SOAP), `httpx` (REST).
 - **Vibe reporting:** GitHub Spec Kit (presets + extensions) for authoring; `sqlglot`
@@ -304,26 +334,33 @@ Rationale: one codebase serves every customer and every customer receives every 
   source records, credentials, or users' personal data. Each AI feature MUST document its inputs.
 - Provider keys MUST never be returned by the API, shown in the interface, or logged.
 - Customers MUST be able to choose a local model so no data leaves their infrastructure.
+- Bizview does not author artifacts with AI. AI inside the product is limited to read-only help
+  and to connectors that consume approved reports.
 
 Rationale: customers trust the product with their business data; AI must add value without
 becoming a data leak or a hard dependency.
 
 ### IX. Spec-Driven Reporting ("Vibe Reporting")
 
-- Every integration (ETL) and every report MUST be defined by an approved, complete GitHub Spec Kit
-  spec in the customer's workspace; one integration spec may serve many report specs.
-- The engine MUST refuse to load, run, or show anything whose spec is missing, incomplete, or
-  changed after validation. AI is used only where an approved report spec declares it, with the
-  aggregates that spec lists. There is no free-form AI entry point in the product.
+- Every integration (ETL) and every report MUST be defined by a spec (`spec.md` with its kind and
+  `Status: Approved`) and declarative artifacts in a project folder; one integration spec may
+  serve many report specs.
+- Projects are authored OUTSIDE Bizview — by people or by any AI — against the published contract
+  (the validator schemas, the Spec Kit preset and rules, and the source structure packs) and enter
+  Bizview only through validation and import. Bizview itself describes sources, publishes the
+  authoring skeleton, validates, imports, runs and shares; it does not author.
+- The engine MUST refuse to load, run, or show anything whose spec is missing or changed after
+  validation. "No spec, no run" is enforced on `spec.md`; for imported projects `plan.md`,
+  `tasks.md` and the other Spec Kit artifacts are optional. There is no free-form AI entry point
+  in the product.
 - Customer logic is declarative (YAML + read-only SQL / request definitions); no customer code in
   the product.
 - Work is organised in projects: each project is a folder with its own numbered specs (001, 002,
-  …) covering sources, integrations, reports and distribution. The in-app agent changes a project
-  only through Spec Kit commands (constitution, specify, clarify, plan, tasks, analyze, checklist,
-  implement, converge) and answers only about BizView, reports, integrations, ETL and sources.
+  …) covering sources, integrations, reports and distribution.
 
-Rationale: specs make every number explainable and reviewable, keep AI work bounded, and let
-customers build reports themselves — "vibe reporting".
+Rationale: specs make every number explainable and reviewable, and a published contract lets
+customers build reports with whatever intelligence they prefer — a person or any AI — while
+Bizview stays the runtime that validates, runs and shares: "vibe reporting".
 
 ## Constraints
 
@@ -380,4 +417,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 2.1.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-18
+**Version**: 3.0.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-29
