@@ -152,6 +152,21 @@ def test_the_stage_budget_stops_the_stage(monkeypatch, superuser):
     assert "Listo." in text or "/speckit-all" in text
 
 
+def test_a_zero_budget_disables_the_stage_ceiling(monkeypatch, superuser):
+    settings = get_settings()
+    # Owner decision (2026-10-21, reaffirmed 2026-10-29): 0 means the AI is unlimited per stage.
+    monkeypatch.setattr(settings, "ai_stage_token_budget", 0)
+    client = signed_in("root@example.com")
+    from tests.conftest import new_chat
+
+    sid = new_chat(client)
+    fake.SHARED.queue(_chat_reply("Listo."))
+    body = _send(client, sid, "/speckit-specify panorama")
+    text = " ".join(str(m["content"]) for m in body["messages"])
+    assert "Listo." in text
+    assert "presupuesto" not in text
+
+
 def test_a_stage_run_carries_its_own_context_mark(db, chat):
     _c, project, sid = chat
     run = runs.create(db, session_id=sid, project_id=project["id"],

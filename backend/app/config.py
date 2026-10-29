@@ -102,7 +102,8 @@ class Settings(BaseSettings):
     # Feature 040 (D): a stage has a token ceiling, so one integration cannot cost 14 M tokens by
     # construction. Past it the stage stops with `blocked:stage_budget` and its state saved; the
     # runner-up message says which command resumes it.
-    ai_stage_token_budget: int = Field(default=600_000, ge=10_000, le=20_000_000)
+    # 0 disables the ceiling (owner 2026-10-21: the AI is unlimited).
+    ai_stage_token_budget: int = Field(default=600_000, ge=0, le=20_000_000)
     # The owner waived the step-up for Auto ("do not need auth to auto mode"): selecting the mode is
     # the authorisation. Set to true to ask for the password again when a run is confirmed.
     ai_auto_require_step_up: bool = False

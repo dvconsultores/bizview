@@ -2617,6 +2617,7 @@ def _turn(db, actor, session: AssistantSession, text: str, app_settings, ip,
                  session.id, run.command if run is not None else "-", len(tools), prompt_chars,
                  int(getattr(run, "tokens", 0) or 0))
         if (run is not None
+                and app_settings.ai_stage_token_budget > 0
                 and int(getattr(run, "tokens", 0) or 0) >= app_settings.ai_stage_token_budget):
             new_messages.append(_add(
                 db, session, role="assistant",
