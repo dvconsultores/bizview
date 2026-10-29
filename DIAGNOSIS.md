@@ -176,7 +176,7 @@ extract via C6). One steering message with the validator's own
 `/speckit-implement … --only T001,…` fix was used to focus a window, mirroring the product's
 «Implementar tareas pendientes» button.
 
-### C12 (observed 2026-10-29, pending fix) — an empty stage still advances the cursor
+### C12 (observed 2026-10-29, FIXED 8aa22e8 — the cursor honors missing artifacts) — an empty stage still advances the cursor
 
 A stage run can complete having written nothing (the model closes it or jumps with
 `run_command`), and the in-flight pipeline cursor then moves on; when the model later tries to
@@ -186,7 +186,26 @@ reopen the skipped stage it is refused («La etapa 4/8 del plan es /speckit-task
 in-run cursor should consult the same artifact proof `completed()` uses before refusing a
 reopen, or an artifact-less completion of specify/plan/tasks should not advance the cursor.
 
-### C11 (observed 2026-10-29, pending fix) — «Detener» can 500 on a Postgres deadlock
+### C15 (observed 2026-10-29 in production, FIXED f5a4677) — the run report re-dirties an applied project
+
+The pipeline applies (snapshot taken), and only then writes `run-report.md` and the spec-status
+bookkeeping into the draft — so a freshly applied project immediately shows «Cambios sin
+aplicar» again. Cosmetic but corrosive to trust. Fix direction: write the report and status
+flips before the apply snapshot, or exclude generated files from the pending-changes
+comparison.
+
+### C14 (observed 2026-10-29 in production, FIXED 8aa22e8 — converge prompt scope) — converge appends tasks implement cannot complete
+
+Converge added T026–T030 to 002-panorama-cripto; T030 asks to edit a content line of the spec
+(`**Uses**`), and T028 asks to verify/fix the OTHER spec's file — but the implement stage's
+write rules only allow ticking tasks, flipping `**Status**`, and writing the spec's own
+artifacts. The agent honestly refuses to tick what it could not do, so `verify` fails forever
+(«hay 5 tareas sin completar»). Fix direction: converge must only append tasks whose evidence
+implement can produce (own-spec artifacts, report/integration files), and a task that names a
+spec document line should be executed by converge itself (it owns tasks.md appends) or routed to
+the stage that owns the file.
+
+### C11 (observed 2026-10-29, FIXED 4efc4e8 — the stop retries the deadlock) — «Detener» can 500 on a Postgres deadlock
 
 `POST /sessions/{id}/stop` → `service.stop` → `runs.mark_stale_interrupted` updates every
 `running` row of `assistant_command_run` while the live turn's transaction is updating the same
