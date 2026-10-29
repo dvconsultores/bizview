@@ -183,6 +183,21 @@ def test_a_structural_failure_lets_the_agent_fix_records():
     assert tools._requests_checked(session, ops) is None
 
 
+def test_an_unchecked_request_without_fields_may_be_created():
+    path = "integrations/cmc/requests/rates.yaml"
+    session = _session({})
+    ops = [
+        {
+            "op": "write",
+            "path": path,
+            "content": "method: GET\npath: rates\nrecords: $.data\n",
+        }
+    ]
+
+    # A new file must be creatable or check_query has nothing to check (C8: creation deadlock).
+    assert tools._requests_checked(session, ops) is None
+
+
 def test_extract_reads_an_object_as_one_record():
     payload = {"data": {"value": 42, "classification": "Greed"}}
     request = {

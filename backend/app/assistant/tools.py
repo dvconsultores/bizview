@@ -1864,10 +1864,6 @@ def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
         path = op.get("path") or ""
         if op.get("op") != "write" or not origin.REQUEST_FILE.match(str(path)):
             continue
-        entry = dict((session.query_checks or {}).get(path) or {})
-        if not entry:
-            raise ToolError(t("assistant.check_request_first", path=path))
-        keys = [str(key) for key in entry.get("keys") or []]
         try:
             document = yaml.safe_load(op.get("content") or "")
         except yaml.YAMLError:
@@ -1875,6 +1871,12 @@ def _requests_checked(session: Any, ops: list[dict[str, Any]]) -> None:
         # A renamed column is legal — what must exist in the shape is the mapped key, so only
         # plain top-level paths are judged here; nested or indexed paths belong to the check.
         fields = dict(document.get("fields") or {}) if isinstance(document, dict) else {}
+        entry = dict((session.query_checks or {}).get(path) or {})
+        # A skeleton without `fields` may always be written (C8): check_query needs the file to
+        # exist, so demanding a check first made a new request file impossible to create.
+        if fields and not entry:
+            raise ToolError(t("assistant.check_request_first", path=path))
+        keys = [str(key) for key in entry.get("keys") or []]
         missing: list[str] = []
         for path_value in fields.values():
             token = str(path_value)
