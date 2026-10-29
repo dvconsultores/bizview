@@ -1,5 +1,11 @@
 # Tasks: 042-report-sheet-appearance-fix
 
+> **Superseded in part by 043 (2026-10-29).** Batch A (tabbed sheet) is replaced by 043 WS-D:
+> the owner keeps the Parámetros inline panel and makes Filtros the same component — no sheet.
+> The started Batch A work is stashed (`042 Batch A tabbed sheet — superseded`); its removable
+> param-chips behaviour is re-briefed inside WS-D. Batch B is absorbed by 043 WS-E. Batches C
+> (tiles) and D remain this spec's scope and run alongside 043's UI workstreams.
+
 Batches are DeepSeek briefs; each lands with its tests before the next starts.
 
 ## Batch A — the sheet
