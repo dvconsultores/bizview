@@ -157,9 +157,13 @@ def project_json(p: Project) -> dict:
 LEGACY_UNTRACKED = ("project.yaml", ".specify/memory/constitution.md")
 
 
+_GENERATED = re.compile(r"^specs/[^/]+/run-report\.md$")  # C15: pipeline output, not user edits
+
+
 def changed_files(applied: dict[str, str] | None, current: dict[str, str]) -> dict:
     """Paths added, changed and removed since the applied file map."""
-    applied = applied or {}
+    applied = {p: v for p, v in (applied or {}).items() if not _GENERATED.match(p)}
+    current = {p: v for p, v in current.items() if not _GENERATED.match(p)}
     return {"added": sorted(set(current) - set(applied)),
             "changed": sorted(p for p in current if p in applied and applied[p] != current[p]),
             "removed": sorted(set(applied) - set(current))}

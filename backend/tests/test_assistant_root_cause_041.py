@@ -304,6 +304,16 @@ def test_a_changed_file_resets_the_read_counter(db, superuser):
     tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
 
 
+def test_the_run_report_does_not_reopen_an_applied_project():
+    from app.projects.service import changed_files
+
+    applied = {"project.yaml": "a"}
+    current = {"project.yaml": "a", "specs/001-x/run-report.md": "# informe"}
+    # C15: the pipeline writes its report after the apply snapshot; a generated file must not
+    # flip the project back to «Cambios sin aplicar».
+    assert changed_files(applied, current) == {"added": [], "changed": [], "removed": []}
+
+
 def test_the_run_report_is_replaced_not_conflicted(db, superuser):
     session = project_view(db, superuser.id, {"specs/001-x/spec.md": "# X\n"})
     state = {"id": None, "specs": ["001-x"], "cursor": 0}
