@@ -891,6 +891,19 @@ def _scoped_history(db, session: AssistantSession, run) -> list[ChatMessage]:
     for row in rows:
         if row.id <= from_id and row.role == "user" and (row.content or "").strip():
             anchor = row
+    if anchor is None:
+        # C7: an Auto run has one user message; past 30 rows the window no longer contains it.
+        row = db.scalar(
+            select(AssistantMessage)
+            .where(AssistantMessage.session_id == session.id,
+                   AssistantMessage.id <= from_id,
+                   AssistantMessage.role == "user",
+                   AssistantMessage.content.isnot(None),
+                   AssistantMessage.content != "")
+            .order_by(AssistantMessage.id.desc())
+            .limit(1))
+        if row is not None:
+            anchor = history_module.from_rows([row])[0]
     kept = ([anchor] if anchor is not None else []) + [row for row in rows if row.id > from_id]
     built = history_module.build(kept)
     return built.messages

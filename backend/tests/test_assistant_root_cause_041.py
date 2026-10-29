@@ -5,6 +5,7 @@ epoch units, no-progress stop).
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select
 
 from app.ai import fake
 from app.assistant import tools
@@ -13,7 +14,7 @@ from app.config import get_settings
 from app.db import get_sessionmaker
 from app.engine import extract
 from app.i18n import t
-from app.models import AppUser
+from app.models import AppUser, AssistantMessage, AssistantSession
 from app.sources import service as sources
 from tests.conftest import new_chat, project_view, signed_in, sql
 from tests.test_assistant_api import _chat_reply, _tool_call
@@ -229,6 +230,38 @@ def test_check_query_reads_the_keys_of_an_object_response(
     entry = session.query_checks[path]
     assert entry["ok"] is True
     assert entry["keys"] == ["id", "total"]
+
+
+def test_scoped_history_finds_the_anchor_beyond_the_window(db, superuser):
+    from app.assistant import service as assistant_service
+
+    client = signed_in("root@example.com")
+    sid = new_chat(client)
+    session = db.get(AssistantSession, sid)
+
+    db.add(AssistantMessage(session_id=sid, role="user", content="Objetivo: panorama cripto"))
+    for i in range(35):
+        db.add(AssistantMessage(session_id=sid, role="assistant", content=f"ronda {i}"))
+    db.flush()
+    last_id = db.scalar(
+        select(AssistantMessage.id)
+        .where(AssistantMessage.session_id == sid)
+        .order_by(AssistantMessage.id.desc())
+        .limit(1)
+    )
+
+    run = SimpleNamespace(
+        result={pipeline.PIPELINE_KEY: {"id": 1}, "history_from": last_id},
+        spec=None,
+    )
+
+    # With a single user message older than the 30-row window the stage opened with an empty
+    # history and died `blocked:ai_history_invalid` (C7).
+    messages = assistant_service._scoped_history(db, session, run)
+
+    assert messages
+    assert messages[0].role == "user"
+    assert "Objetivo" in messages[0].content
 
 
 def test_the_run_report_is_replaced_not_conflicted(db, superuser):
