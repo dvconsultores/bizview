@@ -304,6 +304,28 @@ def test_a_changed_file_resets_the_read_counter(db, superuser):
     tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
 
 
+def test_a_stop_deadlock_is_retried(monkeypatch, superuser):
+    from sqlalchemy.exc import OperationalError
+
+    from app.api import assistant as assistant_api
+
+    calls = {"n": 0}
+
+    def flaky_stop(db, session, settings, reason="stopped:user"):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OperationalError("UPDATE", {}, Exception("deadlock detected"))
+        return None
+
+    monkeypatch.setattr(assistant_api.service, "stop", flaky_stop)
+    client = signed_in("root@example.com")
+    sid = new_chat(client)
+    response = client.post(f"/api/assistant/sessions/{sid}/stop")
+    # C11: the first attempt deadlocked against the live turn; the retry answers normally.
+    assert response.status_code == 200
+    assert calls["n"] == 2
+
+
 def test_the_run_report_does_not_reopen_an_applied_project():
     from app.projects.service import changed_files
 

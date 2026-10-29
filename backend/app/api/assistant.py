@@ -1,4 +1,5 @@
 """Vibe-reporting assistant (feature 014): super user only."""
+import time
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -6,6 +7,7 @@ from bizview_cli import layout
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.ai import vision_enabled
@@ -512,7 +514,19 @@ def get_activity(
 @router.post("/sessions/{session_id}/stop")
 def stop_run(session_id: int, actor: AppUser = Depends(require_superuser), db: Session = DB):
     session = _own_session(db, session_id, actor)
-    service.stop(db, session, get_settings())
+    # C11: stop's UPDATE can deadlock against the live turn's transaction; retry once and
+    # map a second failure to the normal 409 conflict instead of a 500.
+    try:
+        service.stop(db, session, get_settings())
+    except OperationalError:
+        db.rollback()
+        time.sleep(0.3)
+        session = _own_session(db, session_id, actor)
+        try:
+            service.stop(db, session, get_settings())
+        except OperationalError:
+            db.rollback()
+            raise ApiError(409, "conflict", M("assistant.stop_retry")) from None
     return service.session_json(session, _messages(db, session))
 
 
