@@ -251,6 +251,18 @@ def test_preview_outcome_redacts_values():
     assert outcome_lines(None) == [] and outcome_lines({"status": "pending"}) == []
 
 
+def test_preview_outcome_names_the_structured_check_reason():
+    lines = outcome_lines({"status": "failed", "integrations": {"x": {
+        "status": "failed", "message": None, "datasets": {},
+        "checks": [{"dataset": "altcoin_season", "type": "contract", "ok": False,
+                    "detail": "snapshot_at: 3 valores vacíos", "key": "run.check.nulls",
+                    "params": {"column": "snapshot_at", "n": 3}}]}}})
+    text = "\n".join(lines)
+    # C10: without the structured reason the agent iterated blind on the failing dataset.
+    assert "comprobación contract no superada en altcoin_season" in text
+    assert "snapshot_at" in text and "3" in text
+
+
 def test_history_skips_preview_notices(superuser, db):
     s = _stored_session(db, superuser, status="open")
     db.add(AssistantMessage(session_id=s.id, role="user", content="hola"))

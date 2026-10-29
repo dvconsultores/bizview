@@ -164,7 +164,8 @@ def ai_error_text(message: str) -> str:
 
 
 def outcome_lines(preview: dict | None) -> list[str]:
-    """Preview outcome for the AI: status, row counts, redacted errors; never check details."""
+    """Preview outcome for the AI: status, row counts, redacted errors; a failed check names its
+    structured run.check.* reason (config and counts, never row values)."""
     if not preview or preview.get("status") == "pending":
         return []
     lines = [f"Vista previa: {preview.get('status')}"]
@@ -181,8 +182,12 @@ def outcome_lines(preview: dict | None) -> list[str]:
         lines.append(line)
         for check in item.get("checks") or []:
             if not check.get("ok", True):
-                lines.append(f"- comprobación {check.get('type')} no superada en "
-                             f"{check.get('dataset')}")
+                line = (f"- comprobación {check.get('type')} no superada en "
+                        f"{check.get('dataset')}")
+                if str(check.get("key") or "").startswith("run.check."):
+                    # C10: the structured reason is config and counts, never row values.
+                    line += ": " + t(check["key"], **(check.get("params") or {}))
+                lines.append(line)
     reports = preview.get("reports") or {}
     for rid in sorted(reports):
         item = reports[rid]
