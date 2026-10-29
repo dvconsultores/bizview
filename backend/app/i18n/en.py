@@ -769,6 +769,7 @@ MESSAGES: dict[str, str] = {
     "assistant.context_exhausted": "The conversation's context no longer fits the model and compacting it does not free enough space. The work up to the last round is saved; write `/speckit-all <spec>` to resume at the current stage.",
     "assistant.stage_budget": "The stage spent its token budget ({tokens} of {limit}). The work up to the last round is saved; write `/speckit-all <spec>` to resume at the current stage.",
     "assistant.no_progress": "The turn repeated {rounds} identical rounds ({tools}) without changing any file; it stops to save the budget. The work up to the last round is saved.",
+    "assistant.read_repeat": "You already read {paths} and it did not change; do not re-read it: act on the draft or close the stage with finish_command.",
     "assistant.check_request_first": "Before writing `fields` in {path}, run check_query on that file: the fields are derived from the real shape of the response.",
     "assistant.check_request_missing": "Fields {columns} are not in the response of {path}; the actual keys are: {keys}. Fix the `fields` (or the mapping) before continuing.",
     "assistant.auto.next_stage": "Stage {done} is done. The contract allows {stages}: open the next one with run_command and continue; do not ask the user to confirm.",

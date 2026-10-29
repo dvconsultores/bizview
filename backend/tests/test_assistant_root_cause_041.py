@@ -16,7 +16,7 @@ from app.engine import extract
 from app.i18n import t
 from app.models import AppUser, AssistantMessage, AssistantSession
 from app.sources import service as sources
-from tests.conftest import new_chat, project_view, signed_in, sql
+from tests.conftest import new_chat, project_view, signed_in, sql, write_project
 from tests.test_assistant_api import _chat_reply, _tool_call
 
 pytestmark = pytest.mark.usefixtures("without_command_guard")
@@ -277,6 +277,31 @@ def test_scoped_history_finds_the_anchor_beyond_the_window(db, superuser):
     assert messages
     assert messages[0].role == "user"
     assert "Objetivo" in messages[0].content
+
+
+def test_a_third_identical_read_is_refused(db, superuser):
+    # en producción el modelo releyó dos archivos sin cambios cientos de veces y agotó el
+    # contexto (C13).
+    path = "specs/001-x/spec.md"
+    session = project_view(db, superuser.id, {path: "# X\n"})
+    tools.reset_run(session)
+    actor = db.get(AppUser, superuser.id)
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+    with pytest.raises(tools.ToolError):
+        tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+
+
+def test_a_changed_file_resets_the_read_counter(db, superuser):
+    path = "specs/001-x/spec.md"
+    session = project_view(db, superuser.id, {path: "# X\n"})
+    tools.reset_run(session)
+    actor = db.get(AppUser, superuser.id)
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+    write_project(session.project.id, {path: "# X2\n"}, superuser.id)
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
+    tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
 
 
 def test_the_run_report_is_replaced_not_conflicted(db, superuser):

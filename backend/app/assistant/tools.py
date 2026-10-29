@@ -552,6 +552,7 @@ DISCOVERY_TOOLS = frozenset(
     {"list_sources", "describe_source", "profile_source", "get_authoring_guide", "get_workspace"}
 )
 RUN_READS_KEY = "run_reads"
+RUN_REREADS_KEY = "run_rereads"
 MEMO_TOOLS = frozenset({"describe_source", "profile_source", "get_authoring_guide", "check_query"})
 DRAFT_TOOLS = ("propose_draft", "edit_draft", "read_draft", "update_notes", "apply_fix")
 REPEAT_NOTE = (
@@ -637,11 +638,13 @@ def _source_kind(db: Session, name: str, args: dict[str, Any]) -> str | None:
 def reset_run(session: Any) -> None:
     """Limpia los contadores del run actual en working_state (solo reasigna si existen)."""
     state = session.working_state or {}
-    if RUN_CALLS_KEY in state or RUN_DISCOVERY_KEY in state or RUN_READS_KEY in state:
+    if (RUN_CALLS_KEY in state or RUN_DISCOVERY_KEY in state or RUN_READS_KEY in state
+            or RUN_REREADS_KEY in state):
         state = dict(state)
         state.pop(RUN_CALLS_KEY, None)
         state.pop(RUN_DISCOVERY_KEY, None)
         state.pop(RUN_READS_KEY, None)
+        state.pop(RUN_REREADS_KEY, None)
         session.working_state = state
 
 
@@ -2130,6 +2133,7 @@ def _read_draft(
 
     state = dict(session.working_state or {})
     reads = dict(state.get(RUN_READS_KEY) or {})
+    rereads = dict(state.get(RUN_REREADS_KEY) or {})
     result_files: dict[str, str] = {}
     unchanged: dict[str, str] = {}
     missing: list[str] = []
@@ -2149,6 +2153,9 @@ def _read_draft(
         # integration.yaml» and the reader gave up (20M tokens, `limit:rounds`, three runs).
         if reads.get(path) == digest:
             unchanged[path] = digest
+            rereads[path] = int(rereads.get(path, 0)) + 1
+        else:
+            rereads[path] = 0
         if total + len(content) <= MAX_TOOL_RESULT_CHARS:
             result_files[path] = content
             total += len(content)
@@ -2160,7 +2167,12 @@ def _read_draft(
                 total += remaining
             truncated.append(path)
 
+    requested = [path for path in paths if path not in missing]
+    over = [path for path in requested if rereads.get(path, 0) >= 2]
+    if over and len(over) == len(requested):
+        raise ToolError(t("assistant.read_repeat", paths=", ".join(sorted(over))))
     state[RUN_READS_KEY] = reads
+    state[RUN_REREADS_KEY] = rereads
     session.working_state = state
     _remember(session, {path: history.sha(files[path]) for path in result_files})
     note = None
