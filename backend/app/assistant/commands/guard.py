@@ -268,9 +268,13 @@ class _Checker:
             task = _TASK_ID.search(old)
             if self.ctx.only and (task is None or task.group(0) not in self.ctx.only):
                 return False
-            if any(reference not in self.ctx.files
-                   for reference in _TASK_REFERENCE.findall(old)):
-                return False
+            for reference in _TASK_REFERENCE.findall(old):
+                if reference.endswith("/"):
+                    # C9: a folder reference is proved by any file living under it.
+                    if not any(name.startswith(reference) for name in self.ctx.files):
+                        return False
+                elif reference not in self.ctx.files:
+                    return False
         return True
 
     def status_implemented(self, op: dict) -> bool:

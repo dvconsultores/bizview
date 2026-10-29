@@ -130,6 +130,22 @@ def test_plan_tasks_and_converge():
     refused(ctx("speckit-analyze"), w("specs/003-ventas/plan.md"))
 
 
+def test_a_folder_reference_is_proved_by_its_files():
+    tasks = "specs/003-ventas/tasks.md"
+    body = "# T\n- [{box}] T006 Crear la carpeta `integrations/ventas/` con sus peticiones.\n"
+    files = {
+        tasks: body.format(box=" "),
+        "integrations/ventas/integration.yaml": "id: ventas\n",
+    }
+    c = ctx("speckit-implement", kind="integracion", files=files)
+    # C9: a folder is never a file key, so this tick was impossible and the spec stayed open.
+    check_ops(c, [w(tasks, body.format(box="X"))])
+    empty = ctx(
+        "speckit-implement", kind="integracion", files={tasks: files[tasks]}
+    )
+    refused_with(empty, "tasks_tick_needs_evidence", w(tasks, body.format(box="X")))
+
+
 def test_implement_ticks_status_and_artifacts():
     tasks, spec = "specs/003-ventas/tasks.md", "specs/003-ventas/spec.md"
     files = {tasks: "# T\n- [ ] T001 a\n- [ ] T002 b\n",
