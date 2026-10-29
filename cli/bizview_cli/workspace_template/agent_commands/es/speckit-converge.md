@@ -43,6 +43,10 @@ tareas, di qué comando los crea y termina. Responde en el idioma del usuario.
    anterior intacto más lo nuevo), `## Phase N: Convergence` y una tarea por hallazgo (CRÍTICOS y
    ALTOS primero): `- [ ] T0NN <acción en imperativo> per <origen> (<tipo>)`. Nunca reutilices ni
    renumeres ids; si ya hay una fase de convergencia, agrega otra debajo.
+   Agrega SOLO tareas que /speckit-implement pueda completar: trabajo en los artefactos de esta
+   spec (integrations/…, reports/…, distributions/…) o verificaciones ya comprobables. Un hallazgo
+   que exija editar spec.md, plan.md u otros documentos NO se convierte en tarea: repórtalo en la
+   tabla y en «Decisiones» como pendiente para el humano o para la etapa dueña del documento.
 6. Sin hallazgos: NO toques `tasks.md` (ni un encabezado vacío) e informa
    "✅ Convergida: los artefactos cumplen la spec, el plan y las tareas" con los conteos.
 7. Próximo paso: con tareas agregadas, cuántas y en qué fase, y recomienda `/speckit-implement`; si

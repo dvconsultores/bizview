@@ -1236,8 +1236,9 @@ def _run_command(db: Session, session: Any,
             raise ToolError(t("pipeline.no_restart"))
         plan = _plan_grow(db, session, plan, spec)
         # 040: the state machine decides where the plan goes before the model's request is read.
-        plan = pipeline.routed_state(db, plan, session.files()) or plan
-        plan_at = _plan_position(db, plan, name, spec)
+        project_files = session.files()
+        plan = pipeline.routed_state(db, plan, project_files) or plan
+        plan_at = _plan_position(db, plan, name, spec, project_files)
         index, _cursor = plan_at
         spec = plan["specs"][index] if plan.get("specs") else None
         target = pipeline.STAGE_COMMANDS[pipeline.STAGES[_cursor]]
@@ -1332,8 +1333,11 @@ def _stage_summary_message(db: Session, session: Any, run: Any) -> None:
     db.flush()
 
 
+_STAGE_DOCS = {"specify": "spec.md", "plan": "plan.md", "tasks": "tasks.md"}  # C12: stage artifacts
+
+
 def _plan_position(db: Session, plan: dict[str, Any], name: str,
-                   spec: str | None) -> tuple[int, int]:
+                   spec: str | None, files: dict[str, str] | None = None) -> tuple[int, int]:
     """(spec_index, stage_index) the model asked for, refused when it is not the plan's next one.
 
     The two judging stages (`analyze`, `verify`) have no writers, so the only way to fix what they
@@ -1367,6 +1371,11 @@ def _plan_position(db: Session, plan: dict[str, Any], name: str,
                               step=f"{cursor + 1}/{pipeline.TOTAL}"))
         return index, cursor
     expected_spec = plan["specs"][index]
+    doc = _STAGE_DOCS.get(requested or "")
+    if (doc is not None and pipeline.STAGES.index(requested) < cursor
+            and f"specs/{expected_spec}/{doc}" not in (files or {})):
+        # C12: the stage completed without its artifact; reopening it is the plan's own repair.
+        return index, pipeline.STAGES.index(requested)
     if pipeline.STAGE_COMMANDS[expected] != name:
         raise ToolError(t("pipeline.order", expected=f"/{pipeline.STAGE_COMMANDS[expected]} "
                                                      f"{expected_spec}",

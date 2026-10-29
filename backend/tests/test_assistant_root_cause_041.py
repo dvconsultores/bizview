@@ -304,6 +304,27 @@ def test_a_changed_file_resets_the_read_counter(db, superuser):
     tools.run_tool(db, actor, session, "read_draft", {"paths": [path]}, get_settings())
 
 
+def test_converge_prompt_limits_tasks_to_implement_scope():
+    from app.assistant.commands.registry import prompt_body
+
+    # C14: converge appended tasks implement cannot execute (edit spec.md, another spec's files)
+    # and the pipeline wedged on «hay N tareas sin completar».
+    assert "SOLO tareas que /speckit-implement pueda completar" in prompt_body(
+        "speckit-converge", "es")
+    assert "ONLY tasks that /speckit-implement can complete" in prompt_body(
+        "speckit-converge", "en")
+
+
+def test_a_missing_artifact_lets_the_model_reopen_its_stage():
+    plan = {"id": 1, "specs": ["002-x"], "spec_index": 0, "cursor": 3, "until": None}
+    files = {"specs/002-x/spec.md": "# X\n"}
+    # C12: the cursor says tasks, but plan.md does not exist and tasks itself demands it.
+    assert tools._plan_position(None, plan, "speckit-plan", None, files) == (0, 2)
+    with pytest.raises(tools.ToolError):
+        tools._plan_position(None, plan, "speckit-plan", None,
+                             {**files, "specs/002-x/plan.md": "# Plan\n"})
+
+
 def test_a_stop_deadlock_is_retried(monkeypatch, superuser):
     from sqlalchemy.exc import OperationalError
 

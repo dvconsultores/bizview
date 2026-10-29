@@ -43,6 +43,10 @@ creates them and finish. Reply in the user's language.
    content untouched plus the new part), `## Phase N: Convergence` and one task per finding
    (CRITICAL and HIGH first): `- [ ] T0NN <imperative action> per <source> (<gap type>)`. Never
    reuse or renumber ids; when a convergence phase already exists, add another one below it.
+   Append ONLY tasks that /speckit-implement can complete: work on this spec's artifacts
+   (integrations/…, reports/…, distributions/…) or checks that are already provable. A finding
+   that requires editing spec.md, plan.md or other documents does NOT become a task: report it in
+   the table and under «Decisions» as pending for the human or for the stage that owns the file.
 6. No findings: do NOT touch `tasks.md` (not even an empty header) and report
    "✅ Converged: the artifacts satisfy the spec, the plan and the tasks" with the counts.
 7. Next step: with appended tasks, how many and in which phase, and recommend `/speckit-implement`;
