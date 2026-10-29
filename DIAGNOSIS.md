@@ -147,6 +147,54 @@ budget or a guard stopped it. Fix: a dict at the records path counts as a one-re
 engine and the checker, and the `records` schema description says so. With C6 fixed the checker
 reads the object's real keys, which also feeds the C5 guard the information it wants.
 
+### C7–C10 (found 2026-10-29 by the live local E2E, each test-first + fixed)
+
+A full `/speckit-all` E2E on a fresh project (`panorama-cripto`, isolated schema
+`app_test_041dev`, fixed code, real DeepSeek provider and real CoinMarketCap API) surfaced four
+more causes, each reproduced failing before its fix:
+
+- **C7 — empty history past the 30-row window.** An Auto conversation has one user message;
+  `_scoped_history` searched the anchor only inside the newest 30 rows, so from the third stage
+  on the history was empty and the stage died `blocked:ai_history_invalid`. Fix: fetch the
+  newest user row ≤ `history_from` directly when the windowed scan misses (service.py).
+- **C8 — request files impossible to create.** The C5 guard refused every unchecked write while
+  `check_query` only accepts files that exist: creation deadlock. Fix: a skeleton without
+  `fields` writes freely; declaring `fields` still requires a check to have run (tools.py).
+- **C9 — a folder reference blocks its task forever.** `tasks_ticks` demanded every backticked
+  reference be a file key; «Crear la carpeta `integrations/x/`» never ticks, and one such line
+  voids a bulk tick — the production «hay N tareas sin completar» wall. Fix: a trailing-slash
+  reference is proved by any file under it (commands/guard.py).
+- **C10 — blind preview failures.** The AI outcome line omitted every check detail, so the agent
+  burned whole stage windows guessing («comprobación contract no superada en altcoin_season»).
+  Fix: a `run.check.*` key is rebuilt from its params — columns, counts, declared bounds, never
+  row values — and appended to the line (assistant/preview.py).
+
+**E2E result (2026-10-29):** with C1–C10 in place the pipeline completed implement for
+001-mercado-cripto with all 36 tasks ticked and a **green preview against the live API**
+(assets=100, global_metrics=1, fear_greed=1, altcoin_season=1 — the two object-shaped endpoints
+extract via C6). One steering message with the validator's own
+`/speckit-implement … --only T001,…` fix was used to focus a window, mirroring the product's
+«Implementar tareas pendientes» button.
+
+### C12 (observed 2026-10-29, pending fix) — an empty stage still advances the cursor
+
+A stage run can complete having written nothing (the model closes it or jumps with
+`run_command`), and the in-flight pipeline cursor then moves on; when the model later tries to
+reopen the skipped stage it is refused («La etapa 4/8 del plan es /speckit-tasks, no
+/speckit-plan: ábrela en ese orden») even though the stage's artifact (plan.md) does not exist.
+`detect()` repairs the cursor from artifacts only on a fresh `/speckit-all`. Fix direction: the
+in-run cursor should consult the same artifact proof `completed()` uses before refusing a
+reopen, or an artifact-less completion of specify/plan/tasks should not advance the cursor.
+
+### C11 (observed 2026-10-29, pending fix) — «Detener» can 500 on a Postgres deadlock
+
+`POST /sessions/{id}/stop` → `service.stop` → `runs.mark_stale_interrupted` updates every
+`running` row of `assistant_command_run` while the live turn's transaction is updating the same
+row: ShareLock cycle, `DeadlockDetected`, unhandled → 500. Seen on the local E2E while the
+implement stage was committing a round. Fix direction: retry the stop's update once on
+`DeadlockDetected` (or skip-locked), and map the failure to the normal "stop requested" answer —
+the turn's own commit already records the stop flag.
+
 ## 3. Ruled out
 
 - **H1 as stated** (guard demands a tool that doesn't exist for REST): `check_query` accepts
