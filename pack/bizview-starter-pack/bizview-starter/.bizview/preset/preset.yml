@@ -1,0 +1,34 @@
+schema_version: "1.0"
+
+preset:
+  id: "bizview"
+  name: "Bizview vibe reporting"
+  version: "0.2.0"
+  description: "Source, integration, report and distribution specs in Bizview projects (vibe reporting)"
+  author: "bizview"
+  license: "AGPL-3.0-or-later"
+
+requires:
+  speckit_version: ">=1.0.0"
+
+provides:
+  templates:
+    - type: "template"
+      name: "spec-template"
+      file: "templates/spec-template.md"
+      description: "Fuente, integración, reporte or distribución spec"
+    - type: "template"
+      name: "plan-template"
+      file: "templates/plan-template.md"
+      description: "Maps the spec to Bizview artifacts"
+    - type: "template"
+      name: "tasks-template"
+      file: "templates/tasks-template.md"
+      description: "Artifact tasks ending with bizview validate"
+    - type: "command"
+      name: "speckit.specify"
+      file: "commands/speckit.specify.md"
+      description: "Vibe reporting rules before specify"
+      strategy: "prepend"
+
+tags: ["bizview", "vibe-reporting", "bi"]

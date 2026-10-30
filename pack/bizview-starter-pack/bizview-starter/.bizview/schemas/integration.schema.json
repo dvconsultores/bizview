@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bizview integration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "spec",
+    "source",
+    "schedule",
+    "datasets"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Pista opcional del editor con la URL del esquema; el validador la ignora.",
+      "type": "string"
+    },
+    "id": {
+      "description": "Identificador único de la integración; debe coincidir con el nombre de la carpeta integrations/<id>/.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,49}$"
+    },
+    "spec": {
+      "description": "Ruta de la carpeta de especificación, p. ej. specs/integrations/001-ventas.",
+      "type": "string"
+    },
+    "source": {
+      "description": "Nombre de la fuente de datos registrada en la instalación (PostgreSQL, REST, Supabase…).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "schedule": {
+      "description": "Programación de ejecución como cron de 5 campos, p. ej. \"0 * * * *\".",
+      "type": "string",
+      "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+    },
+    "time_limit_minutes": {
+      "description": "Duración máxima de una ejecución en minutos, entre 1 y 240.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 240
+    },
+    "timezone": {
+      "description": "Zona horaria IANA usada para programar y calcular ventanas, p. ej. America/Caracas.",
+      "type": "string",
+      "minLength": 1
+    },
+    "datasets": {
+      "description": "Mapa de conjuntos de datos; cada clave es el id del dataset y su valor la definición, y cada dataset se convierte en una tabla.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "description": "Identificador del dataset: minúsculas, números o guion bajo.",
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+      },
+      "additionalProperties": {
+        "description": "Definición de un dataset: columnas, extracción, incrementalidad y validaciones opcionales.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "columns",
+          "extract"
+        ],
+        "properties": {
+          "description": {
+            "description": "Descripción breve del dataset para documentar su propósito.",
+            "type": "string",
+            "maxLength": 300
+          },
+          "primary_key": {
+            "description": "Lista de columnas que identifican de forma única cada fila; deben existir en columns.",
+            "type": "array",
+            "items": {
+              "description": "Nombre de una columna que forma parte de la clave primaria.",
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,40}$"
+            },
+            "minItems": 1
+          },
+          "date_column": {
+            "description": "Columna de fecha o timestamptz usada para cargas incrementales e informes.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "columns": {
+            "description": "Mapa de columnas; la clave es el nombre de la columna y el valor su definición de tipo.",
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "description": "Nombre de columna: minúsculas, números o guion bajo.",
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,40}$"
+            },
+            "additionalProperties": {
+              "description": "Definición de una columna: tipo almacenado, nulabilidad y restricciones opcionales.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "description": "Tipo almacenado de la columna: text, integer, bigint, numeric, boolean, date o timestamptz.",
+                  "enum": [
+                    "text",
+                    "integer",
+                    "bigint",
+                    "numeric",
+                    "boolean",
+                    "date",
+                    "timestamptz"
+                  ]
+                },
+                "nullable": {
+                  "description": "Si la columna admite valores nulos; por defecto es true.",
+                  "type": "boolean"
+                },
+                "description": {
+                  "description": "Descripción breve de la columna para documentar su contenido.",
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "enum": {
+                  "description": "Lista de valores permitidos para la columna.",
+                  "type": "array",
+                  "items": {
+                    "description": "Uno de los valores permitidos para la columna.",
+                    "type": "string"
+                  },
+                  "minItems": 1
+                },
+                "min": {
+                  "description": "Valor numérico mínimo permitido.",
+                  "type": "number"
+                },
+                "max": {
+                  "description": "Valor numérico máximo permitido.",
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "extract": {
+            "description": "Método de extracción: consulta SQL de solo lectura o petición REST/SOAP.",
+            "oneOf": [
+              {
+                "description": "Extracción mediante un archivo SQL de solo lectura.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "query"
+                ],
+                "properties": {
+                  "query": {
+                    "description": "Ruta relativa a un archivo SELECT SQL de solo lectura bajo queries/, p. ej. queries/ventas.sql.",
+                    "type": "string",
+                    "pattern": "^queries/[A-Za-z0-9_.-]+\\.sql$"
+                  },
+                  "params": {
+                    "description": "Parámetros opcionales; requeridos window_start y window_end cuando la carga es incremental.",
+                    "type": "array",
+                    "items": {
+                      "description": "Parámetro disponible: window_start o window_end.",
+                      "enum": [
+                        "window_start",
+                        "window_end"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "description": "Extracción mediante un archivo de petición REST o SOAP.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "description": "Ruta relativa a un archivo YAML de petición REST/SOAP bajo requests/, p. ej. requests/pedidos.yaml.",
+                    "type": "string",
+                    "pattern": "^requests/[A-Za-z0-9_.-]+\\.ya?ml$"
+                  }
+                }
+              }
+            ]
+          },
+          "incremental": {
+            "description": "Estrategia de carga incremental: recarga completa o por ventana de días con reconstrucción opcional.",
+            "oneOf": [
+              {
+                "description": "Recarga completa en cada ejecución.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "description": "Modo de recarga completa; valor fijo \"full\".",
+                    "const": "full"
+                  }
+                }
+              },
+              {
+                "description": "Recarga incremental de los últimos N días con reconstrucción completa programada opcional.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "window_days"
+                ],
+                "properties": {
+                  "window_days": {
+                    "description": "Cantidad de días hacia atrás que se recargan en cada ejecución incremental, entre 1 y 366.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 366
+                  },
+                  "full_rebuild_cron": {
+                    "description": "Cron de 5 campos para reconstruir completamente el dataset, p. ej. \"0 2 * * 0\".",
+                    "type": "string",
+                    "pattern": "^\\S+ \\S+ \\S+ \\S+ \\S+$"
+                  },
+                  "slice": {
+                    "description": "Divide la ventana incremental: none, day o month.",
+                    "enum": [
+                      "none",
+                      "day",
+                      "month"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "checks": {
+            "description": "Validaciones de calidad de datos que se ejecutan después de cargar el dataset.",
+            "type": "array",
+            "items": {
+              "description": "Una validación de calidad: row_count, not_null o reconcile.",
+              "oneOf": [
+                {
+                  "description": "Valida que el número de filas esté dentro de un rango.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "description": "Tipo de validación; valor fijo \"row_count\".",
+                      "const": "row_count"
+                    },
+                    "min": {
+                      "description": "Número mínimo esperado de filas.",
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "max": {
+                      "description": "Número máximo esperado de filas.",
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "description": "Valida que las columnas indicadas no contengan valores nulos.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "columns"
+                  ],
+                  "properties": {
+                    "type": {
+                      "description": "Tipo de validación; valor fijo \"not_null\".",
+                      "const": "not_null"
+                    },
+                    "columns": {
+                      "description": "Columnas que deben estar libres de valores nulos.",
+                      "type": "array",
+                      "items": {
+                        "description": "Nombre de una columna a validar.",
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                      },
+                      "minItems": 1
+                    }
+                  }
+                },
+                {
+                  "description": "Concilia los datos contra una consulta SQL a la fuente; solo PostgreSQL.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "query",
+                    "compare"
+                  ],
+                  "properties": {
+                    "type": {
+                      "description": "Tipo de validación; valor fijo \"reconcile\".",
+                      "const": "reconcile"
+                    },
+                    "query": {
+                      "description": "Consulta SQL contra la fuente que devuelve los valores esperados para comparar.",
+                      "type": "string"
+                    },
+                    "compare": {
+                      "description": "Columnas a comparar entre el dataset y el resultado de la consulta; al menos 2.",
+                      "type": "array",
+                      "items": {
+                        "description": "Nombre de una columna a comparar.",
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                      },
+                      "minItems": 2
+                    },
+                    "tolerance": {
+                      "description": "Tolerancia numérica permitida en la comparación; por defecto 0.01.",
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "transform": {
+            "description": "Transformación ETL opcional: una consulta SQL SELECT de solo lectura sobre el frame `input` que se ejecuta en el motor SQL de Polars después de la extracción. El SQL se valida contra una lista estricta de construcciones permitidas y se regenera antes de ejecutarse.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "input",
+              "sql"
+            ],
+            "properties": {
+              "input": {
+                "description": "Mapa de columnas que la extracción entrega al transformador: cada clave es el nombre de una columna y su valor define su tipo y nulabilidad.",
+                "type": "object",
+                "minProperties": 1,
+                "propertyNames": {
+                  "description": "Nombre de columna de entrada: empieza por letra minúscula y solo contiene minúsculas, dígitos o guion bajo.",
+                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                },
+                "additionalProperties": {
+                  "description": "Definición de una columna de entrada: tipo almacenado y si admite valores nulos.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "description": "Tipo almacenado de la columna: text, integer, bigint, numeric, boolean, date o timestamptz.",
+                      "enum": [
+                        "text",
+                        "integer",
+                        "bigint",
+                        "numeric",
+                        "boolean",
+                        "date",
+                        "timestamptz"
+                      ]
+                    },
+                    "nullable": {
+                      "description": "Si la columna admite valores nulos; por defecto es true.",
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "sql": {
+                "description": "Sentencia SQL SELECT de solo lectura que transforma el frame `input`; debe referenciar `input` y opcionalmente CTEs definidos en el propio SQL.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              },
+              "batch_rows": {
+                "description": "Número de filas por lote para la transformación en modo fila; solo se usa cuando el SQL no contiene agregaciones ni ventanas.",
+                "type": "integer",
+                "minimum": 10000,
+                "maximum": 1000000,
+                "default": 200000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

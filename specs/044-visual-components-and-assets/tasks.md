@@ -194,3 +194,14 @@ T022 parity test          T023 palette test
   place; T021 and T043 change the copy source, not the template.
 - Every task that touches user-visible text writes Spanish and English in the same commit.
 - No task introduces an AI call: the vocabulary gate (T044) is the guard.
+
+---
+
+## Phase 7: Convergence
+
+- [ ] T046 Pass a `column:` set's own value in the table cell and the KPI tile so a cached logo draws there too, not only in the asset grid, and cover both in `frontend/tests/unit/layout-assets.test.tsx` per US2/AC2 (partial)
+- [ ] T047 Verify the four components and their images at 375 px and 1280 px in both themes: add the case to `frontend/tests/e2e/layout.spec.ts` (or a 044 spec) and run it, since only jsdom unit tests cover the screen today per SC-001 and Constitution I (partial)
+- [ ] T048 Make the declared lookup order real — allow a set with both `folder` and `column` (`anyOf` in `$defs/image_set` of `cli/bizview_cli/schemas/report.schema.json`) and resolve project asset → cached URL → fallback in `frontend/src/components/report/ReportImage.tsx` — or amend FR-005 and data-model's "AND/OR" to the shipped exactly-one rule per FR-005 (contradicts)
+- [ ] T049 Reconcile the artifacts with the shipped URL-column design: FR-004's `kind: image_url` and data-model's column `kind` do not exist in `cli/bizview_cli/schemas/integration.schema.json`; either add the kind and have `backend/app/images/cache.py` read it, or amend FR-004, data-model and research R6 to the report-declared column per FR-004 (contradicts)
+- [ ] T050 Prove the viewer never reaches a third party and that a bad URL never fails a load: a run-level test whose failing URL leaves the run `succeeded` and whose payload carries only `/api/…` paths, plus a transport-spy assertion that a second render issues no outbound request per SC-003 (partial)
+- [ ] T051 Align the cache retention default across T001, `backend/app/config.py` and `docs/INSTALL.md` — `image_cache_days` shipped as 30 and T001 said 90 per T001 (`plan: image cache settings`) (partial)

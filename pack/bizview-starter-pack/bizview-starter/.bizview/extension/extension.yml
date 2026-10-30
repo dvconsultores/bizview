@@ -1,0 +1,30 @@
+schema_version: "1.0"
+
+extension:
+  id: bizview
+  name: "Bizview vibe reporting"
+  version: "0.1.0"
+  description: "Validation and source description for Bizview workspaces; no spec, no run"
+  author: bizview
+  license: AGPL-3.0-or-later
+
+requires:
+  speckit_version: ">=1.0.0"
+  tools:
+    - name: bizview
+      required: true
+
+provides:
+  commands:
+    - name: speckit.bizview.validate
+      file: commands/speckit.bizview.validate.md
+      description: "Validate the workspace and write bizview.lock"
+    - name: speckit.bizview.describe
+      file: commands/speckit.bizview.describe.md
+      description: "Describe a data source's structure (no data) from the installation"
+
+hooks:
+  after_implement:
+    command: speckit.bizview.validate
+    optional: false
+    description: "Validate artifacts against their specs and write the lock"

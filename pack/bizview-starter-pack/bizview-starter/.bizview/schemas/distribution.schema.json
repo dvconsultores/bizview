@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bizview distribution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "spec",
+    "report"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,49}$",
+      "description": "Identificador de la distribución; igual al nombre del archivo sin .yaml."
+    },
+    "spec": {
+      "type": "string",
+      "pattern": "^specs/[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}$",
+      "description": "Carpeta del spec de tipo distribución dentro del mismo proyecto."
+    },
+    "report": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,49}$",
+      "description": "Id del reporte que se distribuye."
+    },
+    "subscriptions": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 20,
+      "description": "Envíos programados del reporte.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "frequency",
+          "hour",
+          "period",
+          "recipients"
+        ],
+        "description": "Un envío programado del reporte.",
+        "properties": {
+          "frequency": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "description": "Frecuencia de envío del reporte."
+          },
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "description": "Hora del día (0-23) para el envío."
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "Día de la semana (0=lunes, 6=domingo); solo y obligatorio en envíos semanales."
+          },
+          "monthday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 28,
+            "description": "Día del mes (1-28); solo y obligatorio en envíos mensuales."
+          },
+          "period": {
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7_days",
+              "mtd",
+              "last_month",
+              "qtd",
+              "ytd",
+              "last_12_months"
+            ],
+            "description": "Periodo de datos que cubre el reporte enviado."
+          },
+          "recipients": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "roles"
+            ],
+            "description": "Destinatarios del envío, solo por rol.",
+            "properties": {
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "description": "Roles que reciben el reporte.",
+                "items": {
+                  "enum": [
+                    "admin",
+                    "user"
+                  ],
+                  "description": "Rol de los destinatarios."
+                }
+              }
+            }
+          },
+          "attach_pdf": {
+            "type": "boolean",
+            "default": true,
+            "description": "Adjunta el PDF del reporte (requiere pdf.enabled en el reporte)."
+          },
+          "link_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 90,
+            "description": "Días de validez del enlace compartido incluido en el correo, o null para no incluir enlace."
+          },
+          "paused": {
+            "type": "boolean",
+            "default": false,
+            "description": "Pausa el envío sin borrarlo."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "frequency": {
+                  "const": "weekly",
+                  "description": "Condición: envío semanal."
+                }
+              },
+              "required": [
+                "frequency"
+              ]
+            },
+            "then": {
+              "required": [
+                "weekday"
+              ],
+              "not": {
+                "required": [
+                  "monthday"
+                ]
+              }
+            },
+            "else": {
+              "if": {
+                "properties": {
+                  "frequency": {
+                    "const": "monthly",
+                    "description": "Condición: envío mensual."
+                  }
+                },
+                "required": [
+                  "frequency"
+                ]
+              },
+              "then": {
+                "required": [
+                  "monthday"
+                ],
+                "not": {
+                  "required": [
+                    "weekday"
+                  ]
+                }
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "weekday"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "monthday"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "share": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Política de enlaces compartidos del reporte.",
+      "properties": {
+        "allowed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Permite crear enlaces compartidos del reporte."
+        },
+        "max_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "description": "Días máximos de validez de un enlace compartido."
+        }
+      }
+    }
+  }
+}
