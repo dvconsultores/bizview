@@ -17,6 +17,12 @@ function roleFor(key: string) {
   return roleAt([], hash);
 }
 
+/** The row column a `column:` set reads its pictures from: `l.logo_url` -> `logo_url`. */
+export function imageColumn(set: ReportImageSet): string | null {
+  if (!set.column) return null;
+  return set.column.split(".").pop() || null;
+}
+
 const CACHED = /^[0-9a-f]{64}\.(png|jpe?g|webp)$/;
 const ABSOLUTE = /^https?:\/\//i;
 
@@ -29,11 +35,13 @@ export function imageSrc(set: ReportImageSet, value: unknown): string | null {
   return ABSOLUTE.test(raw) ? raw : null;
 }
 
-/** Feature 044: the image of a row key in a declared set — 20 px in a table cell, 40 px in a tile.
+/** Feature 044: the image of a row in a declared set — 20 px in a table cell, 40 px in a tile.
  *
- * The URL comes from the payload (`images.<set>.url`), so only the key is appended and a file name
- * is never guessed. A key with no file, a broken image and `fallback: none` all end in nothing
- * drawn; `fallback: initial` draws a circle with the key's first letter in a palette colour.
+ * The order is the one the contract publishes: the project's own file for the key first, the
+ * cached URL column second, the fallback last. The URL comes from the payload
+ * (`images.<set>.url`), so only the key is appended and a file name is never guessed. A key with
+ * no file, a broken image and `fallback: none` all end in nothing drawn; `fallback: initial`
+ * draws a circle with the key's first letter in a palette colour.
  */
 export function ReportImage({
   set,
@@ -50,7 +58,9 @@ export function ReportImage({
   size?: 20 | 40;
 }) {
   const key = imageKey(name);
-  const src = imageSrc(set, value) ?? (set.url && key ? `${set.url}${encodeURIComponent(key)}` : null);
+  // Asset first (FR-005): `set.url` is the project folder, `value` the cached URL column.
+  const asset = set.url && key ? `${set.url}${encodeURIComponent(key)}` : null;
+  const src = asset ?? imageSrc(set, value);
   const [failed, setFailed] = useState<string | null>(null);
   const alt = label && label.trim() !== "" ? label : key;
   const box = { width: size, height: size };

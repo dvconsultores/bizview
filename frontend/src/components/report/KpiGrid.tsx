@@ -91,7 +91,8 @@ export function KpiGrid({
                 label={localized(k, "label")}
                 icon={
                   image ? (
-                    <ReportImage set={image} name={k.metric} label={localized(k, "label")} size={40} />
+                    <ReportImage set={image} name={k.metric} label={localized(k, "label")}
+                                 size={40} />
                   ) : (
                     <Icon className="h-5 w-5" aria-hidden />
                   )

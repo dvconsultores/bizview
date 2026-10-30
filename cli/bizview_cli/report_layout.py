@@ -267,6 +267,18 @@ def _image_ref(value, type_, images: dict, path: str, label: str, file: str, ent
             f"{label}: el conjunto de imágenes '{value}' no está en images", file=file,
             path=path, expected={"enum": sorted(images)},
             fix=_use("un conjunto declarado en images", tuple(sorted(images)))))
+        return
+    spec = images.get(value)
+    # A `kpi` tile has no row, so a set fed by a URL column has nothing to look up: the tile would
+    # always draw its fallback. The folder sets keyed by metric id do work (044, T046).
+    if type_ == "kpi" and isinstance(spec, dict) and spec.get("column"):
+        out.append(_issue(
+            entry, "layout_image_column_on_kpi",
+            f"{label}: el conjunto '{value}' se lee de la columna {spec['column']}, y una tarjeta"
+            " kpi no tiene fila", file=file, path=path,
+            fix=_use("un conjunto con carpeta en un kpi",
+                     tuple(n for n, s in images.items()
+                           if isinstance(s, dict) and s.get("folder")))))
 
 
 def _web(web: dict, facts: _Facts, file: str, entry: str, out: list[Issue],

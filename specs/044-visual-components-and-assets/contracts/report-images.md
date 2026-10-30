@@ -27,7 +27,7 @@ With `imageSet`:
     "key":      { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,40}$" },
     "fallback": { "enum": ["initial", "none"], "default": "initial" }
   },
-  "oneOf": [{ "required": ["folder"] }, { "required": ["column"] }]
+  "anyOf": [{ "required": ["folder"] }, { "required": ["column"] }]
 }
 ```
 
@@ -38,8 +38,12 @@ Rules the schema cannot express, enforced by `bizview validate`:
 3. `key` names a declared dimension, a column of a dataset the report uses, or a metric id — the
    last one because a `kpi` tile has no row, so its only stable identity is the metric it shows
    (`images: {coins: {folder: assets/coins, key: precio_btc}}`).
-4. A set with neither `folder` nor `column` is an error (schema's `oneOf`); a set with `column` only
-   is valid but warns that nothing is cached until the integration runs.
+4. A set with neither `folder` nor `column` is an error (schema's `anyOf`); a set with `column` only
+   is valid but nothing is cached until the integration runs.
+5. A set with **both** is valid and resolves in the published order: the project's file for the key
+   first, the cached URL column second, `fallback` last (FR-005).
+6. A `column` set on a `kpi` component is refused: a KPI has no row to read the column from, so the
+   tile could only ever draw its fallback. Its set must come from a folder and be keyed by metric id.
 
 ## `image` on a component
 

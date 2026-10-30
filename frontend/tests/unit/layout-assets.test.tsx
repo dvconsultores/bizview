@@ -203,6 +203,68 @@ describe("044 images", () => {
     expect(imageSrc(set, "")).toBeNull();
   });
 
+  it("a table cell reads a cached URL column, not the key", () => {
+    const cached = {
+      ...def,
+      images: {
+        coins: { key: "symbol", fallback: "initial", url: URL_PREFIX },
+        logos: { key: "symbol", fallback: "initial", column: "l.logo_url", cached_url: "/api/reports/r/images/" },
+      },
+    } as unknown as ReportDefinition;
+    const hash = `${"b".repeat(64)}.png`;
+    const data = {
+      ...source,
+      views: [
+        {
+          id: "monedas",
+          type: "table",
+          columns: [
+            { id: "symbol", label: "Símbolo", kind: "dimension" },
+            { id: "logo_url", label: "Logo", kind: "dimension" },
+          ],
+          rows: [{ symbol: "BTC", logo_url: hash }],
+        },
+      ],
+    } as unknown as ReportData;
+    mounted = createRoot(container);
+    act(() =>
+      mounted!.render(
+        <LayoutRenderer
+          layout={{ components: [{ id: "t", type: "table", view: "monedas", columns: ["symbol"], image: "logos" } as WebComponent] }}
+          data={data}
+          def={cached}
+        />,
+      ),
+    );
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(`/api/reports/r/images/${hash}`);
+  });
+
+  it("the asset comes before the cache when a set declares both", () => {
+    const both = {
+      ...def,
+      images: {
+        coins: {
+          key: "symbol",
+          fallback: "initial",
+          url: URL_PREFIX,
+          column: "l.logo_url",
+          cached_url: "/api/reports/r/images/",
+        },
+      },
+    } as unknown as ReportDefinition;
+    mounted = createRoot(container);
+    act(() =>
+      mounted!.render(
+        <LayoutRenderer
+          layout={{ components: [{ id: "a", type: "asset", view: "activos", columns: ["symbol"], image: "coins" } as WebComponent] }}
+          data={source}
+          def={both}
+        />,
+      ),
+    );
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(`${URL_PREFIX}BTC`);
+  });
+
   it("no image: keeps today's behaviour", () => {
     mount_({ id: "t", type: "table", view: "monedas", columns: ["symbol"] } as WebComponent);
     expect(container.querySelectorAll("img")).toHaveLength(0);

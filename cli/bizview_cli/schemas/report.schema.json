@@ -1709,7 +1709,7 @@
           "default": "initial"
         }
       },
-      "oneOf": [
+      "anyOf": [
         {
           "required": [
             "folder"

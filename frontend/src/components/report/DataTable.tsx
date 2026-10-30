@@ -7,7 +7,7 @@ import { Button } from "../Button";
 import { CardMenu } from "./CardMenu";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
-import { ReportImage } from "./ReportImage";
+import { ReportImage, imageColumn } from "./ReportImage";
 
 type Table = Extract<ReportView, { type: "table" }>;
 
@@ -24,6 +24,12 @@ interface DataTableProps {
   pageSize?: number;
   /** Feature 044: draw the image of `set` in the cell of `column` (the column the set is keyed by). */
   image?: { set: ReportImageSet; column: string };
+}
+
+/** A cached-URL set's picture for one row: the column the set declares, never the key. */
+function valueOf(row: Record<string, unknown>, set: ReportImageSet): unknown {
+  const column = imageColumn(set);
+  return column ? row[column] : undefined;
 }
 
 /** The declared order wins, unknown ids are dropped and a column is never repeated. */
@@ -135,7 +141,8 @@ export function DataTable({
                   >
                     {image && c.id === image.column ? (
                       <span className="flex items-center gap-2">
-                        <ReportImage set={image.set} name={r[c.id]} size={20} />
+                        <ReportImage set={image.set} name={r[c.id]} size={20}
+                                     value={valueOf(r, image.set)} />
                         {r[c.id] ?? "—"}
                       </span>
                     ) : c.kind === "metric" ? (

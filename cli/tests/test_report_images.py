@@ -126,3 +126,25 @@ def test_a_kpi_tile_may_key_the_set_by_metric_id(tmp_path):
     result = validate.validate(root)
     assert "image_key_unknown" not in codes(result), codes(result)
     assert errors(result) == set(), codes(result)
+
+def test_a_column_set_is_refused_on_a_kpi_tile(tmp_path):
+    """A KPI has no row: the kpi's own set must come from a folder, keyed by metric id."""
+    root = ws(tmp_path)
+    coins(root, "total_facturado.png")
+    images(root, {"estados": {"folder": "assets/estados", "key": "estado"}},
+           {"id": "cara", "type": "kpi", "view": "resumen", "metric": "total_facturado",
+            "image": "remotas", "span": 3})
+    doc = yaml.safe_load((root / REPORT).read_text())
+    doc["images"]["remotas"] = {"column": "f.estado", "key": "estado"}
+    (root / REPORT).write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    assert "layout_image_column_on_kpi" in codes(validate.validate(root))
+
+    # The same set on a table is fine: a table has rows to read the column from.
+    doc = yaml.safe_load((root / REPORT).read_text())
+    doc["layout"]["web"]["components"] = [
+        c for c in doc["layout"]["web"]["components"] if c.get("id") != "cara"]
+    doc["layout"]["web"]["components"].append(
+        {"id": "tabla", "type": "table", "view": "detalle", "columns": ["estado"],
+         "image": "remotas", "span": 12})
+    (root / REPORT).write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    assert "layout_image_column_on_kpi" not in codes(validate.validate(root))
