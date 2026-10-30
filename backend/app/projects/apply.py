@@ -101,9 +101,9 @@ def apply_project(db, actor, project: Project, ip, *, session=None):
 
     Returns (version, revalidated): revalidated when the active version changed since the
     project was last validated (the composed tree was checked again against it)."""
-    from app.assistant import origin, readiness
     from app.assistant.preview import drop_for_session
-    from app.projects import fs
+    from app.projects import fs, readiness
+    from app.projects import origin_checks as origin
     from app.projects.workview import real
     from app.workspace import service as workspace_service
 

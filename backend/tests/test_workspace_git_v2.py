@@ -101,9 +101,9 @@ def test_app_project_with_git_slug_refused_and_convert(workspace, superuser, pro
 
 
 def test_git_apply_keeps_app_projects(applied, workspace, projects, monkeypatch):
-    monkeypatch.setattr("app.assistant.readiness.compute",
+    monkeypatch.setattr("app.projects.readiness.compute",
                         lambda *a, **k: {"ready": True, "pending": []})
-    monkeypatch.setattr("app.assistant.origin.recheck_draft", lambda *a, **k: [])
+    monkeypatch.setattr("app.projects.origin_checks.recheck_draft", lambda *a, **k: [])
     c = applied
     slug = c.post("/api/projects", json={"name": "Extra"}).json()["slug"]
     report = (workspace / "reports/ventas/report.yaml").read_text().replace(

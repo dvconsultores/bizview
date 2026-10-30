@@ -1068,7 +1068,7 @@ def _guarded(call) -> tuple[dict[str, Any], str]:
 
 def _get_app_guide(args: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Feature 023 plan §4: the index, one topic, or the closest topics."""
-    from app.assistant import guide
+    from app import guide
     from app.i18n import current
 
     lang = guide.lang_of(current())

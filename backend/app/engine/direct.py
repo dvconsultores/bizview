@@ -1516,7 +1516,7 @@ def validation_context(db, app=None) -> wsv.DirectContext:
         except Exception:
             return None
 
-    from app.assistant.personal import personal_kind
+    from app.projects.personal import personal_kind
 
     memo: dict[tuple[str, tuple[str, ...]], dict] = {}
 

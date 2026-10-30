@@ -11,9 +11,9 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import object_session
 
-from app.assistant.personal import personal_kind, query_columns, request_columns
 from app.i18n import t
 from app.models import AssistantMessage
+from app.projects.personal import personal_kind, query_columns, request_columns
 
 INTEGRATION_FILE = re.compile(r"^integrations/([^/]+)/integration\.yaml$")
 REPORT_FILE = re.compile(r"^reports/([^/]+)/report\.yaml$")

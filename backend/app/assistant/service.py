@@ -275,7 +275,7 @@ log = logging.getLogger(__name__)
 
 @functools.lru_cache(maxsize=4)
 def _full_prefix(lang: str) -> str:
-    from app.assistant import guide
+    from app import guide
 
     base = SYSTEM_PREFIX_EN if lang == "en" else SYSTEM_PREFIX
     with use_locale(lang):
@@ -1966,7 +1966,7 @@ def _command_turn(db, actor, session: AssistantSession, parsed,
                                                                   parsed.args))]
     if definition.name == "ayuda" and not parsed.args:
         # 023 plan §6: the fixed reply, no provider call; recorded as a completed run.
-        from app.assistant.guide import ayuda
+        from app.assistant import ayuda
 
         project = db.get(Project, session.project_id) if session.project_id else None
         reply = ayuda.fixed_reply(db, project, current())
@@ -2321,7 +2321,7 @@ def _command_extra(run, db=None, files: dict[str, str] | None = None) -> str:
     stands (039/040)."""
     parts: list[str] = []
     if run.command == "ayuda" and run.arguments:
-        from app.assistant.guide import ayuda
+        from app.assistant import ayuda
 
         parts.append(ayuda.topic_block(run.arguments, run.locale))
     stored = run.result if isinstance(run.result, dict) else {}

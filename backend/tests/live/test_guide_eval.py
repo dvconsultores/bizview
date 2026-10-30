@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from app.assistant import guide
+from app import guide
 from app.config import get_settings
 from app.i18n import t, use_locale
 from tests.conftest import signed_in, write_project

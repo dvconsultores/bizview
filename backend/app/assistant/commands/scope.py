@@ -109,7 +109,7 @@ def _fold(text: str) -> str:
 def guide_terms() -> re.Pattern | None:
     """Titles and aliases of the app guide (023) as whole words: help questions are in scope."""
     try:
-        from app.assistant import guide
+        from app import guide
 
         terms = {_fold(term) for term in guide.all_terms()}
     except Exception:          # the guide has its own validation tests

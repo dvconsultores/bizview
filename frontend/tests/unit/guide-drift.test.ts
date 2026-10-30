@@ -10,7 +10,7 @@ import { canAccess, matchRoute, ROUTES, type RouteAccess, type Viewer } from "..
 import { ADMIN_TILES } from "../../src/pages/admin/adminTiles";
 
 const ROOT = join(process.cwd(), "..");
-const GUIDE = join(ROOT, "backend/app/assistant/guide");
+const GUIDE = join(ROOT, "backend/app/guide");
 
 interface Topic { id: string; roles: string[]; routes: string[]; tiles: string[] }
 const index = parse(readFileSync(join(GUIDE, "index.yaml"), "utf8")) as { topics: Topic[] };

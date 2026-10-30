@@ -136,7 +136,7 @@ def manifest_text(version) -> str:
     if manifest:
         return _dump(manifest)
     # First apply of an installation: the workspace template named after the organization (014).
-    from app.assistant.tree import bootstrap_manifest
+    from app.projects.tree import bootstrap_manifest
 
     return bootstrap_manifest()
 

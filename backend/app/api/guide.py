@@ -2,7 +2,7 @@
 viewer's role may read, in the request language."""
 from fastapi import APIRouter, Depends, Response
 
-from app.assistant import guide
+from app import guide
 from app.auth.deps import current_user
 from app.errors import ApiError
 from app.i18n import M, current

@@ -25,9 +25,9 @@ DISTRIBUTION_B = ("id: envio-b\nspec: specs/002-envio-b\nreport: ventas-b\nsubsc
 def env(tmp_path, monkeypatch):
     monkeypatch.setattr(get_settings(), "projects_dir", str(tmp_path / "projects"))
     # Readiness and query re-checks have their own tests; here only the apply mechanics.
-    monkeypatch.setattr("app.assistant.readiness.compute",
+    monkeypatch.setattr("app.projects.readiness.compute",
                         lambda *a, **k: {"ready": True, "pending": []})
-    monkeypatch.setattr("app.assistant.origin.recheck_draft", lambda *a, **k: [])
+    monkeypatch.setattr("app.projects.origin_checks.recheck_draft", lambda *a, **k: [])
     return tmp_path / "projects"
 
 

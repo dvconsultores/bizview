@@ -270,16 +270,24 @@ def readiness_view(db: Session, project: Project):
     return WorkView(project, session)
 
 
-def revalidate(db: Session, project: Project) -> dict:
-    """Validate the project (stored on it) and compute its readiness."""
-    from app.assistant import readiness
+def revalidate(db: Session, project: Project, *, check_origin: bool = False) -> dict:
+    """Validate the project (stored on it) and compute its readiness.
+
+    Origin checks run only on the explicit validate action, never on file saves."""
+    from app.projects import readiness
     from app.projects.compose import validate_project
 
     validation = validate_project(db, project)
     project.validation = validation
     db.flush()
+    view = readiness_view(db, project)
+    if check_origin and validation.get("valid"):
+        from app.config import get_settings
+        from app.projects import origin_checks
+
+        origin_checks.recheck_draft(db, view, get_settings())
     return {"validation": validation,
-            "readiness": readiness.compute(readiness_view(db, project))}
+            "readiness": readiness.compute(view)}
 
 
 def ensure_editable(project: Project) -> None:

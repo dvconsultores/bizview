@@ -5,7 +5,8 @@ import re
 
 import pytest
 
-from app.assistant import guide, service
+from app import guide
+from app.assistant import service
 from app.assistant.commands import scope
 from app.assistant.commands.registry import REGISTRY
 

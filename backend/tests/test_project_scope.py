@@ -47,9 +47,9 @@ REPORT_NO_JOIN = """
 def env(tmp_path, monkeypatch):
     monkeypatch.setattr(get_settings(), "projects_dir", str(tmp_path / "projects"))
     # Readiness and the query re-check have their own suites: here only the scope matters.
-    monkeypatch.setattr("app.assistant.readiness.compute",
+    monkeypatch.setattr("app.projects.readiness.compute",
                         lambda *a, **k: {"ready": True, "pending": []})
-    monkeypatch.setattr("app.assistant.origin.recheck_draft", lambda *a, **k: [])
+    monkeypatch.setattr("app.projects.origin_checks.recheck_draft", lambda *a, **k: [])
     return tmp_path / "projects"
 
 

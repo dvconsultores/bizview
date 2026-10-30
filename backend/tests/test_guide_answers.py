@@ -4,8 +4,8 @@ import time
 
 import pytest
 
+from app import guide
 from app.ai import fake
-from app.assistant import guide
 from app.assistant.commands.registry import REGISTRY
 from app.i18n import t, use_locale
 from app.projects import fs

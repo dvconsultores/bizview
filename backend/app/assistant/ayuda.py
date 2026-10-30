@@ -1,6 +1,6 @@
 """`/ayuda` (feature 023, plan §6): the fixed reply without arguments (no provider call) and the
 resolved-topic block of `/ayuda <tema>`."""
-from app.assistant import guide
+from app import guide
 from app.assistant.commands import registry
 from app.assistant.commands.scope import wrap_data
 from app.i18n import t, use_locale

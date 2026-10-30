@@ -238,7 +238,7 @@ def project_changes(slug: str, after: int = Query(0, ge=0),
 
 @router.post("/{slug}/validate")
 def validate(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
-    return projects.revalidate(db, projects.get(db, slug))
+    return projects.revalidate(db, projects.get(db, slug), check_origin=True)
 
 
 def _conversation(db: Session, p: Project, actor: AppUser):

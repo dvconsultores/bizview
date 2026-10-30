@@ -19,18 +19,18 @@ from bizview_cli import sqlsafety
 from bizview_cli import transform as transform_contract
 from psycopg import sql as pgsql
 
-from app.assistant.personal import (
-    personal_kind,
-    query_columns,
-    request_columns,
-    shape_personal,
-)
 from app.assistant.preview import CONNECT_TEXT, active_integrations, redact_values
 from app.engine import direct, extract
 from app.engine import report as engine
 from app.engine.extract import ExtractError
 from app.errors import ApiError
 from app.i18n import t
+from app.projects.personal import (
+    personal_kind,
+    query_columns,
+    request_columns,
+    shape_personal,
+)
 from app.projects.workview import real
 from app.services.audit import record
 from app.sources.service import by_name, secrets_of
