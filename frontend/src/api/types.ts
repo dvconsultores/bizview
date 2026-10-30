@@ -275,8 +275,10 @@ export interface ReportImageSet {
   fallback: "initial" | "none";
   /** Present for a folder set: `/api/reports/<id>/assets/<set>/`. */
   url?: string;
-  /** Present for a cached-URL set (still declaration-only). */
+  /** Present for a cached-URL set: the column holding the addresses. */
   column?: string;
+  /** Present for a cached-URL set: the prefix a cached value (`<sha256>.<ext>`) is read from. */
+  cached_url?: string;
 }
 
 export interface Change {

@@ -60,6 +60,7 @@ export function AssetGrid({
         {visible.map((row, idx) => {
           const imageSrc = !image && roles.image ? asString(row[roles.image]) : "";
           const imageName = image ? row[image.key] : undefined;
+          const imageValue = image?.column ? row[image.column.split(".").pop() ?? ""] : undefined;
           const title = roles.title ? asString(row[roles.title]) : "";
           const subtitle = roles.subtitle ? asString(row[roles.subtitle]) : "";
           const rawValue = roles.value ? row[roles.value] : undefined;
@@ -83,7 +84,9 @@ export function AssetGrid({
 
           return (
             <div key={idx} className="flex min-w-0 flex-col gap-1">
-              {image ? <ReportImage set={image} name={imageName} size={40} /> : null}
+              {image ? (
+                <ReportImage set={image} name={imageName} value={imageValue} size={40} />
+              ) : null}
               {roles.image && imageSrc ? (
                 <span>
                   <img

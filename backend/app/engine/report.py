@@ -980,9 +980,11 @@ def layout_problems(ctx: Context) -> list[dict]:
             for issue in issues if issue.level != "error"]
 
 
-def definition_json(ctx: Context, *, assets_base: str | None = None) -> dict:
-    """The report as the client reads it. `assets_base` is the report-scoped asset path of the
-    door the caller came through (044): with it, each declared image set carries its URL prefix."""
+def definition_json(ctx: Context, *, assets_base: str | None = None,
+                    images_base: str | None = None) -> dict:
+    """The report as the client reads it. `assets_base` and `images_base` are the report-scoped
+    image paths of the door the caller came through (044): with them, each declared image set
+    carries the prefix its pictures are read from."""
     d = ctx.definition
     pdf_cfg = d.get("pdf") or {}
     pdf_views = pdf_cfg.get("views")
@@ -1011,7 +1013,7 @@ def definition_json(ctx: Context, *, assets_base: str | None = None) -> dict:
             "views": pdf_layout_views},
         "ai_narrative": bool((d.get("ai_narrative") or {}).get("enabled", False)),
     }
-    images = report_images.payload(ctx, assets_base)
+    images = report_images.payload(ctx, assets_base, images_base)
     if images:
         out["images"] = images
     if isinstance(d.get("layout"), dict):

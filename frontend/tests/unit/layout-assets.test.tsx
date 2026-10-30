@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LayoutRenderer } from "../../src/components/report/LayoutRenderer";
-import { imageKey } from "../../src/components/report/ReportImage";
+import { imageKey, imageSrc } from "../../src/components/report/ReportImage";
 import type { ReportData, ReportDefinition, WebComponent } from "../../src/api/types";
 
 // Feature 044 — US1: a declared image set reaches the table cell, the asset tile and the KPI tile.
@@ -186,6 +186,21 @@ describe("044 images", () => {
     });
     expect(container.querySelectorAll("img")).toHaveLength(1);
     expect(container.querySelector('[role="img"]')).toBeNull();
+  });
+
+  it("a cached value is read from the report door, never from the third party", () => {
+    const set = {
+      key: "symbol",
+      fallback: "initial",
+      column: "l.logo_url",
+      cached_url: "/api/reports/cripto/images/",
+    } as const;
+    const hash = `${"a".repeat(64)}.png`;
+    expect(imageSrc(set, hash)).toBe(`/api/reports/cripto/images/${hash}`);
+    // A value the worker could not cache keeps its own address: the browser's onError ends it.
+    expect(imageSrc(set, "https://cdn.example/x.png")).toBe("https://cdn.example/x.png");
+    expect(imageSrc(set, "/site/logo.png")).toBeNull();
+    expect(imageSrc(set, "")).toBeNull();
   });
 
   it("no image: keeps today's behaviour", () => {

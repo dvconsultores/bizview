@@ -1099,3 +1099,34 @@ class AssistantRunProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+IMAGE_CACHE_STATUSES = ("ok", "failed")
+
+
+class ImageCache(Base):
+    """One URL a report asked a picture from, and what came back (feature 044, US3).
+
+    Content-addressed on disk: two URLs whose bytes are identical share one file, so the row keeps
+    the URL and the hash separately. A row is never deleted when a project goes away — the image
+    belongs to the installation — and the sweep is what removes old ones.
+    """
+
+    __tablename__ = "image_cache"
+    __table_args__ = (
+        UniqueConstraint("url", name="ux_image_cache_url"),
+        CheckConstraint(_in("status", IMAGE_CACHE_STATUSES), name="status"),
+        CheckConstraint("bytes IS NULL OR bytes >= 0", name="bytes"),
+        CheckConstraint("(status = 'ok') = (sha256 IS NOT NULL)", name="sha_on_ok"),
+        Index("ix_image_cache_sha256", "sha256"),
+        Index("ix_image_cache_fetched", "fetched_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    url: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str | None] = mapped_column(Text)
+    ext: Mapped[str | None] = mapped_column(Text)
+    bytes: Mapped[int | None] = mapped_column(Integer)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    status: Mapped[str] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text)

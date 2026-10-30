@@ -20,6 +20,7 @@ from app.engine import direct, narrative
 from app.engine import report as engine
 from app.errors import ApiError, not_found
 from app.i18n import M
+from app.images import cache as images_cache
 from app.models import AppUser, Dashboard, ReportCache
 from app.projects import fs
 from app.reports import images as report_images
@@ -115,7 +116,28 @@ def filter_values(ctx: engine.Context, dimension: str, sel,
 @router.get("/{report_id}")
 def get_report(report_id: str, user: AppUser = Depends(current_user), db: Session = DB):
     return engine.definition_json(_context(db, user, report_id),
-                                  assets_base=f"/api/reports/{report_id}/assets")
+                                  assets_base=f"/api/reports/{report_id}/assets",
+                                  images_base=f"/api/reports/{report_id}/images")
+
+
+def cached_image_response(name: str, request: Request) -> Response:
+    """One cached image: the file, its ETag and a year of private caching.
+
+    The name is the content hash, so the ETag is the name and a changed picture is a different
+    URL. Nothing is proxied: only files the cache already holds are served.
+    """
+    try:
+        data, content_type, digest = images_cache.read(name)
+    except (FileNotFoundError, OSError):
+        raise not_found(M("images.not_cached")) from None
+    etag = f'"{digest}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(data, media_type=content_type, headers={
+        "ETag": etag,
+        "Cache-Control": "private, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 def asset_response(ctx: engine.Context, base: str, set_name: str, key: str,
@@ -140,6 +162,14 @@ def asset_response(ctx: engine.Context, base: str, set_name: str, key: str,
         "Cache-Control": "private, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
     })
+
+
+@router.get("/{report_id}/images/{name}")
+def report_cached_image(report_id: str, name: str, request: Request,
+                        user: AppUser = Depends(current_user), db: Session = DB):
+    """A cached URL image by content hash (044 US2), behind the report's own access check."""
+    _context(db, user, report_id)
+    return cached_image_response(name, request)
 
 
 @router.get("/{report_id}/assets/{set_name}/{key}")

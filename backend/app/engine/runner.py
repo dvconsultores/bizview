@@ -46,7 +46,8 @@ from app.db import get_engine, get_sessionmaker, lock_key
 from app.engine import datasets, extract, rollup, transform
 from app.engine.extract import ExtractError
 from app.i18n import M, t, to_stored
-from app.models import AppUser, DataSource, IntegrationRun
+from app.images import cache as images_cache
+from app.models import AppUser, DataSource, IntegrationRun, WorkspaceVersion
 from app.sources import service as sources
 
 log = logging.getLogger("app.engine")
@@ -791,6 +792,14 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
         if failed_rollups:
             message = M("run.rollup_failed",
                         reports=", ".join(failed_rollups))
+    try:
+        version = db.get(WorkspaceVersion, run.version_id) if run.version_id else None
+        counts = images_cache.refresh_reports(db, version, iid)
+        if counts["fetched"] or counts["failed"]:
+            log.info("run %s: images fetched=%s failed=%s", run.id, counts["fetched"],
+                     counts["failed"])
+    except Exception:      # an image never fails a load
+        log.warning("run %s: the image cache pass failed", run.id, exc_info=True)
     _finish(db, run, "succeeded", message, plans)
     return run
 

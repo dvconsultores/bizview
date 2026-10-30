@@ -22,7 +22,7 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "direct_read_log", "report_rollup", "project", "project_file_revision",
               "assistant_command_run", "assistant_attachment", "google_link",
               "assistant_auto_run", "assistant_run_profile", "ai_status",
-              "appearance_settings"}
+              "appearance_settings", "image_cache"}
 
 
 def schema_tables():

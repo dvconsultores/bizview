@@ -33,12 +33,13 @@ def project_slug(ctx) -> str | None:
     return slug if isinstance(slug, str) and slug else None
 
 
-def payload(ctx, base: str | None = None) -> dict:
+def payload(ctx, base: str | None = None, cached_base: str | None = None) -> dict:
     """What the report definition carries: per set, its key, fallback and URL prefix.
 
     `base` is the report-scoped asset path of whichever door the client came through
     (`/api/reports/<id>/assets` or `/api/shared/<token>/assets`), so a share link reads the images
-    of its report and nothing else. Without a base the sets are declarative only.
+    of its report and nothing else; `cached_base` is that same door's cache path. Without them the
+    sets are declarative only.
     """
     out: dict[str, dict] = {}
     slug = project_slug(ctx)
@@ -48,6 +49,10 @@ def payload(ctx, base: str | None = None) -> dict:
         item: dict = {"key": spec.get("key"), "fallback": spec.get("fallback") or "initial"}
         if spec.get("column"):
             item["column"] = spec["column"]
+            # A cached URL is served by content hash: the row value *is* `<sha256>.<ext>`, so the
+            # client appends it to this prefix and the third party is never contacted.
+            if cached_base:
+                item["cached_url"] = f"{cached_base}/"
         if base and slug and isinstance(spec.get("folder"), str) and spec["folder"]:
             item["url"] = f"{base}/{name}/"
         out[name] = item

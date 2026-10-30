@@ -120,18 +120,18 @@ hosts, and the dashboard still renders, with zero outbound requests during the p
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] Cache tests in `backend/tests/test_image_cache.py`: one file per distinct image, two URLs with identical bytes share one file, a failure records `failed` and does not retry within 24 h, the data load still succeeds, and the transport spy records zero requests on a second render (SC-003)
-- [ ] T032 [P] [US3] Guard tests in the same file: a private address, a redirect into a private address, a payload over 300 KB and a non-image body are refused through `backend/app/security/netguard.py`
+- [x] T031 [P] [US3] Cache tests in `backend/tests/test_image_cache.py`: one file per distinct image, two URLs with identical bytes share one file, a failure records `failed` and does not retry within 24 h, the data load still succeeds, and the transport spy records zero requests on a second render (SC-003)
+- [x] T032 [P] [US3] Guard tests in the same file: a private address, a redirect into a private address, a payload over 300 KB and a non-image body are refused through `backend/app/security/netguard.py`
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Add migration `0043_image_cache.py` in `backend/alembic/versions/` creating the cached-image table of `data-model.md` (`url` unique, `sha256`, `ext`, `bytes`, `fetched_at`, `status` check `ok|failed`, `error`), plus its `upgrade`/`downgrade`
-- [ ] T034 [US3] Add the `image_url` kind to the extraction types in `backend/app/engine/extract.py`: accepted, kept as `text`, never coerced
-- [ ] T035 [US3] Create `backend/app/images/` (service + fetch): resolve through `netguard.guarded_client`, 10 s timeout, 300 KB cap, PNG/JPEG/WebP only (SVG refused — R3), content-hash into `image_cache_dir`, insert or update the row
-- [ ] T036 [US3] Run the cache pass after a successful load in `backend/app/engine/runner.py`: at most 500 new images per run, failures recorded and never failing the load, `status='failed'` older than 24 h retried once
-- [ ] T037 [US3] Serve cached images in `backend/app/api/projects.py`: extend the route added in T010 to fall through to the cache by hash, with the same ETag semantics and without ever proxying a third-party URL
-- [ ] T038 [US3] Add the retention sweep to `backend/app/worker.py` (hourly, like the preview housekeeping): remove files with no `ok` row and rows older than `image_cache_days`
-- [ ] T039 [US3] Make the renderer prefer the asset and then the cached URL in `frontend/src/components/report/LayoutRenderer.tsx`, using the key-to-URL map already in the payload (T017)
+- [x] T033 [US3] Add migration `0043_image_cache.py` in `backend/alembic/versions/` creating the cached-image table of `data-model.md` (`url` unique, `sha256`, `ext`, `bytes`, `fetched_at`, `status` check `ok|failed`, `error`), plus its `upgrade`/`downgrade`
+- [ ] T034 [US3] Add the `image_url` kind to the extraction types in `backend/app/engine/extract.py`: accepted, kept as `text`, never coerced — **dropped on purpose**: an integration column has only `type`, no `kind`, and the report already declares the URL column in `images.<set>.column`; a second list would drift. `columns_for` reads the declaration instead
+- [x] T035 [US3] Create `backend/app/images/` (service + fetch): resolve through `netguard.guarded_client`, 10 s timeout, 300 KB cap, PNG/JPEG/WebP only (SVG refused — R3), content-hash into `image_cache_dir`, insert or update the row
+- [x] T036 [US3] Run the cache pass after a successful load in `backend/app/engine/runner.py`: at most 500 new images per run, failures recorded and never failing the load, `status='failed'` older than 24 h retried once
+- [x] T037 [US3] Serve cached images in `backend/app/api/projects.py`: extend the route added in T010 to fall through to the cache by hash, with the same ETag semantics and without ever proxying a third-party URL
+- [x] T038 [US3] Add the retention sweep to `backend/app/worker.py` (hourly, like the preview housekeeping): remove files with no `ok` row and rows older than `image_cache_days`
+- [x] T039 [US3] Make the renderer prefer the asset and then the cached URL in `frontend/src/components/report/LayoutRenderer.tsx`, using the key-to-URL map already in the payload (T017)
 
 **Checkpoint**: all three stories work independently; US3 degrades to US1's assets when the network is gone.
 

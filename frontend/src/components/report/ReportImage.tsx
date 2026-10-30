@@ -17,6 +17,18 @@ function roleFor(key: string) {
   return roleAt([], hash);
 }
 
+const CACHED = /^[0-9a-f]{64}\.(png|jpe?g|webp)$/;
+const ABSOLUTE = /^https?:\/\//i;
+
+/** The image URL of one row: the cached file when the worker already fetched the value, the raw
+ * address otherwise (a failed fetch keeps it, and the browser's `onError` ends in the fallback). */
+export function imageSrc(set: ReportImageSet, value: unknown): string | null {
+  const raw = value === null || value === undefined ? "" : String(value).trim();
+  if (raw === "") return null;
+  if (CACHED.test(raw)) return set.cached_url ? `${set.cached_url}${raw}` : null;
+  return ABSOLUTE.test(raw) ? raw : null;
+}
+
 /** Feature 044: the image of a row key in a declared set — 20 px in a table cell, 40 px in a tile.
  *
  * The URL comes from the payload (`images.<set>.url`), so only the key is appended and a file name
@@ -26,16 +38,19 @@ function roleFor(key: string) {
 export function ReportImage({
   set,
   name,
+  value,
   label,
   size = 40,
 }: {
   set: ReportImageSet;
   name: unknown;
+  /** A cached-URL set's own value for this row (the column the set declares). */
+  value?: unknown;
   label?: string;
   size?: 20 | 40;
 }) {
   const key = imageKey(name);
-  const src = set.url && key ? `${set.url}${encodeURIComponent(key)}` : null;
+  const src = imageSrc(set, value) ?? (set.url && key ? `${set.url}${encodeURIComponent(key)}` : null);
   const [failed, setFailed] = useState<string | null>(null);
   const alt = label && label.trim() !== "" ? label : key;
   const box = { width: size, height: size };

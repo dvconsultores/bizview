@@ -53,7 +53,9 @@ def get_shared(
     db: Session = DB,
 ):
     links.record_visit(db, shared.link_id)
-    definition = engine.definition_json(shared.ctx, assets_base=f"/api/shared/{share_token}/assets")
+    definition = engine.definition_json(
+        shared.ctx, assets_base=f"/api/shared/{share_token}/assets",
+        images_base=f"/api/shared/{share_token}/images")
     definition["ai_narrative"] = False
     return {
         "dashboard": {"code": shared.dashboard.code, "name": shared.dashboard.name,
@@ -63,6 +65,16 @@ def get_shared(
         "theme": shared.theme,
         "report": definition,
     }
+
+
+@router.get("/{token}/images/{name}")
+def shared_cached_image(
+    request: Request,
+    name: str,
+    shared: links.Shared = Depends(shared_link),
+):
+    """A cached URL image of the shared report (044 US2): the same signed door as its data."""
+    return reports.cached_image_response(name, request)
 
 
 @router.get("/{token}/assets/{set_name}/{key}")
