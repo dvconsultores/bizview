@@ -383,6 +383,19 @@ editor (files, problems, history) next to its conversations. `PROJECT_MAX_MB` (d
 the size of one project. Applying a project creates a workspace version with it and the other
 applied projects; the version records which project owns each artifact.
 
+A project may also ship images: `assets/` inside the project folder holds the logos a report
+shows (`≤ 300 KB` each, `≤ 25 MB` per project), and they travel with the project's export. They
+need no extra volume, because they live inside `projects/` and are backed up with it.
+
+Images that a report reads from a **URL column** are different: the worker downloads each new
+address once and stores the bytes in `IMAGE_CACHE_DIR` (default `./image-cache` next to the
+compose file, mounted as `IMAGE_CACHE_DIR_HOST`; `IMAGE_CACHE_DAYS`, default 30, is the retention
+window). The files are named by their content hash and shared by every project that asks for the
+same address, so plan for a few megabytes per hundred logos — the 300 KB cap per image is the
+ceiling. It is written by the worker and read by the backend, so both need it, and it belongs in
+the backups: without it the dashboards show the fallback circle until the next run downloads the
+images again.
+
 A mockup attached to a conversation as the report brief is stored outside the project, in
 `ATTACHMENTS_DIR` (default `./attachments` next to the compose file, mounted as
 `ATTACHMENTS_DIR_HOST`; `ATTACHMENTS_MAX_MB` 5 and `ATTACHMENTS_MAX_PER_MESSAGE` 4 by default;

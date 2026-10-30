@@ -139,9 +139,9 @@ hosts, and the dashboard still renders, with zero outbound requests during the p
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T040 [P] Authoring guide: a section in `docs/VIBE-REPORTING.md` on images (folder, naming by key, limits, licence) and on the four components' PDF blocks
-- [ ] T041 [P] `CHANGELOG.md`: an entry under the next version — Added (assets folder, `images:`, the PDF blocks, the image cache) and Changed (the schema version bump)
-- [ ] T042 [P] `docs/INSTALL.md`: `IMAGE_CACHE_DIR`, its volume and its size expectation, next to the projects folder section
+- [x] T040 [P] Authoring guide: a section in `docs/VIBE-REPORTING.md` on images (folder, naming by key, limits, licence) and on the four components' PDF blocks
+- [x] T041 [P] `CHANGELOG.md`: an entry under the next version — Added (assets folder, `images:`, the PDF blocks, the image cache) and Changed (the schema version bump)
+- [x] T042 [P] `docs/INSTALL.md`: `IMAGE_CACHE_DIR`, its volume and its size expectation, next to the projects folder section
 - [ ] T043 Bump the authoring skeleton version in `cli/bizview_cli/workspace_template/` (copy source only) and regenerate `pack/` so the published contract and the code ship together (constitution note in `plan.md`)
 - [ ] T044 Run `sh scripts/check_vocabulary.sh` — must stay green: this feature adds no AI surface and no authoring-in-product path
 - [ ] T045 Run the seven checks of `specs/044-visual-components-and-assets/quickstart.md` in order and record the result of each in the PR description

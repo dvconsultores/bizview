@@ -23,9 +23,11 @@ services:
       POLARS_TEMP_DIR: ${POLARS_TEMP_DIR:-/tmp/bizview-polars}
       PROJECTS_DIR: /app/data/projects
       ATTACHMENTS_DIR: /app/data/attachments
+      IMAGE_CACHE_DIR: /app/data/image-cache
     volumes:
       - ${PROJECTS_DIR_HOST:-./projects}:/app/data/projects     # BI projects (feature 020), read-write, backend only
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # chat image briefs (feature 024)
+      - ${IMAGE_CACHE_DIR_HOST:-./image-cache}:/app/data/image-cache   # images cached from a URL column (feature 044)
 
   worker:
     container_name: bizview-worker                      # integration runs (feature 005): same image, other entry point
@@ -40,11 +42,14 @@ services:
     environment:
       POLARS_TEMP_DIR: ${POLARS_TEMP_DIR:-/tmp/bizview-polars}  # Polars streaming spill (whole-mode transforms)
       ATTACHMENTS_DIR: /app/data/attachments   # feature 024: the worker sweeps unsent images
+      IMAGE_CACHE_DIR: /app/data/image-cache   # feature 044: the worker downloads the images here
     restart: unless-stopped
     healthcheck:
       disable: true
     volumes:
       - ${ATTACHMENTS_DIR_HOST:-./attachments}:/app/data/attachments   # feature 024
+      # Read-write: the worker is the one that downloads the images a report asks for (feature 044).
+      - ${IMAGE_CACHE_DIR_HOST:-./image-cache}:/app/data/image-cache
       # The previews it runs read the project folders (feature 020/014). Without this mount the
       # worker saw an empty draft, recorded a "succeeded" preview over no files, and the workspace
       # kept saying "el borrador cambió desde la última vista previa" while Apply stayed disabled.

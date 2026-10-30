@@ -8,6 +8,34 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Las imágenes viajan dentro del proyecto (2026-10-29, feature 044)**: la carpeta `assets/` del
+  proyecto acepta `.png`, `.jpg`, `.webp` y `.svg` (≤ 300 KB cada uno, ≤ 25 MB por proyecto), con
+  los bytes comprobados contra la extensión y el SVG limpio al importar (sin scripts ni referencias
+  externas). Un reporte declara `images: {coins: {folder: assets/coins, key: symbol}}` y un
+  componente lo usa con `image: coins`: la clave de la fila busca `BTC.png`, `btc.png` o
+  `BTC.svg` sin que nadie escriba una ruta, y sirve la imagen en `/api/reports/<id>/assets/…` con
+  `ETag` e inmutable. Sin archivo, o con `fallback: none`, se dibuja el círculo con la inicial y un
+  color de la paleta. `assets/` se exporta y se importa con el resto del proyecto.
+- **Cuatro bloques visuales en el PDF (feature 044)**: `gauge`, `index`, `share` y `asset` dejan de
+  ser sólo de pantalla. El PDF dibuja el arco con sus bandas y su aguja, la barra de índice con sus
+  dos extremos, el reparto con su resto y la ficha con el logo, la cifra y la insignia con signo, y
+  las cifras coinciden con la pantalla. Las imágenes se embeben del propio proyecto; un conjunto
+  sólo con SVG imprime el círculo de la inicial, como ya avisa la validación.
+- **Las imágenes de una columna de URL se cachean una sola vez (feature 044)**: tras una carga
+  correcta, el worker descarga las direcciones nuevas de la columna que declara el reporte (bajo el
+  guardián de direcciones de las fuentes, 10 s, 300 KB, sólo PNG/JPEG/WebP) y las guarda con nombre
+  de su hash. La fila pasa a apuntar a Bizview, así que quien mira el tablero nunca llama al
+  tercero, dos URL con los mismos bytes comparten un archivo, y un fallo se registra sin romper la
+  carga (se reintenta como mucho una vez al día).
+
+### Changed
+
+- **Contrato de autoría (feature 044)**: `report.yaml` gana `images:`; los componentes `table`,
+  `kpi` y `asset` aceptan `image:`; `layout.pdf.blocks` acepta los cuatro tipos visuales, y la
+  validación rechaza un bloque enlazado a una vista que no sabe dibujar. La guía de autoría
+  (`docs/VIBE-REPORTING.md` §4) explica las carpetas, los límites, el relleno y la licencia de las
+  imágenes.
+
 - **El plan de `/speckit-all` vuelve a implementar por sí solo (2026-10-28, feature 040)**: las
   etapas ya no son un índice de ida. Si converger agrega o reabre tareas, el run las implementa en
   la misma ejecución y vuelve a converger (máximo dos rondas de convergencia); si verificar falla,

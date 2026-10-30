@@ -26,8 +26,8 @@ RUN uv sync --no-dev --no-install-project --frozen
 
 COPY backend/ ./
 RUN useradd --system --uid 10001 app && chmod +x entrypoint.sh \
-    && mkdir -p /app/data/projects /app/data/workspace \
-    && chown app:app /app/data/projects /app/data/workspace
+    && mkdir -p /app/data/projects /app/data/workspace /app/data/image-cache \
+    && chown app:app /app/data/projects /app/data/workspace /app/data/image-cache
 USER app
 
 EXPOSE 8000
