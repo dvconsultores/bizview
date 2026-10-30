@@ -67,15 +67,20 @@ apply or the Help page needs may die with the agent.
 
 ## Batches (each: brief → apply verbatim → verify → audit → correct)
 
-- **A1 Detach** (backend): D3, D4, D5 backend moves + re-keying; `api/guide.py` and
-  `api/projects.py` re-pointed; worker preview queue; i18n keys that move (`readiness.*`,
-  `preview.*`, `origin.*`, `tree.*`, `summary.*`, `narrative.*`, `ai.error.*` stay). Suites must
-  be green with the assistant still present — detachment is behavior-preserving except readiness
-  (D4), whose new deterministic path gets tests in the same batch.
-- **A2 Delete backend**: `app/assistant/`, `api/assistant.py`, testhooks, tool-calling provider
-  surface (D1), 035 state machinery (D2), config settings (spec'd list), models/constants,
-  `main.py`, `worker.py` leftovers, `projects/*` session parameters and busy-gates, backend i18n
-  deletions, D6 migrations, `cli.py` `import_open_drafts` removal.
+- **A1 Detach** (backend): D4 and the D5 moves that are behavior-preserving (guide, origin check
+  half, personal, `tree.bootstrap_manifest`); `api/guide.py` re-pointed; D4's deterministic
+  readiness path is **additive** (validate runs the checks; the agent's path keeps working).
+  Suites green with the assistant still present. — *Amended 2026-10-29: D3 (preview re-key) and
+  the WorkView simplification move to A2: `validation`/`query_checks`/`preview` already live on
+  the Project (WorkView), and preview's session coupling (advisory locks, conversation messages,
+  `_view`) cannot be re-keyed while the chat still runs it.*
+- **A2 Delete backend + re-key**: D3 preview re-key (project-keyed schemas and lock, worker
+  queue on the new `preview_request`, `record_outcome` retired — the outcome lives in
+  `project.preview`), WorkView simplified to project-only; then `app/assistant/`,
+  `api/assistant.py`, testhooks, tool-calling provider surface (D1), 035 state machinery (D2),
+  config settings (spec'd list), models/constants, `main.py`, `worker.py` leftovers,
+  `projects/*` session parameters and busy-gates, backend i18n deletions, D6 migrations,
+  `cli.py` `import_open_drafts` removal.
 - **A3 Delete frontend + WS-G**: moves first (D5), then `components/assistant/`, pages, routes,
   `routeAccess`, api clients, `types.ts` blocks, i18n groups (`assistant` minus `downloadZip`
   relocation, `chatAttachments`, slim `ai`, `nav.ai` etc.), `AppShell`/`ShellChrome`/

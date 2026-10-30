@@ -9,20 +9,16 @@ before the next starts. Full suites once, at the end of A4 (code first, test las
       `prompt_block`/`index_text`/`resolve` left behind; the 14 `agente` topics +
       `perfiles-de-ejecucion` parked in `specs/043-…/drafts/guide-reuse/`;
       `frontend/tests/unit/guide-drift.test.ts` re-pathed.
-- [ ] T002 Preview re-keyed by project (D3): `assistant/preview.py` → `projects/preview.py`;
-      `preview_request` table (new, keyed by `project_id` + user) written by a migration that
-      also migrates pending `assistant_preview_request` rows; `engine/runner.run_preview`,
-      `engine/datasets.preview_prefix`, `engine/report.PreviewVersion`, `worker.py`
-      queue/cleanup, `projects/apply.drop_for_session` → `drop_for_project`; API routes under
-      `/api/projects/{slug}/preview*` unchanged in shape.
+- [ ] T002 *(moved to Batch A2, runs as T006b — see plan amendment: preview cannot be re-keyed
+      behavior-preservingly while the chat still runs it)*.
 - [ ] T003 Readiness deterministic (D4): `assistant/readiness.py` → `projects/readiness.py`;
       `POST /projects/{slug}/validate` runs `origin.run_check` for every query/request file and
       records `project.query_checks`; personal-data confirmation persisted per project;
       apply gate reads both; tests for the new path.
 - [ ] T004 Remaining moves (D5): `origin.py` check half → `projects/origin_checks.py`;
       `personal.py` → `projects/personal.py` (`engine/direct.py` re-pointed);
-      `tree.bootstrap_manifest` → `projects/compose.py`; `WorkView` project-only; moved i18n
-      keys (`readiness.*`, `preview.*`, `origin.*`, `tree.*`) keep their ids.
+      `tree.bootstrap_manifest` → `projects/compose.py`; moved i18n keys keep their ids.
+      (`WorkView` simplification moved to A2 with the preview re-key.)
 - [ ] T005 Verify: ruff + full backend suite green (assistant still present), frontend
       `guide-drift` green.
 
@@ -30,6 +26,12 @@ before the next starts. Full suites once, at the end of A4 (code first, test las
 - [ ] T006 Fix migration 0029 (`upgrade()` must not import `app.assistant`); new drop migration
       per D6 (export applied conversations' spec folders, drop `assistant_*`, `ai_status`,
       revision FKs → plain columns, `app_user.attachments_notice_at`).
+- [ ] T006b Preview re-keyed by project (D3, ex-T002): `assistant/preview.py` →
+      `projects/preview.py`; new `preview_request` table (project_id + requested_by) in the D6
+      migration; schemas and advisory lock keyed by project id; `record_outcome` retired (the
+      outcome lives in `project.preview`); `engine` keying, `worker.py` queue/cleanup,
+      `drop_for_session` → `drop_for_project`; WorkView → project-only view; API routes under
+      `/api/projects/{slug}/preview*` unchanged in shape.
 - [ ] T007 Delete `app/assistant/`, `api/assistant.py`, assistant testhooks; `main.py` router
       list; `worker.py` notify/watch and attachment sweep; `cli.py` `import_open_drafts`.
 - [ ] T008 Provider slim-down (D1): delete `Provider.chat` + chat types + `history_rules.py` +
