@@ -37,7 +37,7 @@ images:
 
 | Field | Required | Rules |
 |---|---|---|
-| folder | one of `folder`/`column` | must exist in the project and start with `assets/` |
+| folder | `folder` and/or `column` | must exist in the project and start with `assets/` |
 | column | one of `folder`/`column` | must be a declared column of a dataset the report uses |
 | key | yes | a declared dimension, or a column of a dataset the report uses |
 | fallback | no (default `initial`) | `initial` draws the circle; `none` leaves the space empty |
@@ -78,5 +78,6 @@ than the retention window or the file is gone.
   `project_file_revision` already say.
 - **No per-project cache.** Sharing by content hash is the point; per-project caches would multiply
   the same 483 logos per project.
-- **No image column type in the database.** `image_url` is an extraction-level kind; the column stays
-  `text` in the dataset, which keeps the engine's type system unchanged.
+- **No image column type in the database, and no `kind: image_url` on the column either.** The
+  report's `images.<set>.column` is the declaration: the worker reads it, and the column stays `text`
+  in the dataset, which keeps the engine's type system unchanged (R6).

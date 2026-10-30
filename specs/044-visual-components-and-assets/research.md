@@ -104,3 +104,27 @@ the only option that keeps both.
   example in the golden project.
 - *A second positional slot for the set*: positional lists are already the hardest part of this
   schema to read; a named key is clearer.
+
+## R6 — Who says which column holds image addresses
+
+**Decision**: the **report** says it, in `images: {<set>: {column: <alias>.<column>}}`; there is no
+`kind: image_url` on the integration column. After a load, `app/images/cache.py` collects the columns
+the applied reports name for that integration (`columns_for`), fetches the unknown values, and
+rewrites the successful ones to `<sha256>.<ext>`. The payload hands the client a report-scoped
+`cached_url` prefix, and the two doors that already serve the report (`/api/reports/<id>/images/<name>`
+and `/api/shared/<token>/images/<name>`) serve the bytes.
+
+**Rationale**: an integration column in `integration.schema.json` carries a stored `type` and no
+`kind`; adding one would mean a second declaration of the same fact — the schema would hold it, the
+report would also hold it, and the two would drift. The report is where the picture is *used*, so it
+is where "this column holds addresses" belongs, and the validator can check the alias against
+`uses` while it is already checking `key` against the dimensions. It also keeps the engine's type
+system untouched, which FR-004's original wording would have bent.
+
+**Alternatives considered**:
+- *`kind: image_url` on the column (the original plan)*: needs a schema change in the authoring
+  contract, a validator rule pairing it with `text`, and the worker still has to find which datasets
+  of which reports are affected — the report already answers that.
+- *Fetch at render time*: rejected in R4 (a network in the report path).
+- *Store the address in the row and let the browser fetch it*: that is what the asset tile did until
+  now, and it is exactly the third-party request SC-003 forbids.

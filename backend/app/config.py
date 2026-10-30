@@ -187,7 +187,7 @@ class Settings(BaseSettings):
     # Images fetched once from an `image_url` column of a report (feature 044): content-addressed
     # files outside PROJECTS_DIR, shared by every project that asks for the same URL.
     image_cache_dir: str = Field(default_factory=lambda: str(ROOT / "image-cache"))
-    image_cache_days: int = Field(default=30, ge=1, le=3650)
+    image_cache_days: int = Field(default=90, ge=1, le=3650)
     # Image briefs in the chat (feature 024): files live outside PROJECTS_DIR, with limits.
     attachments_dir: str = Field(default_factory=lambda: str(ROOT / "attachments"))
     attachments_max_per_message: int = Field(default=4, ge=1, le=10)

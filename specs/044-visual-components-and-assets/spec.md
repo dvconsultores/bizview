@@ -147,8 +147,13 @@ dashboard renders them with the network to those hosts cut off afterwards, and t
 - **FR-003**: The four components — `asset`, `gauge`, `index`, `share` — MUST exist in the
   declarative schema (the CLI's `report.schema.json` as the single source), in the screen renderer
   and in the PDF renderer, and MUST take their colours only from palette roles.
-- **FR-004**: Integration columns MUST support `kind: image_url`, and the worker MUST cache those
-  images locally as described in US3, without ever blocking a data load on an image failure.
+- **FR-004**: A report MUST be able to name a column that holds image addresses
+  (`images: {<set>: {column: <alias>.<column>, key: <key>}}`), and the worker MUST cache the values
+  of the columns the applied reports name, as described in US3, without ever blocking a data load on
+  an image failure. *(Amended 2026-10-29 — this first asked for an integration column `kind:
+  `image_url``: an integration column carries only a stored `type`, and the report already declares
+  which column holds the addresses, so a second declaration could only drift from it. See research
+  R6.)*
 - **FR-005**: The image lookup order MUST be project asset → cached URL → fallback; `initial` MUST
   draw a circle with the first letter in a palette-derived colour, `none` MUST leave the space empty.
 - **FR-006**: Served images MUST carry per-version caching headers and MUST NOT exceed 300 KB each;

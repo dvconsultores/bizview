@@ -389,7 +389,7 @@ need no extra volume, because they live inside `projects/` and are backed up wit
 
 Images that a report reads from a **URL column** are different: the worker downloads each new
 address once and stores the bytes in `IMAGE_CACHE_DIR` (default `./image-cache` next to the
-compose file, mounted as `IMAGE_CACHE_DIR_HOST`; `IMAGE_CACHE_DAYS`, default 30, is the retention
+compose file, mounted as `IMAGE_CACHE_DIR_HOST`; `IMAGE_CACHE_DAYS`, default 90, is the retention
 window). The files are named by their content hash and shared by every project that asks for the
 same address, so plan for a few megabytes per hundred logos — the 300 KB cap per image is the
 ceiling. It is written by the worker and read by the backend, so both need it, and it belongs in
