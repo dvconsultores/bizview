@@ -116,6 +116,11 @@ LAYOUT_REPORT = """
         metrics: [net_sales, orders]
         limit: 50
     filters: [product]
+    images:
+      productos:
+        folder: assets/productos
+        key: product
+        fallback: initial
     pdf:
       enabled: true
     layout:
@@ -140,10 +145,18 @@ LAYOUT_REPORT = """
             series: [net_sales]
             orientation: horizontal
             span: 4
+          - id: fichas
+            type: asset
+            view: detalle
+            columns: [product, product, net_sales]
+            image: productos
+            limit: 4
+            span: 12
           - id: detalle
             type: table
             view: detalle
             columns: [product, net_sales, orders]
+            image: productos
             totals: true
             page_size: 25
             span: 12
@@ -239,4 +252,23 @@ def build(root: Path, origin: str, *, source: str = "Origen prueba", title: str 
     write(root, "reports/ventas/report.yaml", REPORT.format(title=title))
     spec(root, "report", "002-ventas-layout")
     write(root, "reports/ventas-layout/report.yaml", LAYOUT_REPORT.format(title=title))
+    assets(root)
     return root
+
+
+#: The products the origin fixture carries, so every row of the seeded table has its picture.
+PRODUCT_CODES = ("P1", "P2")
+
+
+def assets(root: Path) -> None:
+    """Feature 044: the logos the layout report reads from `assets/productos/`."""
+    import io
+
+    from PIL import Image as Pillow
+
+    for code in PRODUCT_CODES:
+        buffer = io.BytesIO()
+        Pillow.new("RGB", (16, 16), (60, 90, 200)).save(buffer, format="PNG")
+        path = root / "assets" / "productos" / f"{code}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(buffer.getvalue())

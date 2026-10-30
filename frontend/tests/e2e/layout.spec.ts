@@ -20,6 +20,7 @@ interface DeclaredComponent {
   view?: string;
   span?: number;
   summary?: boolean;
+  image?: string;
 }
 
 interface Definition {
@@ -141,6 +142,35 @@ for (const scheme of ["light", "dark"] as const) {
       }
       await expectNoHorizontalScroll(page);
       await expectAccessible(page, `layout at 1280 in ${scheme}`);
+    });
+
+    test("every picture comes from this installation, at 375 and 1280 px (044)", async ({ page }) => {
+      const { declared } = await openReport(page, LAYOUT_REPORT);
+      expect(
+        declared.filter((component) => component.image).length,
+        `${LAYOUT_REPORT} must declare a component with image: for this spec to prove SC-001`,
+      ).toBeGreaterThan(0);
+
+      // A viewer never reaches the third party: every src is one of our own doors.
+      const sources = await page
+        .locator("[data-layout-id] img")
+        .evaluateAll((images) => images.map((image) => image.getAttribute("src") ?? ""));
+      expect(sources.length).toBeGreaterThan(0);
+      for (const src of sources) {
+        expect(src, "an image must come from this installation").toMatch(/^\/api\//);
+      }
+
+      // The pictures are drawn at their documented size and never widen the page.
+      for (const width of [375, 1280]) {
+        await page.setViewportSize({ width, height: width === 375 ? 740 : 900 });
+        await settled(page);
+        const sizes = await page
+          .locator("[data-layout-id] img")
+          .evaluateAll((images) => images.map((image) => Math.round(image.getBoundingClientRect().width)));
+        for (const size of sizes) expect([20, 40], `image width ${size} at ${width}px`).toContain(size);
+        await expectNoHorizontalScroll(page);
+      }
+      await expectAccessible(page, `images in ${scheme}`);
     });
 
     test("every chart announces the engine's summary", async ({ page }) => {
