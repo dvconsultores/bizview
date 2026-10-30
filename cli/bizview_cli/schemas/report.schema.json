@@ -1289,7 +1289,7 @@
       ],
       "properties": {
         "type": {
-          "description": "Tipo del bloque: header, kpi_row, chart, table, text, page_break o footer.",
+          "description": "Tipo del bloque: header, kpi_row, chart, table, text, page_break, footer o uno de los visuales (gauge, index, share, asset).",
           "enum": [
             "header",
             "kpi_row",
@@ -1297,7 +1297,11 @@
             "table",
             "text",
             "page_break",
-            "footer"
+            "footer",
+            "gauge",
+            "index",
+            "share",
+            "asset"
           ]
         },
         "id": {
@@ -1333,7 +1337,7 @@
           ]
         },
         "items": {
-          "description": "Métricas de la fila de indicadores (kpi_row); al menos una.",
+          "description": "Métricas del bloque: en kpi_row, las de la fila de indicadores; en share, las de los segmentos, en orden.",
           "type": "array",
           "items": {
             "description": "Id de una métrica del indicador.",
@@ -1392,7 +1396,7 @@
           "maximum": 200
         },
         "columns": {
-          "description": "Columnas de la tabla del PDF en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "description": "Columnas del PDF en orden: en table, las métricas o dimensiones de la tabla (por defecto, las de la vista); en asset, la lista posicional [imagen, título, subtítulo, valor, delta].",
           "type": "array",
           "items": {
             "description": "Id de una métrica o dimensión de la tabla.",
@@ -1471,6 +1475,64 @@
           "type": "string",
           "maxLength": 200,
           "description": "Línea legal en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa legal."
+        },
+        "metric": {
+          "description": "Métrica del bloque gauge o index.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "min": {
+          "description": "Mínimo de la escala de gauge/index; por defecto 0.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Máximo de la escala de gauge/index; por defecto 100.",
+          "type": "number"
+        },
+        "low_label": {
+          "description": "Etiqueta del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "low_label_en": {
+          "description": "Etiqueta en inglés del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label": {
+          "description": "Etiqueta del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label_en": {
+          "description": "Etiqueta en inglés del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label": {
+          "description": "Etiqueta del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label_en": {
+          "description": "Etiqueta en inglés del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "image": {
+          "description": "Conjunto de imágenes (clave de `images`) del bloque: en table, la imagen de la celda clave; en asset, junto al nombre.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "sparkline": {
+          "description": "Mostrar la minigráfica del kpi; por defecto false.",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "asset: cuántas filas de la vista se muestran; por defecto 8.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
         }
       },
       "allOf": [

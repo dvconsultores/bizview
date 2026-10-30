@@ -26,7 +26,13 @@ if TYPE_CHECKING:
 WEB_COMPONENT_TYPES = ("kpi", "line", "area", "bar", "pie", "donut", "table", "gauge", "share",
                        "index", "asset", "text", "filters",
                        "spacer")
-PDF_BLOCK_TYPES = ("header", "kpi_row", "chart", "table", "text", "page_break", "footer")
+PDF_BLOCK_TYPES = ("header", "kpi_row", "chart", "table", "text", "page_break", "footer",
+                   "gauge", "index", "share", "asset")
+# 044: la vista que cada bloque visual sabe dibujar (el renderizador muestra una tarjeta de
+# error con cualquier otra, así que el validador lo rechaza antes).
+PDF_BLOCK_VIEWS = {"gauge": "kpis", "index": "kpis", "share": "kpis", "asset": "table"}
+# 044: los bloques del PDF que pueden dibujar la imagen de un conjunto declarado.
+PDF_BLOCK_IMAGES = ("table", "asset")
 CHART_KINDS = ("line", "area", "bar", "pie", "donut")
 COLOR_ROLES = ("primary", "positive", "negative", "neutral", "muted",
                *(f"series{n}" for n in range(1, 9)))
@@ -112,7 +118,7 @@ def check_layout(definition: dict, *, file: str, entry: str = "report") -> list[
                           "value": PALETTE_PRESETS[0]}))
     pdf = layout.get("pdf")
     if isinstance(pdf, dict):
-        _pdf(pdf, facts, file, entry, out)
+        _pdf(pdf, facts, file, entry, out, images)
         if _legacy_pdf(definition):
             out.append(_issue(
                 entry, "layout_pdf_legacy_views",
@@ -243,16 +249,17 @@ _IMAGE_COMPONENTS = ("table", "kpi", "asset")
 
 
 def _image_ref(value, type_, images: dict, path: str, label: str, file: str, entry: str,
-               out: list[Issue]) -> None:
-    """044: a component may name an image set, and only the three that can draw one."""
+               out: list[Issue], allowed: tuple[str, ...] | None = None) -> None:
+    """044: a component or block may name an image set, and only those that can draw one."""
     if value is None:
         return
-    if type_ not in _IMAGE_COMPONENTS:
+    if type_ not in (allowed or _IMAGE_COMPONENTS):
         out.append(_issue(
             entry, "layout_image_not_allowed",
-            f"{label}: image solo vale en {', '.join(_IMAGE_COMPONENTS)}", file=file,
-            path=path, expected={"enum": list(_IMAGE_COMPONENTS)},
-            fix=_use("image en un componente que dibuja imágenes", _IMAGE_COMPONENTS)))
+            f"{label}: image solo vale en {', '.join(allowed or _IMAGE_COMPONENTS)}", file=file,
+            path=path, expected={"enum": list(allowed or _IMAGE_COMPONENTS)},
+            fix=_use("image en un componente que dibuja imágenes",
+                     allowed or _IMAGE_COMPONENTS)))
         return
     if value not in images:
         out.append(_issue(
@@ -306,7 +313,8 @@ def _web(web: dict, facts: _Facts, file: str, entry: str, out: list[Issue],
 # ------------------------------------------------------------------ layout.pdf
 
 
-def _pdf(pdf: dict, facts: _Facts, file: str, entry: str, out: list[Issue]) -> None:
+def _pdf(pdf: dict, facts: _Facts, file: str, entry: str, out: list[Issue],
+         images: dict | None = None) -> None:
     """Comprueba layout.pdf: página, bloques, ids únicos, referencias y límites."""
 
     _enum(out, entry, file, "/layout/pdf/overflow", "overflow", pdf.get("overflow"),
@@ -326,7 +334,12 @@ def _pdf(pdf: dict, facts: _Facts, file: str, entry: str, out: list[Issue]) -> N
                 f"{label}: tipo de bloque '{type_}' fuera del catálogo", file=file,
                 path=where + "/type", expected={"enum": list(PDF_BLOCK_TYPES)},
                 fix=_use("uno de los tipos del catálogo", PDF_BLOCK_TYPES)))
+        _image_ref(block.get("image"), type_, images or {}, where + "/image", label, file, entry,
+                   out, allowed=PDF_BLOCK_IMAGES)
         view = _view_ref(block.get("view"), where + "/view", label, facts, file, entry, out)
+        if isinstance(type_, str) and type_ in PDF_BLOCK_VIEWS:
+            _view_unsuitable(view, block.get("view"), PDF_BLOCK_VIEWS[type_], where + "/view",
+                             label, file, entry, out)
         if type_ == "chart":
             _enum(out, entry, file, where + "/kind", f"{label}: kind", block.get("kind"),
                   CHART_KINDS)
@@ -606,6 +619,24 @@ def _block_enums(node: dict, where: str, label: str, file: str, entry: str,
 
 
 # -------------------------------------------------------------------- avisos
+
+
+def _view_unsuitable(view: dict | None, view_id: object, wanted: str, path: str, label: str,
+                     file: str, entry: str, out: list[Issue]) -> None:
+    """layout_view_unsuitable: un bloque visual enlazado a una vista del tipo equivocado.
+
+    El renderizador sustituye el bloque por una tarjeta de error, así que se rechaza al validar."""
+
+    if view is None:
+        return
+    kind = view.get("type")
+    if not isinstance(kind, str) or kind == wanted:
+        return
+    out.append(_issue(
+        entry, "layout_view_unsuitable",
+        f"{label}: la vista '{view_id}' es de tipo '{kind}' y este bloque necesita una vista"
+        f" '{wanted}'", file=file, path=path, expected={"view_type": wanted},
+        fix=f"enlaza el bloque a una vista de tipo {wanted} o cambia el tipo del bloque"))
 
 
 def _x_suitable(x: object, view: dict | None, facts: _Facts, path: str, label: str, file: str,

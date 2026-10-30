@@ -8,8 +8,10 @@ palette and the fonts live here, with the ones the fixed story already uses.
 `pdf.render()` owns the document: it builds the story here when the report declares a layout and
 keeps the fixed story for every report that does not (FR-009).
 """
+import base64
 import io
 import logging
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,11 +23,12 @@ from zoneinfo import ZoneInfo
 from reportlab.graphics.charts.barcharts import HorizontalBarChart, VerticalBarChart
 from reportlab.graphics.charts.lineplots import LinePlot
 from reportlab.graphics.charts.piecharts import Pie
-from reportlab.graphics.shapes import Circle, Drawing
+from reportlab.graphics.shapes import Circle, Drawing, Line, Polygon, Rect, String, Wedge
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4, LETTER, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     Flowable,
     Image,
@@ -48,12 +51,24 @@ FONTS = {"sans": "Helvetica", "sans_bold": "Helvetica-Bold",
 ALIGN = {"left": TA_LEFT, "center": TA_CENTER, "right": TA_RIGHT}
 PAGE_SIZES = {"a4": A4, "letter": LETTER}
 DEFAULT_MARGINS = {"top": 12.0, "right": 10.0, "bottom": 12.0, "left": 10.0}
-BLOCK_TYPES = ("header", "kpi_row", "chart", "table", "text", "page_break", "footer")
+BLOCK_TYPES = ("header", "kpi_row", "chart", "table", "text", "page_break", "footer",
+               "gauge", "index", "share", "asset")
 CHART_KINDS = ("line", "area", "bar", "pie", "donut")
 MIN_CHART_MM, MAX_CHART_MM, DEFAULT_CHART_MM = 30, 200, 60
 MIN_MARGIN, MAX_MARGIN = 5.0, 40.0
 DEFAULT_TOP_N = 6
 DEFAULT_KIND = {"trend": "line", "ranking": "bar", "table": "bar", "kpis": "bar"}
+# 044: the four visual blocks mirror their screen components exactly, palette roles included.
+GAUGE_ROLES = ("negative", "series5", "neutral", "series3", "positive")
+SHARE_ROLES = ("series1", "series2", "series3", "series4")
+INDEX_ROLES = ("series1", "neutral", "series2")
+INDEX_SLICES = 24
+GAUGE_MAX_RADIUS, GAUGE_HOLE = 32 * mm, 0.76
+ASSET_COLUMNS, ASSET_LIMIT = 4, 8
+ASSET_LOGO = 10 * mm
+BADGE_WIDTH, BADGE_HEIGHT, BADGE_ARROW = 24 * mm, 4.4 * mm, 2.2 * mm
+BADGE_ARROW_X = 1.6 * mm
+DATA_URI_RE = re.compile(r"^data:image/(png|jpeg|jpg|webp|gif);base64,(.+)$", re.IGNORECASE)
 LINK_RE = re.compile(r"\[([^\]\n]+)\]\((https?://[^)\s]+)\)")
 BOLD_RE = re.compile(r"\*\*([^*\n]+)\*\*")
 ITALIC_RE = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
@@ -850,5 +865,389 @@ def _footer(ctx: Layout, block: dict, story: Story) -> None:
         story.add(PageNumber(ctx.styles["small"], t("pdf.page")))
 
 
+# ------------------------------------------------------- visual blocks (feature 044)
+
+
+def _metric_item(view: dict | None, metric: object) -> dict | None:
+    """The `kpis` item a gauge, index or share block binds to, by metric id."""
+    items = (view or {}).get("items")
+    if not isinstance(items, list) or not isinstance(metric, str):
+        return None
+    for item in items:
+        if isinstance(item, dict) and item.get("metric") == metric:
+            return item
+    return None
+
+
+def _scale(block: dict) -> tuple[float, float]:
+    """`min`/`max` of the gauge and index scales: 0 to 100 when the report says nothing."""
+    low = block.get("min")
+    high = block.get("max")
+    low = float(low) if isinstance(low, int | float) and not isinstance(low, bool) else 0.0
+    high = float(high) if isinstance(high, int | float) and not isinstance(high, bool) else 100.0
+    return (low, high) if high > low else (low, low + 100.0)
+
+
+def _ratio(value: object, low: float, high: float) -> float | None:
+    """Where the value sits on its scale, clamped to 0-1; None when it is not a number."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:      # NaN
+        return None
+    return min(1.0, max(0.0, (number - low) / (high - low)))
+
+
+def _mix(ctx: Layout, roles: tuple[str, ...], position: float) -> Any:
+    """A colour inside a role run: the palette steps between the declared roles."""
+    steps = len(roles) - 1
+    if steps <= 0:
+        return ctx.palette.role(roles[0] if roles else None)
+    span = min(max(position, 0.0), 1.0) * steps
+    index = min(int(span), steps - 1)
+    share = span - index
+    left, right = ctx.palette.role(roles[index]), ctx.palette.role(roles[index + 1])
+    return _blend(left, right, share)
+
+
+def _blend(left, right, share: float):
+    from reportlab.lib.colors import Color
+    return Color(left.red + (right.red - left.red) * share,
+                 left.green + (right.green - left.green) * share,
+                 left.blue + (right.blue - left.blue) * share)
+
+
+def _swatch(ctx: Layout, role: str, index: int):
+    return ctx.palette.role(role, index)
+
+
+def _gauge(ctx: Layout, block: dict, story: Story) -> None:
+    """Semicircular gauge: five equal bands by role, a needle at the value, the figure inside."""
+    item = _metric_item(_view(ctx, block), block.get("metric"))
+    if item is None:
+        return
+    low, high = _scale(block)
+    ratio = _ratio(item.get("value"), low, high)
+    radius = min(GAUGE_MAX_RADIUS, (ctx.width - 6 * mm) / 2)
+    centre_x, centre_y = ctx.width / 2, 2 * mm
+    height = centre_y + radius + 2 * mm
+    drawing = Drawing(ctx.width, height)
+    bands = len(GAUGE_ROLES)
+    for i, role in enumerate(GAUGE_ROLES):
+        band = Wedge(centre_x, centre_y, radius, 180 - (i + 1) * 180 / bands,
+                     180 - i * 180 / bands)
+        band.fillColor = _swatch(ctx, role, i)
+        band.strokeColor = None
+        drawing.add(band)
+    # The bands are pie slices, so a half disc punched out of them leaves the ring: only the
+    # half above the chord is painted, which keeps the block's box tight.
+    hole = Wedge(centre_x, centre_y, radius * GAUGE_HOLE, 0, 180)
+    hole.fillColor = ctx.palette.surface
+    hole.strokeColor = None
+    drawing.add(hole)
+    if ratio is not None:
+        angle = math.pi * (1 - ratio)
+        needle = Line(centre_x, centre_y, centre_x + radius * math.cos(angle),
+                      centre_y + radius * math.sin(angle))
+        needle.strokeColor = ctx.palette.ink
+        needle.strokeWidth = 2
+        drawing.add(needle)
+    hub = Circle(centre_x, centre_y, 2.4 * mm)
+    hub.fillColor = ctx.palette.ink
+    hub.strokeColor = None
+    drawing.add(hub)
+    shown = _pdf().fmt(item.get("value"), item.get("format", "number"), ctx.currency)
+    figure = String(centre_x, centre_y + radius * 0.12, shown,
+                    fontSize=_figure_size(radius, shown), textAnchor="middle")
+    figure.fillColor = ctx.palette.ink
+    figure.fontName = "Helvetica-Bold"
+    drawing.add(figure)
+    story.add(KeepTogether([drawing]))
+    _caption(ctx, story, _item_label(ctx, item, block), centred=True)
+    story.space()
+
+
+def _figure_size(radius: float, shown: str) -> float:
+    """The figure's font size: big in the middle of the arc, shrunk so a long one still fits."""
+    room = radius * GAUGE_HOLE * 1.6
+    return max(6.0, min(radius * 0.26, room / (0.58 * max(len(shown), 1))))
+
+
+def _index(ctx: Layout, block: dict, story: Story) -> None:
+    """Two-ended index bar: the figure, a band from one role to the other, a marker."""
+    item = _metric_item(_view(ctx, block), block.get("metric"))
+    if item is None:
+        return
+    low, high = _scale(block)
+    ratio = _ratio(item.get("value"), low, high)
+    width = ctx.width
+    height = 22 * mm
+    drawing = Drawing(width, height)
+    label = _item_label(ctx, item, block)
+    shown = _pdf().fmt(item.get("value"), item.get("format", "number"), ctx.currency)
+    figure = String(0, height - 4 * mm, shown, fontSize=15, textAnchor="start")
+    figure.fillColor = ctx.palette.ink
+    figure.fontName = "Helvetica-Bold"
+    drawing.add(figure)
+    if label:
+        sub = String(0, height - 8.5 * mm, label, fontSize=7.5, textAnchor="start")
+        sub.fillColor = ctx.palette.muted
+        drawing.add(sub)
+    bar_y, bar_h = 5 * mm, 2.6 * mm
+    slice_w = width / INDEX_SLICES
+    for i in range(INDEX_SLICES):
+        piece = Rect(i * slice_w, bar_y, slice_w + 0.4, bar_h)
+        piece.fillColor = _mix(ctx, INDEX_ROLES, (i + 0.5) / INDEX_SLICES)
+        piece.strokeColor = None
+        drawing.add(piece)
+    if ratio is not None:
+        marker = Rect(width * ratio - 0.5 * mm, bar_y - 1.4 * mm, 1 * mm, bar_h + 2.8 * mm)
+        marker.fillColor = ctx.palette.ink
+        marker.strokeColor = None
+        drawing.add(marker)
+    for text, anchor_x, align in ((localized(block, "low_label", ctx.locale), 0, "start"),
+                                  (localized(block, "high_label", ctx.locale), width, "end")):
+        if not text:
+            continue
+        end = String(anchor_x, 1 * mm, str(text), fontSize=7.5, textAnchor=align)
+        end.fillColor = ctx.palette.muted
+        drawing.add(end)
+    story.add(KeepTogether([drawing]))
+    story.space()
+
+
+def _share(ctx: Layout, block: dict, story: Story) -> None:
+    """Share bar: the figures by segment and a stacked bar whose rest is the declared label."""
+    view = _view(ctx, block)
+    wanted = [m for m in (block.get("items") or []) if isinstance(m, str)]
+    segments = []
+    total = 0.0
+    for i, metric in enumerate(wanted):
+        item = _metric_item(view, metric)
+        if item is None:
+            continue
+        value = item.get("value")
+        try:
+            number = float(value) if value is not None else 0.0
+        except (TypeError, ValueError):
+            number = 0.0
+        total += number
+        segments.append({"label": _item_label(ctx, item, block), "value": number,
+                         "colour": _swatch(ctx, SHARE_ROLES[i % len(SHARE_ROLES)], i)})
+    if not segments:
+        return
+    rest_label = localized(block, "remainder_label", ctx.locale)
+    if rest_label:
+        segments.append({"label": str(rest_label), "value": max(0.0, 100.0 - total),
+                         "colour": _swatch(ctx, SHARE_ROLES[len(segments) % len(SHARE_ROLES)],
+                                           len(segments))})
+    width = ctx.width
+    height = 20 * mm
+    drawing = Drawing(width, height)
+    cell = width / len(segments)
+    for i, segment in enumerate(segments):
+        dot = Circle(i * cell + 1.2 * mm, height - 2.4 * mm, 1.1 * mm)
+        dot.fillColor = segment["colour"]
+        dot.strokeColor = None
+        drawing.add(dot)
+        caption = String(i * cell + 3.6 * mm, height - 3.1 * mm, segment["label"][:28],
+                         fontSize=7, textAnchor="start")
+        caption.fillColor = ctx.palette.muted
+        drawing.add(caption)
+        figure = String(i * cell, height - 8 * mm,
+                        _pdf().fmt(segment["value"], "percent", ctx.currency), fontSize=11,
+                        textAnchor="start")
+        figure.fillColor = ctx.palette.ink
+        figure.fontName = "Helvetica-Bold"
+        drawing.add(figure)
+    bar_x, bar_y, bar_h = 0.0, 1 * mm, 3 * mm
+    for segment in segments:
+        part = min(100.0, max(0.0, segment["value"])) / 100 * width
+        if part <= 0:
+            continue
+        piece = Rect(bar_x, bar_y, part, bar_h)
+        piece.fillColor = segment["colour"]
+        piece.strokeColor = None
+        drawing.add(piece)
+        bar_x += part
+    story.add(KeepTogether([drawing]))
+    story.space()
+
+
+def _asset(ctx: Layout, block: dict, story: Story) -> None:
+    """Asset tiles: logo, name, figure and signed badge, `limit` rows of the bound table."""
+    view = _view(ctx, block)
+    rows = (view or {}).get("rows")
+    if not isinstance(rows, list) or not rows:
+        return
+    roles = _asset_roles(block)
+    limit = block.get("limit")
+    limit = limit if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 \
+        else ASSET_LIMIT
+    visible = [r for r in rows[:limit] if isinstance(r, dict)]
+    if not visible:
+        return
+    cells = [_asset_cell(ctx, block, roles, row) for row in visible]
+    width = ctx.width / ASSET_COLUMNS
+    grid = []
+    for start in range(0, len(cells), ASSET_COLUMNS):
+        chunk = cells[start:start + ASSET_COLUMNS]
+        chunk += [[] for _ in range(ASSET_COLUMNS - len(chunk))]
+        grid.append(chunk)
+    table = Table(grid, colWidths=[width] * ASSET_COLUMNS)
+    table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.add(KeepTogether([table]))
+    story.space()
+
+
+def _asset_roles(block: dict) -> dict[str, str | None]:
+    """`columns` is positional for an asset tile: image, title, subtitle, value, delta."""
+    columns = [c if isinstance(c, str) and c else None for c in (block.get("columns") or [])]
+    columns += [None] * (5 - len(columns))
+    return dict(zip(("image", "title", "subtitle", "value", "delta"), columns, strict=False))
+
+
+def _asset_cell(ctx: Layout, block: dict, roles: dict[str, str | None],
+                row: dict) -> list:
+    """One tile: the logo (or its initial), the name, the figure and the badge."""
+    out = []
+    key = roles.get("image")
+    title = _cell_text(row, roles.get("title"))
+    logo = _asset_logo(ctx, row.get(key) if key else None, block.get("image"), title)
+    if logo is not None:
+        out.append(logo)
+    if title:
+        out.append(Paragraph(escape(title), ctx.styles["cell_bold"]))
+    subtitle = _cell_text(row, roles.get("subtitle"))
+    if subtitle:
+        out.append(Paragraph(escape(subtitle), ctx.styles["text_caption"]))
+    figure = row.get(roles.get("value")) if roles.get("value") else None
+    out.append(Paragraph(escape(_pdf().fmt(figure, "number", ctx.currency)),
+                         ctx.styles["kpi_value"]))
+    badge = _badge(ctx, row.get(roles.get("delta")) if roles.get("delta") else None)
+    if badge is not None:
+        out.append(badge)
+    return out
+
+
+def _cell_text(row: dict, column: str | None) -> str:
+    if not column:
+        return ""
+    value = row.get(column)
+    return "" if value is None else str(value)
+
+
+def _badge(ctx: Layout, value: object) -> Any | None:
+    """The signed badge: a triangle pointing up or down, in the palette pair of its sign.
+
+    The standard PDF fonts carry no ▲/▼ glyph, so the arrow is drawn as a triangle instead of
+    typed: the badge reads the same as the screen tile (044 FR-003)."""
+    try:
+        number = float(value) if value is not None and value != "" else None
+    except (TypeError, ValueError):
+        return None
+    if number is None:
+        return None
+    up = number >= 0
+    ink = ctx.palette.positive if up else ctx.palette.negative
+    backing = ctx.palette.kpi_delta_bg_positive if up else ctx.palette.kpi_delta_bg_negative
+    text = _pdf().fmt(number, "percent", ctx.currency)
+    width = BADGE_WIDTH
+    drawing = Drawing(width, BADGE_HEIGHT)
+    pill = Rect(0, 0, width, BADGE_HEIGHT, rx=BADGE_HEIGHT / 2, ry=BADGE_HEIGHT / 2)
+    pill.fillColor = backing
+    pill.strokeColor = None
+    drawing.add(pill)
+    triangle = Polygon([BADGE_ARROW_X, BADGE_HEIGHT / 2 - BADGE_ARROW / 2,
+                        BADGE_ARROW_X + BADGE_ARROW, BADGE_HEIGHT / 2 - BADGE_ARROW / 2,
+                        BADGE_ARROW_X + BADGE_ARROW / 2, BADGE_HEIGHT / 2 + BADGE_ARROW / 2]
+                       if up else
+                       [BADGE_ARROW_X, BADGE_HEIGHT / 2 + BADGE_ARROW / 2,
+                        BADGE_ARROW_X + BADGE_ARROW, BADGE_HEIGHT / 2 + BADGE_ARROW / 2,
+                        BADGE_ARROW_X + BADGE_ARROW / 2, BADGE_HEIGHT / 2 - BADGE_ARROW / 2])
+    triangle.fillColor = ink
+    triangle.strokeColor = None
+    drawing.add(triangle)
+    figure = String(BADGE_ARROW_X + BADGE_ARROW + 1.2 * mm, BADGE_HEIGHT / 2 - 2.2, text,
+                    fontSize=7, textAnchor="start")
+    figure.fillColor = ink
+    drawing.add(figure)
+    return drawing
+
+
+def _asset_logo(ctx: Layout, value: object, image_set: object, title: str) -> Any | None:
+    """The embedded raster when the row carries one, the initial circle otherwise.
+
+    The payload inlines project images as data URIs so the PDF embeds exactly the bytes the
+    screen shows (042 R5 keeps the client from guessing a path); anything else — a site path, a
+    third-party address — draws the `initial` fallback of FR-005."""
+    blob = _data_uri(value)
+    if blob is not None:
+        try:
+            reader = ImageReader(io.BytesIO(blob))
+            size = reader.getSize()
+            image = Image(io.BytesIO(blob), width=ASSET_LOGO, height=ASSET_LOGO,
+                          kind="bound")
+            if size:      # keep the aspect and round it: the tiles show a circle
+                image.drawHeight = ASSET_LOGO
+                image.drawWidth = ASSET_LOGO
+            return image
+        except Exception:      # an unreadable image is a fallback, never a failed document
+            log.warning("asset image in set %s could not be embedded", image_set)
+    return _initial_circle(ctx, title)
+
+
+def _data_uri(value: object) -> bytes | None:
+    if not isinstance(value, str):
+        return None
+    match = DATA_URI_RE.match(value.strip())
+    if match is None:
+        return None
+    try:
+        return base64.b64decode(match.group(2), validate=False)
+    except (ValueError, TypeError):
+        return None
+
+
+def _initial_circle(ctx: Layout, name: str) -> Any | None:
+    """FR-005 `initial`: a circle in a palette colour by hash of the key, its first letter in it."""
+    letter = (name or "?").strip()[:1].upper() or "?"
+    colour = ctx.palette.series[sum(name.encode("utf-8")) % len(ctx.palette.series)]
+    drawing = Drawing(ASSET_LOGO, ASSET_LOGO)
+    circle = Circle(ASSET_LOGO / 2, ASSET_LOGO / 2, ASSET_LOGO / 2)
+    circle.fillColor = colour
+    circle.strokeColor = None
+    drawing.add(circle)
+    initial = String(ASSET_LOGO / 2, ASSET_LOGO / 2 - 2.4, letter, fontSize=11,
+                     textAnchor="middle")
+    initial.fillColor = ctx.palette.surface
+    initial.fontName = "Helvetica-Bold"
+    drawing.add(initial)
+    return drawing
+
+
+def _item_label(ctx: Layout, item: dict, block: dict) -> str:
+    """The label under a figure: the metric's own, then the block's title."""
+    return (localized(item, "label", ctx.locale) or localized(block, "title", ctx.locale)
+            or str(item.get("metric") or ""))
+
+
+def _caption(ctx: Layout, story: Story, text: str, centred: bool = False) -> None:
+    if not text:
+        return
+    style = ctx.styles["caption"]
+    if centred:
+        style = ParagraphStyle("cap26c", parent=style, alignment=TA_CENTER)
+    story.add(Paragraph(escape(text), style))
+
+
 _BLOCKS = {"header": _header, "kpi_row": _kpi_row, "chart": _chart, "table": _table,
-           "text": _text, "page_break": _page_break, "footer": _footer}
+           "text": _text, "page_break": _page_break, "footer": _footer,
+           "gauge": _gauge, "index": _index, "share": _share, "asset": _asset}

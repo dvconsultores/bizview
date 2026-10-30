@@ -93,18 +93,18 @@ one asset block exports to PDF, and every figure equals the screen's.
 
 ### Tests for User Story 2
 
-- [ ] T022 [P] [US2] Parity test in `backend/tests/test_pdf_visual_components.py`: for the four kinds, the numbers read from the PDF equal the renderer's; the asset block embeds the same image bytes; an SVG-only set draws the fallback circle; an unknown `kind` produces the named error card (SC-001, SC-006)
-- [ ] T023 [P] [US2] Palette test in `backend/tests/test_pdf_visual_components.py`: every gauge band and share segment resolves through `THEME_ROLES`, in every preset × theme (SC-004)
+- [x] T022 [P] [US2] Parity test in `backend/tests/test_pdf_visual_components.py`: for the four kinds, the numbers read from the PDF equal the renderer's; the asset block embeds the same image bytes; an SVG-only set draws the fallback circle; an unknown `kind` produces the named error card (SC-001, SC-006)
+- [x] T023 [P] [US2] Palette test in `backend/tests/test_pdf_visual_components.py`: every gauge band and share segment resolves through `THEME_ROLES`, in every preset × theme (SC-004)
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Extend `cli/bizview_cli/schemas/report.schema.json` so the four kinds are valid PDF block kinds with the same properties they have as components (`min`/`max`/`bands`/`label_metric`/`parts`/`rest_label`/`image`)
-- [ ] T025 [P] [US2] Implement the `gauge` block in `backend/app/reports/pdf_layout.py`: semicircular arc, bands by role, marker, centre value, label below
-- [ ] T026 [P] [US2] Implement the `index` block in `backend/app/reports/pdf_layout.py`: value, gradient bar between two roles, marker, end labels
-- [ ] T027 [P] [US2] Implement the `share` block in `backend/app/reports/pdf_layout.py`: figures plus a stacked bar whose remainder is `rest_label` when the parts sum to less than 100
-- [ ] T028 [US2] Implement the `asset` block in `backend/app/reports/pdf_layout.py`: embedded raster (PNG/JPEG/WebP via ReportLab's image reader), name, value, sign-coloured badge, optional sparkline
-- [ ] T029 [US2] In `backend/app/reports/pdf_layout.py`, make the four blocks resolve `image:` against the project folder and the cache with the same lookup as the screen, drawing the initial circle when only an SVG exists (R3)
-- [ ] T030 [US2] In `backend/app/reports/pdf_layout.py`, make an unsupported block kind fall through to the existing error card (026 FR-006) with the kind's name, never a blank region
+- [x] T024 [US2] Extend `cli/bizview_cli/schemas/report.schema.json` so the four kinds are valid PDF block kinds with the same properties they have as components (the property names shipped by 042 Batch C, not the ones this task first listed: `min`/`max`/`low_label`/`high_label`/`remainder_label`/`metric`/`items`/`columns`/`image`/`sparkline`/`limit`
+- [x] T025 [P] [US2] Implement the `gauge` block in `backend/app/reports/pdf_layout.py`: semicircular arc, bands by role, marker, centre value, label below
+- [x] T026 [P] [US2] Implement the `index` block in `backend/app/reports/pdf_layout.py`: value, gradient bar between two roles, marker, end labels
+- [x] T027 [P] [US2] Implement the `share` block in `backend/app/reports/pdf_layout.py`: figures plus a stacked bar whose remainder is `rest_label` when the parts sum to less than 100
+- [x] T028 [US2] Implement the `asset` block in `backend/app/reports/pdf_layout.py`: embedded raster (PNG/JPEG/WebP via ReportLab's image reader), name, value, sign-coloured badge, optional sparkline
+- [ ] T029 [US2] In `backend/app/reports/pdf_layout.py`, make the four blocks resolve `image:` against the project folder and the cache with the same lookup as the screen, drawing the initial circle when only an SVG exists (R3) — **half done**: the blocks draw a data-URI image or the initial circle, but they do not yet look the set up in the project folder; needs a project root threaded to the renderer
+- [x] T030 [US2] In `backend/app/reports/pdf_layout.py`, make an unsupported block kind fall through to the existing error card (026 FR-006) with the kind's name, never a blank region
 
 **Checkpoint**: screen and PDF agree; US1's logos now reach the PDF when shipped as raster.
 
