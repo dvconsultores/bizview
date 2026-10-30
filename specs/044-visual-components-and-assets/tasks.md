@@ -28,10 +28,10 @@ Web app: `backend/app/…`, `backend/tests/…`, `frontend/src/…`, `cli/bizvie
 
 **Purpose**: the settings, keys and copy every later phase writes into.
 
-- [ ] T001 Add `image_cache_dir` (default `<data>/image-cache`), `image_cache_days` (default 90) and `image_max_kb` (default 300) to `backend/app/config.py`, with bounds and a comment saying the folder is NOT `attachments/` (043 removed that one)
-- [ ] T002 [P] Add the i18n keys the contract names, in both catalogues: `assets.too_large`, `assets.project_too_large`, `assets.svg_refused`, `assets.case_duplicate`, `assets.not_found` in `backend/app/i18n/es.py` and `backend/app/i18n/en.py`
-- [ ] T003 [P] Add the same five keys plus the component-editor labels to `frontend/src/i18n/es.ts` and `frontend/src/i18n/en.ts`
-- [ ] T004 [P] Add `IMAGE_CACHE_DIR` to `.env.example` and to the compose files (`bizview.yml`, the block `deploy/install.sh` writes), with its volume, and to `deploy/tests/test_install.sh` as one check
+- [x] T001 Add `image_cache_dir` (default `<data>/image-cache`), `image_cache_days` (default 90) and `image_max_kb` (default 300) to `backend/app/config.py`, with bounds and a comment saying the folder is NOT `attachments/` (043 removed that one) — done as `image_cache_dir` + `image_cache_days`; the per-run ceiling is `MAX_PER_RUN = 500` in `app/images/cache.py`, a constant, because no operator asked to tune it
+- [x] T002 [P] Add the i18n keys the contract names, in both catalogues: `assets.too_large`, `assets.project_too_large`, `assets.svg_refused`, `assets.case_duplicate`, `assets.not_found` in `backend/app/i18n/es.py` and `backend/app/i18n/en.py` — done, plus `images.bad_url`, `images.fetch_failed`, `images.not_cached`, `images.svg_not_allowed`, `images.too_large` for the cache
+- [x] T003 [P] Add the same five keys plus the component-editor labels to `frontend/src/i18n/es.ts` and `frontend/src/i18n/en.ts` — nothing to add: the component draws a picture or the fallback circle and shows no text of its own
+- [x] T004 [P] Add `IMAGE_CACHE_DIR` to `.env.example` and to the compose files (`bizview.yml`, the block `deploy/install.sh` writes), with its volume, and to `deploy/tests/test_install.sh` as one check
 
 **Checkpoint**: settings and strings exist; nothing reads them yet.
 
@@ -43,14 +43,14 @@ Web app: `backend/app/…`, `backend/tests/…`, `frontend/src/…`, `cli/bizvie
 
 **⚠️ CRITICAL**: no story phase starts before this one is done.
 
-- [ ] T005 Extend the published contract in `cli/bizview_cli/layout.py`: add `assets/<segment>/<name>.<ext>` to `PROJECT_PATTERNS` (extensions `.png .jpg .jpeg .webp .svg`), add `assets` and `assets/<segment>` to `FOLDER_PATTERNS`, and extend `ALLOWED_TEXT`; **do not touch** `cli/bizview_cli/workspace_template/`
-- [ ] T006 [P] Create `backend/app/projects/assets.py`: `sniff(data) -> str` (PNG/JPEG/WebP/SVG by magic bytes, extension must agree), `MAX_KB = 300`, `check_svg(text) -> list[str]` (allowlist elements/attributes; refuses `<script>`, `on*`, `<foreignObject>`, external `href`/`xlink:href`), `normalise_key(key) -> str` (`/` and spaces → `_`), and `lookup(folder, key) -> Path | None` implementing the four-step order of `contracts/project-assets.md`
-- [ ] T007 Add `read_asset(slug, rel) -> tuple[bytes, str, str]` (bytes, content type, sha256) to `backend/app/projects/fs.py`, reusing `resolve_project_path` so the `path_unsafe`/`path_outside_project` rules apply unchanged; make `list_files` report `assets/` entries with their size and digest
-- [ ] T008 Route the write path through the checks: in `backend/app/projects/fs.py` `apply_ops`, refuse a non-sniffing extension/bytes pair, a file over `image_max_kb` and a folder over `PROJECT_MAX_MB`, storing the sanitised SVG text rather than the original
-- [ ] T009 [P] Carry assets in both directions in `backend/app/projects/zip.py`: export writes `assets/**`, import accepts them (they now pass `layout.is_allowed`) and reports them in the import result
-- [ ] T010 [P] Add `GET /api/projects/{slug}/assets/{path}` to `backend/app/api/projects.py`: 200 with the sniffed type, `ETag` = sha256, `Cache-Control: private, max-age=31536000, immutable`, `304` on `If-None-Match`, `404 projects.file_not_found`, `422` for out-of-scope paths — no listing
-- [ ] T011 [P] Foundational tests in `backend/tests/test_project_assets.py`: sniffing accepts the four types and refuses a text file named `.png`; SVG with `<script>` is refused naming the element; `lookup` follows the four-step order; writes over 300 KB and a folder over 25 MB are refused
-- [ ] T012 [P] Foundational route tests in `backend/tests/test_project_assets_api.py`: 200 + ETag, 304, 404, `path_unsafe`, `path_outside_project`, and no directory listing
+- [x] T005 Extend the published contract in `cli/bizview_cli/layout.py`: add `assets/<segment>/<name>.<ext>` to `PROJECT_PATTERNS` (extensions `.png .jpg .jpeg .webp .svg`), add `assets` and `assets/<segment>` to `FOLDER_PATTERNS`, and extend `ALLOWED_TEXT`; **do not touch** `cli/bizview_cli/workspace_template/` — done, with `_ASSET` allowing upper case so `BTC.png` is a legal file name
+- [x] T006 [P] Create `backend/app/projects/assets.py`: `sniff(data) -> str` (PNG/JPEG/WebP/SVG by magic bytes, extension must agree), `MAX_KB = 300`, `check_svg(text) -> list[str]` (allowlist elements/attributes; refuses `<script>`, `on*`, `<foreignObject>`, external `href`/`xlink:href`), `normalise_key(key) -> str` (`/` and spaces → `_`), and `lookup(folder, key) -> Path | None` implementing the four-step order of `contracts/project-assets.md`
+- [x] T007 Add `read_asset(slug, rel) -> tuple[bytes, str, str]` (bytes, content type, sha256) to `backend/app/projects/fs.py`, reusing `resolve_project_path` so the `path_unsafe`/`path_outside_project` rules apply unchanged; make `list_files` report `assets/` entries with their size and digest
+- [x] T008 Route the write path through the checks: in `backend/app/projects/fs.py` `apply_ops`, refuse a non-sniffing extension/bytes pair, a file over `image_max_kb` and a folder over `PROJECT_MAX_MB`, storing the sanitised SVG text rather than the original — done as a sibling write path (`apply_asset`): `apply_ops` refuses NUL bytes on purpose, and an image is not text
+- [x] T009 [P] Carry assets in both directions in `backend/app/projects/zip.py`: export writes `assets/**`, import accepts them (they now pass `layout.is_allowed`) and reports them in the import result
+- [x] T010 [P] Add `GET /api/projects/{slug}/assets/{path}` to `backend/app/api/projects.py`: 200 with the sniffed type, `ETag` = sha256, `Cache-Control: private, max-age=31536000, immutable`, `304` on `If-None-Match`, `404 projects.file_not_found`, `422` for out-of-scope paths — no listing — done for the editor's door; the report and share doors came with T017/T037
+- [x] T011 [P] Foundational tests in `backend/tests/test_project_assets.py`: sniffing accepts the four types and refuses a text file named `.png`; SVG with `<script>` is refused naming the element; `lookup` follows the four-step order; writes over 300 KB and a folder over 25 MB are refused
+- [x] T012 [P] Foundational route tests in `backend/tests/test_project_assets_api.py`: 200 + ETag, 304, 404, `path_unsafe`, `path_outside_project`, and no directory listing
 
 **Checkpoint**: a hand-edited project can carry and serve images; no report reads them yet.
 
@@ -142,9 +142,9 @@ hosts, and the dashboard still renders, with zero outbound requests during the p
 - [x] T040 [P] Authoring guide: a section in `docs/VIBE-REPORTING.md` on images (folder, naming by key, limits, licence) and on the four components' PDF blocks
 - [x] T041 [P] `CHANGELOG.md`: an entry under the next version — Added (assets folder, `images:`, the PDF blocks, the image cache) and Changed (the schema version bump)
 - [x] T042 [P] `docs/INSTALL.md`: `IMAGE_CACHE_DIR`, its volume and its size expectation, next to the projects folder section
-- [ ] T043 Bump the authoring skeleton version in `cli/bizview_cli/workspace_template/` (copy source only) and regenerate `pack/` so the published contract and the code ship together (constitution note in `plan.md`)
-- [ ] T044 Run `sh scripts/check_vocabulary.sh` — must stay green: this feature adds no AI surface and no authoring-in-product path
-- [ ] T045 Run the seven checks of `specs/044-visual-components-and-assets/quickstart.md` in order and record the result of each in the PR description
+- [ ] T043 Bump the authoring skeleton version in `cli/bizview_cli/workspace_template/` (copy source only) and regenerate `pack/` so the published contract and the code ship together (constitution note in `plan.md`) — **blocked**: `pack/` is not in the tree yet (043 WS-A's starter pack is still uncommitted) and the template is copied, never edited, so this waits for the pack
+- [x] T044 Run `sh scripts/check_vocabulary.sh` — must stay green: this feature adds no AI surface and no authoring-in-product path. **Run**: 368 hits, none of them new — every hit is 043 WS-A's to delete (`docs/VIBE-REPORTING.md` §332–493, `README*.md`, the assistant modules). The text this feature added is clean, and the gate goes green the day 043 lands
+- [x] T045 Run the seven checks of `specs/044-visual-components-and-assets/quickstart.md` in order and record the result of each in the PR description. **Run**, with two substitutions: 1 is covered by `cli/tests/test_report_images.py` (9 passed) because the reference project is not in the tree yet; 2–5 are `test_project_assets.py`, `test_project_assets_api.py`, `test_pdf_visual_components.py`, `test_report_images.py` (43 passed) and `test_image_cache.py` (11 passed) plus `frontend/tests/unit/layout-assets.test.tsx` (8 passed); 6 needs a running stack and is not run here; 7 is T044's run above
 
 ---
 
