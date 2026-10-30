@@ -269,8 +269,11 @@ def _values(schema: str, dataset: str, column: str) -> list[str]:
     query = sql.SQL("SELECT DISTINCT {col} FROM {schema}.{table} WHERE {col} IS NOT NULL").format(
         col=sql.Identifier(column), schema=sql.Identifier(schema),
         table=sql.Identifier(dataset))
+    # psycopg's own connection: `Composed` is not a SQLAlchemy statement, and handing it to
+    # `Session.execute` raised inside the pass, which swallowed the whole rewrite.
     with get_engine().connect() as conn:
-        return [row[0] for row in conn.execute(query) if isinstance(row[0], str) and row[0]]
+        rows = conn.connection.driver_connection.execute(query).fetchall()
+    return [row[0] for row in rows if isinstance(row[0], str) and row[0]]
 
 
 def _rewrite(schema: str, dataset: str, column: str, urls: list[str],
@@ -284,10 +287,11 @@ def _rewrite(schema: str, dataset: str, column: str, urls: list[str],
         col=sql.Identifier(column), schema=sql.Identifier(schema),
         table=sql.Identifier(dataset))
     with get_engine().begin() as conn:
+        pg = conn.connection.driver_connection
         for url in urls:
             name = cached.get(url)
             if name is not None:
-                conn.execute(query, (name, url))
+                pg.execute(query, (name, url))
 
 
 def refresh_reports(db: Session, version, integration_id: str) -> dict[str, int]:

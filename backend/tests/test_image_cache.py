@@ -1,4 +1,5 @@
 """Feature 044 US2: images fetched once from a URL column, cached by content hash."""
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -7,6 +8,8 @@ from app.config import get_settings
 from app.images import cache
 from app.models import ImageCache
 from app.security import netguard
+from tests.test_runner import origin as origin  # fixture (feature 005 origin table)
+from tests.test_runner import pg_source as pg_source  # fixture
 
 
 def _png(shade: int = 30) -> bytes:
@@ -21,6 +24,8 @@ def _png(shade: int = 30) -> bytes:
 
 PNG = _png()
 OTHER = _png(200)
+#: What a rewritten column value looks like: the hash and the extension, nothing else.
+CACHE_NAME = re.compile(r"^[0-9a-f]{64}\.(png|jpe?g|webp)$")
 
 
 @pytest.fixture(autouse=True)
@@ -178,3 +183,106 @@ def test_a_url_without_an_extension_is_judged_by_its_bytes(db, fetched):
     served["https://cdn.example/logo.png?v=2"] = OTHER
     assert cache.store(db, "https://cdn.example/logos/1234").status == "ok"
     assert cache.store(db, "https://cdn.example/logo.png?v=2").status == "ok"
+
+
+# --- the load boundary: a report declares the column, the run caches it ---------------------
+
+URL_QUERY = ("SELECT doc AS document_id, line AS line_no, kind AS line_kind, completed_at, "
+             "(completed_at AT TIME ZONE 'America/Caracas')::date AS local_date, "
+             "product AS product_code, amount AS net_amount, "
+             "'https://cdn.example/' || doc || '.png' AS logo_url "
+             + "FROM " + __import__("tests.test_runner", fromlist=["ORIGIN"]).ORIGIN +
+             " WHERE completed_at >= :window_start AND completed_at < :window_end")
+
+
+def _version(db, integration_id: str) -> int:
+    """An applied version whose report asks this integration for a URL column."""
+    from app.models import WorkspaceVersion
+
+    version = WorkspaceVersion(
+        checksum="044", lock={}, specs={}, projects={}, state="archived",
+        artifacts={"reports": {"cripto": {
+            "project": "cripto",
+            "definition": {
+                "id": "cripto",
+                "uses": {"l": f"{integration_id}.sale_lines"},
+                "images": {"logos": {"column": "l.logo_url", "key": "document_id"}},
+            },
+        }}},
+    )
+    db.add(version)
+    db.commit()
+    return version.id
+
+
+def _run_with_logos(version_id: int, *, kind: str = "full"):
+    from app.engine import runner
+    from tests.test_runner import NOW, integration
+
+    definition, files = integration()
+    definition["datasets"]["sale_lines"]["columns"]["logo_url"] = {"type": "text"}
+    files["queries/lines.sql"] = URL_QUERY
+    return runner.run_integration(definition, files, version_id=version_id, kind=kind, now=NOW)
+
+
+def _logos(integration_id: str = "ventas-prueba") -> list[str]:
+    from sqlalchemy import text
+
+    from app.db import get_engine
+    from app.engine import datasets
+
+    query = (f'SELECT logo_url FROM "{datasets.schema_name(integration_id)}"."sale_lines" '
+             "ORDER BY 1")
+    with get_engine().begin() as conn:
+        return [row[0] for row in conn.execute(text(query))]
+
+
+def test_a_run_rewrites_the_column_to_the_cached_file(db, origin, pg_source, fetched):
+    """The point of the cache: after the load, the row names a file this installation owns."""
+    served, _ = fetched
+    served["https://cdn.example/A1.png"] = PNG
+    served["https://cdn.example/A2.png"] = OTHER
+    served["https://cdn.example/OLD.png"] = PNG
+    version_id = _version(db, "ventas-prueba")
+
+    result = _run_with_logos(version_id)
+
+    assert result.status == "succeeded", result.message
+    values = _logos()
+    assert values and all(CACHE_NAME.match(v) for v in values), values
+    assert len(set(values)) == 2          # A1 and OLD share their bytes, so they share a file
+    for value in values:
+        data, content_type, _ = cache.read(value)
+        assert data and content_type == "image/png"
+
+
+def test_a_url_that_cannot_be_fetched_never_fails_the_load(db, origin, pg_source, fetched):
+    # Nothing is served, so every fetch fails; the load must not care.
+    version_id = _version(db, "ventas-prueba")
+
+    result = _run_with_logos(version_id)
+
+    assert result.status == "succeeded", result.message
+    assert all(v.startswith("https://cdn.example/") for v in _logos())
+
+
+def test_building_the_payload_and_the_pdf_opens_no_connection(db, monkeypatch):
+    """SC-003: a render never reaches the third party — the cache is the only way out."""
+    touched: list[str] = []
+    monkeypatch.setattr(cache, "download", lambda url: touched.append(url))
+
+    from types import SimpleNamespace
+
+    from app.reports import images as report_images
+
+    ctx = SimpleNamespace(
+        report_id="cripto", direct=None, tables={}, columns={}, integrations=[],
+        definition={"title": "C", "metrics": {}, "dimensions": {}, "views": {},
+                    "images": {"logos": {"column": "l.logo_url", "key": "document_id"}}},
+        version=SimpleNamespace(id=1, artifacts={"reports": {"cripto": {"project": "x"}}}),
+    )
+    payload = report_images.payload(ctx, "/api/reports/r/assets", "/api/reports/r/images")
+    assert payload["logos"] == {"key": "document_id", "fallback": "initial",
+                                "column": "l.logo_url", "cached_url": "/api/reports/r/images/"}
+    assert "cdn.example" not in str(payload)
+    assert touched == []
