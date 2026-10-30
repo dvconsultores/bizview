@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Banknote, Hash, Minus, Percent, Type } from "lucide-react";
 import type { ColorRole, KpiItem, TrendPoint } from "../../api/types";
-import { changeTone, formatChange, formatValue } from "../../lib/numbers";
+import { changeTone, formatChange, formatValue, formatValueCompact } from "../../lib/numbers";
 import { StatTile } from "../StatTile";
 import { Sparkline } from "./charts/Sparkline";
 import { RenderErrorCard } from "./RenderErrorCard";
@@ -77,6 +77,9 @@ export function KpiGrid({
           }
           const Icon = ICONS[k.format] ?? Hash;
           const points = sparkline?.find((entry) => entry.metric === k.metric)?.points;
+          const display = formatValueCompact(k.value, k.format, currency);
+          const full = formatValue(k.value, k.format, currency);
+          const small = display.length > 7;
           return (
             <li key={k.metric} className="min-w-0">
               <StatTile
@@ -87,13 +90,14 @@ export function KpiGrid({
                 value={
                   <>
                     <span
-                      className={
+                      className={`${
                         isTv
-                          ? "block text-[length:var(--kpi-numeral-tv)] tabular-nums tracking-[var(--kpi-tracking)] [overflow-wrap:anywhere] sm:text-[length:var(--kpi-numeral-tv-lg)] xl:text-[length:var(--kpi-numeral-tv-xl)]"
-                          : "block text-[length:var(--kpi-numeral)] tabular-nums tracking-[var(--kpi-tracking)] [overflow-wrap:anywhere] sm:text-[length:var(--kpi-numeral-lg)]"
-                      }
+                          ? "block text-[length:var(--kpi-numeral-tv)] tabular-nums tracking-[var(--kpi-tracking)] whitespace-nowrap sm:text-[length:var(--kpi-numeral-tv-lg)] xl:text-[length:var(--kpi-numeral-tv-xl)]"
+                          : "block text-[length:var(--kpi-numeral)] tabular-nums tracking-[var(--kpi-tracking)] whitespace-nowrap sm:text-[length:var(--kpi-numeral-lg)]"
+                      }${small ? " text-[0.85em]" : ""}`}
+                      title={full !== display ? full : undefined}
                     >
-                      {formatValue(k.value, k.format, currency)}
+                      {display}
                     </span>
                     {points ? (
                       <Sparkline values={points.map((point) => point.value)} role={sparklineRole} className="mt-1" />

@@ -784,7 +784,7 @@
       ],
       "properties": {
         "type": {
-          "description": "Tipo del componente: kpi, line, area, bar, pie, donut, table, text, filters o spacer.",
+          "description": "Tipo del componente: kpi, line, area, bar, pie, donut, table, gauge, share, index, asset, text, filters o spacer.",
           "enum": [
             "kpi",
             "line",
@@ -793,6 +793,10 @@
             "pie",
             "donut",
             "table",
+            "gauge",
+            "share",
+            "index",
+            "asset",
             "text",
             "filters",
             "spacer"
@@ -844,9 +848,53 @@
           "type": "boolean"
         },
         "metric": {
-          "description": "Id de la métrica del componente kpi.",
+          "description": "Id de la métrica del componente kpi, gauge o index.",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "min": {
+          "description": "Mínimo de la escala de gauge/index; por defecto 0.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Máximo de la escala de gauge/index; por defecto 100.",
+          "type": "number"
+        },
+        "low_label": {
+          "description": "Etiqueta del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "low_label_en": {
+          "description": "Etiqueta en inglés del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label": {
+          "description": "Etiqueta del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label_en": {
+          "description": "Etiqueta en inglés del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label": {
+          "description": "Etiqueta del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label_en": {
+          "description": "Etiqueta en inglés del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "limit": {
+          "description": "asset: cuántas filas de la vista se muestran; por defecto 8.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
         },
         "delta": {
           "description": "Comparación del kpi: previous_period (por defecto) o none.",
@@ -910,7 +958,7 @@
           "description": "Etiqueta de la categoría agrupada en inglés (opcional); si falta se usa other_label."
         },
         "columns": {
-          "description": "Columnas de la tabla en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "description": "Columnas de la vista que muestra el componente: para table, en orden (por defecto, las de la vista); para asset, lista posicional [imagen, título, subtítulo, valor, delta] (imagen y delta pueden ser \"\" para omitir).",
           "type": "array",
           "items": {
             "description": "Id de una métrica o dimensión de la tabla.",

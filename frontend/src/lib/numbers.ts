@@ -23,6 +23,31 @@ export function formatCompact(value: number): string {
   return numberFormat({ notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
+/** Feature 042: KPI tiles never wrap — big magnitudes compact (es «2,66 B», en "2.66T"), full
+ * value in the tooltip. Currency keeps its code via Intl compact. */
+export function formatValueCompact(
+  value: number | string | null | undefined,
+  format: MetricFormat = "number",
+  currency = "USD",
+): string {
+  if (value === null || value === undefined || value === "" || typeof value === "string") {
+    return formatValue(value, format, currency);
+  }
+  if (format === "text" || format === "percent" || Math.abs(value) < 100_000) {
+    return formatValue(value, format, currency);
+  }
+  if (format === "currency") {
+    return numberFormat({
+      style: "currency",
+      currency,
+      currencyDisplay: "code",
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+  return numberFormat({ notation: "compact", maximumFractionDigits: 2 }).format(value);
+}
+
 export function formatChange(change: Change | null | undefined): string {
   if (!change) return "—";
   if (change.new) return t.common.new;

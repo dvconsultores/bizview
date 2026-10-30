@@ -212,6 +212,25 @@
 /* Feature 030 FR-009: `impacto` also sets the KPI typography and the card surfaces. The palette
  * colours come from the JSON preset at runtime; only the shapes live here. Other presets keep
  * today's typography. */
+/* 042 → WS-E bridge: semantic palette tokens for the tile components. WS-E re-defines these on
+ * the report root per effective preset; until then they mirror the installation palette vars. */
+:root {
+  --series-1: rgb(var(--c-chart-1));
+  --series-2: rgb(var(--c-chart-2));
+  --series-3: rgb(var(--c-chart-3));
+  --series-4: rgb(var(--c-chart-4));
+  --series-5: rgb(var(--c-chart-5));
+  --series-6: rgb(var(--c-chart-6));
+  --series-7: rgb(var(--c-chart-7));
+  --series-8: rgb(var(--c-chart-8));
+  --positive: rgb(var(--c-chart-positive));
+  --negative: rgb(var(--c-chart-negative));
+  --neutral: rgb(var(--c-chart-neutral));
+  --kpi-text-color: rgb(var(--c-kpi-text));
+  --kpi-delta-bg-pos: rgb(var(--c-kpi-delta-bg-positive));
+  --kpi-delta-bg-neg: rgb(var(--c-kpi-delta-bg-negative));
+}
+
 :root[data-palette="impacto"] {
   --kpi-numeral: 1.75rem;
   --kpi-numeral-lg: 2.5rem;

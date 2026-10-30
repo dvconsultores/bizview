@@ -423,6 +423,10 @@ export type WebComponentType =
   | "pie"
   | "donut"
   | "table"
+  | "gauge"
+  | "share"
+  | "index"
+  | "asset"
   | "text"
   | "filters"
   | "spacer";
@@ -456,6 +460,22 @@ export interface WebComponent {
   metric?: string;
   delta?: "previous_period" | "none";
   sparkline?: boolean;
+
+  // gauge | index (042)
+  min?: number;
+  max?: number;
+  low_label?: string;
+  low_label_en?: string;
+  high_label?: string;
+  high_label_en?: string;
+
+  // share (042): metric ids live in `items`; the remainder segment is computed to 100.
+  items?: string[];
+  remainder_label?: string;
+  remainder_label_en?: string;
+
+  // asset (042): `columns` is the positional role list [image, title, subtitle, value, delta].
+  limit?: number;
 
   // line | area | bar
   x?: string;

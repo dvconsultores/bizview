@@ -16,6 +16,10 @@ import { KpiGrid } from "./KpiGrid";
 import { FiltersBlock, SpacerBlock, TextBlock, type LayoutParamsWiring } from "./LayoutBlocks";
 import { componentRoles, roleAt } from "./layoutRoles";
 import { NoDataCard, RenderErrorCard } from "./RenderErrorCard";
+import { AssetGrid } from "./tiles/AssetGrid";
+import { GaugeTile } from "./tiles/GaugeTile";
+import { IndexTile } from "./tiles/IndexTile";
+import { ShareTile } from "./tiles/ShareTile";
 import { AreaChart } from "./charts/AreaChart";
 import { BarChart } from "./charts/BarChart";
 import { LineChart } from "./charts/LineChart";
@@ -46,7 +50,8 @@ const SPAN: Record<number, string> = {
 const GUTTER: Record<string, string> = { sm: "gap-3", md: "gap-5", lg: "gap-8" };
 
 /** The component catalogue (data-model §3). An unknown type is an error card, never a blank cell. */
-const VIEW_TYPES: readonly string[] = ["kpi", "line", "area", "bar", "pie", "donut", "table"];
+const VIEW_TYPES: readonly string[] = ["kpi", "line", "area", "bar", "pie", "donut", "table",
+                                       "gauge", "share", "index", "asset"];
 
 const DEFAULT_TOP_N = 6;
 const DEFAULT_PAGE_SIZE = 25;
@@ -80,7 +85,7 @@ export function LayoutRenderer({
       {components.map((component, index) => (
         <div
           key={`${component.id}-${index}`}
-          className={`min-w-0 ${SPAN[clampSpan(component)]}`}
+          className={`min-w-0 ${SPAN[clampSpan(component)]}${TILE_TYPES.has(component.type) && component.span === undefined ? " xl:col-span-3" : ""}`}
           data-layout-id={component.id}
           data-layout-type={component.type}
           data-layout-span={clampSpan(component)}
@@ -93,9 +98,15 @@ export function LayoutRenderer({
   );
 }
 
+const TILE_TYPES = new Set(["gauge", "share", "index"]);
+
 function clampSpan(component: WebComponent): number {
   const value = component.span;
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 12 ? value : 12;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 12
+    ? value
+    : TILE_TYPES.has(component.type)
+      ? 6
+      : 12;
 }
 
 /** A component binds to a payload view by its declared id and by nothing else. */
@@ -175,6 +186,30 @@ function Component({
   if (view.empty) return <NoDataCard error={view.empty} />;
 
   switch (component.type) {
+    case "gauge":
+    case "share":
+    case "index": {
+      if (view.type !== "kpis") {
+        return (
+          <ErrorCard component={component.id} type={component.type}
+                     reference={data.render_reference}
+                     message={t.layout.errorCard(component.id, component.type)} />
+        );
+      }
+      if (component.type === "gauge") return <GaugeTile component={component} items={view.items} />;
+      if (component.type === "share") return <ShareTile component={component} items={view.items} />;
+      return <IndexTile component={component} items={view.items} />;
+    }
+    case "asset": {
+      if (view.type !== "table") {
+        return (
+          <ErrorCard component={component.id} type={component.type}
+                     reference={data.render_reference}
+                     message={t.layout.errorCard(component.id, component.type)} />
+        );
+      }
+      return <AssetGrid component={component} view={view} />;
+    }
     case "kpi":
       return <KpiComponent component={component} view={view} data={data} def={def} size={size} />;
     case "line":

@@ -23,7 +23,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from bizview_cli.validate import Issue
 
-WEB_COMPONENT_TYPES = ("kpi", "line", "area", "bar", "pie", "donut", "table", "text", "filters",
+WEB_COMPONENT_TYPES = ("kpi", "line", "area", "bar", "pie", "donut", "table", "gauge", "share",
+                       "index", "asset", "text", "filters",
                        "spacer")
 PDF_BLOCK_TYPES = ("header", "kpi_row", "chart", "table", "text", "page_break", "footer")
 CHART_KINDS = ("line", "area", "bar", "pie", "donut")
