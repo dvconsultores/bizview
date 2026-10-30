@@ -26,7 +26,7 @@ from app.models import (
     EmailSend,
     ShareLink,
 )
-from app.reports import palette, pdf
+from app.reports import images, palette, pdf
 from app.security import crypto
 from app.services import audit, dashboards
 from app.sharing import links
@@ -748,6 +748,7 @@ def _process_send(
                     viewer=requester.full_name if send.subscription_id is None else None,
                     locale=loc,
                     palette=palette.resolve(definition, palette.installation_preset(db)),
+                    images=images.reader(ctx),
                 )
                 if len(content) > mail_send.MAX_ATTACHMENT:
                     too_large_by[loc] = True

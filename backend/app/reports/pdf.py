@@ -240,11 +240,14 @@ def render_preview(definition: dict, payload: dict, *, report_id: str, organizat
 
 def render(definition: dict, payload: dict, *, organization: str, product: str,
            viewer: str | None = None, preview: bool = False, layout: dict | None = None,
-           locale: str | None = None, palette: ReportPalette | None = None) -> bytes:
+           locale: str | None = None, palette: ReportPalette | None = None,
+           images: dict | None = None) -> bytes:
     """`definition` = report definition JSON; `payload` = the data response (selection, views).
 
     `palette` is the resolved preset (030): callers pass the installation's one; without it the
-    report's own `layout.theme.palette` resolves, falling back to `impacto`."""
+    report's own `layout.theme.palette` resolves, falling back to `impacto`.
+    `images` (044) is what `app.reports.images.reader` hands back: per declared set, the column its
+    key comes from and the lookup that reads the project file."""
     loc = locale or current()
     with use_locale(loc):
         pal = palette if palette is not None else resolve(definition)
@@ -272,7 +275,7 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
         if declarative is not None:
             story = render_layout(definition=definition, payload=payload, styles=st,
                                   organization=organization, product=product, viewer=viewer,
-                                  preview=preview, locale=loc, palette=pal)
+                                  preview=preview, locale=loc, palette=pal, images=images)
             doc.build(story)
             return buf.getvalue()
         meta = meta_lines(definition, payload, viewer)

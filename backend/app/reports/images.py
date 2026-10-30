@@ -77,3 +77,46 @@ def resolve(ctx, set_name: str, key: str) -> tuple[bytes, str, str]:
         raise asset_rules.AssetRefused("key_not_found", key)
     rel = f"{str(spec['folder']).rstrip('/')}/{found.name}"
     return fs.read_asset(slug, rel)
+
+
+def _raster(found: Path) -> bytes | None:
+    """The file's bytes when ReportLab can embed them; SVG needs a rasteriser this product does
+    not ship, so an SVG-only set draws the initial circle on paper (research R3)."""
+    if found.suffix.lower() == ".svg":
+        return None
+    try:
+        return found.read_bytes()
+    except OSError:
+        return None
+
+
+def reader(ctx) -> dict[str, dict]:
+    """Per set, the column its key comes from and a memoised lookup the PDF can call.
+
+    The resolver never raises: a set whose folder vanished or whose key has no file answers
+    `None`, and the block draws the declared fallback instead of failing the document.
+    """
+    slug = project_slug(ctx)
+    if slug is None:
+        return {}
+    out: dict[str, dict] = {}
+    for name, spec in declared(ctx).items():
+        if not isinstance(spec, dict):
+            continue
+        try:
+            folder = _folder(slug, spec)
+        except (asset_rules.AssetRefused, fs.ProjectPathError):
+            continue
+        seen: dict[str, bytes | None] = {}
+
+        def load(key: object, folder: Path = folder, seen: dict = seen) -> bytes | None:
+            name_ = asset_rules.normalise_key("" if key is None else str(key))
+            if not name_:
+                return None
+            if name_ not in seen:
+                found = asset_rules.lookup(folder, name_)
+                seen[name_] = _raster(found) if found is not None else None
+            return seen[name_]
+
+        out[name] = {"key": spec.get("key"), "bytes": load}
+    return out

@@ -214,7 +214,8 @@ def report_pdf(report_id: str, request: Request, user: AppUser = Depends(current
     settings = get_settings()
     content = pdf.render(definition, payload, organization=settings.organization_name,
                          product=settings.product_name, viewer=user.full_name,
-                         palette=palette.resolve(definition, palette.installation_preset(db)))
+                         palette=palette.resolve(definition, palette.installation_preset(db)),
+                         images=report_images.reader(ctx))
     period = payload["selection"]["current"]
     name = f"{report_id}-{period['from']}-{period['to']}.pdf"
     return Response(content, media_type="application/pdf",

@@ -12,8 +12,21 @@ from app.projects import assets as asset_rules
 from app.projects import fs
 from app.projects import service as project_service
 from app.reports import images as report_images
+from app.reports import pdf
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+def _png() -> bytes:
+    """A real 8x8 PNG: ReportLab reads it with PIL, so a hand-made header would fail."""
+    import io
+
+    from PIL import Image as Pillow
+
+    buffer = io.BytesIO()
+    Pillow.new("RGB", (8, 8), (200, 30, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+PNG = _png()
 SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
 
 ACTOR = {"kind": "user", "user_id": None, "session_id": None, "command": "edit"}
@@ -131,3 +144,51 @@ def test_a_key_that_is_not_there_is_a_404_the_client_turns_into_a_fallback(proje
     with pytest.raises(engine.ApiError) as exc:
         reports.asset_response(ctx, "/api/reports/r/assets", "coins", "HYPE", request())
     assert exc.value.status == 404
+
+def _pdf_definition(blocks: list[dict]) -> dict:
+    return {
+        "title": "Panorama",
+        "description": "Cripto",
+        "currency": "USD",
+        "metrics": {"btc": {"label": "BTC", "format": "number", "sql": "1"}},
+        "dimensions": {"symbol": {"label": "Símbolo", "sql": "s"},
+                       "name": {"label": "Nombre", "sql": "n"}},
+        "images": COINS,
+        "views": [{"id": "monedas", "type": "table",
+                   "dimensions": ["symbol", "name"], "metrics": ["btc"]}],
+        "layout": {"pdf": {"blocks": blocks}},
+    }
+
+
+def _pdf_payload(symbols: list[str]) -> dict:
+    return {
+        "selection": {"period": "mtd", "current": {"from": "2026-10-01", "to": "2026-10-31"},
+                      "previous": None, "compare": "none", "partial": False, "grain": "day"},
+        "filters": {},
+        "freshness": {"updated_at": None, "data_version": "v1"},
+        "views": [{"id": "monedas", "type": "table",
+                   "columns": [{"id": "symbol", "label": "Símbolo", "kind": "dimension"},
+                               {"id": "name", "label": "Nombre", "kind": "dimension"},
+                               {"id": "btc", "label": "BTC", "kind": "metric"}],
+                   "rows": [{"symbol": s, "name": s.title(), "btc": 100} for s in symbols]}],
+    }
+
+
+def _render_pdf(project, symbols: list[str], columns: list) -> bytes:
+    ctx = ctx_for(project, images=COINS)
+    definition = _pdf_definition([{"id": "fichas", "type": "asset", "view": "monedas",
+                                   "columns": columns, "image": "coins"}])
+    return pdf.render(definition, _pdf_payload(symbols), organization="Acme", product="Bizview",
+                      viewer="Ana", locale="es", images=report_images.reader(ctx))
+
+
+def test_the_pdf_embeds_the_project_file_the_key_names(project):
+    content = _render_pdf(project, ["BTC"], ["symbol", "name", None, "btc"])
+    assert b"/Subtype /Image" in content
+
+
+def test_an_svg_or_missing_key_draws_the_initial_circle_instead(project):
+    """ReportLab cannot embed SVG, and a key with no file has nothing to embed: both fall back."""
+    for symbol in ("ETH", "HYPE"):
+        content = _render_pdf(project, [symbol], ["symbol", "name", None, "btc"])
+        assert b"/Subtype /Image" not in content, symbol

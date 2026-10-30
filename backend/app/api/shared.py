@@ -13,7 +13,7 @@ from app.db import DB
 from app.engine import report as engine
 from app.errors import not_found
 from app.i18n import M
-from app.reports import palette, pdf
+from app.reports import images, palette, pdf
 from app.security import throttle
 from app.sharing import links
 
@@ -128,6 +128,7 @@ def shared_pdf(
         product=settings.product_name,
         viewer=None,
         palette=palette.resolve(definition, palette.installation_preset(db)),
+        images=images.reader(ctx),
     )
     period = payload["selection"]["current"]
     name = f"{ctx.report_id}-{period['from']}-{period['to']}.pdf"

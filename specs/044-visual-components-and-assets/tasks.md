@@ -103,7 +103,7 @@ one asset block exports to PDF, and every figure equals the screen's.
 - [x] T026 [P] [US2] Implement the `index` block in `backend/app/reports/pdf_layout.py`: value, gradient bar between two roles, marker, end labels
 - [x] T027 [P] [US2] Implement the `share` block in `backend/app/reports/pdf_layout.py`: figures plus a stacked bar whose remainder is `rest_label` when the parts sum to less than 100
 - [x] T028 [US2] Implement the `asset` block in `backend/app/reports/pdf_layout.py`: embedded raster (PNG/JPEG/WebP via ReportLab's image reader), name, value, sign-coloured badge, optional sparkline
-- [ ] T029 [US2] In `backend/app/reports/pdf_layout.py`, make the four blocks resolve `image:` against the project folder and the cache with the same lookup as the screen, drawing the initial circle when only an SVG exists (R3) — **half done**: the blocks draw a data-URI image or the initial circle, but they do not yet look the set up in the project folder; needs a project root threaded to the renderer
+- [x] T029 [US2] In `backend/app/reports/pdf_layout.py`, make the four blocks resolve `image:` against the project folder and the cache with the same lookup as the screen, drawing the initial circle when only an SVG exists (R3) — the asset block resolves the declared set through `app.reports.images.reader`; SVG and a missing key still draw the circle, and the `column:` cache waits for T031–T039
 - [x] T030 [US2] In `backend/app/reports/pdf_layout.py`, make an unsupported block kind fall through to the existing error card (026 FR-006) with the kind's name, never a blank region
 
 **Checkpoint**: screen and PDF agree; US1's logos now reach the PDF when shipped as raster.

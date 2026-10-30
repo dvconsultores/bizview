@@ -13,7 +13,7 @@ import io
 import logging
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -160,6 +160,8 @@ class Layout:
     width: float
     blocks: list
     palette: ReportPalette
+    #: 044: per declared image set, the column its key comes from and a lookup for the bytes.
+    images: dict = field(default_factory=dict)
     index: int = 0
 
 
@@ -248,7 +250,7 @@ class PageNumber(Flowable):
 
 def render_layout(*, definition: dict, payload: dict, styles, organization: str, product: str,
                   viewer: str | None, preview: bool, locale: str,
-                  palette: ReportPalette | None = None) -> list:
+                  palette: ReportPalette | None = None, images: dict | None = None) -> list:
     """Historia de flowables para definition["layout"]["pdf"].
 
     Feature 038: a block that cannot be drawn becomes its own error card — with the code and the
@@ -261,7 +263,7 @@ def render_layout(*, definition: dict, payload: dict, styles, organization: str,
     ctx = Layout(definition=definition, payload=payload, styles=story.styles,
                  organization=organization, product=product, viewer=viewer, preview=preview,
                  locale=locale, currency=definition.get("currency", "USD"), pdf=pdf_doc,
-                 width=story.width, blocks=blocks, palette=pal)
+                 width=story.width, blocks=blocks, palette=pal, images=images or {})
     for index, block in enumerate(blocks):
         ctx.index = index
         _render_block(ctx, block, story, payload)
@@ -1118,9 +1120,8 @@ def _asset_cell(ctx: Layout, block: dict, roles: dict[str, str | None],
                 row: dict) -> list:
     """One tile: the logo (or its initial), the name, the figure and the badge."""
     out = []
-    key = roles.get("image")
     title = _cell_text(row, roles.get("title"))
-    logo = _asset_logo(ctx, row.get(key) if key else None, block.get("image"), title)
+    logo = _asset_logo(ctx, _logo_bytes(ctx, block, roles, row), block.get("image"), title)
     if logo is not None:
         out.append(logo)
     if title:
@@ -1182,13 +1183,26 @@ def _badge(ctx: Layout, value: object) -> Any | None:
     return drawing
 
 
-def _asset_logo(ctx: Layout, value: object, image_set: object, title: str) -> Any | None:
-    """The embedded raster when the row carries one, the initial circle otherwise.
+def _logo_bytes(ctx: Layout, block: dict, roles: dict[str, str | None],
+                row: dict) -> bytes | None:
+    """The image of one asset tile.
 
-    The payload inlines project images as data URIs so the PDF embeds exactly the bytes the
-    screen shows (042 R5 keeps the client from guessing a path); anything else — a site path, a
-    third-party address — draws the `initial` fallback of FR-005."""
-    blob = _data_uri(value)
+    A declared set wins: the set's `key` names the column holding the key, and the resolver reads
+    the project file (T029) so the PDF embeds exactly the bytes the screen shows. Without a set the
+    row's own image column is read, as a data URI the payload inlined (042 R5); anything else —
+    a site path, a third-party address — draws the `initial` fallback of FR-005.
+    """
+    name = block.get("image")
+    declared = ctx.images.get(name) if isinstance(name, str) else None
+    if declared is not None:
+        column = declared.get("key")
+        return declared["bytes"](row.get(column) if column else None)
+    column = roles.get("image")
+    return _data_uri(row.get(column) if column else None)
+
+
+def _asset_logo(ctx: Layout, blob: bytes | None, image_set: object, title: str) -> Any | None:
+    """The embedded raster when there is one, the initial circle otherwise."""
     if blob is not None:
         try:
             reader = ImageReader(io.BytesIO(blob))
