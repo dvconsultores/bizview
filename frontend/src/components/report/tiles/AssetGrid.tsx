@@ -1,5 +1,6 @@
-import type { WebComponent } from "../../../api/types";
+import type { ReportImageSet, WebComponent } from "../../../api/types";
 import { formatValue, formatValueCompact } from "../../../lib/numbers";
+import { ReportImage } from "../ReportImage";
 
 type AssetView = { rows: Record<string, unknown>[] };
 
@@ -30,7 +31,16 @@ function asString(v: unknown): string {
   return v === null || v === undefined ? "" : String(v);
 }
 
-export function AssetGrid({ component, view }: { component: WebComponent; view: AssetView }) {
+export function AssetGrid({
+  component,
+  view,
+  image,
+}: {
+  component: WebComponent;
+  view: AssetView;
+  /** Feature 044: a declared image set; its key column takes the place of the first role. */
+  image?: ReportImageSet;
+}) {
   const roles = resolveRoles(component);
   const rows = Array.isArray(view.rows) ? view.rows : [];
   const limit = component.limit ?? 8;
@@ -48,7 +58,8 @@ export function AssetGrid({ component, view }: { component: WebComponent; view: 
     <div className="h-full rounded-card border border-line bg-surface p-4 shadow-card">
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {visible.map((row, idx) => {
-          const imageSrc = roles.image ? asString(row[roles.image]) : "";
+          const imageSrc = !image && roles.image ? asString(row[roles.image]) : "";
+          const imageName = image ? row[image.key] : undefined;
           const title = roles.title ? asString(row[roles.title]) : "";
           const subtitle = roles.subtitle ? asString(row[roles.subtitle]) : "";
           const rawValue = roles.value ? row[roles.value] : undefined;
@@ -72,6 +83,7 @@ export function AssetGrid({ component, view }: { component: WebComponent; view: 
 
           return (
             <div key={idx} className="flex min-w-0 flex-col gap-1">
+              {image ? <ReportImage set={image} name={imageName} size={40} /> : null}
               {roles.image && imageSrc ? (
                 <span>
                   <img

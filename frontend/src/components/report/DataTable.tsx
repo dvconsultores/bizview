@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ReportView, SortDirection } from "../../api/types";
+import type { ReportImageSet, ReportView, SortDirection } from "../../api/types";
 import { csvFileName, downloadCsv, toCsv, viewCsvTable } from "../../lib/csv";
 import { formatValue } from "../../lib/numbers";
 import { Card } from "../Card";
@@ -7,6 +7,7 @@ import { Button } from "../Button";
 import { CardMenu } from "./CardMenu";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
+import { ReportImage } from "./ReportImage";
 
 type Table = Extract<ReportView, { type: "table" }>;
 
@@ -21,6 +22,8 @@ interface DataTableProps {
   totals?: boolean;
   sort?: { by: string; dir: SortDirection };
   pageSize?: number;
+  /** Feature 044: draw the image of `set` in the cell of `column` (the column the set is keyed by). */
+  image?: { set: ReportImageSet; column: string };
 }
 
 /** The declared order wins, unknown ids are dropped and a column is never repeated. */
@@ -61,6 +64,7 @@ export function DataTable({
   totals = false,
   sort,
   pageSize,
+  image,
 }: DataTableProps) {
   const t = useT();
   const [page, setPage] = useState(0);
@@ -129,7 +133,16 @@ export function DataTable({
                       idx === 0 ? "font-semibold text-ink" : "text-ink-2"
                     }`}
                   >
-                    {c.kind === "metric" ? formatValue(r[c.id] as number | null, c.format, currency) : r[c.id] ?? "—"}
+                    {image && c.id === image.column ? (
+                      <span className="flex items-center gap-2">
+                        <ReportImage set={image.set} name={r[c.id]} size={20} />
+                        {r[c.id] ?? "—"}
+                      </span>
+                    ) : c.kind === "metric" ? (
+                      formatValue(r[c.id] as number | null, c.format, currency)
+                    ) : (
+                      (r[c.id] ?? "—")
+                    )}
                   </td>
                 ))}
               </tr>

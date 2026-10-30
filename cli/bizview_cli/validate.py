@@ -1417,8 +1417,12 @@ ASSET_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".svg")
 
 
 def _image_keys(a: dict, integrations: dict[str, Entry]) -> set[str]:
-    """044: la clave de un conjunto es una dimensión declarada o una columna de un alias usado."""
-    keys = set(a.get("dimensions") or {})
+    """044: la clave de un conjunto es una dimensión declarada, una columna de un alias usado o un
+    metric id.
+
+    El tercer caso es el de la tarjeta `kpi`: no tiene fila, así que el único dato estable de cada
+    elemento es el metric id (`images: {coins: {folder: assets/coins, key: precio_btc}}`)."""
+    keys = set(a.get("dimensions") or {}) | set(a.get("metrics") or {})
     for target in (a.get("uses") or {}).values():
         if not isinstance(target, str) or "." not in target:
             continue

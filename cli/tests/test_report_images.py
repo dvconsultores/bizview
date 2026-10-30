@@ -111,3 +111,17 @@ def test_an_unknown_set_name_is_refused(tmp_path):
     images(root, SET, {"id": "detalle_logo", "type": "table", "view": "detalle",
                        "columns": ["estado", "moneda"], "image": "otro"})
     assert "layout_image_unknown" in errors(validate.validate(root))
+
+
+def test_a_kpi_tile_may_key_the_set_by_metric_id(tmp_path):
+    """A `kpi` tile has no row, so its only stable identity is the metric id."""
+    root = ws(tmp_path)
+    doc = yaml.safe_load((root / REPORT).read_text())
+    metric = next(iter(doc["metrics"]))
+    coins(root, f"{metric}.png")
+    images(root, {"coins": {"folder": "assets/coins", "key": metric}},
+           {"id": "cara", "type": "kpi", "view": "resumen", "metric": metric,
+            "image": "coins", "span": 3})
+    result = validate.validate(root)
+    assert "image_key_unknown" not in codes(result), codes(result)
+    assert errors(result) == set(), codes(result)

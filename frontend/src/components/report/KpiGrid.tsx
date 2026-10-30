@@ -1,9 +1,10 @@
 import { ArrowDownRight, ArrowUpRight, Banknote, Hash, Minus, Percent, Type } from "lucide-react";
-import type { ColorRole, KpiItem, TrendPoint } from "../../api/types";
+import type { ColorRole, KpiItem, ReportImageSet, TrendPoint } from "../../api/types";
 import { changeTone, formatChange, formatValue, formatValueCompact } from "../../lib/numbers";
 import { StatTile } from "../StatTile";
 import { Sparkline } from "./charts/Sparkline";
 import { RenderErrorCard } from "./RenderErrorCard";
+import { ReportImage } from "./ReportImage";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
 
@@ -42,6 +43,7 @@ export function KpiGrid({
   metric,
   sparkline,
   sparklineRole,
+  image,
 }: {
   items: KpiItem[];
   currency: string;
@@ -52,6 +54,8 @@ export function KpiGrid({
   metric?: string;
   sparkline?: { metric: string; points: TrendPoint[] }[];
   sparklineRole?: ColorRole;
+  /** Feature 044: a declared image set, keyed by the item's metric id (a KPI has no row key). */
+  image?: ReportImageSet;
 }) {
   const t = useT();
   const isTv = size === "tv";
@@ -85,7 +89,13 @@ export function KpiGrid({
               <StatTile
                 className="h-full"
                 label={localized(k, "label")}
-                icon={<Icon className="h-5 w-5" aria-hidden />}
+                icon={
+                  image ? (
+                    <ReportImage set={image} name={k.metric} label={localized(k, "label")} size={40} />
+                  ) : (
+                    <Icon className="h-5 w-5" aria-hidden />
+                  )
+                }
                 size={size}
                 value={
                   <>

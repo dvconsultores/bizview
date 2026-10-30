@@ -263,6 +263,20 @@ export interface ReportDefinition {
   layout?: LayoutDocument;
   /** Feature 026: the layout warnings, sent with the definition; a warning never blocks the run. */
   layout_problems?: LayoutProblem[];
+  /** Feature 044: the declared `images:` sets, with the URL prefix the server resolved for them. */
+  images?: Record<string, ReportImageSet>;
+}
+
+/** Feature 044: one `images:` set as the report payload reads it. `url` is the report-scoped asset
+ * prefix — the client appends the row key, never a file name. */
+export interface ReportImageSet {
+  /** The dimension or column the key comes from. */
+  key: string;
+  fallback: "initial" | "none";
+  /** Present for a folder set: `/api/reports/<id>/assets/<set>/`. */
+  url?: string;
+  /** Present for a cached-URL set (still declaration-only). */
+  column?: string;
 }
 
 export interface Change {
@@ -476,6 +490,9 @@ export interface WebComponent {
 
   // asset (042): `columns` is the positional role list [image, title, subtitle, value, delta].
   limit?: number;
+
+  // table | kpi | asset (044): a declared image set; the row key picks the file.
+  image?: string;
 
   // line | area | bar
   x?: string;

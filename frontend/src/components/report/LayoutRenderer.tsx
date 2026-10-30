@@ -2,6 +2,7 @@ import type {
   ColorRole,
   ReportData,
   ReportDefinition,
+  ReportImageSet,
   ReportView,
   TrendPoint,
   WebComponent,
@@ -208,7 +209,7 @@ function Component({
                      message={t.layout.errorCard(component.id, component.type)} />
         );
       }
-      return <AssetGrid component={component} view={view} />;
+      return <AssetGrid component={component} view={view} image={imageSet(def, component)} />;
     }
     case "kpi":
       return <KpiComponent component={component} view={view} data={data} def={def} size={size} />;
@@ -227,6 +228,22 @@ function Component({
                    message={t.layout.errorCard(component.id, component.type)} />
       );
   }
+}
+
+/** Feature 044: the set a component names, or `undefined` when it names none or an unknown one. */
+function imageSet(def: ReportDefinition, component: WebComponent): ReportImageSet | undefined {
+  if (!component.image) return undefined;
+  return def.images?.[component.image];
+}
+
+/** A table draws the image in the cell of the column the set is keyed by; no such column, no image. */
+function tableImage(
+  def: ReportDefinition,
+  component: WebComponent,
+): { set: ReportImageSet; column: string } | undefined {
+  const set = imageSet(def, component);
+  if (!set || !set.key || !component.view) return undefined;
+  return { set, column: set.key };
 }
 
 function KpiComponent({
@@ -269,6 +286,7 @@ function KpiComponent({
       metric={component.metric}
       sparkline={sparkline}
       sparklineRole={roleAt(componentRoles(component), 0)}
+      image={imageSet(def, component)}
     />
   );
 }
@@ -521,6 +539,7 @@ function TableComponent({
       totals={component.totals === true}
       sort={component.sort}
       pageSize={clampNumber(component.page_size, 5, 200, DEFAULT_PAGE_SIZE)}
+      image={tableImage(def, component)}
     />
   );
 }

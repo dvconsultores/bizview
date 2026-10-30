@@ -35,7 +35,9 @@ Rules the schema cannot express, enforced by `bizview validate`:
 
 1. `folder`, when present, exists in the project and contains at least one allowed image.
 2. `column`, when present, names a declared dataset column the report uses.
-3. `key` names a declared dimension, or a column of a dataset the report uses.
+3. `key` names a declared dimension, a column of a dataset the report uses, or a metric id — the
+   last one because a `kpi` tile has no row, so its only stable identity is the metric it shows
+   (`images: {coins: {folder: assets/coins, key: precio_btc}}`).
 4. A set with neither `folder` nor `column` is an error (schema's `oneOf`); a set with `column` only
    is valid but warns that nothing is cached until the integration runs.
 
@@ -66,7 +68,35 @@ views:
 - `image` names the **set** that turns that key into a picture.
 - With `image` absent, `columns[0]` keeps today's behaviour (a URL rendered as-is), so every report
   written since 042 keeps working.
-- With `image` present and `columns[0]` absent, the set's own `key` is used.
+- With `image` present, the set's own `key` wins over `columns[0]`: the picture comes from the
+  project, not from the row.
+
+## What the client receives (T017)
+
+The report payload gains one `images` entry per declared set. It never carries a file name: the
+browser appends the row key and the server resolves the file.
+
+```json
+"images": {
+  "coins": {
+    "key": "symbol",
+    "fallback": "initial",
+    "url": "/api/reports/cripto-panorama/assets/coins/"
+  },
+  "logos": { "key": "symbol", "fallback": "initial", "column": "l.logo_url" }
+}
+```
+
+- `url` is present for a folder set and names the door the client came through:
+  `/api/reports/<id>/assets/<set>/` for a signed-in reader, `/api/shared/<token>/assets/<set>/` for
+  a share link. A column set has no `url` until the image cache serves one.
+- `GET <url><key>` answers with the bytes, an `ETag` and `private, max-age=31536000, immutable`.
+  The lookup is exact case, then case-insensitive, then `png`, `svg`, `webp`, `jpg`, `jpeg`
+  (research R3), so `BTC.png`, `btc.svg` and `btc.webp` all answer for `BTC`.
+- The key is normalised the same way on both sides (`app/projects/assets.normalise_key`): `/` and
+  spaces become `_`, so the row value `HYPE/USD` is requested as `HYPE_USD`.
+- A key with no file answers `404`; the client draws the declared fallback and never retries a
+  guess.
 
 ## PDF
 
