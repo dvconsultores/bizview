@@ -26,7 +26,8 @@ def block(root: Path, *blocks: dict, images: dict | None = None) -> None:
     doc = yaml.safe_load(path.read_text())
     doc["layout"]["pdf"]["blocks"].extend(blocks)
     if images is not None:
-        doc["images"] = images
+        # The golden report already declares `estados`; a case adds its own without dropping it.
+        doc["images"] = {**(doc.get("images") or {}), **images}
     path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
 
 

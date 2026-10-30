@@ -210,6 +210,39 @@ table views.
 - Number and date formats follow the language: `es` uses `1.234,56`; `en` uses `1,234.56`.
 - The CLI language comes from the global option placed before the command (`bizview --lang en validate`), else `BIZVIEW_LANG`, else `LC_ALL` / `LC_MESSAGES` / `LANG` (first non-empty decides), else Spanish.
 
+### Images (optional)
+
+A project can ship images with its files and use them in a table, in an asset tile or in a KPI.
+Declare the sets in the report and name one from the component:
+
+```yaml
+images:
+  coins:                        # the set's name; components refer to it
+    folder: assets/coins        # inside the project
+    key: symbol                 # the dimension or column that names the file
+    fallback: initial           # initial | none
+layout:
+  web:
+    components:
+      - {id: tabla, type: table, view: detalle, image: coins, span: 12}
+```
+
+- The file for a row is `assets/coins/<key>` — `BTC` finds `BTC.png`, `btc.png`, `BTC.svg`,
+  `BTC.webp` or `BTC.jpg`; case does not matter, and a key with `/` or spaces becomes `_` in the
+  file name. You never write a path in the report: the installation resolves it.
+- A key with no file draws the circle with the first letter, coloured from the palette (`initial`),
+  or nothing at all (`none`).
+- Allowed: `.png`, `.jpg`, `.webp`, `.svg` under `assets/`, at most 300 KB each and 25 MB per
+  project. A `.png` must really be a PNG, and an SVG is cleaned on import — no scripts, no
+  external references.
+- The PDF prints the raster files; an SVG-only set prints the circle instead, so add a PNG when the
+  report is shared on paper.
+- A `kpi` tile has no row, so its set is keyed by the metric id
+  (`images: {coins: {folder: assets/coins, key: total_facturado}}`).
+- **Licence**: ship only images you may redistribute. Logos of your own customers' brands, the
+  vendor's own artwork or a CC0 set (for example the CC0 cryptocurrency logos) are fine; an image
+  copied from a website usually is not, and it travels inside the project when you export it.
+
 ### Direct reports ("Reportes directos")
 
 Use a direct report only when the data is already prepared by another process — a tested

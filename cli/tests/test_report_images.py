@@ -27,9 +27,10 @@ def errors(result: validate.Result) -> set[str]:
 
 
 def images(root: Path, spec: dict, component: dict | None = None) -> None:
+    """Adds sets to the ones the golden report already declares (it ships `estados`)."""
     path = root / REPORT
     doc = yaml.safe_load(path.read_text())
-    doc["images"] = spec
+    doc["images"] = {**(doc.get("images") or {}), **spec}
     if component is not None:
         doc["layout"]["web"]["components"].append(component)
     path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
