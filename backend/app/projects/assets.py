@@ -62,8 +62,13 @@ def normalise_key(key: str) -> str:
     return cleaned.strip("._-")
 
 
-def sniff(data: bytes, name: str) -> str:
-    """The real type of `data`; raises when it is not one of the four, or disagrees with `name`."""
+def sniff(data: bytes, name: str, *, strict: bool = True) -> str:
+    """The real type of `data`; raises when it is not one of the four, or disagrees with `name`.
+
+    `strict=False` is for a body fetched from a URL, where the path carries no usable extension
+    (`/logos/1234`, `/logo.png?v=2`): the magic bytes are then the only evidence, and they are
+    enough — the name a file gets is the hash, not the one the address claimed.
+    """
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         kind = "png"
     elif data.startswith(b"\xff\xd8\xff"):
@@ -75,6 +80,8 @@ def sniff(data: bytes, name: str) -> str:
     else:
         raise AssetRefused("not_image", name)
 
+    if not strict:
+        return kind
     suffix = Path(name).suffix.lower()
     if suffix == ".svg" and kind != "svg":
         raise AssetRefused("not_image", name)

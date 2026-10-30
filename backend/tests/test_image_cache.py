@@ -170,3 +170,11 @@ def test_the_columns_come_from_the_reports_that_ask_for_them():
     }}})()
     assert cache.columns_for(version, "cripto") == [("logos", "logo_url")]
     assert cache.columns_for(version, "precios") == [("dia", "foto")]
+
+def test_a_url_without_an_extension_is_judged_by_its_bytes(db, fetched):
+    """`/logos/1234` and `/logo.png?v=2` carry no usable extension: the magic bytes decide."""
+    served, _ = fetched
+    served["https://cdn.example/logos/1234"] = PNG
+    served["https://cdn.example/logo.png?v=2"] = OTHER
+    assert cache.store(db, "https://cdn.example/logos/1234").status == "ok"
+    assert cache.store(db, "https://cdn.example/logo.png?v=2").status == "ok"

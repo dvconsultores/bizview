@@ -75,7 +75,7 @@ def _accept(data: bytes, url: str) -> tuple[str, str]:
     """(kind, content type) of a fetched body, or `ImageRefused`."""
     name = urlsplit(url).path.rsplit("/", 1)[-1] or "image"
     try:
-        kind = asset_rules.sniff(data, name)
+        kind = asset_rules.sniff(data, name, strict=False)
     except asset_rules.AssetRefused as e:
         raise ImageRefused(e.reason) from e
     if kind in REFUSED_KINDS:
