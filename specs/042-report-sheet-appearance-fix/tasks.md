@@ -31,12 +31,12 @@ Batches are DeepSeek briefs; each lands with its tests before the next starts.
       snapshots per preset × theme.
 
 ## Batch C — tiles
-- [ ] T012 Compact number formatting (es/en) with tooltip + PDF full value; step-down size; no
+- [X] T012 Compact number formatting (es/en) with tooltip + PDF full value; step-down size; no
       wrapping.
-- [ ] T013 Schema + validator + types: `gauge`, `share`, `index`, `asset`.
-- [ ] T014 Renderer components for the four types; unknown/unimplemented type → error card.
-- [ ] T015 Grid spans (3/6/12) and 16px gaps.
-- [ ] T016 Tests: formatting table, each type from the CoinMarketCap fixture, error card,
+- [X] T013 Schema + validator + types: `gauge`, `share`, `index`, `asset`.
+- [X] T014 Renderer components for the four types; unknown/unimplemented type → error card.
+- [X] T015 Grid spans (3/6/12) and 16px gaps.
+- [X] T016 Tests: formatting table, each type from the CoinMarketCap fixture, error card,
       grid snapshots 375/768/1280/1920.
 
 ## Batch D — polish and docs
