@@ -66,13 +66,13 @@ show logos, `HYPE` shows its initial, and export/import round-trips `assets/`.
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Schema and validator tests in `cli/tests/test_report_images.py`: `images` accepts folder-only and column-only sets, refuses neither, warns on an SVG-only set (R3) and on a case-only duplicate, and `image` is refused on a component type that does not take one
+- [x] T013 [P] [US1] Schema and validator tests in `cli/tests/test_report_images.py`: `images` accepts folder-only and column-only sets, refuses neither, warns on an SVG-only set (R3) and on a case-only duplicate, and `image` is refused on a component type that does not take one
 - [ ] T014 [P] [US1] Renderer tests in `frontend/tests/unit/layout-assets.test.tsx`: the table cell shows a 20 px round image for a keyed row, the asset tile a 40 px one, a missing key draws the initial circle from a palette role, and `image` absent keeps today's URL behaviour (R5)
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Add the `images` block and the `image` property to `cli/bizview_cli/schemas/report.schema.json` exactly as `contracts/report-images.md` specifies (`imageSet` with `folder`/`column` `oneOf`, `key` required, `fallback` default `initial`)
-- [ ] T016 [US1] Implement the validator rules a schema cannot express in `cli/bizview_cli/validate.py`: folder exists and holds an allowed image; `column` names a declared column; `key` is a declared dimension or column; `image` only on `table`/`kpi`/`asset`
+- [x] T015 [US1] Add the `images` block and the `image` property to `cli/bizview_cli/schemas/report.schema.json` exactly as `contracts/report-images.md` specifies (`imageSet` with `folder`/`column` `oneOf`, `key` required, `fallback` default `initial`)
+- [x] T016 [US1] Implement the validator rules a schema cannot express in `cli/bizview_cli/validate.py`: folder exists and holds an allowed image; `column` names a declared column; `key` is a declared dimension or column; `image` only on `table`/`kpi`/`asset`
 - [ ] T017 [US1] Resolve image sets in the report payload: extend the report definition the API returns (`backend/app/reports/` + `frontend/src/api/types.ts`) with `images` and the resolved key-to-URL map, so the client never guesses a path
 - [ ] T018 [P] [US1] Render images in `frontend/src/components/report/LayoutRenderer.tsx`: table cell (20 px round), `kpi` and `asset` tiles (40 px round), `alt` = key or name; the initial fallback uses `palette.role` by a hash of the key
 - [ ] T019 [P] [US1] Add the small image component the renderer uses (loading state, `onError` → fallback) next to the other report components in `frontend/src/components/report/`
