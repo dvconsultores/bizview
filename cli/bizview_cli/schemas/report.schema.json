@@ -676,6 +676,14 @@
           "maxLength": 1000
         }
       }
+    },
+    "images": {
+      "description": "Conjuntos de imágenes del reporte, por nombre; los componentes los usan con image: <conjunto>.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/image_set"
+      },
+      "maxProperties": 20
     }
   },
   "$defs": {
@@ -1039,6 +1047,11 @@
         "font_name": {
           "description": "Familia tipográfica de un componente de texto; por defecto la de la interfaz.",
           "$ref": "#/$defs/font_name"
+        },
+        "image": {
+          "description": "Conjunto de imágenes (clave de `images`) que usa el componente: en table, la imagen de la celda clave; en kpi y asset, junto a la etiqueta.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
         }
       },
       "allOf": [
@@ -1599,6 +1612,51 @@
               "type"
             ]
           }
+        }
+      ]
+    },
+    "image_set": {
+      "description": "Conjunto de imágenes: resuelve la clave de una fila a un archivo del proyecto, a una URL cacheada o al relleno declarado.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "folder": {
+          "description": "Carpeta del proyecto con las imágenes, por ejemplo assets/coins.",
+          "type": "string",
+          "pattern": "^assets/[a-z0-9][a-z0-9._/-]*$"
+        },
+        "column": {
+          "description": "Columna de URL de imagen cuya descarga cachea el worker, por ejemplo l.logo_url.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}\\.[a-z][a-z0-9_]{0,40}$"
+        },
+        "key": {
+          "description": "Dimensión o columna cuyo valor nombra el archivo (BTC → BTC.png).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "fallback": {
+          "description": "Qué dibujar cuando no hay archivo: initial (círculo con la inicial) o none.",
+          "enum": [
+            "initial",
+            "none"
+          ],
+          "default": "initial"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "folder"
+          ]
+        },
+        {
+          "required": [
+            "column"
+          ]
         }
       ]
     }

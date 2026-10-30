@@ -92,9 +92,10 @@ def check_layout(definition: dict, *, file: str, entry: str = "report") -> list[
     for path, value in _texts(layout, "/layout"):
         if value.strip() and _LITERAL.search(value):
             out.append(_literal(path, value, file, entry))
+    images = definition.get("images") if isinstance(definition.get("images"), dict) else {}
     web = layout.get("web")
     if isinstance(web, dict):
-        _web(web, facts, file, entry, out)
+        _web(web, facts, file, entry, out, images)
     theme = layout.get("theme")
     if isinstance(theme, dict):
         _theme(theme, file, entry, out)
@@ -238,7 +239,31 @@ def _theme(theme: dict, file: str, entry: str, out: list[Issue]) -> None:
 # ------------------------------------------------------------------ layout.web
 
 
-def _web(web: dict, facts: _Facts, file: str, entry: str, out: list[Issue]) -> None:
+_IMAGE_COMPONENTS = ("table", "kpi", "asset")
+
+
+def _image_ref(value, type_, images: dict, path: str, label: str, file: str, entry: str,
+               out: list[Issue]) -> None:
+    """044: a component may name an image set, and only the three that can draw one."""
+    if value is None:
+        return
+    if type_ not in _IMAGE_COMPONENTS:
+        out.append(_issue(
+            entry, "layout_image_not_allowed",
+            f"{label}: image solo vale en {', '.join(_IMAGE_COMPONENTS)}", file=file,
+            path=path, expected={"enum": list(_IMAGE_COMPONENTS)},
+            fix=_use("image en un componente que dibuja imágenes", _IMAGE_COMPONENTS)))
+        return
+    if value not in images:
+        out.append(_issue(
+            entry, "layout_image_unknown",
+            f"{label}: el conjunto de imágenes '{value}' no está en images", file=file,
+            path=path, expected={"enum": sorted(images)},
+            fix=_use("un conjunto declarado en images", tuple(sorted(images)))))
+
+
+def _web(web: dict, facts: _Facts, file: str, entry: str, out: list[Issue],
+         images: dict | None = None) -> None:
     """Comprueba layout.web: componentes, ids únicos, referencias y límites."""
 
     _enum(out, entry, file, "/layout/web/gutter", "gutter", web.get("gutter"), GUTTERS)
@@ -256,6 +281,8 @@ def _web(web: dict, facts: _Facts, file: str, entry: str, out: list[Issue]) -> N
                 f"{label}: tipo de componente '{type_}' fuera del catálogo", file=file,
                 path=where + "/type", expected={"enum": list(WEB_COMPONENT_TYPES)},
                 fix=_use("uno de los tipos del catálogo", WEB_COMPONENT_TYPES)))
+        _image_ref(comp.get("image"), type_, images or {}, where + "/image", label,
+                   file, entry, out)
         view = _view_ref(comp.get("view"), where + "/view", label, facts, file, entry, out)
         for key in ("metric", "value"):
             _metric(comp.get(key), f"{where}/{key}", label, key, facts, file, entry, out)

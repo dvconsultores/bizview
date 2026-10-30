@@ -1413,13 +1413,70 @@ def fixable_rules(kind: str, data: dict, key: str, file: str, issues: list[Issue
                       "value": suggestion}))
 
 
-def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Issue],
+ASSET_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".svg")
+
+
+def _image_keys(a: dict, integrations: dict[str, Entry]) -> set[str]:
+    """044: la clave de un conjunto es una dimensión declarada o una columna de un alias usado."""
+    keys = set(a.get("dimensions") or {})
+    for target in (a.get("uses") or {}).values():
+        if not isinstance(target, str) or "." not in target:
+            continue
+        integration_id, dataset_id = target.split(".", 1)
+        integration = integrations.get(integration_id)
+        datasets = (integration.artifact.get("datasets") if integration else None) or {}
+        keys.update((datasets.get(dataset_id) or {}).get("columns") or {})
+    return keys
+
+
+def _check_images(entry: Entry, a: dict, ry: str, issues: list[Issue], root: Path,
+                  integrations: dict[str, Entry]) -> None:
+    """044: `images` — la carpeta existe y tiene imágenes, la clave se declara, y el PDF avisa
+    cuando el conjunto sólo tiene SVG (el PDF embebe ráster; ver research R3)."""
+    images = a.get("images")
+    if not isinstance(images, dict) or not images:
+        return
+    keys = _image_keys(a, integrations)
+    for name, spec in sorted(images.items()):
+        if not isinstance(spec, dict):
+            continue
+        path = _pointer(["images", name])
+        folder = spec.get("folder")
+        if isinstance(folder, str):
+            base = (root / entry.project_dir if entry.project_dir else root) / folder
+            if not base.is_dir():
+                issues.append(Issue(entry.key, "image_folder_missing",
+                                    t("validate.image_folder_missing", name=name, folder=folder),
+                                    file=ry, path=path + "/folder",
+                                    fix=t("validate.fix_add_image_folder", folder=folder)))
+                continue
+            found = [p for p in base.iterdir()
+                     if p.is_file() and p.suffix.lower() in ASSET_SUFFIXES]
+            if not found:
+                issues.append(Issue(entry.key, "image_folder_empty",
+                                    t("validate.image_folder_empty", name=name, folder=folder),
+                                    file=ry, path=path + "/folder"))
+            elif all(p.suffix.lower() == ".svg" for p in found):
+                issues.append(Issue(entry.key, "image_svg_only",
+                                    t("validate.image_svg_only", name=name, folder=folder),
+                                    file=ry, path=path + "/folder", level="warning"))
+        key = spec.get("key")
+        if isinstance(key, str) and key not in keys:
+            issues.append(Issue(entry.key, "image_key_unknown",
+                                t("validate.image_key_unknown", name=name, key=key,
+                                  dimensions=", ".join(sorted(keys)) or "—"),
+                                file=ry, path=path + "/key",
+                                fix=t("validate.fix_declare_image_key", key=key)))
+
+
+def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Issue], root: Path,
                   invalid: set[str] | frozenset[str] = frozenset(),
                   direct: DirectContext | None = None) -> None:
     a = entry.artifact
     ry = f"{entry.folder.as_posix()}/report.yaml"
     # El esquema del informe ya aceptó el layout: ahora las referencias y la idoneidad (FR-014).
     issues.extend(report_layout.check_layout(a, file=ry, entry=entry.key))
+    _check_images(entry, a, ry, issues, root, integrations)
     _check_pdf_views(entry, ry, issues)
     _check_direct_spec(entry, issues)
     if "direct" in a:
@@ -1894,7 +1951,7 @@ def _validate_v2(root: Path, issues: list[Issue], known: dict[str, str] | None,
         _check_integration(root, entry, issues, known)
     for entry in reports.values():
         _check_spec(root, entry, issues)
-        _check_report(entry, integrations, issues, invalid_integrations, direct)
+        _check_report(entry, integrations, issues, root, invalid_integrations, direct)
     for entry in distributions.values():
         _check_spec(root, entry, issues)
         _check_distribution(entry, reports, issues)
@@ -1940,7 +1997,7 @@ def validate(root: Path | str, *, known_sources: set[str] | None = None,
             _check_integration(root, entry, issues, known)
         for entry in reports.values():
             _check_spec(root, entry, issues)
-            _check_report(entry, integrations, issues, invalid_integrations, direct)
+            _check_report(entry, integrations, issues, root, invalid_integrations, direct)
         result = Result(issues, integrations, reports, None, name, manifest_data)
     if result.ok:
         result.lock = build_lock(result)
