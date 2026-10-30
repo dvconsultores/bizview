@@ -45,3 +45,8 @@
    independently-testable rule.
 4. **SC-005 was a live-eval criterion** in the draft. The live agent evaluations are deleted with the
    chat (043 A4), so it is expressed as an author-with-only-the-guide outcome instead.
+5. **The draft's `## Constitution check` was missing from the first promotion** and restored in
+   `93df99e`: every spec in this repository carries it between Success Criteria and Assumptions, and
+   it is checked against the constitution as 043 amended it (IX: authoring outside the product;
+   VIII: Bizview does not author with AI). Principle V is stated as a condition on the plan, so an
+   imaging library has to be declared there rather than assumed.

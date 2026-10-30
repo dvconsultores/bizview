@@ -187,6 +187,39 @@ dashboard renders them with the network to those hosts cut off afterwards, and t
 - **SC-006**: A report using an unsupported component shows the named error card in 100 % of cases,
   never a blank or a broken layout.
 
+## Constitution check
+
+Checked against the constitution as amended by 043 (IX redefined, VIII explicit that Bizview does
+not author with AI).
+
+- **I (mobile-first)** — the components must work at 320 px and pass WCAG 2.2 AA, which is why
+  accessibility is an edge case with an `alt` for every image and a text summary for gauge, index
+  and share. PASS.
+- **II / VI (backend as ETL, data tuning)** — images are static files shipped in the project, never
+  origin queries; the optional URL cache fetches once per new value and never blocks a data load.
+  PASS.
+- **III (source of truth is external)** — `image_url` downloads are read-only HTTP GETs under the
+  same public-host rules as data sources. PASS.
+- **IV (separated concerns by folder)** — assets live under the project folder, next to the specs
+  that declare them; the cache is its own directory inside the data volume, not the project. PASS.
+- **V (fixed technology stack)** — no new stack component: the screen draws SVG with product code,
+  the PDF keeps ReportLab, and any supporting imaging library is declared in the plan. PASS.
+- **VII (one product, many installations)** — assets are project configuration, versioned with the
+  project, so an apply reproduces a dashboard exactly on any installation. PASS.
+- **VIII (AI optional and private)** — no AI anywhere in this feature; an author may be a person or
+  an external agent, and the product only validates and renders. PASS.
+- **IX (spec-driven reporting)** — `images` and the four components are declarative and validated
+  against the project files and the declared columns; nothing about them is authored by Bizview.
+  PASS.
+
+Two consequences the plan must carry, recorded here rather than discovered later:
+
+- The published contract changes (the CLI's report schema and the layout allowlist learning
+  `assets/`), so the authoring skeleton and the example project ship in the same release; otherwise
+  an author following the guide writes a project the validator refuses.
+- `cli/bizview_cli/workspace_template/` stays untouched: it is the external authoring contract, not
+  product code.
+
 ## Assumptions
 
 - **Assets are project configuration, not origin data**: they travel with the project version, so an
