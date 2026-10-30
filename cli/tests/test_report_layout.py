@@ -426,7 +426,8 @@ def test_font_name_only_on_text_blocks(ws) -> None:
 
 def test_unknown_component_type(ws) -> None:
     _with_view_ids(ws)
-    _edit_report(ws, layout=_web({"id": "x", "type": "gauge", "view": "resumen"}))
+    # 044: `gauge` is a real component since 042 Batch C; an unknown type is something else.
+    _edit_report(ws, layout=_web({"id": "x", "type": "bogus", "view": "resumen"}))
     result = validate.validate(ws)
     assert result.ok is False
     assert any(i.path == "/layout/web/components/0/type" for i in result.issues)

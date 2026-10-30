@@ -22,7 +22,8 @@ from app.projects import service as projects
 router = APIRouter(prefix="/api/projects")
 
 CLIENT_ERRORS = ("path_not_allowed", "path_unsafe", "path_outside_project", "too_large",
-                 "not_text", "project_too_large", "spec_number", "file_changed")
+                 "not_text", "project_too_large", "spec_number", "file_changed",
+                 "asset_not_restorable")
 
 
 def path_error(e: fs.ProjectPathError) -> ApiError:
@@ -475,3 +476,33 @@ def import_zip(request: Request, data: bytes = Body(..., media_type="application
                                       ip=client_ip(request))
     except project_zip.ZipRejected as e:
         raise ApiError(413 if e.code == "too_large" else 422, e.code, e.message) from e
+
+
+@router.get("/{slug}/assets/{path:path}")
+def project_asset(slug: str, path: str, request: Request,
+                  actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """An image shipped in the project (044): bytes, ETag and a year of cache.
+
+    Private caching on purpose: the same file is versioned with the project, so the browser may
+    keep it, but it is never a public resource — share links read it in the same origin.
+    """
+    from app.projects import assets as asset_rules
+
+    p = projects.get(db, slug)
+    rel = f"assets/{path}"          # the folder is part of the route, not of the caller's string
+    try:
+        data, content_type, digest = fs.read_asset(p.slug, rel)
+    except FileNotFoundError:
+        raise not_found(M("projects.file_not_found", path=path)) from None
+    except asset_rules.AssetRefused as e:
+        raise validation({"path": e.reason}) from e
+    except fs.ProjectPathError as e:
+        raise path_error(e) from e
+
+    etag = f'"{digest}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(data, media_type=content_type, headers={
+        "ETag": etag,
+        "Cache-Control": "private, max-age=31536000, immutable",
+    })

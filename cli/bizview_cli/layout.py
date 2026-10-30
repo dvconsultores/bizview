@@ -9,6 +9,7 @@ SPEC_FOLDER_RE = re.compile(r"^[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}$")
 _ID = r"[a-z][a-z0-9-]{1,49}"
 _NAME = r"[a-z0-9][a-z0-9._-]{0,63}"
 _SPEC = r"[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}"
+_ASSET = r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}"
 
 PROJECT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"project\.yaml"),
@@ -21,6 +22,11 @@ PROJECT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(rf"integrations/{_ID}/requests/[a-z0-9][a-z0-9._-]{{0,58}}\.yaml"),
     re.compile(rf"reports/{_ID}/report\.yaml"),
     re.compile(rf"distributions/{_ID}\.yaml"),
+    # 044: images shipped inside the project. A folder level is allowed so an author can group
+    # logos by vendor or currency; the file name keeps upper case on purpose (coin tickers:
+    # `assets/coins/BTC.png`), and the extension decides what may be stored (assets.py sniffs it).
+    re.compile(rf"assets/(?:[a-z0-9][a-z0-9._-]{{0,40}}/)?{_ASSET}\."
+               r"(?:png|jpg|jpeg|webp|svg)", re.IGNORECASE),
 )
 
 
@@ -42,6 +48,8 @@ FOLDER_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"reports"),
     re.compile(rf"reports/{_ID}"),
     re.compile(r"distributions"),
+    re.compile(r"assets"),
+    re.compile(r"assets/[a-z0-9][a-z0-9._-]{0,40}"),
 )
 
 
@@ -56,7 +64,8 @@ ALLOWED_TEXT: str = (
     "{spec,plan,tasks,research,data-model,quickstart,run-report}.md; "
     "specs/NNN-nombre/checklists/<nombre>.md; integrations/<id>/integration.yaml; "
     "integrations/<id>/queries/<nombre>.sql; integrations/<id>/requests/<nombre>.yaml; "
-    "reports/<id>/report.yaml; distributions/<id>.yaml"
+    "reports/<id>/report.yaml; distributions/<id>.yaml; "
+    "assets/[<carpeta>/]<nombre>.{png,jpg,jpeg,webp,svg}"
 )
 
 KINDS = ("fuente", "integracion", "reporte", "distribucion")

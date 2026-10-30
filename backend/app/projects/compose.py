@@ -158,7 +158,11 @@ def compose(db, *, include=None, exclude_slug: str | None = None, dest: Path) ->
         for path in files:
             target = dest / "projects" / include.slug / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(fs.read_text(include.slug, path), encoding="utf-8")
+            if path.startswith("assets/"):
+                # 044: an image is copied as bytes; reading it as text would refuse it.
+                target.write_bytes(fs.read_asset(include.slug, path)[0])
+            else:
+                target.write_text(fs.read_text(include.slug, path), encoding="utf-8")
     return dest
 
 

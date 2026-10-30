@@ -11,6 +11,7 @@ from bizview_cli import layout
 from app.config import get_settings
 from app.errors import ApiError
 from app.i18n import M
+from app.projects import assets as asset_rules
 from app.projects import fs
 from app.projects import service as project_service
 from app.services import audit
@@ -65,7 +66,10 @@ def export(db, actor, project, ip: str | None = None) -> bytes:
     listed, _ = fs.list_files(project.slug)
     entries = {f"{project.slug}/{rel}": data for rel, data in _package_files(project.name).items()}
     for path in sorted(listed):
-        entries[f"{project.slug}/{path}"] = fs.read_text(project.slug, path).encode("utf-8")
+        if path.startswith("assets/"):          # 044: images are binary
+            entries[f"{project.slug}/{path}"] = fs.read_asset(project.slug, path)[0]
+        else:
+            entries[f"{project.slug}/{path}"] = fs.read_text(project.slug, path).encode("utf-8")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, data in sorted(entries.items()):
@@ -144,6 +148,7 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
     entries = _entries(data)
     prefix = _strip_top([n for n, _ in entries]) or ""
     files: dict[str, str] = {}
+    images: dict[str, bytes] = {}
     ignored: list[str] = []
     for raw, content in entries:
         rel = raw[len(prefix):]
@@ -151,8 +156,13 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
             fs.check_rel(rel)
             if not layout.is_allowed(rel):
                 raise ValueError(rel)
+            if rel.startswith("assets/"):
+                # 044: validated here so a bad image is reported in `ignored`, never half-written.
+                images[rel] = asset_rules.prepare(content, rel)[0]
+                continue
             files[rel] = content.decode("utf-8")
-        except (fs.ProjectPathError, ValueError):   # UnicodeDecodeError is a ValueError
+        except (fs.ProjectPathError, ValueError, asset_rules.AssetRefused):
+            # UnicodeDecodeError is a ValueError
             ignored.append(rel)
     try:
         meta = yaml.safe_load(files.get("project.yaml") or "")
@@ -179,11 +189,18 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
             {"op": "write", "path": path, "content": text, "base_sha256": None, "force": True}
             for path, text in sorted(files.items())
         ], {"kind": "user", "user_id": actor.id, "session_id": None, "command": "import"})
-    except fs.ProjectPathError as e:
+        for path, data in sorted(images.items()):
+            fs.apply_asset(project.id, path, data,
+                           {"kind": "user", "user_id": actor.id, "session_id": None,
+                            "command": "import"})
+    except (fs.ProjectPathError, asset_rules.AssetRefused) as e:
         # Nothing half-imported stays behind (e.g. two spec folders with the same number).
         shutil.rmtree(fs.project_root(project.slug), ignore_errors=True)
         db.delete(project)
         db.commit()
+        if isinstance(e, asset_rules.AssetRefused):
+            raise ApiError(422, e.reason, M("assets.svg_refused", path=e.detail,
+                                            detail=e.reason)) from e
         raise ApiError(422, e.code, e.message) from e
     result = project_service.revalidate(db, project)
     audit.record(db, "project_imported", actor_id=actor.id, ip=ip,

@@ -224,6 +224,102 @@ def list_files(slug: str) -> tuple[dict[str, tuple[int, str]], list[str]]:
     return (files, sorted(ignored))
 
 
+def read_asset(slug: str, rel: str) -> tuple[bytes, str, str]:
+    """Read an image of the project: (bytes, content type, sha256).
+
+    Binary, so it does not go through `read_text` (which refuses NUL bytes on purpose). The size
+    cap is the asset cap, not the text one.
+    """
+    from app.projects import assets as asset_rules
+
+    target = resolve(slug, rel)
+    fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as f:
+        st = os.fstat(f.fileno())
+        if not stat.S_ISREG(st.st_mode):
+            raise _unsafe(rel)
+        if st.st_size > asset_rules.MAX_KB * 1024:
+            raise ProjectPathError("too_large", M("projects.too_large", path=rel,
+                                                 max=f"{asset_rules.MAX_KB} KB"))
+        data = f.read()
+    kind = asset_rules.sniff(data, rel)
+    return data, asset_rules.CONTENT_TYPES[kind], hashlib.sha256(data).hexdigest()
+
+
+def check_asset_limits(slug: str, rel: str, data: bytes,
+                       current: dict[str, tuple[int, str]]) -> None:
+    """Asset size and project limits. Separate from `check_limits`: images are binary."""
+    from app.projects import assets as asset_rules
+
+    if len(data) > asset_rules.MAX_KB * 1024:
+        raise ProjectPathError("too_large", M("projects.too_large", path=rel,
+                                             max=f"{asset_rules.MAX_KB} KB"))
+    max_mb = get_settings().project_max_mb
+    too_large = ProjectPathError(
+        "project_too_large", M("projects.project_too_large", max_mb=max_mb, max_files=MAX_FILES))
+    if rel not in current and len(current) >= MAX_FILES:
+        raise too_large
+    total = sum(size for path, (size, _) in current.items() if path != rel) + len(data)
+    if total > max_mb * 1024 * 1024:
+        raise too_large
+
+
+def write_asset_atomic(slug: str, rel: str, data: bytes) -> tuple[bytes | None, str]:
+    """Atomically write an image to a project; returns (previous bytes, new sha256)."""
+    target = resolve(slug, rel)
+    previous = _read_bytes(target) if target.exists() else None
+    parts = check_rel(rel)
+    _mkdirs(project_root(slug), parts[:-1])
+    tmp = target.parent / f".{parts[-1]}.{secrets.token_hex(6)}.tmp"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o640)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except OSError as e:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise ProjectPathError("not_writable", M("projects.not_writable")) from e
+    return (previous, hashlib.sha256(data).hexdigest())
+
+
+def apply_asset(project_id: int, rel: str, data: bytes, actor: dict) -> dict:
+    """Store one image in a project, with its revision. The binary sibling of `apply_ops`.
+
+    Kept separate on purpose: `apply_ops` writes UTF-8 text and refuses NUL bytes, which is the
+    right rule for specs and the wrong one for a PNG.
+    """
+    import uuid
+
+    from sqlalchemy import text as sql_text
+
+    from app.db import get_sessionmaker, lock_key
+    from app.models import Project
+    from app.projects import assets as asset_rules
+    from app.projects import history
+
+    stored, kind, _ = asset_rules.prepare(data, rel)
+    with get_sessionmaker()() as db:
+        db.execute(sql_text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+                   {"k": lock_key("project", project_id)})
+        project = db.get(Project, project_id)
+        if project is None or project.deleted_at is not None:
+            raise _unsafe(str(project_id))
+        slug = project.slug
+        history.sync_external(db, project)
+        sizes, _ = list_files(slug)
+        check_asset_limits(slug, rel, stored, sizes)
+        previous, digest = write_asset_atomic(slug, rel, stored)
+        rev = history.record_asset(db, project.id, rel, kind, stored, actor,
+                                   group_id=uuid.uuid4())
+        db.commit()
+        return {"op": "write", "path": rel, "revision_id": rev.id, "sha256": digest,
+                "previous": previous}
+
+
 def check_limits(slug: str, rel: str, data: bytes, current: dict[str, tuple[int, str]]) -> None:
     """Check file size, content, and project limits before writing."""
     if len(data) > MAX_FILE_BYTES:

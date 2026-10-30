@@ -51,6 +51,41 @@ def record(
     return row
 
 
+def record_asset(
+    db,
+    project_id: int,
+    path: str,
+    kind: str,
+    data: bytes,
+    actor: dict,
+    *,
+    group_id: uuid.UUID,
+) -> ProjectFileRevision:
+    """Create the revision row for an image: its hash and size, never its bytes.
+
+    Keeping megabytes of PNG in the history table would make every backup heavier for a file
+    nobody diffs; the hash is what the conflict check needs. A consequence worth knowing: an image
+    cannot be restored to an earlier version, and `restore` refuses those paths with a named error.
+    """
+    row = ProjectFileRevision(
+        project_id=project_id,
+        path=path,
+        op="update",
+        sha256=hashlib.sha256(data).hexdigest(),
+        content=None,
+        size=len(data),
+        actor_kind=actor["kind"],
+        actor_id=actor.get("user_id"),
+        command=(actor.get("command") or "edit")[:60],
+        session_id=actor.get("session_id"),
+        command_run_id=actor.get("command_run_id"),
+        group_id=group_id,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
 def latest(db, project_id: int, path: str) -> ProjectFileRevision | None:
     """Return newest revision for a path."""
     return db.scalars(
@@ -193,6 +228,10 @@ def restore(db, project, revision_id: int, base_sha256: str | None, actor: dict)
         raise fs.ProjectPathError("file_not_found",
                                   M("projects.file_not_found", path=str(revision_id)))
     actor = {**actor, "command": "restore"}
+    if rev.content is None and rev.op != "delete":
+        raise fs.ProjectPathError(
+            "asset_not_restorable",
+            M("projects.asset_not_restorable", path=rev.path))
     if rev.op == "delete":
         return fs.apply_ops(project.id, [{"op": "delete", "path": rev.path,
                                           "base_sha256": base_sha256}], actor)
