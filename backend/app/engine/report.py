@@ -38,6 +38,7 @@ from app.engine.render_errors import RenderError
 from app.errors import ApiError
 from app.i18n import M, localized, t, tn, use_locale
 from app.models import IntegrationRun, ReportCache, WorkspaceVersion
+from app.reports import images as report_images
 
 log = logging.getLogger("app.engine.report")
 
@@ -979,7 +980,9 @@ def layout_problems(ctx: Context) -> list[dict]:
             for issue in issues if issue.level != "error"]
 
 
-def definition_json(ctx: Context) -> dict:
+def definition_json(ctx: Context, *, assets_base: str | None = None) -> dict:
+    """The report as the client reads it. `assets_base` is the report-scoped asset path of the
+    door the caller came through (044): with it, each declared image set carries its URL prefix."""
     d = ctx.definition
     pdf_cfg = d.get("pdf") or {}
     pdf_views = pdf_cfg.get("views")
@@ -1008,6 +1011,9 @@ def definition_json(ctx: Context) -> dict:
             "views": pdf_layout_views},
         "ai_narrative": bool((d.get("ai_narrative") or {}).get("enabled", False)),
     }
+    images = report_images.payload(ctx, assets_base)
+    if images:
+        out["images"] = images
     if isinstance(d.get("layout"), dict):
         out["layout"] = d["layout"]
         out["layout_problems"] = layout_problems(ctx)
