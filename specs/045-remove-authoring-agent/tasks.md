@@ -11,20 +11,20 @@ green.
 
 ## Phase 2: Frontend removal (commit 2)
 
-- [ ] T002 Delete `frontend/src/components/assistant/` (28 files), `frontend/src/pages/admin/AssistantSession.tsx` and `frontend/src/pages/admin/RunProfiles.tsx`
-- [ ] T003 Remove the assistant routes from `frontend/src/App.tsx` and the matching entries from `frontend/src/routeAccess.ts`; keep `/admin/ia` and `Ayuda`
-- [ ] T004 Remove the AI card and the "IA funcionando" pill from `frontend/src/pages/admin/AdminHome.tsx` and `frontend/src/pages/admin/adminTiles.ts`, and set the grid to 3/2/1
-- [ ] T005 Remove the assistant navigation item and the header sparkle from `frontend/src/components/AppShell.tsx`
-- [ ] T006 Strip the assistant strings from `frontend/src/i18n/es.ts` and `frontend/src/i18n/en.ts` and the assistant types from `frontend/src/api/types.ts`
-- [ ] T007 Remove the narrative component and its call site (`Narrative.tsx`, `ReportView.tsx`)
-- [ ] T008 Delete the assistant frontend suites (14) and the browser specs (`assistant*.spec.ts`, `commands.spec.ts`); keep the report, sharing, projects and layout specs
-- [ ] T009 `tsc --noEmit` and `vitest run` green with the agent gone from the screens
+- [x] T002 Delete `frontend/src/components/assistant/` (28 files), `frontend/src/pages/admin/AssistantSession.tsx` and `frontend/src/pages/admin/RunProfiles.tsx` — done in `04cb51b` (28 components, both pages, `RedirectToProject`)
+- [x] T003 Remove the assistant routes from `frontend/src/App.tsx` and the matching entries from `frontend/src/routeAccess.ts`; keep `/admin/ia` and `Ayuda` — done in `04cb51b` (three routes and three access rules)
+- [x] T004 Remove the AI card and the "IA funcionando" pill from `frontend/src/pages/admin/AdminHome.tsx` and `frontend/src/pages/admin/adminTiles.ts`, and set the grid to 3/2/1 — done in `04cb51b` (no AI card, no pill; the tile and its icon went; grid stays 1/2/3)
+- [x] T005 Remove the assistant navigation item and the header sparkle from `frontend/src/components/AppShell.tsx` — done in `04cb51b` (provider, toggle, docked column and the `chat` flag in `ShellChrome`)
+- [x] T006 Strip the assistant strings from `frontend/src/i18n/es.ts` and `frontend/src/i18n/en.ts` and the assistant types from `frontend/src/api/types.ts` — done in `04cb51b` (namespace stripped; `justNow`→`common`, `relativeTime`→`lib/`, `downloadZip`→`workspace`)
+- [x] T007 Remove the narrative component and its call site (`Narrative.tsx`, `ReportView.tsx`) — frontend half done in `04cb51b`, generator and route in `462ef27`; the key stays deprecated-ignored
+- [x] T008 Delete the assistant frontend suites (14) and the browser specs (`assistant*.spec.ts`, `commands.spec.ts`); keep the report, sharing, projects and layout specs — done in `04cb51b`: 19 unit suites and 5 browser specs removed, 3 suites updated (pane tabs, project creation, guide parity)
+- [x] T009 `tsc --noEmit` and `vitest run` green with the agent gone from the screens — gate green: `tsc` clean, 593 tests in 56 files, no assistant route/screen/string/type/client call
 
 ## Phase 3: Backend removal (commit 3)
 
 - [ ] T010 Delete `backend/app/api/assistant.py` and unregister it in `backend/app/main.py`
 - [ ] T011 Delete `backend/app/assistant/` (23 files) and every import of it
-- [ ] T012 Delete `backend/app/engine/narrative.py` and `POST /api/reports/{id}/narrative`, keeping the `ai_narrative` schema key as deprecated-ignored
+- [x] T012 Delete `backend/app/engine/narrative.py` and `POST /api/reports/{id}/narrative`, keeping the `ai_narrative` schema key as deprecated-ignored — done in `462ef27`
 - [ ] T013 Slim `backend/app/ai/` to provider selection plus `complete()`; drop tool calling, rounds, vision and the stage budgets
 - [ ] T014 Drop the assistant hooks from `backend/app/api/projects.py`, `backend/app/api/security.py` and `backend/app/worker.py`
 - [ ] T015 Remove the assistant models from `backend/app/models.py`
