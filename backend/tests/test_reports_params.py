@@ -2,9 +2,6 @@
 import re
 from urllib.parse import quote
 
-from app.ai import AIReply
-from app.config import get_settings
-from app.engine import narrative
 from app.engine import report as engine
 from app.reports import pdf
 from tests.conftest import sql
@@ -126,32 +123,6 @@ def test_pdf_honours_multi_values(applied):
     text = r.content.decode("latin-1")
     assert "(4,25 USD)" in text
     assert "(11,75 USD)" not in text
-
-
-def test_narrative_honours_multi_values(applied, monkeypatch):
-    captured = {}
-
-    class Fake:
-        def complete(self, prompt, *, system=None, max_tokens=1024, effort=None):
-            captured["prompt"], captured["system"] = prompt, system
-            return AIReply("Las ventas subieron.", "fake")
-
-    monkeypatch.setattr(get_settings(), "ai_provider", "anthropic")
-    monkeypatch.setattr(get_settings(), "ai_api_key", "k")
-    monkeypatch.setattr(narrative, "get_provider", lambda s: Fake())
-
-    r = applied.get(f"/api/reports/ventas/narrative?{SELECTION}"
-                    f"&filter.product=P1&filter.product=P2")
-    assert r.status_code == 200
-    prompt = captured["prompt"]
-    assert "Ventas netas: 11.75" in prompt
-    assert "Filtrado por: Producto (2 valores seleccionados)" in prompt
-    assert "P1" not in prompt and "P2" not in prompt
-
-    captured.clear()
-    r = applied.get(f"/api/reports/ventas/narrative?{SELECTION}&filter.product=P2")
-    assert r.status_code == 200
-    assert "Ventas netas: 4.25" in captured["prompt"]
 
 
 def test_cache_distinguishes_selections(applied):

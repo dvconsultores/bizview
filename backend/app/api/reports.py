@@ -3,7 +3,7 @@ dashboard catalogue (feature 002): administrators always, users by grant, or eve
 report spec declares `access.roles: [user]`."""
 import logging
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -12,13 +12,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.ai import AIError
 from app.auth.deps import current_user
 from app.config import get_settings
 from app.db import DB
-from app.engine import direct, narrative
+from app.engine import direct
 from app.engine import report as engine
-from app.errors import ApiError, not_found
+from app.errors import not_found
 from app.i18n import M
 from app.images import cache as images_cache
 from app.models import AppUser, Dashboard, ReportCache
@@ -208,29 +207,6 @@ def filter_options(report_id: str, dimension: str, request: Request,
     q = request.query_params.get("q")
     items, truncated = filter_values(ctx, dimension, sel, q, db=db)
     return {"items": items, "truncated": truncated}
-
-
-@router.get("/{report_id}/narrative")
-def report_narrative(report_id: str, request: Request, user: AppUser = Depends(current_user),
-                     db: Session = DB):
-    ctx = _context(db, user, report_id)
-    if not (ctx.definition.get("ai_narrative") or {}).get("enabled"):
-        raise not_found(M("report.no_ai_summary"))
-    settings = get_settings()
-    if not settings.ai_enabled:
-        raise ApiError(503, "ai_unavailable", M("report.ai_unavailable"))
-    sel, filters = engine.selection(ctx, request.query_params.multi_items(), _today())
-    version, _ = engine.data_version(db, ctx)
-    key = engine.selection_hash(sel, filters, "narrative")
-    try:
-        return _cached(db, ctx, key, version, "narrative", lambda: {
-            "text": narrative.generate(ctx, sel, filters, settings.timezone, settings),
-            "generated_at": datetime.now(UTC)})
-    except AIError as e:
-        log.warning("narrative for %s failed: %s", report_id, e.code)
-        raise ApiError(503, "ai_unavailable", e.message) from None
-    except direct.DirectError as e:
-        raise direct.api_error(e) from None
 
 
 @router.post("/{report_id}/pdf")

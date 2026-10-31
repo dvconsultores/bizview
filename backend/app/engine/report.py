@@ -1011,7 +1011,9 @@ def definition_json(ctx: Context, *, assets_base: str | None = None,
         "pdf_layout": {"orientation": (
             "landscape" if pdf_cfg.get("orientation") == "landscape" else "portrait"),
             "views": pdf_layout_views},
-        "ai_narrative": bool((d.get("ai_narrative") or {}).get("enabled", False)),
+        # Deprecated and ignored since 0.2.0 (045): the generator is gone. The key stays in the
+        # schema and in the payload so a project written for an older installation still validates.
+        "ai_narrative": False,
     }
     images = report_images.payload(ctx, assets_base, images_base)
     if images:

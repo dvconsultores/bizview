@@ -1,14 +1,12 @@
-"""Feature 005 end to end: workspace → validate → apply → worker run → report data, PDF,
-narrative; rollback; access; "no spec, no run"."""
+"""Feature 005 end to end: workspace → validate → apply → worker run → report data, PDF;
+rollback; access; "no spec, no run"."""
 import re
 from pathlib import Path
 
 import pytest
 from bizview_cli import validate as wsv
 
-from app.ai import AIReply
 from app.config import get_settings
-from app.engine import narrative
 from app.worker import Worker
 from tests.conftest import client, reauth, signed_in, sql
 from tests.test_runner import ORIGIN, PRODUCTS
@@ -211,42 +209,18 @@ def test_pdf_has_the_same_figures(applied):
         assert f"({expected})" in text, expected
 
 
-def test_narrative_sends_only_declared_aggregates(applied, monkeypatch):
-    assert applied.get(f"/api/reports/ventas/narrative?{SELECTION}").status_code == 503
-    captured = {}
-
-    class Fake:
-        def complete(self, prompt, *, system=None, max_tokens=1024, effort=None):
-            captured["prompt"], captured["system"] = prompt, system
-            return AIReply("Las ventas subieron.", "fake")
-
-    monkeypatch.setattr(get_settings(), "ai_provider", "anthropic")
-    monkeypatch.setattr(get_settings(), "ai_api_key", "k")
-    monkeypatch.setattr(narrative, "get_provider", lambda s: Fake())
-    r = applied.get(f"/api/reports/ventas/narrative?{SELECTION}")
-    assert r.status_code == 200, r.text
-    assert r.json()["text"] == "Las ventas subieron."
-    prompt = captured["prompt"]
-    assert "Ventas netas: 11.75" in prompt and "Pedidos: 1.00" in prompt
-    assert "Ticket" not in prompt                       # not listed in ai_narrative.inputs
-    for leaked in ("A1", "A2", "OLD", "P1", "P2", "root@example.com"):
-        assert leaked not in prompt
-    assert "Resume en 2 frases." in prompt
-    # With a filter, only its label reaches the provider, never the selected value.
-    r = applied.get(f"/api/reports/ventas/narrative?{SELECTION}&filter.product=P1")
-    assert r.status_code == 200, r.text
-    assert "Filtrado por: Producto" in captured["prompt"] and "P1" not in captured["prompt"]
-
-
-def test_only_narrative_and_connection_test_call_the_ai():
+def test_only_the_ai_service_and_the_connection_test_call_the_provider():
+    """045: with the authoring agent gone, the provider has exactly two callers left — the
+    connection test the administrator runs, and the read-only help assistant."""
     app_dir = Path(__file__).resolve().parents[1] / "app"
     callers = set()
     for f in app_dir.rglob("*.py"):
         text = f.read_text()
         if re.search(r"\bget_provider\(", text) and not f.match("app/ai/__init__.py"):
             callers.add(f.relative_to(app_dir).as_posix())
-    # assistant/service.py: the feature 014 chat (super user only).
-    assert callers == {"ai/service.py", "assistant/service.py", "engine/narrative.py"}
+    # 045 removed engine/narrative.py with its generator. assistant/service.py is the next to go;
+    # the assertion tightens to {"ai/service.py"} the moment it does.
+    assert callers == {"ai/service.py", "assistant/service.py"}
 
 
 def test_non_superuser_cannot_see_runs(applied, admin):

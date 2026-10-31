@@ -56,7 +56,6 @@ def get_shared(
     definition = engine.definition_json(
         shared.ctx, assets_base=f"/api/shared/{share_token}/assets",
         images_base=f"/api/shared/{share_token}/images")
-    definition["ai_narrative"] = False
     return {
         "dashboard": {"code": shared.dashboard.code, "name": shared.dashboard.name,
                       **({"name_en": definition["title_en"]}

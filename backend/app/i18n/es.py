@@ -55,7 +55,6 @@ MESSAGES: dict[str, str] = {
     "sharing.not_found": "Enlace no encontrado.",
     "report.not_found": "Este reporte no existe.",
     "report.filter_not_found": "Filtro no encontrado.",
-    "report.no_ai_summary": "Este reporte no tiene resumen con IA.",
     "report.ai_unavailable": "La IA no está configurada en esta instalación.",
     "report.pdf_not_allowed": "Este reporte no permite PDF.",
     "report.set_missing": "El conjunto {ref} no existe en la versión activa.",
