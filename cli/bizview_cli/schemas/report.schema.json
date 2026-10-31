@@ -898,6 +898,16 @@
           "type": "string",
           "maxLength": 40
         },
+        "items": {
+          "description": "share: las métricas de los segmentos, en orden; el resto se calcula hasta 100.",
+          "type": "array",
+          "items": {
+            "description": "Id de una métrica del indicador.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,40}$"
+          },
+          "minItems": 1
+        },
         "limit": {
           "description": "asset: cuántas filas de la vista se muestran; por defecto 8.",
           "type": "integer",

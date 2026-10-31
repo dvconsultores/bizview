@@ -152,6 +152,28 @@ LAYOUT_REPORT = """
             series: [net_sales]
             orientation: horizontal
             span: 4
+          - id: medidor
+            type: gauge
+            view: resumen
+            metric: net_sales
+            min: 0
+            max: 20
+            span: 4
+          - id: indice
+            type: index
+            view: resumen
+            metric: net_sales
+            min: 0
+            max: 20
+            low_label: Bitcoin
+            high_label: Altcoin
+            span: 4
+          - id: reparto
+            type: share
+            view: resumen
+            items: [net_sales, orders]
+            remainder_label: Otros
+            span: 4
           - id: fichas
             type: asset
             view: detalle

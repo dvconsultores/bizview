@@ -225,6 +225,43 @@ for (const scheme of ["light", "dark"] as const) {
       ).toEqual([]);
     });
 
+    test("the gauge, the index bar and the share bar draw at 375 and 1280 px (SC-001)", async ({
+      page,
+    }) => {
+      const { declared } = await openReport(page, LAYOUT_REPORT);
+      const visual = declared.filter((c) => ["gauge", "index", "share", "asset"].includes(c.type));
+      expect(
+        visual.map((c) => c.type).sort(),
+        `${LAYOUT_REPORT} must declare the four visual components`,
+      ).toEqual(["asset", "gauge", "index", "share"]);
+
+      for (const width of [375, 1280]) {
+        await page.setViewportSize({ width, height: width === 375 ? 740 : 900 });
+        await settled(page);
+        for (const component of visual) {
+          const cell = page.locator(`[data-layout-id='${component.id}']`);
+          await expect(cell, component.id).toBeVisible();
+          // Not a blank. The gauge draws arcs and the asset tile embeds a picture, so both carry
+          // an accessible image; the index and share draw CSS bars and print their figures.
+          await expect(cell, component.id).toBeVisible();
+          const box = await cell.boundingBox();
+          expect(box?.width ?? 0, `${component.id} at ${width}px`).toBeGreaterThan(0);
+          expect(
+            (await cell.innerText()).trim().length,
+            `${component.id} prints its figures at ${width}px`,
+          ).toBeGreaterThan(0);
+          if (component.type === "gauge" || component.type === "asset") {
+            await expect(
+              cell.locator("svg, img, [role='img']").first(),
+              `${component.id} draws at ${width}px`,
+            ).toBeVisible();
+          }
+        }
+        await expectNoHorizontalScroll(page);
+      }
+      await expectAccessible(page, `visual components in ${scheme}`);
+    });
+
     test("every chart announces the engine's summary", async ({ page }) => {
       const { query, declared } = await openReport(page, LAYOUT_REPORT);
       expect(await theme(page)).toBe(scheme);
