@@ -22,6 +22,9 @@ green.
 
 ## Phase 3: Backend removal (commit 3)
 
+**Scope: OD-045-01 (2026-10-31).** The draft preview is removed, not renamed: it is inseparable
+from the conversation session and its queue. Published report rendering is untouched.
+
 - [ ] T010 Delete `backend/app/api/assistant.py` and unregister it in `backend/app/main.py`
 - [ ] T011 Delete `backend/app/assistant/` (23 files) and every import of it
 - [x] T012 Delete `backend/app/engine/narrative.py` and `POST /api/reports/{id}/narrative`, keeping the `ai_narrative` schema key as deprecated-ignored — done in `462ef27`

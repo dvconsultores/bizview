@@ -199,3 +199,29 @@ fail and name them.
 - The upgrade rescues applied drafts and discards everything else; conversation transcripts are not
   kept, as the owner's brief says.
 - Specs are moved to a deprecated folder rather than deleted, so their reasoning survives.
+
+## Scope decision OD-045-01 (2026-10-31, owner)
+
+**The draft preview goes with the agent.** The project page's preview rendered a draft through
+`app/assistant/preview.py`, which is inseparable from the conversation session and its preview
+queue; keeping it would mean keeping two of the tables this feature removes. The owner approved
+removing it rather than renaming it into `projects/`.
+
+Two previews exist in this product and only one is removed:
+
+- **Removed — the draft preview.** `/api/projects/{slug}/preview` and the assistant's report, data
+  and PDF endpoints for a draft; the project's preview button; the preview locks, queue rows and
+  sweep. Nothing outside the authoring flow read them.
+- **Preserved — published report rendering.** Every report, dashboard, share link, email and PDF
+  renders from the applied version exactly as before. The engines and PDF utilities stay; only the
+  draft path that called them goes.
+
+Also resolved by OD-045-01, per dependency:
+
+| Coupled code | Removed | Preserved |
+|---|---|---|
+| `projects/apply.py` `is_busy` | the "a chat run is working" refusal | every protection against concurrent apply, duplicate execution and conflicting edits |
+| `projects/service.py` | conversation titles, assistant attachments, session helpers | shared filename/title handling the project itself needs |
+| `projects/origin_checks.py` | assistant readiness prompts | source connectivity checks, integration validation, redaction, security controls |
+| `worker.py` | preview and attachment sweeps | integration runs, schedules and every other background pass |
+| `ai/service.py` | agent orchestration, tool calling, rounds, token budgets | provider selection and `complete()`, which the help function uses |
