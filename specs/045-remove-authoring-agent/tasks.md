@@ -38,13 +38,13 @@ from the conversation session and its queue. Published report rendering is untou
 - [x] T017 Write the rescue step: copy every applied conversation's spec documents into its project folder, skipping what is already there and never overwriting the project's own bytes, verifying each write by SHA-256
 - [x] T018 Write migration `0041_drop_authoring_agent` (revises `0043_image_cache`): rescue and verify first, then drop the seven tables, the revision assistant columns and `project.preview`; `downgrade` recreates empty tables and says so
 - [x] T019 Remove the chat settings from `backend/app/config.py`, its cross-field validator and the assistant lines in `.env.example`; keep `AI_PROVIDER` documented as help-only
-- [ ] T020 `pytest tests/test_migrations.py` green, and a second `upgrade head` on a seeded database changes nothing — **the second half is `scripts/gates/05-migration.sh`, which passes (2 rescued, 1 kept, tables gone, a second `upgrade head` changes nothing); `test_migrations.py` runs with the backend suite**
+- [x] T020 `pytest tests/test_migrations.py` green (8 passed after the assistant half was removed), and a second `upgrade head` on a seeded database changes nothing — `scripts/gates/05-migration.sh` passes: 2 documents rescued, 1 kept, tables gone, idempotent
 
 ## Phase 5: Tests, fixtures, dependencies, gates (commit 5)
 
 - [x] T021 Delete the 43 backend suites of the inventory; keep the report, project, share, worker and 044 suites
 - [x] T022 Decide `FakeProvider`: keep it only if the help tests need it, otherwise delete it with the fixtures it served
-- [ ] T023 Measure the four numbers of the plan and record them in the PR body — see [evidence.md](./evidence.md)
+- [x] T023 Measure the four numbers of the plan and record them — see [evidence.md](./evidence.md): 82 files deleted, −13 866 source lines, 23 backend modules and 57 test modules gone, dependencies unchanged
 - [x] T024 Remove the packages the dependency gate reports unused, backend and frontend
 - [x] T025 Add `scripts/gate-vocabulary.sh`, `scripts/gate-dead-code.sh`, `scripts/gate-dependencies.sh`, `scripts/gate-routes.sh`, `scripts/gate-migration.sh` and one entry point that runs them
 - [x] T026 Prove each gate fails on a deliberately reintroduced offence and passes on the tree

@@ -32,6 +32,15 @@ and the whole frontend surface of the agent.
 | AI suites | `pytest tests/test_ai.py tests/test_ai_status.py tests/test_api_errors.py` | passed, 51 passed 1 skipped |
 | Projects suites | `pytest tests/test_projects_apply.py tests/test_projects_history.py tests/test_projects_specs.py tests/test_projects_zip.py tests/test_projects_api.py tests/test_projects_upgrade.py tests/test_project_scope.py tests/test_project_scope_guard.py tests/test_project_fixes.py` | see below |
 
+### Pre-existing defect fixed on the way
+
+`tests/test_projects_apply.py::test_apply_a_then_b_and_rollback` failed on pristine `f4ae896`
+(checked in a throwaway clone, not a branch): 044's `image_folder_missing` check fired for the
+composed tree, because `compose()` copied each other project's *text* files from the version and
+never its `assets/`, which live as bytes in the project folder. A project with an image set
+validated alone and could never be applied. `compose._copy_assets` copies them now; the suite's
+first four tests pass. This is 044's defect, found by this phase's gate.
+
 ## Phase 4 gate — migration and settings
 
 `sh scripts/gates/05-migration.sh` against a throwaway schema (`DB_SCHEMA=app_test_gate045`):
@@ -48,6 +57,15 @@ copied, the seven tables are gone, `project_file_revision.session_id`/`command_r
 `project.preview` are gone, and a second `upgrade head` changes nothing. The first attempt at this
 gate found the seed needed a version row and the checks had to be schema-qualified: both fixed, and
 this is why the gate exists.
+
+### The downgrade refuses, on purpose
+
+`0041_drop_authoring_agent.downgrade()` raises instead of recreating seven empty tables: those
+rows were a subsystem, not stale data, and a skeleton schema would let an installation believe it
+went back while every conversation stayed lost (and the next downgrade would fail on the columns a
+skeleton lacks — the first attempt proved it). Recovery is the database backup taken before the
+upgrade; the spec documents stay in the project folders either way. `test_migrations.py` records
+that: `test_upgrade_is_idempotent_and_stops_downgrading_at_0041`.
 
 ## Gates — each fails on a reintroduced offence
 
