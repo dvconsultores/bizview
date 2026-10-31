@@ -1,9 +1,8 @@
 """The `coinmarketcap` project of the production defect of 2026-10-26 (feature 038).
 
 One integration with four datasets joined on `snapshot_at` and a report (`panorama-cripto`) that
-uses all four, with a web layout and a PDF layout. Shared by the render-error tests and the
-preview-after-apply tests; the origin rows live in the test schema, so the integration extracts
-from the test database.
+uses all four, with a web layout and a PDF layout. The render-error tests read it; the origin rows
+live in the test schema, so the integration extracts from the test database.
 """
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -11,7 +10,6 @@ from pathlib import Path
 
 import yaml
 
-from app.assistant import preview
 from app.db import get_engine
 from app.engine import datasets
 from tests.conftest import TEST_SCHEMA, sql
@@ -89,17 +87,3 @@ def validate_project(c, slug: str) -> dict:
     assert r.status_code == 200, r.text
     return r.json()
 
-
-def run_preview(c, slug: str) -> None:
-    r = c.post(f"/api/projects/{slug}/preview")
-    assert r.status_code == 200, r.text
-    request_id = sql("SELECT id FROM assistant_preview_request WHERE project_id = :p "
-                     "ORDER BY id DESC", p=project_id(slug))[0][0]
-    preview.process_request(request_id)
-    state = sql("SELECT preview FROM project WHERE id = :p", p=project_id(slug))[0][0]
-    assert state["status"] == "succeeded", state
-
-
-def preview_schema(session_id: int) -> str:
-    with datasets.preview_schemas(datasets.preview_prefix(session_id)):
-        return datasets.schema_name("mercado-cripto")

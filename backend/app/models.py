@@ -45,10 +45,6 @@ AUDIT_KINDS = (
     # feature 013
     "integration_paused", "integration_resumed", "integration_schedule_changed",
     "integration_run_stopped",
-    # feature 014
-    "assistant_draft_applied", "assistant_session_archived", "assistant_session_deleted",
-    # feature 017
-    "assistant_budget_extended",
     # feature 018
     "share_link_created", "share_link_revoked", "sharing_toggled",
     "email_settings_updated", "email_test_sent", "email_sent",
@@ -60,16 +56,8 @@ AUDIT_KINDS = (
     "project_created", "project_updated", "project_deleted", "project_purged", "project_applied",
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
     "project_fix_applied",
-    # feature 036
-    "assistant_conversation_repaired",
-    # feature 024
-    "assistant_attachment_uploaded", "assistant_attachment_deleted",
     # feature 027
     "google_sign_in", "google_sign_in_refused", "google_linked",
-    # feature 028
-    "assistant_mode_changed", "assistant_contract_confirmed", "assistant_run_started",
-    "assistant_run_applied", "assistant_run_stopped", "assistant_run_rolled_back",
-    "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
     # feature 030
     "appearance_updated",
 )
@@ -85,18 +73,6 @@ THEMES = ("system", "light", "dark")
 LOCALES = ("es", "en")
 TELEGRAM_PURPOSES = ("sign_in", "link")
 TELEGRAM_STATUSES = ("pending", "started", "approved", "refused", "expired", "consumed")
-ASSISTANT_STATUSES = ("open", "applied", "archived")
-ASSISTANT_ROLES = ("user", "assistant", "tool")
-# Feature 028: the composer selector and the run contract of one autonomous run.
-ASSISTANT_MODES = ("ask", "edit", "auto")
-AUTO_RUN_STATUSES = ("confirmed", "running", "applied", "stopped", "failed")
-# Feature 040: `analyze` and `verify` are plan stages too. 039 mapped `speckit-verify` to a stage
-# this CHECK rejected, and the run died with an IntegrityError on `ck_assistant_auto_run_stage`.
-AUTO_RUN_STAGES = ("discover", "specify", "clarify", "plan", "tasks", "analyze", "implement",
-                   "converge", "verify", "preview", "apply")
-AUTO_WATCH_STATES = ("pending", "ok", "failed", "rolled_back")
-# Feature 024: media types decided by magic bytes (app/assistant/attachments.py).
-ATTACHMENT_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
 EMAIL_SEND_STATUSES = ("queued", "sending", "sent", "partial", "failed")
 EMAIL_DELIVERY_STATUSES = ("queued", "sent", "failed", "skipped")
 SUBSCRIPTION_FREQUENCIES = ("daily", "weekly", "monthly")
@@ -628,7 +604,6 @@ class Project(Base):
     spec_seq: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     validation: Mapped[dict | None] = mapped_column(JSONB)
     query_checks: Mapped[dict | None] = mapped_column(JSONB)
-    preview: Mapped[dict | None] = mapped_column(JSONB)
     first_applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -653,7 +628,6 @@ class ProjectFileRevision(Base):
         Index("ix_project_file_revision_path", "project_id", "path", text("id DESC")),
         Index("ix_project_file_revision_project", "project_id", text("id DESC")),
         Index("ix_project_file_revision_group", "project_id", "group_id"),
-        Index("ix_project_file_revision_command_run", "command_run_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
@@ -669,133 +643,8 @@ class ProjectFileRevision(Base):
     actor_kind: Mapped[str] = mapped_column(Text)
     actor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
     command: Mapped[str] = mapped_column(Text)
-    session_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="SET NULL"))
     group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
-    # Feature 021: the /speckit-… command run that wrote it (agent writes inside a command).
-    command_run_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_command_run.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class AssistantSession(Base):
-    """A stored vibe-reporting conversation (feature 014)."""
-    __tablename__ = "assistant_session"
-    __table_args__ = (
-        CheckConstraint("char_length(btrim(title)) BETWEEN 1 AND 120", name="title_len"),
-        CheckConstraint(_in("status", ASSISTANT_STATUSES), name="status"),
-        CheckConstraint("tokens_used >= 0", name="tokens_used"),
-        CheckConstraint("status <> 'applied' OR applied_version_id IS NOT NULL",
-                        name="applied_has_version"),
-        Index("ix_assistant_session_updated_at", text("updated_at DESC")),
-        CheckConstraint("current_spec IS NULL OR current_spec ~ '" + SPEC_FOLDER_PATTERN + "'",
-                        name="current_spec"),
-        CheckConstraint(_in("mode", ASSISTANT_MODES), name="mode"),
-        Index("ix_assistant_session_project", "project_id", text("updated_at DESC")),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    title: Mapped[str] = mapped_column(Text)
-    created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.id"))
-    status: Mapped[str] = mapped_column(Text, server_default=text("'open'"))
-    draft: Mapped[dict | None] = mapped_column(JSONB)
-    validation: Mapped[dict | None] = mapped_column(JSONB)
-    preview: Mapped[dict | None] = mapped_column(JSONB)
-    working_state: Mapped[dict | None] = mapped_column(JSONB)
-    query_checks: Mapped[dict | None] = mapped_column(JSONB)
-    stats: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
-    project_id: Mapped[int] = mapped_column(BigInteger,
-                                            ForeignKey("project.id", ondelete="CASCADE"))
-    current_spec: Mapped[str | None] = mapped_column(Text)
-    read_only: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    # Feature 028: the composer selector (ask | auto; `edit` stays for conversations created
-    # before the simplification). The run contract is the newest `assistant_auto_run` row of this
-    # conversation (no FK back: it would be a table cycle).
-    mode: Mapped[str] = mapped_column(Text, server_default=text("'auto'"))
-    applied_version_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("workspace_version.id"))
-    # Telemetry only (feature 028 revision 2026-10-21: nothing stops on it).
-    tokens_used: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    busy_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-class AssistantMessage(Base):
-    """One turn of a conversation (feature 014): user text, assistant reply, or tool result."""
-    __tablename__ = "assistant_message"
-    __table_args__ = (
-        CheckConstraint(_in("role", ASSISTANT_ROLES), name="role"),
-        CheckConstraint("role <> 'tool' OR tool_name IS NOT NULL", name="tool_has_name"),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"), index=True)
-    role: Mapped[str] = mapped_column(Text)
-    content: Mapped[str] = mapped_column(Text, server_default=text("''"))
-    tool_name: Mapped[str | None] = mapped_column(Text)
-    tool_payload: Mapped[dict | None] = mapped_column(JSONB)
-    # 036: a tool row belongs to the assistant turn that asked for it — by id, never by adjacency.
-    call_id: Mapped[str | None] = mapped_column(Text)
-    assistant_message_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_message.id", ondelete="SET NULL"), index=True)
-    round: Mapped[int | None] = mapped_column(Integer)
-    # 036: cannot be replayed (a preview notice, a result whose call is gone): transcript only.
-    orphan: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class AssistantAttachment(Base):
-    """An image attached to a chat message (feature 024): the brief, not the project's data.
-
-    The bytes live on disk under `ATTACHMENTS_DIR/<session_id>/<sha256>.<ext>`, never inside
-    PROJECTS_DIR, so no export, Git mirror or applied version can carry them (FR-008)."""
-    __tablename__ = "assistant_attachment"
-    __table_args__ = (
-        CheckConstraint(_in("media_type", ATTACHMENT_TYPES), name="media_type"),
-        CheckConstraint("byte_size > 0", name="byte_size"),
-        CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="sha256"),
-        CheckConstraint("original_name IS NULL OR char_length(original_name) <= 120",
-                        name="original_name_len"),
-        Index("ix_assistant_attachment_sha256", "sha256"),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"), index=True)
-    message_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_message.id", ondelete="CASCADE"), index=True)
-    media_type: Mapped[str] = mapped_column(Text)
-    byte_size: Mapped[int] = mapped_column(Integer)
-    sha256: Mapped[str] = mapped_column(Text)
-    original_name: Mapped[str | None] = mapped_column(Text)
-    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class AssistantPreviewRequest(Base):
-    """A super user's "Vista previa" request, processed by the worker (feature 014)."""
-    __tablename__ = "assistant_preview_request"
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"), index=True)
-    # Feature 037: the request carries the project it belongs to, so the worker resolves the folder
-    # from it (and refuses a request whose project and conversation disagree) instead of inferring
-    # the scope from the conversation alone.
-    project_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("project.id", ondelete="CASCADE"), index=True)
-    requested_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
-    requested_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
-    taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # The draft the super user asked to preview, carried with the request (migration 0026). The
-    # worker then never reads the projects folder: the preview runs on exactly the files the
-    # backend validated, even when the two processes do not share that volume.
-    files: Mapped[dict | None] = mapped_column(JSONB)
 
 
 class ShareLink(Base):
@@ -974,131 +823,6 @@ class EmailDelivery(Base):
     )
     error: Mapped[str | None] = mapped_column(Text)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-COMMAND_RUN_STATUSES = (
-    "running", "waiting", "completed", "misrouted", "budget", "interrupted", "failed",
-)
-RESOLVE_SOURCES = ("argument", "number", "title", "current")
-
-
-class AssistantCommandRun(Base):
-    """One /speckit-… (or /ayuda) command executed in a conversation (feature 021, plan §6)."""
-
-    __tablename__ = "assistant_command_run"
-    __table_args__ = (
-        CheckConstraint("command ~ '^(speckit-[a-z]+|ayuda)$'", name="command"),
-        CheckConstraint("char_length(arguments) <= 20000", name="arguments_len"),
-        CheckConstraint("spec IS NULL OR spec ~ '^[0-9]{3}-[a-z0-9-]{1,60}$'", name="spec"),
-        CheckConstraint("locale IN ('es', 'en')", name="locale"),
-        CheckConstraint(_in("status", COMMAND_RUN_STATUSES), name="status"),
-        CheckConstraint("resolved_from IS NULL OR " + _in("resolved_from", RESOLVE_SOURCES),
-                        name="resolved_from"),
-        CheckConstraint("tokens >= 0", name="tokens"),
-        Index("ux_command_run_active", "session_id", unique=True,
-              postgresql_where=text("status IN ('running', 'waiting')")),
-        Index("ix_command_run_session", "session_id", text("started_at DESC")),
-        Index("ix_command_run_project", "project_id", text("started_at DESC")),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"))
-    project_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("project.id", ondelete="CASCADE"))
-    message_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_message.id", ondelete="SET NULL"))
-    command: Mapped[str] = mapped_column(Text)
-    arguments: Mapped[str] = mapped_column(Text, server_default=text("''"))
-    spec: Mapped[str | None] = mapped_column(Text)
-    resolved_from: Mapped[str | None] = mapped_column(Text)
-    forced: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
-    reserved_number: Mapped[int | None] = mapped_column(SmallInteger)
-    locale: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(Text)
-    pending: Mapped[dict | None] = mapped_column(JSONB)
-    resumed_from: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("assistant_command_run.id", ondelete="SET NULL"))
-    files: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
-    result: Mapped[dict | None] = mapped_column(JSONB)
-    tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    error: Mapped[str | None] = mapped_column(Text)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-
-class AssistantAutoRun(Base):
-    """One autonomous run: the confirmed contract and its outcome (feature 028)."""
-
-    __tablename__ = "assistant_auto_run"
-    __table_args__ = (
-        CheckConstraint(_in("status", AUTO_RUN_STATUSES), name="status"),
-        CheckConstraint("stop_reason IS NULL OR char_length(stop_reason) <= 120",
-                        name="stop_reason_len"),
-        CheckConstraint("stage IS NULL OR " + _in("stage", AUTO_RUN_STAGES), name="stage"),
-        CheckConstraint("previews >= 0", name="previews"),
-        CheckConstraint("applies >= 0", name="applies"),
-        CheckConstraint("tokens >= 0", name="tokens"),
-        CheckConstraint(
-            "watch_state IS NULL OR " + _in("watch_state", AUTO_WATCH_STATES),
-            name="watch_state"),
-        CheckConstraint("status <> 'applied' OR version_id IS NOT NULL",
-                        name="applied_has_version"),
-        Index("ux_auto_run_active", "session_id", unique=True,
-              postgresql_where=text("status IN ('confirmed', 'running')")),
-        Index("ix_auto_run_session", "session_id", text("started_at DESC")),
-        Index("ix_auto_run_watch", "watch_state",
-              postgresql_where=text("watch_state = 'pending'")),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("assistant_session.id", ondelete="CASCADE"))
-    project_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("project.id", ondelete="CASCADE"))
-    contract: Mapped[dict] = mapped_column(JSONB)
-    status: Mapped[str] = mapped_column(Text, server_default=text("'confirmed'"))
-    stop_reason: Mapped[str | None] = mapped_column(Text)
-    stage: Mapped[str | None] = mapped_column(Text)
-    previews: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    applies: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    tokens: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    version_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("workspace_version.id"))
-    summary: Mapped[dict | None] = mapped_column(JSONB)
-    watch_integration: Mapped[str | None] = mapped_column(Text)
-    watch_state: Mapped[str | None] = mapped_column(Text)
-    confirmed_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.id"))
-    confirmed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
-    confirmed_ip: Mapped[str | None] = mapped_column(INET)
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
-    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class AssistantRunProfile(Base):
-    """A saved run contract, reused as a form prefill (feature 028, US5)."""
-
-    __tablename__ = "assistant_run_profile"
-    __table_args__ = (
-        CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 60", name="name_len"),
-        Index("ux_run_profile_name", "name", unique=True,
-              postgresql_where=text("deleted_at IS NULL")),
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    name: Mapped[str] = mapped_column(Text)
-    contract: Mapped[dict] = mapped_column(JSONB)
-    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 IMAGE_CACHE_STATUSES = ("ok", "failed")

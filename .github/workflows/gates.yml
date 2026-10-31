@@ -1,0 +1,46 @@
+name: gates
+
+# Feature 045: the in-app authoring agent and its dead code cannot come back silently.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: gate
+          POSTGRES_DB: bizview_gate
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    env:
+      DATABASE_URL_BI: postgresql://postgres:gate@127.0.0.1:5432/bizview_gate
+      BIZVIEW_SECRET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: install
+        run: |
+          python -m pip install uv
+          uv venv
+          . .venv/bin/activate
+          uv pip install -e ./cli -e ./backend pytest ruff vulture deptry
+          (cd frontend && npm ci)
+      - name: vocabulary, dead code, dependencies, routes, settings
+        run: . .venv/bin/activate && sh scripts/gates/all.sh
+      - name: migration (seeded database, rescue verified, tables gone)
+        run: . .venv/bin/activate && sh scripts/gates/05-migration.sh
+      - name: backend suite
+        run: . .venv/bin/activate && cd backend && python -m pytest -q
+      - name: frontend suite
+        run: cd frontend && npx tsc --noEmit && npx vitest run

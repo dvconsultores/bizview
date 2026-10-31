@@ -13,7 +13,7 @@ Solo el **Superusuario**.
 
 1. En el editor del proyecto pulsa **Descargar**: el .zip trae el proyecto con su carpeta
    `.specify/` y las plantillas de Spec Kit.
-2. Ábrelo en VS Code y trabaja con los comandos `/speckit-…` de tu agente.
+2. Ábrelo en VS Code y trabaja ahí con tu agente; valida con `bizview validate` antes de subir.
 3. Valida desde la terminal con `bizview validate`. Para leer la estructura de las fuentes usa
    `bizview describe` con un token de [Abrir Tokens de acceso](app:/admin/tokens).
 4. Para traerlo de vuelta, comprímelo y usa **Importar proyecto** en

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.errors import ApiError, not_found, validation
 from app.i18n import M
-from app.models import AppUser, AssistantSession, AuditEvent, Project, ProjectFileRevision
+from app.models import AppUser, AuditEvent, Project, ProjectFileRevision
 from app.projects import fs, specs
 from app.services.audit import record as audit
 
@@ -215,10 +215,6 @@ def list_projects(db: Session) -> list[dict]:
 
     projects = db.scalars(select(Project).where(Project.deleted_at.is_(None))
                           .order_by(Project.last_activity_at.desc())).all()
-    counts = dict(db.execute(
-        select(AssistantSession.project_id, func.count(AssistantSession.id))
-        .where(AssistantSession.project_id.in_([p.id for p in projects]))
-        .group_by(AssistantSession.project_id)).all()) if projects else {}
     version = active(db)
     applied = _version_projects(version) if version is not None else {}
     result = []
@@ -226,7 +222,6 @@ def list_projects(db: Session) -> list[dict]:
         item = project_json(p)
         item["status"] = status(db, p)[0]
         item["spec_count"] = len(_spec_folders(p.slug))
-        item["conversations"] = counts.get(p.id, 0)
         item["artifacts"] = _folder_artifacts(p.slug)
         item["applied"] = {g: (applied.get(p.slug) or {}).get(g, []) for g in ARTIFACT_GROUPS}
         item["problems"] = (len((p.validation or {}).get("errors") or [])
@@ -241,33 +236,14 @@ def detail(db: Session, project: Project, viewer: AppUser) -> dict:
     data["status"], data["changed_files"] = status(db, project)
     data["last_applied"] = last_applied(db, project)
     data["specs"] = specs.list_specs(db, project)
-    sessions = db.scalars(
-        select(AssistantSession)
-        .where(AssistantSession.project_id == project.id,
-               AssistantSession.created_by == viewer.id)
-        .order_by(AssistantSession.updated_at.desc())).all()
-    from app.assistant.service import shown_title
-
-    data["conversations"] = [
-        {"id": s.id, "title": shown_title(s.title), "status": s.status, "read_only": s.read_only,
-         "current_spec": s.current_spec, "updated_at": _iso(s.updated_at)}
-        for s in sessions
-    ]
     return data
 
 
 def readiness_view(db: Session, project: Project):
-    """WorkView for project-level readiness: its latest conversation, or a blank one."""
-    from types import SimpleNamespace
-
+    """WorkView for project-level readiness."""
     from app.projects.workview import WorkView
 
-    session = db.scalars(select(AssistantSession).where(AssistantSession.project_id == project.id)
-                         .order_by(AssistantSession.updated_at.desc()).limit(1)).first()
-    if session is None:
-        session = SimpleNamespace(id=None, working_state={}, stats={}, status="open",
-                                  current_spec=None)
-    return WorkView(project, session)
+    return WorkView(project)
 
 
 def revalidate(db: Session, project: Project, *, check_origin: bool = False) -> dict:
@@ -297,24 +273,18 @@ def ensure_editable(project: Project) -> None:
 
 
 def changes(db: Session, project: Project, after: int) -> dict:
-    """Revisions after `after` (oldest first), the latest id and whether a chat is busy."""
-    from app.assistant.service import is_busy
-    from app.config import get_settings
+    """Revisions after `after` (oldest first) and the latest id."""
 
     revisions = db.scalars(select(ProjectFileRevision).where(
         ProjectFileRevision.project_id == project.id, ProjectFileRevision.id > after,
     ).order_by(ProjectFileRevision.id).limit(500)).all()
     latest = db.scalar(select(func.max(ProjectFileRevision.id))
                        .where(ProjectFileRevision.project_id == project.id))
-    sessions = db.scalars(select(AssistantSession).where(
-        AssistantSession.project_id == project.id, AssistantSession.busy_since.is_not(None)))
-    settings = get_settings()
     return {
         "items": [{"id": r.id, "path": r.path, "op": r.op, "actor": r.actor_kind,
-                   "actor_id": r.actor_id, "command": r.command, "session_id": r.session_id,
+                   "actor_id": r.actor_id, "command": r.command,
                    "time": r.created_at.isoformat()} for r in revisions],
         "latest": latest if latest is not None else after,
-        "busy": any(is_busy(s, settings) for s in sessions),
     }
 
 
@@ -350,8 +320,7 @@ def delete_project(db: Session, actor: AppUser, project: Project, ip: str | None
 
 def purge_trash(db: Session, now=None) -> int:
     """Remove projects deleted more than TRASH_DAYS ago: trash folder, owned rows, row."""
-    from app.assistant import attachments as chat_attachments
-    from app.models import AssistantSession, EmailSubscription
+    from app.models import EmailSubscription
     from app.projects import fs
 
     now = now or datetime.now(UTC)
@@ -362,11 +331,6 @@ def purge_trash(db: Session, now=None) -> int:
         folder = fs.projects_dir() / fs.TRASH / _trash_name(project.slug, project.deleted_at)
         if folder.is_dir() and not folder.is_symlink():
             shutil.rmtree(folder)
-        # Feature 024: the images of the project's conversations live outside that folder, so
-        # they are removed here and not by the folder tree (their rows cascade with the project).
-        for session_id in db.scalars(select(AssistantSession.id).where(
-                AssistantSession.project_id == project.id)):
-            chat_attachments.forget_session(db, session_id)
         db.execute(delete(EmailSubscription).where(EmailSubscription.project_id == project.id))
         audit(db, "project_purged", actor_id=None, ip=None,
               detail={"project_id": project.id, "project": project.slug})

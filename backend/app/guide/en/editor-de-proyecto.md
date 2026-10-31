@@ -25,11 +25,9 @@ Only the **Superuser**.
 - **New file**, **New folder**, **Rename** and **Delete** work only inside the project's allowed
   paths (see Project structure). With the keyboard, in the explorer press F2 to rename and Delete
   to delete the selected item.
-- The chat panel works with the **Current spec** you choose; **New chat in this project** opens
-  another conversation.
-- On a phone, the **Files**, **Editor** and **Chat** tabs show one panel at a time.
-- While the agent works you see "The assistant is editing the project…" and files update by
-  themselves.
+- On a phone, the **Files** and **Editor** tabs show one panel at a time.
+- Every change is kept in the history with its author and time; you can compare two versions and
+  restore an earlier one.
 
 ## Common problems
 

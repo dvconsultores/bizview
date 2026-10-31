@@ -153,7 +153,6 @@ class Layout:
     organization: str
     product: str
     viewer: str | None
-    preview: bool
     locale: str
     currency: str
     pdf: dict
@@ -249,7 +248,7 @@ class PageNumber(Flowable):
 
 
 def render_layout(*, definition: dict, payload: dict, styles, organization: str, product: str,
-                  viewer: str | None, preview: bool, locale: str,
+                  viewer: str | None, locale: str,
                   palette: ReportPalette | None = None, images: dict | None = None) -> list:
     """Historia de flowables para definition["layout"]["pdf"].
 
@@ -261,7 +260,7 @@ def render_layout(*, definition: dict, payload: dict, styles, organization: str,
     pal = palette if palette is not None else resolve(definition)
     story = Story(definition.get("layout") or {}, _styles(styles, pal))
     ctx = Layout(definition=definition, payload=payload, styles=story.styles,
-                 organization=organization, product=product, viewer=viewer, preview=preview,
+                 organization=organization, product=product, viewer=viewer,
                  locale=locale, currency=definition.get("currency", "USD"), pdf=pdf_doc,
                  width=story.width, blocks=blocks, palette=pal, images=images or {})
     for index, block in enumerate(blocks):
@@ -386,8 +385,6 @@ def _markdown(text: str, link: str) -> str:
 
 def _header(ctx: Layout, block: dict, story: Story) -> None:
     flow: list = []
-    if ctx.preview:
-        flow.append(Paragraph(t("pdf.preview"), ctx.styles["preview"]))
     if block.get("logo", True):
         logo = _logo(block)
         if logo is not None:

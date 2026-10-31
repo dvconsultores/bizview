@@ -1,9 +1,7 @@
-"""Feature 020 T028: projects API, conversations bound to projects."""
-import re
+"""Feature 020 T028: projects API — creation, slug, trash, rename, tree, listing."""
 
 import pytest
 
-from app.ai import fake
 from app.config import get_settings
 from tests.conftest import signed_in, sql
 
@@ -11,10 +9,9 @@ from tests.conftest import signed_in, sql
 @pytest.fixture(autouse=True)
 def env(tmp_path, monkeypatch):
     monkeypatch.setenv("BIZVIEW_TEST_HOOKS", "1")
-    monkeypatch.setenv("AI_PROVIDER", "fake")
+    monkeypatch.setenv("AI_PROVIDER", "none")
     monkeypatch.setenv("PROJECTS_DIR", str(tmp_path / "projects"))
     get_settings.cache_clear()
-    fake.SHARED.reset()
     yield tmp_path / "projects"
     get_settings.cache_clear()
 
@@ -114,57 +111,6 @@ def test_tree_equals_disk(env, superuser):
     assert r.json()["error"]["code"] == "path_unsafe"
     r = c.get(f"/api/projects/{slug}/file", params={"path": "specs/009-z/spec.md"})
     assert r.status_code == 404
-
-
-def test_sessions_require_a_project(env, superuser):
-    c = signed_in("root@example.com")
-    assert c.post("/api/assistant/sessions", json={}).status_code == 422
-    assert c.post("/api/assistant/sessions", json={"project": "no-existe"}).status_code == 404
-    chat = c.post("/api/projects", json={"name": "Chat"}).json()["slug"]
-    r = c.post("/api/assistant/sessions", json={"project": chat})
-    assert r.status_code == 200
-    assert r.json()["project"]["slug"] == chat
-    assert r.json()["read_only"] is False
-    other = c.post("/api/projects", json={"name": "Otro"}).json()["slug"]
-    assert c.post("/api/assistant/sessions", json={"project": other}).status_code == 200
-    r = c.get("/api/assistant/sessions", params={"project": chat})
-    assert len(r.json()["sessions"]) == 1
-
-
-def test_read_only_session_refuses_messages(env, superuser):
-    c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "RO"}).json()["slug"]
-    session_id = c.post("/api/assistant/sessions", json={"project": slug}).json()["id"]
-    sql("UPDATE assistant_session SET read_only = true WHERE id = :i", i=session_id)
-    r = c.post(f"/api/assistant/sessions/{session_id}/messages", json={"text": "hola"})
-    assert r.status_code == 409
-    assert r.json()["error"]["code"] == "read_only"
-    assert fake.SHARED.payloads() == []
-
-
-def test_current_spec_must_exist(env, superuser):
-    c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "SpecTest"}).json()["slug"]
-    session_id = c.post("/api/assistant/sessions", json={"project": slug}).json()["id"]
-    url = f"/api/assistant/sessions/{session_id}"
-    assert c.patch(url, json={"current_spec": "001-a"}).status_code == 422
-    (env / slug / "specs" / "001-a").mkdir(parents=True, exist_ok=True)
-    r = c.patch(url, json={"current_spec": "001-a"})
-    assert r.status_code == 200
-    assert r.json()["current_spec"] == "001-a"
-    r = c.patch(url, json={"current_spec": ""})
-    assert r.status_code == 200
-    assert r.json()["current_spec"] is None
-
-
-def test_proposal_without_provider(env, superuser):
-    c = signed_in("root@example.com")
-    r = c.post("/api/assistant/project-proposal",
-               json={"text": "Quiero un reporte de ventas por sucursal"})
-    assert r.status_code == 200
-    assert r.json()["name"]
-    assert re.match(r"^[a-z][a-z0-9-]{1,49}$", r.json()["slug"])
-    assert fake.SHARED.payloads() == []
 
 
 def test_list_shows_artifacts_applied_and_problems(env, superuser):

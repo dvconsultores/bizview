@@ -6,9 +6,6 @@ import re
 import pytest
 
 from app import guide
-from app.assistant import service
-from app.assistant.commands import scope
-from app.assistant.commands.registry import REGISTRY
 
 HEADINGS = {
     "es": ["Para qué sirve", "Quién puede usarlo", "Cómo se hace", "Opciones",
@@ -82,22 +79,18 @@ def test_environment_names_only_in_superuser_topics_and_no_secrets(loaded):
             assert not SECRET_LITERAL.search(body), f"{lang}/{topic.id}.md: parece un secreto"
 
 
-def test_registry_commands_and_topic_commands_match(loaded):
+def test_topic_commands_are_the_ones_the_app_still_has(loaded):
+    """Feature 045 removed the in-app authoring agent and its `/speckit-…` commands: a topic that
+    still advertises one would send a reader looking for a screen that no longer exists."""
     documented = {c.lstrip("/") for topic in loaded.topics for c in topic.commands}
-    assert set(REGISTRY) <= documented, (
-        f"comandos sin tema: {sorted(set(REGISTRY) - documented)}; agrégalos a `commands` de un "
-        "tema en index.yaml")
-    extra = sorted(documented - set(REGISTRY))
-    assert not extra, f"comandos inexistentes en index.yaml: {extra}"
+    assert documented <= {"ayuda"}, f"comandos inexistentes en index.yaml: {sorted(documented)}"
 
 
-def test_index_is_deterministic_bounded_and_in_the_system_prefix():
+def test_index_is_deterministic_and_bounded():
     for lang in guide.LANGS:
         text = guide.index_text(lang)
         assert text == guide.index_text(lang)
         assert len(text) <= guide.INDEX_MAX, f"índice {lang}: {len(text)} > {guide.INDEX_MAX}"
-        assert guide.prompt_block(lang) in service.system_prefix(lang)
-    assert service.system_prefix("es") == service.system_prefix("es")
 
 
 def test_resolve_ids_titles_aliases_and_closest():
@@ -118,23 +111,14 @@ def test_role_filter():
     assert "usuarios" in admin_ids and "usuarios" not in user_ids
     assert {"ingreso", "tableros", "ayuda"} <= user_ids
     assert guide.get("seguridad", "es", user) is None
-    assert guide.get("seguridad", "es", None) is not None      # the agent (superuser chat)
+    assert guide.get("seguridad", "es", None) is not None      # no viewer: everything is readable
 
 
-HELP_QUESTIONS = [
-    "¿cómo activo el tema oscuro?", "¿cómo cambio mi contraseña?",
-    "¿cómo comparto un tablero por correo cada lunes?", "¿qué es un reporte directo?",
-    "¿cómo restablezco la contraseña de un usuario?", "¿dónde veo la auditoría?",
-    "¿cómo activo la verificación en dos pasos?", "¿cómo vinculo telegram?",
-    "¿cómo exporto a csv?", "¿qué hace /speckit-plan?",
-    "how do I turn on the dark theme?", "how do I reset a user's password?",
-    "how do I share a dashboard with a link?", "what is a direct report?",
-    "how do I change the language?", "where is the audit log?",
-    "how do I set up two-step verification?", "how do I link telegram?",
-    "how do I export to pdf?", "what does /speckit-implement do?",
-]
-
-
-@pytest.mark.parametrize("question", HELP_QUESTIONS)
-def test_help_questions_are_never_refused(question):
-    assert scope.precheck(question).out is False, question
+def test_every_title_and_alias_opens_a_topic(loaded):
+    """The help search is the surviving reader-facing surface (feature 023, kept by 045): whatever a
+    reader types — the title or any alias, in either language — opens a topic, never nothing. An
+    alias two topics share («ia») may open either; the index is the one that owns it."""
+    for topic in loaded.topics:
+        for lang in guide.LANGS:
+            for words in (topic.title[lang], *topic.aliases[lang]):
+                assert guide.resolve(words, lang)[0] is not None, (lang, words)

@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 
-from app.models import AssistantSession, Project
+from app.models import Project
 from app.projects import assets, compose, fs
 from app.projects import service as project_service
 from app.services import audit
@@ -114,50 +114,11 @@ def ensure_principal(db) -> bool:
     return True
 
 
-def import_open_drafts(db) -> int:
-    """Each open conversation draft becomes its own project «<title> (borrador)» (idempotent)."""
-    sessions = db.scalars(select(AssistantSession).where(
-        AssistantSession.draft.is_not(None), AssistantSession.status != "applied",
-    ).order_by(AssistantSession.id)).all()
-    count = 0
-    for session in sessions:
-        if "imported_project" in (session.stats or {}):
-            continue
-        files = (session.draft or {}).get("files") or {}
-        if not files:
-            session.stats = {**(session.stats or {}), "imported_project": 0}
-            db.flush()
-            continue
-        name = f"{(session.title or 'Borrador').strip()[:60]} (borrador)"      # FR-016
-        project = Project(slug=project_service.suggest_slug(db, name), name=name[:80],
-                          origin="app", created_by=session.created_by,
-                          imported_at=datetime.now(UTC))
-        db.add(project)
-        db.flush()
-        db.commit()
-        try:
-            _write_tree(project, {**_base_files(project), **compose.draft_tree(files)})
-        except (OSError, fs.ProjectPathError) as exc:
-            log.warning("draft of conversation %s not imported (%s)", session.id, exc)
-            db.delete(project)
-            db.commit()
-            continue
-        db.refresh(project)
-        session.project_id = project.id
-        session.read_only = False
-        session.stats = {**(session.stats or {}), "imported_project": project.id}
-        audit.record(db, "project_imported", actor_id=session.created_by, ip=None,
-                     detail={"project_id": project.id, "project": project.slug,
-                             "session": session.id, "source": "draft"})
-        db.flush()
-        count += 1
-    return count
 
 
 def upgrade(db) -> None:
     """Feature 020 upgrade steps, run by `bootstrap` at every start (both are idempotent)."""
     ensure_principal(db)
-    import_open_drafts(db)
     db.flush()
 
 

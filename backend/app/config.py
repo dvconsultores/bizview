@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.mail.addresses import HOST, normalize_domains, normalize_email
@@ -55,58 +55,15 @@ class Settings(BaseSettings):
     # address (build arg BIZVIEW_SOURCE_URL → SOURCE_URL); an installation may override it.
     source_url: str | None = None
 
-    # Optional AI provider (constitution VIII): off unless configured.
+    # Optional AI provider (constitution VIII): off unless configured. Since 045 the only caller
+    # is the read-only help agent (feature 033); authoring lives outside BizView.
     ai_provider: AIProvider = "none"
     ai_api_key: SecretStr | None = None
     ai_model: str | None = Field(default=None, max_length=100)
     ai_base_url: str | None = None
     ai_timeout_seconds: float = Field(default=30, ge=1, le=300)
-    # Per-request timeout of assistant chat() calls (a round writing a full draft is slow).
-    ai_chat_timeout_seconds: float = Field(default=180, ge=10, le=600)
-    # Cached prompt tokens cost a fraction of normal tokens (DeepSeek ~10%).
-    ai_chat_cached_token_weight: float = Field(default=0.1, ge=0, le=1)
-    # Longest answer per round: a full draft (specs, YAML, SQL) needs several thousand tokens.
-    ai_chat_max_tokens: int = Field(default=16_000, ge=1_024, le=64_000)
-    # Tool rounds per autonomous run before the assistant posts a progress message.
-    ai_chat_max_rounds: int = Field(default=60, ge=1, le=200)
-    # The owner's rule (2026-10-21): the AI is unlimited. Tokens are counted for the run summary
-    # and the status bar, but nothing stops a turn or a run on them — no conversation budget, no
-    # per-command ceiling. The bounds left are the round caps, the provider timeout and "Detener".
-    # Assistant runs working at the same time in this process; more get 409 assistant_capacity.
-    ai_agent_max_concurrent: int = Field(default=4, ge=1, le=32)
-    # Agent previews per conversation (kept small so preview generation stays cheap).
-    ai_chat_max_previews: int = Field(default=5, ge=1, le=20)
-    # Seconds after which a stale assistant busy claim is considered abandoned, counted
-    # from the last saved round. The loop heartbeats before its single timeout retry and
-    # the SDK does not retry chat calls, so the longest stretch between heartbeats is one
-    # chat call plus tool time; the validator keeps a 2x margin.
-    ai_chat_busy_stale_seconds: int = Field(default=900, ge=60, le=7200)
-    # Origin tool timeout: SQL/HTTP tools run inside this window.
-    ai_tool_timeout_seconds: float = Field(default=20, ge=1, le=120)
-    # Discovery tool calls per run before the assistant must propose a draft.
-    ai_agent_discovery_limit: int = Field(default=15, ge=3, le=100)
-
-    # Feature 028: the run contract of one autonomous run. A contract stores the numbers it was
-    # confirmed with, so changing these never alters a run already under way.
-    # Owner, 2026-10-27: an Auto run has no round cap. A real feature (eight stages, two specs)
-    # went past 200 rounds and stopped at `limit:rounds` with 3.9M tokens spent. `None` is the
-    # default — unlimited; an installation may still set a ceiling, and "Detener", the contract
-    # limits and the provider errors keep their own stops.
-    ai_auto_max_rounds: int | None = Field(default=None, ge=1, le=100_000)
-    # In-turn history budget (characters, about tokens x 4). Past it the loop compacts what it
-    # already carries instead of stopping: the last exchanges stay verbatim (up to
-    # `history.COMPACT_TAIL_CHARS`, capped by this budget), older tool results keep their
-    # one-line summary. Keep it above the tail, or the newest result is summarised too.
-    # A chat turn keeps its own `ai_chat_max_rounds`.
-    ai_context_compact_chars: int = Field(default=200_000, ge=20_000, le=2_000_000)
-    # Feature 040 (D): a stage has a token ceiling, so one integration cannot cost 14 M tokens by
-    # construction. Past it the stage stops with `blocked:stage_budget` and its state saved; the
-    # runner-up message says which command resumes it.
-    # 0 disables the ceiling (owner 2026-10-21: the AI is unlimited).
-    ai_stage_token_budget: int = Field(default=600_000, ge=0, le=20_000_000)
-    # The owner waived the step-up for Auto ("do not need auth to auto mode"): selecting the mode is
-    # the authorisation. Set to true to ask for the password again when a run is confirmed.
-    ai_auto_require_step_up: bool = False
+    # Origin checks run inside this window (SQL/HTTP), on the explicit validate action only.
+    origin_check_timeout_seconds: float = Field(default=20, ge=1, le=120)
 
     # Email and share links (feature 018, amendment 2026-10-07): installation environment only,
     # like the AI settings; nothing about the SMTP server is stored in the database.
@@ -188,13 +145,6 @@ class Settings(BaseSettings):
     # files outside PROJECTS_DIR, shared by every project that asks for the same URL.
     image_cache_dir: str = Field(default_factory=lambda: str(ROOT / "image-cache"))
     image_cache_days: int = Field(default=90, ge=1, le=3650)
-    # Image briefs in the chat (feature 024): files live outside PROJECTS_DIR, with limits.
-    attachments_dir: str = Field(default_factory=lambda: str(ROOT / "attachments"))
-    attachments_max_per_message: int = Field(default=4, ge=1, le=10)
-    attachments_max_mb: int = Field(default=5, ge=1, le=20)
-    # auto: on for the Anthropic-style provider, off for an OpenAI-compatible endpoint (the
-    # product cannot know its catalogue); true/false overrides both (feature 024, research R2).
-    ai_vision: Literal["auto", "true", "false"] = "auto"
     # Interface language when neither the account nor the browser decides (feature 022)
     default_locale: Literal["es", "en"] = "es"
 
@@ -382,16 +332,6 @@ class Settings(BaseSettings):
         except ValueError as e:
             raise ValueError(f"EMAIL_ALLOWED_DOMAINS: {e}") from e
         return ",".join(domains)
-
-    @model_validator(mode="after")
-    def _busy_stale_covers_round(self) -> "Settings":
-        worst_case = 2 * self.ai_chat_timeout_seconds + self.ai_tool_timeout_seconds
-        if self.ai_chat_busy_stale_seconds <= worst_case:
-            raise ValueError(
-                "AI_CHAT_BUSY_STALE_SECONDS must exceed 2 x "
-                "AI_CHAT_TIMEOUT_SECONDS + AI_TOOL_TIMEOUT_SECONDS"
-            )
-        return self
 
     @property
     def version(self) -> str:

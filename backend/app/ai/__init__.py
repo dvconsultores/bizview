@@ -2,14 +2,12 @@
 
 Only strings composed by product code reach a provider: aggregates and metadata, never raw source
 records, credentials, or users' personal data. Every feature that calls `complete()` documents
-what it sends. `chat()` callers send only what the assistant tool layer composed (sanitised).
-`context` is dynamic per-round text sent after the history (never stored); keep it out of
-`system` so system+history remain a cacheable prefix.
+what it sends: the optional help agent (feature 033) is the only caller left after 045 removed the
+in-app authoring agent.
 Provider keys never leave this package: errors are redacted before they surface.
 """
-from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Protocol
 
 from app.ai.errors import CODES as ERROR_CODES
 from app.ai.errors import MESSAGES as MESSAGES
@@ -49,92 +47,12 @@ class AIReply:
     model: str
 
 
-ChatRole = Literal["user", "assistant", "tool"]
-StopReason = Literal["end", "tool_use", "max_tokens"]
-
-
-@dataclass(frozen=True)
-class ToolSpec:            # a tool the model may call
-    name: str
-    description: str
-    parameters: dict       # JSON Schema of the arguments (type: object)
-
-
-@dataclass(frozen=True)
-class ToolCall:
-    id: str
-    name: str
-    args: dict
-    args_error: str | None = None
-
-
-def vision_enabled(settings: Settings) -> bool:
-    """Whether the configured model can read images (feature 024, research R2).
-
-    `AI_VISION=auto` (the default) trusts the Anthropic-style provider and distrusts an
-    OpenAI-compatible endpoint, whose catalogue the product cannot know."""
-    if settings.ai_vision == "true":
-        return True
-    if settings.ai_vision == "false":
-        return False
-    return settings.ai_provider == "anthropic"
-
-
-@dataclass(frozen=True)
-class ImagePart:           # an image attached to a user turn (feature 024)
-    media_type: str
-    data: bytes
-
-
-@dataclass(frozen=True)
-class ChatMessage:         # provider-neutral history entry
-    role: ChatRole
-    content: str = ""
-    tool_calls: tuple[ToolCall, ...] = ()   # assistant turns only
-    tool_call_id: str | None = None         # tool results only (answers ToolCall.id)
-    reasoning: str | None = None            # in memory only, never stored
-    images: tuple[ImagePart, ...] = ()      # user turns only; never stored in the history
-
-
-@dataclass(frozen=True)
-class ChatUsage:
-    input: int = 0
-    output: int = 0
-    cached: int = 0
-
-    def __post_init__(self) -> None:
-        # Clamp cached to a valid subset of input.
-        object.__setattr__(self, "cached", max(0, min(self.cached, self.input)))
-
-    @property
-    def total(self) -> int:
-        return self.input + self.output
-
-    def weighted(self, weight: float) -> int:
-        """Cost estimate where cached tokens cost `weight` (0..1) of normal tokens."""
-        return round((self.input - self.cached) + self.output + weight * self.cached)
-
-
-@dataclass(frozen=True)
-class ChatReply:
-    text: str
-    tool_calls: tuple[ToolCall, ...]
-    usage: ChatUsage
-    model: str
-    stop_reason: StopReason = "end"
-    reasoning: str | None = None
-
-
 class Provider(Protocol):
     name: str
     model: str
 
     def complete(self, prompt: str, *, system: str | None = None, max_tokens: int = 1024,
                  effort: str | None = None) -> AIReply: ...
-
-    def chat(self, messages: Sequence[ChatMessage], *,
-             tools: Sequence[ToolSpec] = (), system: str | None = None,
-             max_tokens: int = 4096, context: str | None = None) -> ChatReply: ...
 
 
 def redact(text: str, secret: str | None, limit: int = 200) -> str:
@@ -148,11 +66,6 @@ def get_provider(settings: Settings) -> Provider:
     """The configured provider; raises AIError('not_configured') when AI is off or incomplete."""
     if not settings.ai_enabled:
         raise AIError("not_configured")
-    if settings.ai_provider == "fake":  # test hooks only; re-checked at call time
-        from app.ai import fake
-        if not fake.enabled():
-            raise AIError("not_configured")
-        return fake.SHARED
     if settings.ai_provider == "anthropic":
         from app.ai.anthropic_provider import AnthropicProvider
         return AnthropicProvider(settings)

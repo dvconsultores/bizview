@@ -19,7 +19,6 @@ errors caused by that cancel are recorded as 'stopped'.
 
 Messages stored in `integration_run.message` never contain credentials.
 """
-import copy
 import io
 import logging
 import queue
@@ -804,93 +803,3 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
     return run
 
 
-def run_preview(integration: dict, files: dict, *, session_id: int,
-                now: datetime | None = None, max_window_days: int = 7,
-                time_limit_s: int = 300) -> dict:
-    """Run a draft integration into the session's preview schemas (feature 014): never the
-    published `ds_*` schemas, no integration_run row, all-or-nothing like a real run."""
-    app = get_settings()
-    iid = integration["id"]
-    secrets: dict = {}
-    plans: list[Plan] = []
-    preview_key = lock_key("preview", session_id)
-    engine = get_engine()
-    try:
-        tz_name = extract.check_timezone(integration.get("timezone") or app.timezone)
-    except ExtractError as e:
-        return {"status": "failed", "message": str(e), "datasets": {}, "checks": []}
-    tz = ZoneInfo(tz_name)
-    now = now or datetime.now(UTC)
-    deadline = time.monotonic() + time_limit_s
-
-    def check() -> None:
-        if time.monotonic() > deadline:
-            raise ExtractError(M("run.preview_timeout"))
-
-    with engine.connect() as lock_conn, get_sessionmaker()() as db:
-        pg_lock = lock_conn.connection.driver_connection
-        got = pg_lock.execute(
-            "SELECT pg_try_advisory_lock(hashtextextended(%s, 0))", (preview_key,)
-        ).fetchone()[0]
-        pg_lock.commit()
-        if not got:
-            return {"status": "skipped", "message": t("run.preview_running"),
-                    "datasets": {}, "checks": []}
-        try:
-            source = db.scalar(select(DataSource).where(
-                DataSource.name.ilike(integration["source"].strip())
-            ))
-            if source is None:
-                return {"status": "failed",
-                        "message": t("run.source_missing",
-                                      source=integration['source']),
-                        "datasets": {}, "checks": []}
-            secrets = sources.secrets_of(source)
-            with datasets.preview_schemas(datasets.preview_prefix(session_id)):
-                schema = datasets.schema_name(iid)
-                with engine.connect() as conn:
-                    pg = conn.connection.driver_connection
-                    try:
-                        pg.execute(
-                            sql.SQL("SET LOCAL TimeZone = {}").format(sql.Literal(tz_name))
-                        )
-                        for name, original in integration["datasets"].items():
-                            check()
-                            ds = copy.deepcopy(original)
-                            inc = ds.get("incremental") or {}
-                            if "window_days" in inc:
-                                inc["window_days"] = min(int(inc["window_days"]),
-                                                         max_window_days)
-                            state = datasets.ensure_table(pg, iid, name, ds)
-                            full = "window_days" not in inc
-                            start, end = window(ds, full=full, now=now, tz=tz)
-                            plan = Plan(name, ds, full, start, end, state)
-                            plans.append(plan)
-                            staging = _stage(pg, schema, name, list(ds["columns"]))
-                            _extract(pg, plan, staging, integration=integration, files=files,
-                                     source=source, secrets=secrets, app=app,
-                                     deadline=deadline, tz=tz_name, check=check,
-                                     spill_label=f"preview{session_id}")
-                            _run_checks(pg, plan, staging, files=files, source=source,
-                                        secrets=secrets, app=app, tz=tz_name,
-                                        deadline=deadline, stop_check=check)
-                        failed = [c for p in plans for c in p.checks if not c["ok"]]
-                        if failed:
-                            pg.rollback()
-                            return {"status": "failed",
-                                    "message": t("run.preview_check_failed"),
-                                    "datasets": {}, "checks": failed}
-                        for plan in plans:
-                            _load(pg, plan, schema, f"_stg_{plan.name}", 0)
-                        pg.commit()
-                    except BaseException:
-                        pg.rollback()
-                        raise
-            return {"status": "succeeded", "message": None,
-                    "datasets": {p.name: {"rows": p.written} for p in plans}, "checks": []}
-        except Exception as e:
-            return {"status": "failed", "message": _safe_message(e, secrets),
-                    "datasets": {}, "checks": []}
-        finally:
-            pg_lock.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", (preview_key,))
-            pg_lock.commit()

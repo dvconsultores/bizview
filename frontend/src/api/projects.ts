@@ -53,7 +53,6 @@ export const projectsApi = {
       `${base(slug)}/apply`),
   remove: (slug: string) => api.del<void>(base(slug)),
   convert: (slug: string) => api.post<ProjectDetail>(`${base(slug)}/convert`),
-  requestPreview: (slug: string) => api.post<{ preview: unknown }>(`${base(slug)}/preview`),
   history: (slug: string, params: { path?: string; spec?: string; before?: number } = {}) =>
     api.get<ProjectHistory>(`${base(slug)}/history${qs(params)}`),
   revision: (slug: string, id: number) =>

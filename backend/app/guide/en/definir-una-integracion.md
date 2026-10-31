@@ -7,7 +7,7 @@ load, from where, how often and how to check it.
 
 ## Who can use it
 
-Only the **Superuser**; the agent usually writes it with `/speckit-implement`.
+Only the **Superuser**; it is written in the project editor or imported already written.
 
 ## How to
 

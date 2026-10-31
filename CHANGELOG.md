@@ -4,6 +4,56 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-11-01
+
+Bizview stops authoring. The in-app agent never worked well enough to trust (owner, 2026-10-29:
+"the in-app agent never worked; better to use a powerful AI dedicated to this, externally"), so
+authoring moved outside the product (feature 043) and everything that existed only to serve it is
+gone (feature 045). Reading, running and sharing are untouched.
+
+### Removed
+
+- **Feature 014 — vibe chat**: the conversation, its composer, the "Asistente" panel and its
+  routes, the draft preview and its temporary schemas, the tables `assistant_session`,
+  `assistant_message` and `assistant_preview_request`.
+- **Feature 015 — the vision brief**: attached images and the `assistant_attachment` table.
+- **Feature 017 — the agentic loop**: `app/assistant/**` (loop, tools, tree and history builders,
+  context compression, repair), the run activity map and the token-budget widgets.
+- **Feature 021 — Spec Kit commands in the app**: `/speckit-…` and `/ayuda` as commands, the
+  command registry, its guards and the `assistant_command_run` table. The Spec Kit flow itself
+  lives in the author's repository, driven by the CLI.
+- **Feature 024 — image briefs**: `ATTACHMENTS_DIR`, `ATTACHMENTS_MAX_MB`,
+  `ATTACHMENTS_MAX_PER_MESSAGE`, `AI_VISION` and the attachment sweep in the worker.
+- **Feature 028 — Auto mode**: the mode selector, run contracts and profiles, "Pasar a Auto", the
+  post-apply watch with its automatic rollback, and the tables `assistant_auto_run` and
+  `assistant_run_profile`.
+- **Feature 029 / 039 / 040 — `/speckit-all`**: the state machine, its stage bounds, its stage
+  token ceiling and `run-report.md` as a product output.
+- **Feature 035 / 036 — the AI status page for chat**: the narrative generator and the repair of
+  conversation history. `report.yaml`'s `ai_narrative` key stays accepted and ignored (deprecated
+  since 0.2.0) so a project written for an older installation still validates.
+- **Feature 037 — the project preview work order**: `POST /api/projects/{slug}/preview` and its
+  report, data and PDF endpoints. Published report rendering, PDF, sharing and email remain.
+- **Settings and dependencies**: `AI_CHAT_*`, `AI_COMMAND_TOKEN_CEILING`, `AI_CONTEXT_COMPACT_CHARS`,
+  `AI_STAGE_TOKEN_BUDGET`, `AI_AGENT_*`, `AI_AUTO_*` and `AI_TOOL_TIMEOUT_SECONDS` (replaced by
+  `ORIGIN_CHECK_TIMEOUT_SECONDS`). `AI_PROVIDER` stays, defaults to `none` and is documented as
+  help only. Provider tool-calling code, `app/ai/fake.py` and `app/ai/history_rules.py` are gone.
+- **Specifications**: 014, 015, 017, 021, 024, 028, 029, 035, 036, 039 and 040 moved to
+  `specs/_deprecated/`, each with a `DEPRECATED.md`.
+- **The draft preview's readiness gate**: a project is ready on validation, query checks and the
+  composition of the other applied projects; it no longer needs a preview before applying.
+
+### Changed
+
+- **Principle IX of the constitution** (amendment 2.1.0 → 3.0.0): projects are authored outside
+  Bizview against the published contract and enter only through validation and import.
+- **Administración**: the AI card and the "IA funcionando" pill are gone; the access-tokens and
+  projects cards say what they now do; the grid is 3/2/1.
+- **Upgrading from 0.1.x**: migration `0041_drop_authoring_agent` copies every draft spec document
+  into its project folder and verifies each copy by SHA-256 **before** dropping a single table. A
+  copy that fails aborts the upgrade with the tables intact. The downgrade recreates the tables
+  empty: recovering the rows means restoring a database backup taken before the upgrade.
+
 ## [Unreleased]
 
 ### Added

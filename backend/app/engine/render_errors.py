@@ -16,7 +16,6 @@ from typing import Any
 
 from app.errors import ApiError
 
-PREVIEW_EXPIRED = "preview_expired"
 DATASET_MISSING = "dataset_missing"
 JOIN_FAILED = "join_failed"
 EMPTY_DATASET = "empty_dataset"
@@ -26,7 +25,6 @@ FORMAT_UNKNOWN = "format_unknown"
 PDF_RENDER = "pdf_render"
 
 CODES: tuple[str, ...] = (
-    PREVIEW_EXPIRED,
     DATASET_MISSING,
     JOIN_FAILED,
     EMPTY_DATASET,

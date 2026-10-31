@@ -14,9 +14,9 @@ log = logging.getLogger("app.security")
 
 PROTECTED_PREFIXES = ("/api/admin", "/api/sources", "/api/security", "/api/workspace",
                       "/api/integrations", "/api/tokens")
-# Super-user only areas (reads included): projects and the AI assistant. Ordinary users never
+# Super-user only areas (reads included): projects. Ordinary users never
 # reach them, so covering the whole prefix does not break their reads.
-ADMIN_ONLY_PREFIXES = ("/api/projects", "/api/assistant")
+ADMIN_ONLY_PREFIXES = ("/api/projects",)
 # Admin-only share controls under /api/dashboards: minting a public link, sending by e-mail and
 # scheduled subscriptions. Their GET reads stay available; only the state-changing methods are
 # covered below.

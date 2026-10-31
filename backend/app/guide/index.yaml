@@ -102,8 +102,8 @@ topics:
     tiles: []
     commands: ["/ayuda"]
     aliases:
-      es: ["ayuda", "soporte", "guía", "preguntar al asistente", "buscar en la ayuda"]
-      en: ["help", "support", "guide", "ask the assistant", "search help"]
+      es: ["ayuda", "soporte", "guía", "buscar en la ayuda", "temas"]
+      en: ["help", "support", "guide", "search help", "topics"]
     related: [navegacion]
   - id: perfil
     section: cuenta

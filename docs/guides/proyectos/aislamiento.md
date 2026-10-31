@@ -25,7 +25,6 @@ porque un id duplicado o una referencia a otra integración son problemas reales
 | Vista previa | `project.preview` | el proyecto |
 | Conversaciones | `assistant_session.project_id` | el proyecto (y su autor) |
 | Historial de archivos | `project_file_revision.project_id` | el proyecto |
-| Comandos `/speckit-…` | `assistant_command_run.project_id` | el proyecto |
 | Contratos de ejecución | `assistant_auto_run.project_id` | el proyecto |
 | Solicitudes de vista previa | `assistant_preview_request.project_id` | el proyecto |
 | Perfiles de ejecución | `assistant_run_profile` | la instalación (formulario: etapas, límites y nombres de fuente; no son archivos de un proyecto) |

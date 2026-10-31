@@ -1,27 +1,23 @@
-"""Feature 037: a project never shows, fixes or previews another project's files.
+"""Feature 037: a project never shows, fixes or applies another project's files.
 
 The incident (production, 2026-10-26): `/proyectos/artemisa` listed a problem of
 `projects/coinmarketcap/…`, offered «Aplicar arreglo» for it and answered «El archivo … ya no
-existe»; the worker failed four previews with «no ve ningún archivo del proyecto». These tests are
-the regression: two projects, one user, and no path of the other project anywhere.
+existe». These tests are the regression: two projects, one user, and no path of the other project
+anywhere. Feature 045 removed the draft preview, so the paths under test are tree, history,
+validate, fix and apply.
 """
 from __future__ import annotations
 
 import json
-import secrets
-import shutil
 from textwrap import dedent
 
 import pytest
 
-from app.assistant import preview, service
 from app.config import get_settings
-from app.models import AppUser, AssistantPreviewRequest, AssistantSession
+from app.models import AppUser
 from app.projects import fs
 from app.projects import service as project_service
-from app.projects.workview import for_session
-from tests.conftest import reauth, sql, v2_files
-from tests.test_assistant_preview import _draft
+from tests.conftest import reauth, sql
 from tests.test_runner import origin as origin
 from tests.test_runner import pg_source as pg_source
 from tests.test_vibe_reporting import applied as applied
@@ -208,81 +204,6 @@ def test_the_fix_endpoint_refuses_a_foreign_path(applied, origin):
 
 
 # --- preview --------------------------------------------------------------------------------------
-
-def test_the_project_preview_carries_its_project_and_files(applied, origin):
-    c = applied
-    a = _project_with_integration(c, origin, "Proyecto Alfa", "ventas-a")
-    r = c.post(f"/api/projects/{a}/preview")
-    assert r.status_code == 200, r.text
-    pid = sql("SELECT id FROM project WHERE slug = :s", s=a)[0][0]
-    row = sql("SELECT project_id, files FROM assistant_preview_request ORDER BY id DESC LIMIT 1")[0]
-    assert row[0] == pid
-    assert all(not path.startswith("projects/") for path in row[1])
-    assert "integrations/ventas-a/integration.yaml" in row[1]
-
-
-def test_the_project_preview_uses_the_callers_conversation(db, superuser, admin):
-    """R5: the project's newest conversation was taken whoever owned it."""
-    actor = db.get(AppUser, superuser.id)
-    project = project_service.create(db, actor, "Compartido")
-    db.commit()
-    mine = service.create_session(db, actor, project_id=project.id)
-    other = AssistantSession(title="De otra persona", created_by=admin.id, status="open",
-                             project_id=project.id)
-    db.add(other)
-    db.commit()
-    view = for_session(db, mine)
-    view.validation = {"valid": True, "errors": [], "warnings": []}
-    db.commit()
-
-    from app.api.projects import _conversation
-
-    assert _conversation(db, project, actor).id == mine.id
-
-
-def test_a_preview_for_another_project_is_not_run(db, superuser):
-    """R6: the request names its project; a mismatch is refused and logged, not run blind."""
-    actor = db.get(AppUser, superuser.id)
-    a = project_service.create(db, actor, "Alfa")
-    project_service.create(db, actor, "Beta")
-    db.commit()
-    files = v2_files(_draft())
-    fs.apply_ops(a.id, [{"op": "write", "path": p, "content": t, "base_sha256": None,
-                         "force": False} for p, t in files.items()],
-                 {"kind": "user", "user_id": superuser.id, "session_id": None, "command": "edit"})
-    session = service.create_session(db, actor, project_id=a.id)
-    for_project = project_service.create(db, actor, f"Otro {secrets.token_hex(2)}")
-    db.commit()
-    req = AssistantPreviewRequest(session_id=session.id, project_id=for_project.id,
-                                  requested_by=superuser.id, files=files)
-    db.add(req)
-    db.commit()
-
-    preview.process_request(req.id)
-
-    db.refresh(req)
-    assert req.finished_at is not None
-    state = sql("SELECT preview FROM project WHERE id = :i", i=a.id)[0][0]
-    assert state["status"] == "failed"
-    assert for_project.slug in state["message"] and a.slug in state["message"]
-
-
-def test_an_empty_folder_names_the_project_and_the_path(db, superuser):
-    """R6: «no ve ningún archivo» without a name made a wrong scope and a missing volume equal."""
-    actor = db.get(AppUser, superuser.id)
-    project = project_service.create(db, actor, "Sin carpeta")
-    db.commit()
-    session = service.create_session(db, actor, project_id=project.id)
-    db.commit()
-    root = fs.project_root(project.slug)
-    shutil.rmtree(root)
-
-    result = preview.run_draft_preview(db, session)
-
-    assert result["status"] == "failed"
-    assert project.slug in result["message"] and str(root) in result["message"]
-    assert "PROJECTS_DIR" in result["message"]
-
 
 # --- the incident, end to end ---------------------------------------------------------------------
 

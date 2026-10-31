@@ -42,8 +42,6 @@ def record(
         actor_kind=actor["kind"],
         actor_id=actor.get("user_id"),
         command=(actor.get("command") or "edit")[:60],
-        session_id=actor.get("session_id"),
-        command_run_id=actor.get("command_run_id"),
         group_id=group_id,
     )
     db.add(row)
@@ -77,8 +75,6 @@ def record_asset(
         actor_kind=actor["kind"],
         actor_id=actor.get("user_id"),
         command=(actor.get("command") or "edit")[:60],
-        session_id=actor.get("session_id"),
-        command_run_id=actor.get("command_run_id"),
         group_id=group_id,
     )
     db.add(row)
@@ -137,8 +133,7 @@ HISTORY_EVENTS = ("project_applied", "project_withdrawn", "project_imported")
 def _rev_json(rev, names: dict[int, str]) -> dict:
     return {"id": rev.id, "path": rev.path, "op": rev.op, "actor": rev.actor_kind,
             "actor_name": names.get(rev.actor_id) if rev.actor_kind == "user" else None,
-            "command": rev.command, "session_id": rev.session_id,
-            "command_run_id": rev.command_run_id,
+            "command": rev.command,
             "restored_from": rev.restored_from, "renamed_from": rev.renamed_from,
             "size": rev.size, "sha256": rev.sha256, "time": rev.created_at.isoformat()}
 
@@ -179,8 +174,7 @@ def list_revisions(db, project_id: int, *, path: str | None = None, spec: str | 
             groups.append({"group_id": str(rev.group_id), "actor": rev.actor_kind,
                            "actor_name": names.get(rev.actor_id) if rev.actor_kind == "user"
                            else None,
-                           "command": rev.command, "session_id": rev.session_id,
-                           "command_run_id": rev.command_run_id,
+                           "command": rev.command,
                            "time": rev.created_at.isoformat(), "files": []})
         groups[-1]["files"].append(_rev_json(rev, names))
     items = groups + [{"event": e.kind, "time": e.occurred_at.isoformat(),
@@ -241,8 +235,8 @@ def restore(db, project, revision_id: int, base_sha256: str | None, actor: dict)
 
 
 def spec_timeline(db, project, folder: str) -> dict:
-    """Stage dates of a spec folder from its revisions and versions, and its conversations."""
-    from app.models import AssistantSession, WorkspaceVersion
+    """Stage dates of a spec folder from its revisions and versions."""
+    from app.models import WorkspaceVersion
     from app.projects import specs
 
     prefix = f"specs/{folder}/"
@@ -255,7 +249,7 @@ def spec_timeline(db, project, folder: str) -> dict:
         return next((r for r in live if r.path == f"{prefix}{path}" and test(r)), None)
 
     def clarified(rev) -> bool:
-        return specs._command(rev.command) == "speckit-clarify" or (
+        return (
             rev.content is not None and specs.parse_spec(rev.content)["clarified"])
 
     found = [
@@ -273,10 +267,4 @@ def spec_timeline(db, project, folder: str) -> dict:
             stages.append({"stage": "aplicada", "time": version.applied_at.isoformat(),
                            "version": version.id})
     stages.sort(key=lambda s: s["time"])
-    session_ids = {r.session_id for r in revisions if r.session_id is not None}
-    sessions = db.scalars(select(AssistantSession).where(
-        AssistantSession.id.in_(session_ids) | ((AssistantSession.project_id == project.id)
-                                                & (AssistantSession.current_spec == folder))
-    ).order_by(AssistantSession.id)).all()
-    return {"folder": folder, "stages": stages,
-            "conversations": [{"id": s.id, "title": s.title} for s in sessions]}
+    return {"folder": folder, "stages": stages}

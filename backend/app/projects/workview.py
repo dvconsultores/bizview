@@ -1,25 +1,23 @@
-"""Project-level working state seen by the 017 assistant modules (feature 020, research R4).
+"""The working state validation, readiness and origin checks read from a project.
 
-`WorkView(project, session)` answers the attributes readiness/origin/preview/tools read from a
-conversation: `draft` comes from the project folder (read-only), `validation`, `query_checks` and
-`preview` live on the project (shared by every conversation of the project), everything else is the
-conversation's (`working_state`, `stats`, `id`, `status`, ...). Use `real(obj)` where the ORM needs
-the mapped session object (`db.add`, `object_session`).
+`WorkView(project)` answers the attributes those modules need: `draft` comes from the project
+folder (read-only), while `validation` and `query_checks` live on the project row. Feature 045
+removed the conversation and the draft preview that used to sit behind this adapter.
 """
+
+from typing import ClassVar
 
 from app.projects import fs
 
-PROJECT_STATE = ("validation", "query_checks", "preview")
+PROJECT_STATE = ("validation", "query_checks")
 
 
 class WorkView:
-    """Adapter (project, conversation) with the attributes of an AssistantSession."""
+    """The project's own working state."""
 
-    def __init__(self, project, session) -> None:
+    def __init__(self, project) -> None:
         object.__setattr__(self, "project", project)
-        object.__setattr__(self, "session", session)
         object.__setattr__(self, "_files", None)
-        object.__setattr__(self, "command_run", None)   # feature 021: the running command
 
     def files(self) -> dict[str, str]:
         """Layout files of the project folder {path: text} (cached until refresh())."""
@@ -54,28 +52,38 @@ class WorkView:
         files = self.files()
         return {"files": files, "summary": self.project.name} if files else None
 
+    @property
+    def id(self):
+        return self.project.id
+
+    @property
+    def description(self):
+        return self.project.description
+
+    # Without a conversation there is no working state and no run statistics to read.
+    working_state: ClassVar[dict] = {}
+    stats: ClassVar[dict] = {}
+
     def __getattr__(self, name):
         if name in PROJECT_STATE:
             return getattr(self.project, name)
-        return getattr(self.session, name)
+        raise AttributeError(name)
 
     def __setattr__(self, name, value) -> None:
         if name in PROJECT_STATE:
             setattr(self.project, name, value)
             _persist(self.project.id, name, value)
-        elif name == "command_run":
-            object.__setattr__(self, name, value)
         elif name == "draft":
             raise AttributeError("draft is read-only: write project files with fs.apply_ops")
         else:
-            setattr(self.session, name, value)
+            raise AttributeError(name)
 
 
 def _persist(project_id: int, name: str, value) -> None:
     """Write one project-level state column in its own short transaction.
 
-    The conversation's transaction never locks the project row: `fs.apply_ops` (own session)
-    updates it on every write, and a lock held by the caller's open transaction would block it.
+    The request's transaction never locks the project row: `fs.apply_ops` (own session) updates
+    it on every write, and a lock held by the caller's open transaction would block it.
     """
     from sqlalchemy import update
 
@@ -88,15 +96,5 @@ def _persist(project_id: int, name: str, value) -> None:
 
 
 def real(obj):
-    """The mapped AssistantSession behind a WorkView (or obj itself)."""
-    return obj.session if isinstance(obj, WorkView) else obj
-
-
-def for_session(db, session) -> WorkView:
-    """WorkView of a conversation and its project (the project is detached from `db`)."""
-    from app.models import Project
-
-    project = db.get(Project, session.project_id)
-    if project is not None:
-        db.expunge(project)
-    return WorkView(project, session)
+    """The mapped Project behind a WorkView (or obj itself)."""
+    return obj.project if isinstance(obj, WorkView) else obj

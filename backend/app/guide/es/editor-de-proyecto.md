@@ -25,11 +25,9 @@ Solo el **Superusuario**.
 - **Nuevo archivo**, **Nueva carpeta**, **Renombrar** y **Eliminar** funcionan solo dentro de las
   rutas permitidas del proyecto (ver Estructura de un proyecto). Con el teclado, en el explorador
   pulsa F2 para renombrar y Supr para eliminar el elemento seleccionado.
-- El panel del chat trabaja con la **Spec actual** que elijas; **Nuevo chat en este proyecto**
-  abre otra conversación.
-- En el teléfono, las pestañas **Archivos**, **Editor** y **Chat** muestran un panel a la vez.
-- Mientras el agente trabaja verás «El asistente está editando el proyecto…» y los archivos se
-  actualizan solos.
+- En el teléfono, las pestañas **Archivos** y **Editor** muestran un panel a la vez.
+- Cada cambio queda en el historial con su autor y su hora; puedes comparar dos versiones y
+  restaurar una anterior.
 
 ## Problemas frecuentes
 

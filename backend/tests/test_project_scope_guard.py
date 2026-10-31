@@ -2,9 +2,10 @@
 
 The incident was not a single wrong line: it was a payload that carried another project's rows
 because nothing forced a query to name its project. This guard reads the backend with `ast` and
-fails when a `select(<project-scoped model>)` is written without `project_id` or `session_id` in
-the statement. The allowlist lists the call sites that are installation-wide by definition — each
-with the reason — so a new one has to be justified here, in the code review, not forgotten.
+fails when a `select(<project-scoped model>)` is written without `project_id` in the statement. The
+allowlist lists the call sites that are installation-wide by definition — each with the reason — so
+a new one has to be justified here, in the code review, not forgotten. Feature 045 removed the
+assistant models this set also guarded: a project revision is what is left.
 """
 from __future__ import annotations
 
@@ -15,33 +16,11 @@ import app
 
 APP_DIR = Path(app.__file__).parent
 SCOPED = {
-    "AssistantSession",
-    "AssistantPreviewRequest",
-    "AssistantCommandRun",
-    "AssistantAutoRun",
-    "AssistantRunProfile",
     "ProjectFileRevision",
 }
 
 # file (relative to app/) → function → why the scope is not a project.
-ALLOWED = {
-    ("api/assistant.py", "list_sessions"):
-        "the caller's own conversations across projects (the history page); `?project=` filters",
-    ("api/assistant.py", "list_run_profiles"):
-        "run profiles are installation-wide contract prefills (stages, limits, source names)",
-    ("api/assistant.py", "create_run_profile"):
-        "the unique-name check of an installation-wide profile",
-    ("api/assistant.py", "update_run_profile"):
-        "the unique-name check of an installation-wide profile",
-    ("projects/importer.py", "import_open_drafts"):
-        "feature 020 migration: turns pre-020 conversations into projects, across all of them",
-    ("assistant/preview.py", "cleanup_stale"):
-        "hourly housekeeping of every project's preview schema",
-    ("worker.py", "take_preview_requests"):
-        "the worker's queue is installation-wide: it takes work orders, it does not act on a page",
-    ("worker.py", "_resolve_auto_watch"):
-        "the scheduler reacts to a new version for every project watching an integration",
-}
+ALLOWED: dict[tuple[str, str], str] = {}
 
 
 def _segments(src: str):

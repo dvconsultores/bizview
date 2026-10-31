@@ -1,18 +1,15 @@
 """Readiness gate (feature 017, FR-005/FR-009): what is still pending before "Listo para aplicar".
 
-Readiness imports only the dependency-free personal module from app.assistant to avoid a cycle
-with preview/origin.
+Reads only the project's own state (files, validation, query checks): feature 045 removed the draft
+preview that used to be one of the gates, so a project is ready on evidence the editor can produce.
 """
 import hashlib
 import re
 from collections.abc import Iterable
 
 import yaml
-from sqlalchemy import select
-from sqlalchemy.orm import object_session
 
 from app.i18n import t
-from app.models import AssistantMessage
 from app.projects.personal import personal_kind, query_columns, request_columns
 
 INTEGRATION_FILE = re.compile(r"^integrations/([^/]+)/integration\.yaml$")
@@ -100,52 +97,6 @@ def confirmed_columns(
     return [c for c in candidates if _word_in(c, answer)]
 
 
-def record_personal_confirmations(session, answer: str) -> list[str]:
-    """Record newly confirmed personal columns in working_state["personal_confirmed"].
-
-    Uses top-level working_state["personal_confirmed"] (list[str]); working_state["decisions"]
-    is already used by another tool.
-    """
-    db = object_session(session)
-    question: str | None = None
-    if db is not None:
-        question = db.execute(
-            select(AssistantMessage.content)
-            .where(
-                AssistantMessage.session_id == session.id,
-                AssistantMessage.role == "assistant",
-                AssistantMessage.content != "",
-            )
-            .order_by(AssistantMessage.id.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-
-    personal = (session.working_state or {}).get("personal") or {}
-    flagged: list[str] = []
-    if isinstance(personal, dict):
-        for cols in personal.values():
-            if isinstance(cols, dict):
-                flagged.extend(str(c) for c in cols.keys())
-
-    new = confirmed_columns(question, answer, flagged)
-    if not new:
-        return []
-    state = dict(session.working_state or {})
-    current = state.get("personal_confirmed") or []
-    if not isinstance(current, list):
-        current = []
-    current_low = {str(c).lower() for c in current}
-    added: list[str] = []
-    for col in new:
-        low = col.lower()
-        if low not in current_low:
-            added.append(low)
-            current_low.add(low)
-    if not added:
-        return []
-    state["personal_confirmed"] = (current + added)[-100:]
-    session.working_state = state
-    return added
 
 
 def _report_pending(path: str, doc: dict, files: dict[str, str]) -> list[dict]:
@@ -261,7 +212,6 @@ def _direct_pending(
     if not isinstance(direct, dict):
         return pending
     source = str(direct.get("source") or "").strip()
-    rid = REPORT_FILE.match(path).group(1)
     chk = (session.query_checks or {}).get(path)
     sha = file_sha(text)
     if not isinstance(chk, dict) or chk.get("sha256") != sha:
@@ -295,18 +245,6 @@ def _direct_pending(
                 ),
             })
             break
-
-    preview = session.preview or {}
-    if (preview.get("status") == "succeeded"
-            and preview.get("fingerprint") == fingerprint(files)
-            and (preview.get("reports") or {}).get(rid, {}).get("status") != "succeeded"):
-        pending.append({
-            "code": "preview",
-            "file": path,
-            "message": (
-                t("readiness.direct_preview")
-            ),
-        })
 
     flagged = personal_by_src.get(source.lower()) or {}
     declared = ""
@@ -345,12 +283,8 @@ def _direct_pending(
     return pending
 
 
-def compute(session, user_texts: list[str] | None = None) -> dict:
-    """Return ready + pending issues for the session's current draft.
-
-    `user_texts` is unused (kept for call sites): personal-data confirmations come from
-    working_state["personal_confirmed"] (see record_personal_confirmations).
-    """
+def compute(session) -> dict:
+    """Return ready + pending issues for the project's current files."""
     pending: list[dict] = []
     files = (session.draft or {}).get("files") or {}
     if not any(path not in PROJECT_META for path in files):
@@ -484,33 +418,6 @@ def compute(session, user_texts: list[str] | None = None) -> dict:
                     "message": t("readiness.query_check_failed",
                                  error=chk.get('error') or t("readiness.columns_mismatch")),
                 })
-
-    preview = session.preview or {}
-    fp = fingerprint(files)
-    status = preview.get("status")
-    # Feature 038: applying a project retires its preview (`replaced`) because the schemas are
-    # gone. It ran on exactly these files, so it still counts as «previewed»: the gate asks for a
-    # preview before an apply, and re-applying identical files needs none.
-    if status in ("succeeded", "replaced") and preview.get("fingerprint") == fp:
-        pass
-    elif status in ("succeeded", "replaced"):
-        pending.append({
-            "code": "preview", "file": None,
-            "message": t("readiness.preview_stale"),
-        })
-    elif status == "failed":
-        pending.append({
-            "code": "preview", "file": None,
-            "message": t("readiness.preview_failed"),
-        })
-    elif status == "pending":
-        pending.append({"code": "preview", "file": None,
-                        "message": t("readiness.preview_running")})
-    else:
-        pending.append({
-            "code": "preview", "file": None,
-            "message": t("readiness.preview_needed"),
-        })
 
     if valid and blockers:
         pending.append({

@@ -19,8 +19,8 @@
 	import /etc/caddy/tls.snippet
 
 	# Bound the request body before the app buffers and validates it. Generous by default so
-	# image briefs (ATTACHMENTS_MAX_MB × ATTACHMENTS_MAX_PER_MESSAGE) and project zip imports
-	# (PROJECT_MAX_MB) keep working; override with CADDY_MAX_REQUEST_BODY on the container.
+	# project zip imports (PROJECT_MAX_MB) keep working; override with CADDY_MAX_REQUEST_BODY
+	# on the container.
 	request_body {
 		max_size {$CADDY_MAX_REQUEST_BODY:100MB}
 	}

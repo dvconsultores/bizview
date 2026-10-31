@@ -2,17 +2,18 @@
 
 **English** · [Español](README.es.md)
 
-Your business data on your phone, with a chat that builds the reports.
+Your business data on your phone, as reports you own.
 
 Bizview is a self-hosted, mobile-first BI product. Every integration and every report is a
 **declarative spec** (YAML plus read-only SQL), validated before it runs: nothing runs without one.
-An optional AI assistant writes those same specs from a plain request; product code validates and
-renders them, and the model never produces code that the server executes.
+You author those specs outside Bizview — by hand or with whatever AI you prefer — against the
+published contract, and the product validates, imports, runs and shares them. It never authors,
+and the model never produces code that the server executes.
 
 Each organization installs the same published version on its own server. Branding, database,
 language and AI are settings, never code changes.
 
-<!-- screenshot: phone dashboard + chat clip (see website repo) -->
+<!-- screenshot: phone dashboard (see website repo) -->
 
 ## Install (Docker Compose)
 
@@ -54,8 +55,8 @@ them but not write.) To build the images from source instead, clone the reposito
   `SECURITY_PROFILE=internet`, `COOKIE_SECURE=true`, `HTTPS_PORT=443`. Caddy obtains the
   certificate automatically. Open `https://bi.example.com`.
 
-Sign in with the super user, add a data source, and either write a spec in a workspace or open the
-**Asistente** and ask for a report.
+Sign in with the super user, add a data source, and create a project in **Proyectos**: write its
+spec there or import one you authored outside.
 
 **Upgrade**: with the default `BIZVIEW_VERSION=latest`, Watchtower pulls new images automatically
 (every 5 minutes, only the Bizview containers). To pin a version, set `BIZVIEW_VERSION=0.1.0` and
@@ -69,13 +70,13 @@ bizview.yml up -d`. Ports, TLS behind another proxy, Cloudflare, backups and bra
 |---|---|
 | Spec-driven integrations (PostgreSQL, REST, SOAP, Supabase) run by a worker on a schedule | [005](specs/005-vibe-reporting/spec.md), [016](specs/016-supabase-source/spec.md) |
 | Reports with metrics, dimensions, views, filters and periods; direct-source reports over an existing table | [005](specs/005-vibe-reporting/spec.md), [019](specs/019-direct-source-reports/spec.md) |
-| **Asistente**: a chat that drafts, validates and previews specs through Spec Kit commands before anything is applied | [014](specs/014-vibe-chat/spec.md), [017](specs/017-agentic-vibe-chat/spec.md), [021](specs/021-speckit-chat-commands/spec.md) |
 | Declarative layouts for dashboards and PDFs, rendered by the app on screen and by ReportLab on the server | [026](specs/026-declarative-layouts/spec.md) |
 | BI projects: a folder per project with numbered specs, history and an in-browser editor; export as zip | [020](specs/020-bi-projects/spec.md) |
 | Sharing: expiring read-only links, email delivery, scheduled sends | [018](specs/018-dashboard-sharing/spec.md) |
 | Spanish and English, dark mode, PDF and CSV export | [022](specs/022-i18n-en-es/spec.md), [006](specs/006-dark-mode/spec.md) |
 | Administration: users, roles, access, audit log, `internet` security profile, sign in with Google or Telegram | [002](specs/002-auth-admin-home/spec.md), [004](specs/004-data-sources-security/spec.md), [027](specs/027-google-sign-in/spec.md), [007](specs/007-telegram-sign-in/spec.md) |
 | In-app guide, update notice, project search | [023](specs/023-chat-app-guide/spec.md), [025](specs/025-app-updates-and-search/spec.md) |
+| Authoring outside the product: the CLI, the published schemas and the workspace skeleton | [043](specs/043-bizview-refactor-external-authoring/spec.md), [045](specs/045-remove-authoring-agent/spec.md) |
 
 Mobile first: every screen works from 320 px, WCAG 2.2 AA. How to write reports:
 [docs/VIBE-REPORTING.md](docs/VIBE-REPORTING.md).
@@ -90,7 +91,7 @@ Mobile first: every screen works from 320 px, WCAG 2.2 AA. How to write reports:
 | Site and TLS | `SITE_ADDRESS`, `CADDY_ALLOWED_HOSTS`, `HTTP_PORT` (8081), `HTTPS_PORT` (8443; `443` on a public server), `CADDY_TLS`, `TRUSTED_PROXIES` |
 | Security | `SECURITY_PROFILE` (`private` / `internet`), `COOKIE_SECURE`, `BIZVIEW_SECRET_KEY`, `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` |
 | Branding | `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL`, `DEFAULT_LOCALE`, `TIMEZONE` |
-| AI (optional, off by default) | `AI_PROVIDER` (`none` / `anthropic` / `openai`), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` (any OpenAI-compatible endpoint, including local models) |
+| AI (optional, off by default, help only) | `AI_PROVIDER` (`none` / `anthropic` / `openai`), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` (any OpenAI-compatible endpoint, including local models) |
 | Mail and sharing | `SMTP_*`, `EMAIL_ALLOWED_DOMAINS`, `SHARE_LINKS_ENABLED` |
 | Images | `BIZVIEW_IMAGE_PREFIX`, `BIZVIEW_VERSION` |
 

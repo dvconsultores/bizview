@@ -4,12 +4,11 @@ import time
 from contextlib import contextmanager
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import get_engine, lock_key
 from app.engine import direct, report
-from app.models import AppUser
 from tests.conftest import signed_in, sql
 from tests.test_direct_engine import US1_REPORT, _write_workspace
 from tests.test_vibe_reporting import apply, lock
@@ -254,30 +253,3 @@ def test_security_counts_direct_reads(ws, monkeypatch):
     assert r.status_code == 200
     assert r.json()["direct_reads"] == [{"source": "bi", "total": 2, "failed": 1}]
 
-
-def test_security_counts_chat_briefs(ws, monkeypatch):
-    """Feature 024 FR-014: the overview shows what the chat has sent, never the images."""
-    from app.assistant import attachments as chat_attachments
-    from app.config import get_settings
-    from app.db import get_sessionmaker
-    from tests.test_assistant_api import _stored_session
-
-    c, _ = ws
-    assert c.get("/api/security").json()["attachments"]["total"] == 0
-
-    PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-    with get_sessionmaker()() as db:          # `_stored_session` commits on its own
-        user = db.scalar(select(AppUser).where(AppUser.email == "root@example.com"))
-        session = _stored_session(db, user)
-        chat_attachments.store(db, session.id, PNG, "boceto.png", user.id)
-        db.commit()
-        session_id = session.id
-
-    summary = c.get("/api/security").json()["attachments"]
-    assert summary["total"] == 1
-    assert summary["bytes"] == len(PNG)
-    assert summary["conversations"] == 1
-    assert summary["provider"] == get_settings().ai_provider
-    assert "PNG" not in str(summary) and "boceto" not in str(summary)
-    assert get_settings().attachments_dir
-    assert session_id

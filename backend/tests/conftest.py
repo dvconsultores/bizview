@@ -87,7 +87,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from alembic import command
-from app.assistant import service as assistant_service
 from app.auth import passwords
 from app.config import get_settings
 from app.db import get_engine, get_sessionmaker
@@ -124,13 +123,11 @@ def outside_snapshot() -> dict:
 
 
 def drop_test_schema() -> None:
-    """The test schema and the engine's dataset schemas of this run (`<test schema>__ds_*`,
-    and assistant previews `<test schema>__preview_<id>__ds_*`, feature 014)."""
+    """The test schema and the engine's dataset schemas of this run (`<test schema>__ds_*`)."""
     with get_engine().begin() as c:
         c.execute(text(f'DROP SCHEMA IF EXISTS "{assert_test_schema(TEST_SCHEMA)}" CASCADE'))
         prefix = TEST_SCHEMA.replace("_", r"\_")
-        for pattern, start in ((prefix + r"\_\_ds\_%", f"{TEST_SCHEMA}__ds_"),
-                               (prefix + r"\_\_preview\_%", f"{TEST_SCHEMA}__preview_")):
+        for pattern, start in ((prefix + r"\_\_ds\_%", f"{TEST_SCHEMA}__ds_"),):
             for (name,) in c.execute(
                     text("SELECT nspname FROM pg_namespace WHERE nspname LIKE :p"),
                     {"p": pattern}):
@@ -173,13 +170,6 @@ def clean(database):
         "description = 'Resumen, tendencias y productos de tus ventas.', sort_order = 10, "
         "report_id = NULL, managed_by = 'product' WHERE code = 'ventas'")
     yield
-
-
-@pytest.fixture(autouse=True)
-def inline_assistant_runner(monkeypatch):
-    """Tests run assistant turns inline; test_assistant_autonomous uses a threaded runner."""
-    monkeypatch.setattr(assistant_service, "RUNNER", assistant_service.run_turn)
-    monkeypatch.setattr(assistant_service, "_SLOTS", None)
 
 
 MAIL_FIELDS = ("smtp_host", "smtp_port", "smtp_security", "smtp_user", "smtp_password",
@@ -296,46 +286,6 @@ def user():
 
 # --- Feature 020/021: conversations belong to a project ---------------------------------------
 
-def new_chat(c: TestClient, title: str | None = None) -> int:
-    """A conversation (API) on a new project of its own."""
-    r = c.post("/api/projects", json={"name": f"Chat {secrets.token_hex(3)}"})
-    assert r.status_code in (200, 201), r.text
-    body = {"project": r.json()["slug"], **({"title": title} if title else {})}
-    r = c.post("/api/assistant/sessions", json=body)
-    assert r.status_code == 200, r.text
-    return r.json()["id"]
-
-
-def chat_project_id(db, user_id: int) -> int:
-    """Id of a new project for conversations built directly with the ORM."""
-    from app.projects import service as project_service
-
-    project = project_service.create(db, db.get(AppUser, user_id), f"Chat {secrets.token_hex(3)}")
-    db.flush()
-    return project.id
-
-
-@pytest.fixture
-def without_command_guard(monkeypatch):
-    """017/020 mechanics through plain-mode writers; the 021 guard has its own tests
-    (test_assistant_commands_*)."""
-    from app.assistant.tools import TOOL_SPECS
-
-    legacy = frozenset(t["name"] for t in TOOL_SPECS
-                       if t["name"] not in ("finish_command", "suggest_command"))
-    monkeypatch.setattr("app.assistant.commands.guard.check_tool", lambda *a, **k: None)
-    monkeypatch.setattr("app.assistant.commands.guard.allowed_tools", lambda *a, **k: legacy)
-    monkeypatch.setattr("app.assistant.tools._guard_writes", lambda *a, **k: None)
-
-
-def chat_response(c: TestClient, title: str | None = None):
-    """POST /api/assistant/sessions on a new project; the raw response (it may be an error)."""
-    r = c.post("/api/projects", json={"name": f"Chat {secrets.token_hex(3)}"})
-    assert r.status_code in (200, 201), r.text
-    return c.post("/api/assistant/sessions",
-                  json={"project": r.json()["slug"], **({"title": title} if title else {})})
-
-
 _LEGACY_SPEC = re.compile(r"^specs/(integrations|reports)/(\d{3}-[a-z0-9-]+)/")
 _KIND_LINE = {"integrations": "integracion", "reports": "reporte"}
 
@@ -374,16 +324,3 @@ def write_project(project_id: int, files: dict[str, str], user_id: int) -> None:
                               for path, content in files.items()],
                  {"kind": "user", "user_id": user_id, "session_id": None, "command": "edit"})
 
-
-def project_view(db, user_id: int, files: dict[str, str] | None = None):
-    """The WorkView of a conversation on a new project holding `files`."""
-    from app.assistant import service as chat
-    from app.projects.workview import for_session
-
-    project_id = chat_project_id(db, user_id)
-    db.commit()
-    if files:
-        write_project(project_id, files, user_id)
-    session = chat.create_session(db, db.get(AppUser, user_id), project_id=project_id)
-    db.commit()
-    return for_session(db, session)

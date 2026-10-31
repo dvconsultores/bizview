@@ -7,7 +7,7 @@ qué mide y cómo se ve.
 
 ## Quién puede usarlo
 
-Solo el **Superusuario**; normalmente lo escribe el agente con `/speckit-implement`.
+Solo el **Superusuario**; se escribe en el editor del proyecto o se importa ya escrito.
 
 ## Cómo se hace
 
@@ -113,5 +113,5 @@ Campos por tipo:
   admite en un componente o bloque de texto.
 - Los textos con versión en inglés son `text_en`, `other_label_en` y `legal_en`.
 - Un layout no lleva direcciones ni rutas: el logo usa el rol `logo_role`.
-- `bizview validate` comprueba el layout con el mismo esquema del agente.
+- `bizview validate` comprueba el layout con el mismo esquema que el servidor.
 - El ejemplo completo: `reports/facturas-dia/report.yaml`.

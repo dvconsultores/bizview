@@ -40,11 +40,11 @@ def error_body(code: str, message: 'M | str', fields=None, extra=None) -> dict:
 
 
 class StateConflict(Exception):
-    """A write the database refused because the run's state moved under it (feature 040).
+    """A write the database refused because the state it depended on moved under it.
 
-    An `IntegrityError` in the middle of a `/speckit-all` turn used to end the conversation with
-    «Ocurrió un error inesperado (IntegrityError)»: the constraint name is the only thing that says
-    *what* conflicted, so it is carried out instead of the exception type (Step 0 of 040).
+    An `IntegrityError` used to reach the reader as «Ocurrió un error inesperado (IntegrityError)»:
+    the constraint name is the only thing that says *what* conflicted, so it is carried out
+    instead of the exception type (feature 040, Step 0).
     """
 
     def __init__(self, constraint: str | None, detail: str = "") -> None:

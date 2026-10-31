@@ -1,5 +1,4 @@
 """Feature 003 / US3: AI settings, status, connection test, providers (FR-008 - FR-013)."""
-import base64
 import json
 import os
 
@@ -7,7 +6,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from app.ai import AIError, AIReply, ChatMessage, ImagePart, get_provider, redact, service
+from app.ai import AIError, AIReply, get_provider, redact, service
 from app.ai.anthropic_provider import AnthropicProvider
 from app.ai.openai_compatible import OpenAICompatibleProvider
 from app.config import Settings, get_settings
@@ -103,19 +102,13 @@ def test_connection_test_not_configured(superuser):
 class FakeProvider:
     name, model = "anthropic", "claude-opus-5-5"
 
-    def __init__(self, outcome, tool=True, models=None):
-        self.outcome, self.tool, self.models = outcome, tool, models
+    def __init__(self, outcome, models=None):
+        self.outcome, self.models = outcome, models
 
     def complete(self, prompt, **kw):
         if isinstance(self.outcome, AIError):
             raise self.outcome
         return AIReply(text=self.outcome, model=self.model)
-
-    def chat(self, messages, *, tools=(), **kw):
-        from app.ai import ChatReply, ChatUsage, ToolCall
-
-        calls = (ToolCall(id="c1", name=tools[0].name, args={"ok": True}),) if self.tool else ()
-        return ChatReply(text="", tool_calls=calls, usage=ChatUsage(), model=self.model)
 
     def list_models(self):
         return self.models
@@ -135,18 +128,10 @@ def test_connection_test_outcomes(superuser, monkeypatch, outcome, code):
     assert r.status_code == 200 and body["latency_ms"] is not None
     if code is None:
         assert body["ok"] is True and body["reply"] == "OK" and body["error"] is None
-        assert body["tool_call"]["ok"] is True and body["tool_call"]["name"] == "ping"
     else:
         assert body["ok"] is False and body["error"]["code"] == code
         assert body["error"]["message"] and body["error"]["action"] in (None, "admin_ai", "retry")
 
-
-def test_connection_test_reports_a_model_that_does_not_call_tools(superuser, monkeypatch):
-    """A model that answers text but ignores tools leaves the assistant unable to do anything."""
-    monkeypatch.setattr(service, "get_provider", lambda s: FakeProvider("OK", tool=False))
-    body = signed_in(superuser.email).post("/api/admin/ai/test").json()
-    assert body["ok"] is False and body["tool_call"]["ok"] is False
-    assert body["tool_call"]["error"]["code"] == "invalid_tool_call"
 
 
 def test_connection_test_lists_the_provider_models(superuser, monkeypatch):
@@ -320,57 +305,3 @@ def test_anthropic_live_invalid_key():
     assert result["ok"] is False and result["error"]["code"] == "bad_key"
 
 
-# --- image parts on the wire (feature 024, T006/T029) --------------------------------------
-
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
-
-
-def test_openai_compatible_body_carries_the_images_with_the_text_first():
-    seen = {}
-
-    def handler(request: httpx.Request):
-        seen["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-
-    message = ChatMessage("user", "un reporte como este",
-                          images=(ImagePart("image/png", PNG_BYTES),))
-    oc(handler).chat([message], system="sys", max_tokens=64)
-
-    content = seen["body"]["messages"][1]["content"]
-    assert content[0] == {"type": "text", "text": "un reporte como este"}
-    assert content[1] == {
-        "type": "image_url",
-        "image_url": {"url": "data:image/png;base64," + base64.b64encode(PNG_BYTES).decode()},
-    }
-
-
-def test_openai_compatible_body_without_images_is_unchanged():
-    seen = {}
-
-    def handler(request: httpx.Request):
-        seen["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-
-    oc(handler).chat([ChatMessage("user", "hola")], system="sys", max_tokens=64)
-    assert seen["body"]["messages"][1] == {"role": "user", "content": "hola"}
-
-
-def test_anthropic_messages_carry_the_label_before_the_image():
-    """The text block (the untrusted-data label) is read before the picture."""
-    s = settings(ai_provider="anthropic", ai_api_key=KEY)
-    provider = AnthropicProvider(s)
-    parts = provider._messages([ChatMessage("user", "datos no confiables\nun reporte como este",
-                                            images=(ImagePart("image/jpeg", PNG_BYTES),))])
-    content = parts[0]["content"]
-    assert [block["type"] for block in content] == ["text", "image"]
-    assert content[0]["text"].startswith("datos no confiables")
-    assert content[1]["source"] == {
-        "type": "base64", "media_type": "image/jpeg",
-        "data": base64.b64encode(PNG_BYTES).decode()}
-
-
-def test_anthropic_messages_without_images_are_unchanged():
-    s = settings(ai_provider="anthropic", ai_api_key=KEY)
-    provider = AnthropicProvider(s)
-    assert provider._messages([ChatMessage("user", "hola")]) == [
-        {"role": "user", "content": [{"type": "text", "text": "hola"}]}]

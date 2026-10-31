@@ -91,43 +91,8 @@ def telegram_reset(db: Session = DB):
 
 
 # Feature 014: the e2e suite scripts the fake AI provider and turns it off again afterwards.
-@router.post("/api/test/assistant/script")
-def assistant_script(body: dict):
-    from app.ai import ChatReply, ChatUsage, ToolCall, fake
-    from app.config import get_settings
-
-    get_settings().ai_provider = "fake"
-    fake.SHARED.reset()
-    fake.SHARED.queue(*(
-        ChatReply(
-            text=step["text"],
-            tool_calls=tuple(ToolCall(id=c["id"], name=c["name"], args=c["args"],
-                                      args_error=c.get("args_error"))
-                             for c in step.get("tool_calls", [])),
-            usage=ChatUsage(),
-            model="fake",
-            reasoning=step.get("reasoning"),
-        )
-        for step in body["steps"]
-    ))
-    return {"ok": True}
 
 
-@router.post("/api/test/assistant/reset")
-def assistant_reset(db: Session = DB):
-    from app.ai import fake
-    from app.config import get_settings
-    from app.models import AppUser, AssistantAttachment, AssistantSession
-
-    get_settings().ai_provider = "none"
-    fake.SHARED.reset()
-    db.execute(delete(AssistantSession))
-    # Feature 024: the image notice is per account and the attachments live outside the database,
-    # so a reset has to clear both for the suite to start from the same state every time.
-    db.execute(delete(AssistantAttachment))
-    db.execute(update(AppUser).values(attachments_notice_at=None))
-    shutil.rmtree(get_settings().attachments_dir, ignore_errors=True)
-    return {"ok": True}
 
 
 # Feature 017: the agent e2e starts from an empty installation and checks what the worker builds.
@@ -407,7 +372,6 @@ _DIRECT_STATE: dict = {}
 
 @router.post("/api/test/direct/seed")
 def test_direct_seed():
-    import shutil
     import tempfile
     from datetime import datetime
     from pathlib import Path
@@ -484,7 +448,6 @@ def test_direct_seed():
 
 @router.post("/api/test/direct/reset")
 def test_direct_reset():
-    import shutil
 
     from app.db import get_engine
     from app.engine import direct

@@ -7,7 +7,7 @@ dónde, cada cuánto y cómo validarlos.
 
 ## Quién puede usarlo
 
-Solo el **Superusuario**; normalmente lo escribe el agente con `/speckit-implement`.
+Solo el **Superusuario**; se escribe en el editor del proyecto o se importa ya escrito.
 
 ## Cómo se hace
 
@@ -29,4 +29,5 @@ Campos principales:
 
 - La spec de la integración lista en `**Datos personales**:` las columnas personales que se
   incluyeron a pedido.
-- Para ver un ejemplo completo, pide al agente la guía de autoría o descarga un proyecto aplicado.
+- Para ver un ejemplo completo, descarga un proyecto aplicado (**Exportar**) o mira
+  `examples/ventas-basico/` del esqueleto de autoría.

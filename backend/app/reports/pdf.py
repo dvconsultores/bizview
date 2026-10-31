@@ -15,7 +15,6 @@ from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.config import get_settings
-from app.errors import ApiError
 from app.i18n import M, current, localized, t, use_locale
 from app.reports.palette import ReportPalette, resolve
 from app.reports.pdf_layout import DEFAULT_MARGINS, page_setup, pdf_document, render_layout
@@ -117,8 +116,6 @@ def _styles(palette: ReportPalette):
                              spaceBefore=5 * mm, spaceAfter=2 * mm),
         "cell": ParagraphStyle("c", parent=base["Normal"], textColor=palette.ink, fontSize=9,
                                leading=11),
-        "preview": ParagraphStyle("p", parent=base["Normal"], textColor=palette.primary,
-                                  fontName="Helvetica-Bold", fontSize=10, leading=13),
     }
 
 
@@ -219,27 +216,10 @@ def meta_lines(definition: dict, payload: dict, viewer: str | None) -> list[str]
     return meta
 
 
-def render_preview(definition: dict, payload: dict, *, report_id: str, organization: str,
-                   product: str, viewer: str | None, locale: str | None = None,
-                   palette: ReportPalette | None = None) -> bytes:
-    """`render` for a project preview (feature 030): a failure becomes an actionable API error.
-
-    A preview renders the *draft* workspace, so bad data can reach the renderer (a view that lost a
-    key, an empty series, a period with no buckets). Before this, any of those surfaced as the
-    generic 500 with a reference the reader cannot act on (owner, 2026-10-23: "PDF de vista previa"
-    failed with «Ocurrió un error inesperado (referencia …)»). The traceback still goes to the log;
-    the reader gets the report that failed."""
-    try:
-        return render(definition, payload, organization=organization, product=product,
-                      viewer=viewer, preview=True, locale=locale, palette=palette)
-    except Exception as exc:   # reported, never swallowed: the reader gets the report id
-        log.exception("preview PDF failed for report %s", report_id)
-        raise ApiError(500, "preview_pdf_failed",
-                       M("preview.pdf_failed", report=report_id)) from exc
 
 
 def render(definition: dict, payload: dict, *, organization: str, product: str,
-           viewer: str | None = None, preview: bool = False, layout: dict | None = None,
+           viewer: str | None = None, layout: dict | None = None,
            locale: str | None = None, palette: ReportPalette | None = None,
            images: dict | None = None) -> bytes:
     """`definition` = report definition JSON; `payload` = the data response (selection, views).
@@ -263,7 +243,7 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
             pagesize, margins = (landscape(A4) if legacy.get("orientation") == "landscape"
                                  else A4), dict(DEFAULT_MARGINS)
         title = title_text(definition)
-        doc_title = f"{title} ({t('pdf.preview')})" if preview else title
+        doc_title = title
         subject = localized(definition, "description") or definition.get("description")
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=pagesize, leftMargin=margins["left"] * mm,
@@ -275,14 +255,11 @@ def render(definition: dict, payload: dict, *, organization: str, product: str,
         if declarative is not None:
             story = render_layout(definition=definition, payload=payload, styles=st,
                                   organization=organization, product=product, viewer=viewer,
-                                  preview=preview, locale=loc, palette=pal, images=images)
+                                  locale=loc, palette=pal, images=images)
             doc.build(story)
             return buf.getvalue()
         meta = meta_lines(definition, payload, viewer)
-        story = []
-        if preview:
-            story.append(Paragraph(t("pdf.preview"), st["preview"]))
-        story += [Paragraph(escape(title), st["title"]),
+        story = [Paragraph(escape(title), st["title"]),
                   Paragraph(" · ".join(escape(x) for x in (organization, product) if x),
                             st["meta"]),
                   Paragraph("<br/>".join(meta), st["meta"]), Spacer(1, 3 * mm)]

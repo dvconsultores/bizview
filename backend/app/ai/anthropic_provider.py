@@ -1,7 +1,6 @@
 """Claude through the official Anthropic SDK (research R6)."""
-import base64
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 
 import anthropic
 import httpx2  # the SDK's HTTP client since anthropic 1.9 (httpx clients are rejected)
@@ -9,27 +8,14 @@ import httpx2  # the SDK's HTTP client since anthropic 1.9 (httpx clients are re
 from app.ai import (
     AIError,
     AIReply,
-    ChatMessage,
-    ChatReply,
-    ChatUsage,
-    ToolCall,
-    ToolSpec,
 )
 from app.ai.errors import code_for_body, code_for_status, detail_of
-from app.ai.history_rules import HistoryInvalid, assert_valid
 from app.ai.openai_compatible import retry_after_seconds
 from app.config import Settings
 
 # Models that accept server-side refusal fallback ("default" routing, beta 2026-07-01).
 FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-CACHE_CONTROL = {"type": "ephemeral"}
-
-
-def _tokens(usage, name: str) -> int:
-    return getattr(usage, name, 0) or 0
-
-
 
 
 class AnthropicProvider:
@@ -40,7 +26,6 @@ class AnthropicProvider:
         assert settings.ai_api_key is not None and settings.ai_model_effective
         self.model = settings.ai_model_effective
         self._key = settings.ai_api_key.get_secret_value()
-        self._chat_timeout = settings.ai_chat_timeout_seconds
         self._sleep = sleep
         client_kwargs: dict = {
             "api_key": self._key,
@@ -68,129 +53,8 @@ class AnthropicProvider:
         text = "".join(b.text for b in response.content if b.type == "text").strip()
         return AIReply(text=text, model=response.model)
 
-    def chat(self, messages: Sequence[ChatMessage], *,
-             tools: Sequence[ToolSpec] = (), system: str | None = None,
-             max_tokens: int = 4096, context: str | None = None) -> ChatReply:
-        turns = self._messages(messages)
-        if system:
-            params: dict = {
-                "model": self.model,
-                "max_tokens": max_tokens,
-                "system": [{
-                    "type": "text",
-                    "text": system,
-                    "cache_control": dict(CACHE_CONTROL),
-                }],
-                "messages": self._with_context(turns, context),
-            }
-        else:
-            params = {
-                "model": self.model,
-                "max_tokens": max_tokens,
-                "messages": self._with_context(turns, context),
-            }
-        if tools:
-            params["tools"] = [{"name": t.name, "description": t.description,
-                                "input_schema": t.parameters} for t in tools]
-        try:
-            assert_valid(params["messages"], "anthropic")   # 036: never send an orphan result
-        except HistoryInvalid as exc:
-            raise AIError("history_invalid", "; ".join(exc.problems)) from None
-        response = self._create(params, timeout=self._chat_timeout, max_retries=0)
 
-        text = "".join(b.text for b in response.content if b.type == "text").strip()
-        tool_calls = tuple(ToolCall(b.id, b.name, dict(b.input))
-                           for b in response.content if b.type == "tool_use")
-        u = response.usage
-        input_tokens = (
-            _tokens(u, "input_tokens")
-            + _tokens(u, "cache_creation_input_tokens")
-            + _tokens(u, "cache_read_input_tokens")
-        )
-        usage = ChatUsage(
-            input=input_tokens,
-            output=_tokens(u, "output_tokens"),
-            cached=_tokens(u, "cache_read_input_tokens"),
-        )
-        stop = response.stop_reason
-        stop_reason = "tool_use" if stop == "tool_use" else \
-            "max_tokens" if stop == "max_tokens" else "end"
-        return ChatReply(text=text, tool_calls=tool_calls, usage=usage,
-                         model=response.model, stop_reason=stop_reason)
 
-    def _with_context(self, turns: list[dict], context: str | None) -> list[dict]:
-        """Add cache_control to stable end and last history block, then append context.
-
-        Compaction of the last round means the very last block is re-written next turn;
-        mark the block before the last assist tool round so the provider can re-read
-        the already-compacted prefix. Context is never marked.
-        """
-        if not turns:
-            if context:
-                return [{"role": "user", "content": [{"type": "text", "text": context}]}]
-            return []
-
-        result = [dict(turn) for turn in turns]
-        for turn in result:
-            turn["content"] = [dict(block) for block in turn["content"]]
-
-        last_idx = len(result) - 1
-        last_block = result[last_idx]["content"][-1]
-        last_block.setdefault("cache_control", dict(CACHE_CONTROL))
-
-        # Find last assistant turn that contains tool_use blocks
-        last_tool_assistant = -1
-        for i, turn in enumerate(result):
-            if turn["role"] != "assistant":
-                continue
-            if any(block.get("type") == "tool_use" for block in turn["content"]):
-                last_tool_assistant = i
-        if last_tool_assistant > 0:
-            stable = result[last_tool_assistant - 1]
-            stable["content"][-1].setdefault("cache_control", dict(CACHE_CONTROL))
-
-        if context:
-            if result[-1]["role"] == "user":
-                result[-1]["content"].append({"type": "text", "text": context})
-            else:
-                result.append({"role": "user", "content": [{"type": "text", "text": context}]})
-        return result
-
-    def _messages(self, messages: Sequence[ChatMessage]) -> list[dict]:
-        """Neutral history → Messages API turns; consecutive same-role turns are merged so all
-        tool results answering one assistant turn travel in the next user message."""
-        merged: list[dict] = []
-        for msg in messages:
-            if msg.role == "user":
-                content: list[dict] = [{"type": "text", "text": msg.content}]
-                content.extend(
-                    {"type": "image",
-                     "source": {"type": "base64", "media_type": img.media_type,
-                                "data": base64.b64encode(img.data).decode("ascii")}}
-                    for img in msg.images
-                )
-                block: dict = {"role": "user", "content": content}
-            elif msg.role == "assistant":
-                content: list[dict] = []
-                if msg.content:
-                    content.append({"type": "text", "text": msg.content})
-                for call in msg.tool_calls:
-                    content.append({"type": "tool_use", "id": call.id, "name": call.name,
-                                    "input": call.args})
-                if not content:
-                    continue
-                block = {"role": "assistant", "content": content}
-            else:  # tool
-                if msg.tool_call_id is None:
-                    raise ValueError("tool message requires tool_call_id")
-                block = {"role": "user",
-                         "content": [{"type": "tool_result", "tool_use_id": msg.tool_call_id,
-                                      "content": msg.content}]}
-            if merged and merged[-1]["role"] == block["role"]:
-                merged[-1]["content"].extend(block["content"])
-            else:
-                merged.append(block)
-        return merged
 
     def _create(
         self, params: dict, timeout: float | None = None, max_retries: int | None = None

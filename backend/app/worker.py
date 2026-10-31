@@ -22,8 +22,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select, text, update
 
-from app.assistant import attachments
-from app.assistant import preview as assistant_preview
 from app.config import get_settings
 from app.db import get_sessionmaker
 from app.engine import direct, rollup, runner, schedule, transform
@@ -31,11 +29,6 @@ from app.i18n import M, to_stored
 from app.mail import sends as mail_sends
 from app.mail import subscriptions as mail_subscriptions
 from app.models import (
-    AppUser,
-    AssistantAutoRun,
-    AssistantMessage,
-    AssistantPreviewRequest,
-    AssistantSession,
     IntegrationControl,
     IntegrationRun,
     IntegrationRunRequest,
@@ -77,21 +70,6 @@ def _failed_checks(run) -> bool:
     return any(not item.get("ok", True) for item in checks if isinstance(item, dict))
 
 
-def _notify_session(db, watch, reason) -> None:
-    """A system message in the conversation that authorised the run (FR-008)."""
-    from app.i18n import t
-
-    session = db.get(AssistantSession, watch.session_id)
-    if session is None:
-        return
-    detail = t("assistant.watch.failed", integration=watch.watch_integration or "-",
-               reason=str(reason)[:200])
-    if watch.watch_state == "rolled_back":
-        detail += "\n" + t("assistant.watch.rolled_back")
-    db.add(AssistantMessage(session_id=session.id, role="assistant", content=detail))
-    session.updated_at = datetime.now(UTC)
-
-
 class Worker:
     def __init__(self):
         self.settings = get_settings()
@@ -103,7 +81,7 @@ class Worker:
         self.loaded: tuple | None = None
         self.stop = threading.Event()
         self.last_telegram_purge: float | None = None
-        self.last_preview_cleanup: float | None = None
+        self.last_housekeeping: float | None = None
         self.last_mail: float | None = None
         self.mail_job: Future | None = None
         self.last_subscriptions: float | None = None
@@ -136,43 +114,10 @@ class Worker:
                                      kind=kind)
         log.info("run %s %s %s: %s", run.id, integration_id, kind, run.status)
         if run.status in ("failed", "stopped") or _failed_checks(run):
-            self._resolve_auto_watch(run, version_id, integration_id)
-
-    def _resolve_auto_watch(self, run, version_id: int, integration_id: str) -> None:
-        """Feature 028 (FR-008): the first scheduled run of an autonomous apply failed.
-
-        The super user is told in the conversation and, with `auto_rollback`, the previous version
-        comes back. A normal version switch: the scheduler reloads on its next loop.
-        """
-        from app.workspace import service as workspace_service
-
-        with get_sessionmaker()() as db:
-            watch = db.scalar(select(AssistantAutoRun).where(
-                AssistantAutoRun.watch_state == "pending",
-                AssistantAutoRun.version_id == version_id))
-            if watch is None:
-                return
-            if watch.watch_integration and integration_id not in watch.watch_integration.split(","):
-                return
-            contract = watch.contract or {}
-            rollback = bool(contract.get("auto_rollback", True))
-            actor = db.get(AppUser, watch.confirmed_by)
-            reason = run.message or run.status
-            if rollback and actor is not None:
-                try:
-                    previous = workspace_service.rollback(db, actor, None)
-                except Exception:  # a rollback that cannot run must not kill the worker
-                    log.exception("auto rollback of version %s failed", version_id)
-                    watch.watch_state = "failed"
-                else:
-                    watch.watch_state = "rolled_back"
-                    watch.stop_reason = f"rolled_back:{run.id}"
-                    log.warning("version %s rolled back to %s after run %s",
-                                version_id, previous.id, run.id)
-            else:
-                watch.watch_state = "failed"
-            _notify_session(db, watch, reason)
-            db.commit()
+            # Feature 028's auto-rollback followed the chat-driven apply that 045 removed; a
+            # failing scheduled run stays observable through this line and the run rows.
+            log.warning("scheduled run %s of %s on version %s did not pass: %s",
+                        run.id, integration_id, version_id, run.message or run.status)
 
     def reload(self) -> None:
         with get_sessionmaker()() as db:
@@ -254,42 +199,16 @@ class Worker:
         except Exception:
             log.exception("manual run of %s failed", integration_id)
 
-    def take_preview_requests(self) -> None:
-        """Assistant previews (feature 014) run in the worker pool, like manual runs."""
-        with get_sessionmaker().begin() as db:
-            rows = list(db.scalars(
-                select(AssistantPreviewRequest)
-                .where(AssistantPreviewRequest.taken_at.is_(None))
-                .order_by(AssistantPreviewRequest.id)
-                .with_for_update(skip_locked=True)
-                .limit(5)))
-            for r in rows:
-                r.taken_at = datetime.now(UTC)
-            ids = [r.id for r in rows]
-        for rid in ids:
-            self.pool.submit(assistant_preview.process_request, rid)
-
-    def preview_housekeeping(self) -> None:
-        """Drop assistant preview schemas older than a day and prune direct-read logs,
-        at most once per hour."""
+    def housekeeping(self) -> None:
+        """Prune the direct-read log at most once an hour; every other sweep left with 045."""
         now = time.monotonic()
-        if self.last_preview_cleanup is None or now - self.last_preview_cleanup >= 3600:
-            with get_sessionmaker().begin() as db:
-                assistant_preview.cleanup_stale(db)
+        if self.last_housekeeping is None or now - self.last_housekeeping >= 3600:
             try:
                 with get_sessionmaker().begin() as db:
                     direct.prune_log(db)
             except Exception:
                 log.exception("direct read log pruning failed")
-            try:
-                # Feature 024: an image uploaded but never sent does not stay forever.
-                with get_sessionmaker().begin() as db:
-                    removed = attachments.sweep_pending(db)
-                if removed:
-                    log.info("removed %d pending chat attachments", removed)
-            except Exception:
-                log.exception("pending attachment sweep failed")
-            self.last_preview_cleanup = now
+            self.last_housekeeping = now
 
     def take_email_sends(self, force: bool = False) -> Future | None:
         now = time.monotonic()
@@ -387,9 +306,8 @@ class Worker:
                 self.reload()
                 self.rollups_tick()
                 self.take_requests()
-                self.take_preview_requests()
                 self.telegram_housekeeping()
-                self.preview_housekeeping()
+                self.housekeeping()
                 self.email_subscriptions_tick()
                 self.take_email_sends()
             except Exception:

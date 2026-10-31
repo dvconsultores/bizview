@@ -211,17 +211,17 @@ if [[ -e $DIR/.env && $FORCE != 1 ]]; then
 fi
 
 # --- write the installation -------------------------------------------------------------------
-mkdir -p "$DIR/projects" "$DIR/attachments" 2>/dev/null \
+mkdir -p "$DIR/projects" "$DIR/image-cache" 2>/dev/null \
   || die 2 "cannot create $DIR (run with sudo or choose --dir)"
 chmod 755 "$DIR"
 # In-app data written by the containers, which run as uid 10001 ('app'): BI projects (feature 020,
-# one folder per project) and the images attached to the assistant (feature 024).
-chmod 0750 "$DIR/projects" "$DIR/attachments"
+# one folder per project) and the images the reports asked for by URL (feature 044).
+chmod 0750 "$DIR/projects" "$DIR/image-cache"
 if [[ $(id -u) == 0 ]]; then
-  chown 10001:10001 "$DIR/projects" "$DIR/attachments"
+  chown 10001:10001 "$DIR/projects" "$DIR/image-cache"
   PROJECTS_NOTE=""
 else
-  PROJECTS_NOTE="  Projects:    run: sudo chown -R 10001:10001 $DIR/projects $DIR/attachments"
+  PROJECTS_NOTE="  Projects:    run: sudo chown -R 10001:10001 $DIR/projects $DIR/image-cache"
 fi
 
 SECRET_KEY=$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '\n')
@@ -301,7 +301,8 @@ PROJECT_MAX_MB=20
 # services of this installation. With a fixed version tag it waits until the tag changes.
 WATCHTOWER_POLL_INTERVAL=300
 
-# AI (optional, off by default). Providers: none | anthropic | openai_compatible
+# AI (optional, off by default; used only by the read-only help agent since 045).
+# Providers: none | anthropic | openai_compatible
 #   anthropic:          AI_API_KEY required; AI_MODEL defaults to claude-opus-5-5
 #   openai_compatible:  AI_BASE_URL (e.g. http://ollama:11434/v1) and AI_MODEL required
 AI_PROVIDER=none
@@ -309,13 +310,6 @@ AI_API_KEY=
 AI_MODEL=
 AI_BASE_URL=
 AI_TIMEOUT_SECONDS=30
-# Assistant agent limits (optional; defaults shown). No token budget: the AI is unlimited.
-# AI_CHAT_MAX_ROUNDS=20
-# AI_CHAT_MAX_PREVIEWS=5
-# AI_TOOL_TIMEOUT_SECONDS=20
-# AI_CHAT_TIMEOUT_SECONDS=180
-# AI_AGENT_DISCOVERY_LIMIT=15
-# AI_CHAT_BUSY_STALE_SECONDS=900
 
 # Email and shared links (optional, off by default). Email is on when SMTP_HOST and SMTP_FROM
 #   are set; the worker service sends the mail. Test: docker compose run --rm backend python -m
@@ -357,9 +351,10 @@ services:
     expose: ["8000"]
     environment:
       PROJECTS_DIR: /app/data/projects
+      IMAGE_CACHE_DIR: /app/data/image-cache
     volumes:
       - ./projects:/app/data/projects
-      - ./attachments:/app/data/attachments
+      - ./image-cache:/app/data/image-cache
 
   worker:
     container_name: bizview-worker
@@ -369,12 +364,10 @@ services:
     command: ["python", "-m", "app.worker"]
     env_file: .env
     environment:
-      PROJECTS_DIR: /app/data/projects
-      ATTACHMENTS_DIR: /app/data/attachments
+      IMAGE_CACHE_DIR: /app/data/image-cache
     restart: unless-stopped
     volumes:
-      - ./attachments:/app/data/attachments
-      - ./projects:/app/data/projects:ro   # the previews it runs read the project folders
+      - ./image-cache:/app/data/image-cache   # the worker downloads the images here
     healthcheck:
       disable: true
     depends_on:

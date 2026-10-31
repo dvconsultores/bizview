@@ -7,6 +7,28 @@ memory.
 Legend: **R** = removed, **K** = kept (out of scope, with the reason), **A** = adapted (the shell
 stays, the agent inside it goes).
 
+Corrections found while deleting (recorded here, not silently applied):
+
+- **The draft preview goes, the published rendering stays** (OD-045-01): `POST
+  /api/projects/{slug}/preview` and its report/data/PDF endpoints are assistant infrastructure, so
+  they are removed; rendering a published report, its PDF, dashboards, sharing and email are not.
+  `engine/report.py`'s `PreviewVersion`, `preview_context`, `datasets.preview_schemas` and the
+  preview PDF watermark go with it — the direct-report check that survives now builds its context
+  with `report.direct_context`.
+- **The readiness gate loses its preview condition**: with no preview to run, `readiness.compute`
+  would have answered `preview_needed` forever and *no project could ever be applied*. The gate is
+  now validation, query checks and the composition of the other applied projects.
+- **`run_preview` and `AssistantAutoRun`'s post-apply watch** were only reachable from the chat: the
+  worker's scheduled-run failure is logged instead of rolled back from a run contract.
+- **`specs/015-dashboard-autorefresh` is NOT deprecated**: the brief listed 015 as an agent spec,
+  but the folder is dashboard auto-refresh and TV mode, which the product still ships. It stays.
+- **`specs/029` does not exist**; `/speckit-all` is 039 and its hardening is 040.
+- **Migration number**: 0043 is the current head, so the drop is `0041_drop_authoring_agent`
+  (revising `0043_image_cache`), not 0044.
+- **`app_user.attachments_notice_at`** is left in place: it is a nullable column on a table the
+  product keeps, the frontend no longer reads it, and dropping a user column is a separate change
+  with its own audit. It is listed as a follow-up, not deleted silently.
+
 ## 1. Backend modules — R
 
 | Path | Why |

@@ -152,6 +152,7 @@ def compose(db, *, include=None, exclude_slug: str | None = None, dest: Path) ->
         if slug == exclude_slug or (include is not None and slug == include.slug):
             continue
         write_tree(tree, dest / "projects" / slug)
+        _copy_assets(slug, dest / "projects" / slug)
     if include is not None:
         history.sync_external(db, include)
         files, _ = fs.list_files(include.slug)
@@ -164,6 +165,30 @@ def compose(db, *, include=None, exclude_slug: str | None = None, dest: Path) ->
             else:
                 target.write_text(fs.read_text(include.slug, path), encoding="utf-8")
     return dest
+
+
+def _copy_assets(slug: str, target: Path) -> None:
+    """044: the version holds text; a project's images live in its folder and are copied as bytes.
+
+    Without them a composed tree refused `image_folder_missing` for every project that declares an
+    image set — the project validated alone and could never be applied (044 defect, found by the
+    020 apply suite). Projects of the version with no folder left simply contribute nothing."""
+    from app.projects import fs
+
+    try:
+        files, _ = fs.list_files(slug)
+    except (OSError, fs.ProjectPathError):
+        return
+    for path in files:
+        if not path.startswith("assets/"):
+            continue
+        try:
+            data = fs.read_asset(slug, path)[0]
+        except (OSError, fs.ProjectPathError):
+            continue
+        out = target / path
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
 
 
 def _fingerprint(files: dict[str, tuple[int, str]]) -> str:
@@ -315,38 +340,3 @@ _SPEC_LINE = re.compile(
     r"""^(spec:\s*)["']?(specs/(?:integrations|reports)/[^\s"']+?)/?["']?\s*$""", re.MULTILINE)
 
 
-def draft_tree(files: dict[str, str]) -> dict[str, str]:
-    """Project tree of a legacy assistant draft (R10): spec folders renumbered like
-    `legacy_tree`, artifacts kept with their `spec:` line pointing to the new folder."""
-    folders = []
-    for path in files:
-        m = _DRAFT_SPEC.match(path)
-        if m:
-            num = re.match(r"^(\d{3})-", m.group(2))
-            folders.append((int(num.group(1)) if num else 999,
-                            0 if m.group(1) == "integrations" else 1, m.group(2), m.group(1)))
-    old_to_new: dict[str, str] = {}
-    for _num, _order, name, group in sorted(set(folders)):
-        short = name[4:] if re.match(r"^\d{3}-", name) else name
-        old_to_new[f"specs/{group}/{name}"] = f"specs/{len(old_to_new) + 1:03d}-{short}"
-
-    def respec(match: re.Match) -> str:
-        new = old_to_new.get(match.group(2).rstrip("/"))
-        return f"{match.group(1)}{new}" if new else match.group(0)
-
-    tree: dict[str, str] = {}
-    for path, text in files.items():
-        m = _DRAFT_SPEC.match(path)
-        if m:
-            group, name, doc = m.groups()
-            if doc == "spec.md" and not _KIND_V2.search(text):
-                kind = KIND_LINE["integration" if group == "integrations" else "report"]
-                tagged = re.sub(r"(^\*\*Spec type\*\*:.*$)", rf"\1\n\n**Tipo**: {kind}", text,
-                                count=1, flags=re.M)
-                text = tagged if tagged != text else f"**Tipo**: {kind}\n\n{text}"
-            tree[f"{old_to_new[f'specs/{group}/{name}']}/{doc}"] = text
-        elif path.startswith(("integrations/", "reports/")) and path.count("/") >= 2:
-            if path.endswith(("/integration.yaml", "/report.yaml")):
-                text = _SPEC_LINE.sub(respec, text)
-            tree[path] = text
-    return dict(sorted(tree.items()))

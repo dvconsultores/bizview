@@ -11,9 +11,9 @@ Solo el **Superusuario** la escribe; los envíos llegan a los usuarios de los ro
 
 ## Cómo se hace
 
-1. Escribe la spec con `/speckit-specify` (por ejemplo «envío semanal del reporte de ventas a
-   los administradores») y sigue el método hasta `/speckit-implement`.
-2. El agente escribe `distributions/<id>.yaml`:
+1. Escribe la spec de la distribución (por ejemplo «envío semanal del reporte de ventas a los
+   administradores»).
+2. Añade `distributions/<id>.yaml` en el editor con estos campos:
    - `report`: el id del reporte que se envía.
    - `subscriptions`: cada envío con `frequency` (`daily`, `weekly` o `monthly`), `hour`,
      `weekday` o `monthday`, `period`, `recipients` por rol (`admin` o `user`), `attach_pdf` y

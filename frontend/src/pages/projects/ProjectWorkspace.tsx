@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Play, Trash2, Upload } from "lucide-react";
+import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Trash2, Upload } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { isRevisionGroup, projectsApi } from "../../api/projects";
 import type {
@@ -404,16 +404,6 @@ export function ProjectWorkspace() {
     }
   };
 
-  const preview = async () => {
-    try {
-      await projectsApi.requestPreview(slug);
-      void revalidate();
-      toast(t.projects.preview);
-    } catch (e) {
-      setResult({ tone: "error", text: errorText(e, t.common.unexpected) });
-    }
-  };
-
   const activeBuffer = active ? buffers[active] : undefined;
   const fileProblems = useMemo(
     () => (check?.validation.errors ?? []).filter((p) => p.file === active && (!p.project || p.project === slug)),
@@ -517,7 +507,6 @@ export function ProjectWorkspace() {
               <span className="flex flex-wrap items-center gap-1.5">
                 {specInfo.kind && <Badge tone="blue">{t.projects.kind[specInfo.kind]}</Badge>}
                 {specInfo.stage && <Badge tone="gray">{t.projects.stage[specInfo.stage]}</Badge>}
-                {specInfo.converged && <Badge tone="amber">{t.projects.converged}</Badge>}
                 {specInfo.source_missing && (
                   <Link to={specInfo.source_missing.link} className="text-xs text-accent underline">
                     {t.projects.sourceMissing(specInfo.source_missing.source ?? "?")} · {t.projects.registerSource}
@@ -602,8 +591,6 @@ export function ProjectWorkspace() {
               live in the tooltip and the accessible name — the primary action standing out on its
               own, and the destructive one quiet instead of a red block. */}
           <div className="flex items-stretch overflow-hidden rounded-lg border border-line bg-surface">
-            <ToolButton iconOnly icon={<Play className="h-4 w-4" aria-hidden />} label={t.projects.preview}
-                        onClick={() => void preview()} />
             {canFullscreen ? (
               <ToolButton iconOnly
                           icon={full ? <Minimize2 className="h-4 w-4" aria-hidden />
@@ -748,8 +735,8 @@ export function ProjectWorkspace() {
         </div>
         {/* Below every pane, so phones see readiness without opening the editor. */}
         <StatusBar validation={check?.validation ?? null} readiness={check?.readiness ?? null}
-                   status={project.status} lastApplied={project.last_applied} save={save} busy={busy}
-                   onRunPending={readOnly ? undefined : () => void preview()} />
+                   status={project.status} lastApplied={project.last_applied} save={save}
+                   busy={busy} />
       </div>
     </div>
   );

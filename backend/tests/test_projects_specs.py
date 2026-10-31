@@ -60,9 +60,8 @@ def test_kind_aliases(line, expected):
     assert parse_spec(f"# T\n\n{line}\n")["kind"] == expected
 
 
-def _stage(files, applied=None, sources=None, clarify_revision=False, folder="001-ventas"):
-    return stage(folder, files, applied=applied, sources=sources or {},
-                 clarify_revision=clarify_revision)
+def _stage(files, applied=None, sources=None, folder="001-ventas"):
+    return stage(folder, files, applied=applied, sources=sources or {})
 
 
 def test_stages_in_order():
@@ -76,7 +75,6 @@ def test_stages_in_order():
                    "- Q: ¿Qué moneda? → A: USD\n\n## Otra\n")
     assert _stage(files)["stage"] == "aclarada"
     files[spec] = base
-    assert _stage(files, clarify_revision=True)["stage"] == "aclarada"
     files["specs/001-ventas/plan.md"] = "# Plan\n"
     assert _stage(files)["stage"] == "planificada"
     files["specs/001-ventas/tasks.md"] = "- [ ] T001 x\n"
@@ -113,14 +111,10 @@ def test_fuente_stage():
     assert "source_missing" not in result
 
 
-def test_converged_badge_and_list(project, db):
-    tasks = "specs/001-a/tasks.md"
-    first, second = "- [x] T001 a\n", "- [x] T001 a\n- [ ] T002 b\n"
+def test_spec_list_carries_its_folder_number_kind_and_stage(project, db):
     write(project, w("specs/001-a/spec.md", "# A\n\n**Tipo**: reporte\n"),
-          w("specs/001-a/plan.md", "# Plan\n"), w(tasks, first))
-    write(project, w(tasks, second, history.sha(first)), command="/speckit-converge")
+          w("specs/001-a/plan.md", "# Plan\n"),
+          w("specs/001-a/tasks.md", "- [x] T001 a\n- [ ] T002 b\n"))
     item = list_specs(db, project)[0]
-    assert (item["folder"], item["number"], item["kind"], item["stage"], item["converged"]) == (
-        "001-a", 1, "reporte", "tareas", True)
-    write(project, w(tasks, "- [x] T001 a\n- [x] T002 b\n", history.sha(second)))
-    assert list_specs(db, project)[0]["converged"] is False
+    assert (item["folder"], item["number"], item["kind"], item["stage"]) == (
+        "001-a", 1, "reporte", "tareas")

@@ -45,7 +45,7 @@ const tree: ProjectTree = {
   ],
   folders: ["specs", "specs/001-ventas", "reports", "reports/r"],
   ignored: [],
-  specs: { "specs/001-ventas": { kind: "reporte", stage: "tareas", converged: true } },
+  specs: { "specs/001-ventas": { kind: "reporte", stage: "tareas" } },
   status: "borrador",
 };
 
@@ -65,7 +65,6 @@ describe("Explorer", () => {
     const folder = items().find((i) => i.textContent?.includes("001-ventas"))!;
     expect(folder.textContent).toContain(t.projects.kind.reporte);
     expect(folder.textContent).toContain(t.projects.stage.tareas);
-    expect(folder.textContent).toContain(t.projects.converged);
     expect(items().filter((i) => i.tabIndex === 0)).toHaveLength(1);
 
     items()[0].focus();
@@ -205,48 +204,23 @@ describe("problems, status bar and conflicts", () => {
   });
 
   it("says why the project is not ready, not just that it is not", async () => {
-    // Owner, 2026-10-23 ("idk how to apply or preview"): the reason the backend sends was invisible.
+    // Owner, 2026-10-23 ("idk how to apply"): the reason the backend sends was invisible. Feature
+    // 045 removed the draft preview, so the remaining reasons are the checks the editor can run.
     await render(
       <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
                  readiness={{ ready: false, pending: [
-                   { code: "preview", file: null, message: "Ejecuta la vista previa." },
                    { code: "query_check", file: "x.yaml", message: "Comprueba este archivo." },
+                   { code: "workspace", file: null, message: "La composición no es válida." },
                  ] }}
                  status="borrador" lastApplied={null} save="saved" />,
     );
     const note = container.querySelector("[data-readiness-pending]")!;
     expect(note.textContent).toContain(t.projects.notReady);
-    expect(note.textContent).toContain("Ejecuta la vista previa.");
+    expect(note.textContent).toContain("Comprueba este archivo.");
     expect(note.getAttribute("title")).toBe(
-      "Ejecuta la vista previa.\nComprueba este archivo.",
-    );
-  });
-
-  it("turns the pending preview reason into the button that runs it", async () => {
-    // "ok but what to do?" (owner, 2026-10-23): the bar said "Ejecuta la vista previa" and stopped
-    // there. The reason is now the action.
-    const onRunPending = vi.fn();
-    await render(
-      <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
-                 readiness={{ ready: false, pending: [
-                   { code: "preview", file: null, message: "Ejecuta la vista previa." }] }}
-                 status="borrador" lastApplied={null} save="saved" onRunPending={onRunPending} />,
-    );
-    const action = container.querySelector("[data-run-pending]") as HTMLButtonElement;
-    expect(action).not.toBeNull();
-    expect(action.textContent).toBe(t.projects.runPreviewNow);
-    await act(async () => action.click());
-    expect(onRunPending).toHaveBeenCalledTimes(1);
-
-    // A reason that is not an action (a query check) stays a plain explanation.
-    await render(
-      <StatusBar validation={{ valid: true, errors: [], warnings: [] }}
-                 readiness={{ ready: false, pending: [
-                   { code: "query_check", file: "x.yaml", message: "Comprueba este archivo." }] }}
-                 status="borrador" lastApplied={null} save="saved" onRunPending={onRunPending} />,
+      "Comprueba este archivo.\nLa composición no es válida.",
     );
     expect(container.querySelector("[data-run-pending]")).toBeNull();
-    expect(container.textContent).toContain("Comprueba este archivo.");
   });
 
   it("conflict bar choices", async () => {

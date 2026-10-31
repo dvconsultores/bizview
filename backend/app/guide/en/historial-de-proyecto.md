@@ -13,7 +13,7 @@ Only the **Superuser**.
 
 1. In the project editor press **History**.
 2. Filter with **Filter by file** or **Filter by spec**.
-3. Each change shows the author, the command (for example `/speckit-plan`) and the conversation.
+3. Each change shows the author, the action and the time.
 4. To see differences, pick two versions with **From** and **To** and press **Compare**.
 5. To go back to a version, press **Restore**: a new change is created, nothing is deleted.
 

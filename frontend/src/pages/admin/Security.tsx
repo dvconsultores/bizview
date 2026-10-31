@@ -133,42 +133,6 @@ export function Security() {
               </ul>
             )}
           </Card>
-          <Card className="space-y-3 p-5 sm:p-6" aria-labelledby="chat-briefs-title">
-            <h2 id="chat-briefs-title" className="text-lg font-semibold text-ink">
-              {t.chatAttachments.title}
-            </h2>
-            <p className="text-sm text-ink-muted">{t.chatAttachments.subtitle}</p>
-            {(data.attachments?.total ?? 0) === 0 ? (
-              <p className="text-sm text-ink-soft">{t.chatAttachments.empty}</p>
-            ) : (
-              <dl className="grid gap-2 sm:grid-cols-2" data-testid="chat-attachments-summary">
-                <div className="flex min-h-tap items-center justify-between gap-2">
-                  <dt className="text-sm text-ink-muted">{t.chatAttachments.total}</dt>
-                  <dd className="font-medium text-ink">{data.attachments?.total}</dd>
-                </div>
-                <div className="flex min-h-tap items-center justify-between gap-2">
-                  <dt className="text-sm text-ink-muted">{t.chatAttachments.size}</dt>
-                  <dd className="font-medium text-ink">
-                    {t.chatAttachments.sizeValue.replace(
-                      "{value}",
-                      ((data.attachments?.bytes ?? 0) / 1_048_576).toFixed(2),
-                    )}
-                  </dd>
-                </div>
-                <div className="flex min-h-tap items-center justify-between gap-2">
-                  <dt className="text-sm text-ink-muted">{t.chatAttachments.conversations}</dt>
-                  <dd className="font-medium text-ink">{data.attachments?.conversations}</dd>
-                </div>
-                <div className="flex min-h-tap items-center justify-between gap-2">
-                  <dt className="text-sm text-ink-muted">{t.chatAttachments.provider}</dt>
-                  <dd className="font-medium break-words text-ink">
-                    {data.attachments?.provider}
-                    {data.attachments?.model ? ` · ${data.attachments.model}` : ""}
-                  </dd>
-                </div>
-              </dl>
-            )}
-          </Card>
           <TelegramAdminCard />
         </>
       )}

@@ -129,26 +129,3 @@ def test_export_after_a_spec_delete_imports_back(client, projects):
     copy = r.json()["project"]["slug"]
     assert sorted(p.name for p in (projects / copy / "specs").iterdir()) == ["001-a", "003-c"]
 
-
-def test_export_and_applied_version_never_carry_a_chat_image(client, projects, db, superuser):
-    """Feature 024/SC-004: a chat image is outside the project folder and its export."""
-    from app.assistant import attachments as chat_attachments
-    from tests.test_assistant_api import _stored_session
-
-    PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-    session = _stored_session(db, superuser)
-    row = chat_attachments.store(db, session.id, PNG, "boceto.png", superuser.id)
-    db.commit()
-    slug = sql("SELECT p.slug FROM project p JOIN assistant_session s ON s.project_id = p.id"
-               " WHERE s.id = :i", i=session.id)[0][0]
-
-    data = client.get(f"/api/projects/{slug}/export.zip").content
-    names = zipfile.ZipFile(io.BytesIO(data)).namelist()
-    assert names, "the export must not be empty"
-    assert not [n for n in names if row.sha256 in n or "boceto" in n or "attachment" in n]
-
-    # The project folder is what the Git mirror copies: the file lives outside it.
-    folder = projects / slug
-    assert not [p for p in folder.rglob("*") if row.sha256 in p.name]
-    attachment_file = get_settings().attachments_dir
-    assert os.path.isdir(os.path.join(attachment_file, str(session.id)))

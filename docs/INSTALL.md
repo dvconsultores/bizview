@@ -142,13 +142,13 @@ start it:
 
 ```bash
 mkdir -p projects attachments
-sudo chown -R 10001:10001 projects attachments   # the containers run as uid 10001
+sudo chown -R 10001:10001 projects image-cache   # the containers run as uid 10001
 docker compose -f bizview.yml up -d
 ```
 
-The containers run as **uid 10001** (`app`), so `projects/` and `attachments/` must be owned by it.
-Docker would create them as root, and the app could read but not write them: BI projects and chat
-images then fail at first use, and the log says `PROJECTS_DIR … is not writable`.
+The containers run as **uid 10001** (`app`), so `projects/` and `image-cache/` must be owned by it.
+Docker would create them as root, and the app could read but not write them: BI projects and the
+pictures of the reports then fail at first use, and the log says `PROJECTS_DIR … is not writable`.
 
 [`deploy/install.sh`](../deploy/install.sh) does that for you. Run it with `sudo bash`.
 Interactive (asks for the missing answers):
@@ -347,10 +347,9 @@ owned by the engine.
 
 ## 7. AI (optional)
 
-AI is off by default and everything works without it. It is used for report narratives (only
-with the aggregated metrics the spec lists) and by the assistant, which proposes integration and
-report drafts from source structure and aggregates — never detailed records, passwords, or
-personal data.
+AI is off by default and everything works without it. It is used for the read-only help agent
+(033) only: authoring happens outside Bizview (043/045). The provider never receives detailed
+records, passwords, or personal data.
 
 Claude (Anthropic):
 
@@ -374,14 +373,14 @@ Restart, sign in as the super user → **IA** → **Probar conexión**. The page
 response time, or the reason for failure (invalid key, model not found, unreachable, …). The key
 is never shown.
 
-### Projects and assistant (Proyectos)
+### Projects (Proyectos)
 
-Every conversation works inside a **BI project**: a folder `projects/<slug>/` on the backend
-volume (`PROJECTS_DIR`, default `./projects` next to the compose file) with its specs,
-integrations, reports and distributions. **Proyectos** lists them; each project opens a cloud
-editor (files, problems, history) next to its conversations. `PROJECT_MAX_MB` (default 20) limits
-the size of one project. Applying a project creates a workspace version with it and the other
-applied projects; the version records which project owns each artifact.
+A **BI project** is a folder `projects/<slug>/` on the backend volume (`PROJECTS_DIR`, default
+`./projects` next to the compose file) with its specs, integrations, reports and distributions.
+**Proyectos** lists them; each project opens a cloud editor (files, problems, history, validation,
+apply and rollback). `PROJECT_MAX_MB` (default 20) limits the size of one project. Applying a
+project creates a workspace version with it and the other applied projects; the version records
+which project owns each artifact.
 
 A project may also ship images: `assets/` inside the project folder holds the logos a report
 shows (`≤ 300 KB` each, `≤ 25 MB` per project), and they travel with the project's export. They
@@ -396,63 +395,22 @@ ceiling. It is written by the worker and read by the backend, so both need it, a
 the backups: without it the dashboards show the fallback circle until the next run downloads the
 images again.
 
-A mockup attached to a conversation as the report brief is stored outside the project, in
-`ATTACHMENTS_DIR` (default `./attachments` next to the compose file, mounted as
-`ATTACHMENTS_DIR_HOST`; `ATTACHMENTS_MAX_MB` 5 and `ATTACHMENTS_MAX_PER_MESSAGE` 4 by default;
-`AI_VISION` decides whether a model may receive images). The containers that use it must be able
-to write there: the app reads the images and sweeps the ones that never became a message. It must
-be **part of the backups** with `projects/` and the database.
-
-The super user describes a dashboard in a conversation; the assistant reads only source
-structure and aggregates, checks its queries, runs a preview and leaves the draft "Listo
-para aplicar". Applying stays a human action with password confirmation. DeepSeek worksthrough `AI_PROVIDER=openai_compatible` with the endpoint and model below.
+DeepSeek (or any OpenAI-compatible endpoint) works through `AI_PROVIDER=openai_compatible`:
 
 ```ini
 AI_PROVIDER=openai_compatible
 AI_BASE_URL=https://api.deepseek.com
 AI_MODEL=deepseek-chat
-AI_CHAT_CACHED_TOKEN_WEIGHT=0.1
-AI_CHAT_MAX_ROUNDS=60
-AI_CHAT_MAX_TOKENS=16000
-AI_CHAT_MAX_PREVIEWS=5
-AI_TOOL_TIMEOUT_SECONDS=20
-AI_CHAT_TIMEOUT_SECONDS=180
-AI_AGENT_DISCOVERY_LIMIT=15
-AI_CHAT_BUSY_STALE_SECONDS=900
-AI_AGENT_MAX_CONCURRENT=4
 ```
 
-A message starts an autonomous run that keeps working on the server (the page can be closed) until
-the agent asks a business question or reports, the draft is "Listo para aplicar",
-`AI_CHAT_MAX_ROUNDS` rounds or two identical failing tool calls. **There is no token budget**: the
-AI is unlimited, tokens are only counted for the run summary and the status bar (the old
-`AI_CHAT_TOKEN_BUDGET` / `AI_CHAT_BUDGET_STEP` / `AI_CHAT_BUDGET_MAX` / `AI_COMMAND_TOKEN_CEILING`
-are ignored, and the "Ampliar presupuesto" button is gone). "Detener" stops a run keeping the
-rounds already saved; at most `AI_AGENT_MAX_CONCURRENT` runs work at once per backend process;
-applying stays a human action with password confirmation (or one Auto-mode run contract).
-Each round's answer is limited to `AI_CHAT_MAX_TOKENS` tokens
-(default 16000, 1024–64000; a complete draft with specs, YAML and SQL needs several thousand, so
-lower it only for small models). Each chat call of the assistant waits up to `AI_CHAT_TIMEOUT_SECONDS`
-(default 180; `AI_TIMEOUT_SECONDS` keeps governing narratives and the connection test); a timeout
-is retried once per run, then the run stops with a progress summary and keeps the draft. Within a
-run, repeating a discovery call on the same target (`describe_source`, `profile_source`,
-`get_authoring_guide`, `check_query`) answers the earlier result without contacting the source
-("tabla", "/tabla" and "public.tabla" are the same Supabase/REST table) and `refresh` is honoured
-once per target; after `AI_AGENT_DISCOVERY_LIMIT` discovery calls (default 15) without a draft the
-agent is offered only the draft tools until it proposes one. Prompt tokens the provider serves from its
-cache (DeepSeek `prompt_cache_hit_tokens`, OpenAI `cached_tokens`, Anthropic cache reads) count
-`AI_CHAT_CACHED_TOKEN_WEIGHT` (default 0.1) of a token against the budget; the conversation
-statistics keep the raw input, cached and output totals. Each agent round is saved as it finishes, so
-a restart mid-answer keeps the earlier rounds. While the assistant works on a conversation,
-a second message, preview, apply, archive or budget extension is refused ("El asistente sigue
-trabajando…"). The busy mark is refreshed after every saved round; a mark not refreshed for
-`AI_CHAT_BUSY_STALE_SECONDS` is treated as an interrupted answer and the next message resumes
-it; it must exceed 2 × `AI_CHAT_TIMEOUT_SECONDS` + `AI_TOOL_TIMEOUT_SECONDS` (checked at
-startup), so raise it when you raise the chat timeout. The assistant header's "Mapa del agente"
-(also from the session indicator and the "● N herramientas" pill) shows the current run as a
-floating card over the chat: the agent, one node per tool call with its status and duration, and
-background tasks such as the preview; it reads `GET /api/assistant/sessions/{id}/activity` every
-2 s while open and the agent works.
+A failed call records its code and a redacted detail in `ai_status`, which
+`GET /api/health` reads (`configured`, `provider`, `model`, `healthy`, `blocking_code`) and
+**Administración → IA** shows with the provider's own words.
+
+### Projects (Proyectos)
+
+There is no in-app authoring agent since 043/045: projects are authored outside Bizview — by
+people or by any AI — against the published contract, and enter through validation and import.
 
 ### Sign in with Telegram (optional)
 
@@ -670,15 +628,19 @@ without the `commit` field.
 
 The database holds all product data (users, access, audit, applied workspace versions, file
 history of the projects, run history, and the `ds_*` datasets, which can also be rebuilt by a
-full run); the installation folder holds the settings, the **`projects/` folder**
-(the files of every BI project — back it up with the database) and the **`attachments/` folder**
-(`ATTACHMENTS_DIR`: the images attached to the chat as report briefs, feature 024; they are not
-in the database, not in a project folder and not in a project export, so a backup without it
-loses them); the logo is inside the `bizview-web` image.
+full run); the installation folder holds the settings, the **`projects/` folder** (the files of
+every BI project — back it up with the database) and the **`image-cache/` folder** (the pictures
+`IMAGE_CACHE_DIR` keeps for the reports that read a URL column); the logo is inside the
+`bizview-web` image.
+
+Since 045 no conversation data is stored: the in-app authoring agent and its tables are gone, and
+the spec documents of any conversation that had been applied live in its project folder. Restoring
+a database backup taken *before* the 045 upgrade is the only way to get those rows back — the
+downgrade recreates the tables empty.
 
 ```bash
 pg_dump --format=custom --file bizview-$(date +%F).dump "$DATABASE_URL_BI"   # database
-tar czf bizview-install-$(date +%F).tgz -C /opt bizview                        # settings + projects + attachments
+tar czf bizview-install-$(date +%F).tgz -C /opt bizview                        # settings + projects + image cache
 ```
 
 Restore: `pg_restore --clean --dbname "$DATABASE_URL_BI" bizview-YYYY-MM-DD.dump`, put the

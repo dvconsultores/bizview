@@ -113,9 +113,6 @@ class Context:
     runner: Runner = BI_RUNNER
     direct: DirectSpec | None = None
     rollup: "Route | None" = None
-    #: The tables come from an assistant preview schema (feature 014/038): a missing table then
-    #: means the preview expired, not that the published integration lost a dataset.
-    preview: bool = False
 
     @property
     def metrics(self) -> dict:
@@ -126,11 +123,6 @@ class Context:
         return self.definition.get("dimensions") or {}
 
 
-@dataclass
-class PreviewVersion:
-    """Stands in for a WorkspaceVersion when rendering an assistant preview (feature 014)."""
-    id: int
-    artifacts: dict
 
 
 def _build_direct_context(report_id: str, d: dict, version) -> Context:
@@ -171,8 +163,7 @@ def _build_direct_context(report_id: str, d: dict, version) -> Context:
     )
 
 
-def _build_context(report_id: str, d: dict, version, integrations: dict,
-                   schema_for, *, preview: bool = False) -> Context:
+def _build_context(report_id: str, d: dict, version, integrations: dict, schema_for) -> Context:
     if "direct" in d:
         return _build_direct_context(report_id, d, version)
     tables, columns, used = {}, {}, []
@@ -188,7 +179,23 @@ def _build_context(report_id: str, d: dict, version, integrations: dict,
         columns[alias] = integ["definition"]["datasets"][name]["columns"]
         if iid not in used:
             used.append(iid)
-    return Context(report_id, d, version, tables, columns, used, preview=preview)
+    return Context(report_id, d, version, tables, columns, used)
+
+
+@dataclass
+class DetachedVersion:
+    """Stands in for a WorkspaceVersion when a definition reads no workspace artifacts."""
+
+    id: int | None
+    artifacts: dict
+
+
+def direct_context(report_id: str, report_def: dict) -> Context:
+    """Context of a direct report definition: it reads its own source, no applied dataset."""
+    return _build_direct_context(report_id, report_def,
+                                 DetachedVersion(id=None, artifacts={"workspace": {},
+                                                                     "integrations": {},
+                                                                     "reports": {}}))
 
 
 def context(version: WorkspaceVersion, report_id: str) -> Context:
@@ -218,17 +225,6 @@ def cached_context(version, report_id: str) -> Context:
     return ctx
 
 
-def preview_context(version_like, report_id: str, report_def: dict, integrations: dict,
-                    preview_iids: set[str], session_id: int) -> Context:
-    """Draft integrations read from the session's preview schemas, others from published ones."""
-    def schema_for(iid: str) -> str:
-        if iid in preview_iids:
-            with datasets.preview_schemas(datasets.preview_prefix(session_id)):
-                return datasets.schema_name(iid)
-        return datasets.schema_name(iid)
-
-    return _build_context(report_id, report_def, version_like, integrations, schema_for,
-                          preview=bool(preview_iids))
 
 
 # --- SQL building --------------------------------------------------------------------------------
@@ -425,10 +421,6 @@ def _query_failure(ctx: Context, exc: Exception, metric_ids: list[str]) -> Rende
     column = getattr(diag, "column_name", None) or None
     refs = ", ".join(sorted(ctx.definition.get("uses", {}).values()))
     if isinstance(exc, pg_errors.InvalidSchemaName | pg_errors.UndefinedTable):
-        if ctx.preview:
-            return RenderError(render_errors.PREVIEW_EXPIRED,
-                               str(M("render.preview_expired")), status=409,
-                               report_id=ctx.report_id, dataset=table)
         name = table or refs
         return RenderError(render_errors.DATASET_MISSING,
                            str(M("render.dataset_missing", dataset=name)), status=409,
@@ -1081,8 +1073,7 @@ def _route_definition(ctx: Context):
 
 def routed(db, ctx: Context) -> Context:
     """Route materialized daily reports to their fresh rollup; else return ctx unchanged."""
-    if ctx.direct is not None or isinstance(ctx.version, PreviewVersion) \
-            or ctx.version.id is None:
+    if ctx.direct is not None or ctx.version.id is None:
         return ctx
     from app.engine import rollup
     if not rollup.is_materialized(ctx.definition):
@@ -1117,8 +1108,7 @@ def _raw_on_missing(ctx: Context, fn):
     try:
         return fn(ctx)
     except (pg_errors.UndefinedTable, pg_errors.UndefinedColumn, RenderError) as exc:
-        if isinstance(exc, RenderError) and exc.code not in (
-                render_errors.DATASET_MISSING, render_errors.PREVIEW_EXPIRED):
+        if isinstance(exc, RenderError) and exc.code != render_errors.DATASET_MISSING:
             raise
         if ctx.rollup is None:
             raise
@@ -1261,8 +1251,7 @@ def _run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str,
     # path is the answer, and `_raw_on_missing` handles it (feature 005 rollups, 038).
     if ctx.rollup is not None:
         broken = next((v["error"] for v in views if v.get("error")
-                       and v["error"]["code"] in (render_errors.DATASET_MISSING,
-                                                  render_errors.PREVIEW_EXPIRED)), None)
+                       and v["error"]["code"] == render_errors.DATASET_MISSING), None)
         if broken:
             raise RenderError(broken["code"], broken["message"], status=409,
                               report_id=ctx.report_id, reference=reference)

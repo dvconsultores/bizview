@@ -237,7 +237,6 @@ export function Explorer(props: {
                 <span className="min-w-0 truncate">{node.name}</span>
                 {spec?.kind && <Badge tone="blue">{t.projects.kind[spec.kind] ?? spec.kind}</Badge>}
                 {spec?.stage && <Badge tone="gray">{t.projects.stage[spec.stage] ?? spec.stage}</Badge>}
-                {spec?.converged && <Badge tone="amber">{t.projects.converged}</Badge>}
                 {node.folder && isOpen && node.children.length === 0 && (
                   <span className="text-xs text-ink-soft">{t.projects.emptyFolder}</span>
                 )}

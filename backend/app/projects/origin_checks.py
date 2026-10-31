@@ -1,13 +1,13 @@
-"""Origin inspection tools for the assistant: describe/profiling helpers and query checks.
+"""Origin checks for a project's queries and requests (feature 020, re-homed from the assistant).
 
-Constitution VIII: these functions return structure and counts only, never row values.
+Every call returns structure and counts only, never row values (constitution VIII), and error texts
+are redacted before they leave this module.
 """
 import hashlib
-import json
 import logging
 import math
 import re
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -19,7 +19,6 @@ from bizview_cli import sqlsafety
 from bizview_cli import transform as transform_contract
 from psycopg import sql as pgsql
 
-from app.assistant.preview import CONNECT_TEXT, active_integrations, redact_values
 from app.engine import direct, extract
 from app.engine import report as engine
 from app.engine.extract import ExtractError
@@ -27,13 +26,34 @@ from app.errors import ApiError
 from app.i18n import t
 from app.projects.personal import (
     personal_kind,
-    query_columns,
-    request_columns,
     shape_personal,
 )
-from app.projects.workview import real
-from app.services.audit import record
 from app.sources.service import by_name, secrets_of
+
+
+def active_integrations(db) -> dict:
+    """The integrations of the active workspace version: {id: entry}."""
+    from app.workspace import service as workspace_service
+
+    active = workspace_service.active(db)
+    if not active:
+        return {}
+    return (active.artifacts or {}).get("integrations") or {}
+
+
+def redact_values(text: str, limit: int = 300) -> str:
+    """Database error texts can quote row values: strip quoted literals and key groups."""
+    text = re.sub(r"'[^']*'", "«…»", text)
+    text = re.sub(r'"[^"]*"', "«…»", text)
+    text = re.sub(r"=\([^)]*\)", "=(…)", text)
+    text = re.sub(r"\b[a-zA-Z][a-zA-Z0-9+.-]*://\S+", "«…»", text)
+    for key in ("host", "hostaddr", "port", "user", "dbname", "database", "password", "sslmode"):
+        text = re.sub(rf"\b{key}=[^\s,]+", f"{key}=«…»", text, flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "«…»", text)
+    return text[:limit]
+
+
+CONNECT_TEXT = "no se pudo conectar; revisa host, puerto y credenciales"
 
 log = logging.getLogger(__name__)
 
@@ -54,11 +74,6 @@ NO_DISTINCT = {
 }
 
 
-class OriginToolError(Exception):
-    """A tool input error with a safe Spanish message."""
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
 
 
 def flag_personal(description: Any) -> Any:
@@ -95,118 +110,14 @@ def _src_key(name: str) -> str:
     return name.strip().lower()
 
 
-def _state(session) -> dict:
-    return dict(session.working_state or {})
 
 
-def remember(session, source: str, key: str, note: str, *, append: bool = False) -> None:
-    """Store an inspected[src][key] note with size limits and no in-place mutation."""
-    state = _state(session)
-    inspected = dict(state.get("inspected") or {})
-    src = _src_key(source)
-    src_notes = dict(inspected.get(src) or {})
-    if append and key in src_notes:
-        note = f"{src_notes[key]} | {note}"
-    note = note[:NOTE_CHARS]
-    if key in src_notes or len(src_notes) < MAX_NOTES_PER_SOURCE:
-        src_notes[key] = note
-    inspected[src] = src_notes
-    state["inspected"] = inspected
-    session.working_state = state
 
 
-def remember_personal(session, source: str, flags: dict[str, str]) -> None:
-    """Merge personal column flags into state['personal'][src] without in-place mutation."""
-    if not flags:
-        return
-    src = _src_key(source)
-    state = _state(session)
-    personal = dict(state.get("personal") or {})
-    src_personal = dict(personal.get(src) or {})
-    for col, kind in flags.items():
-        src_personal[str(col)] = str(kind)
-    personal[src] = src_personal
-    state["personal"] = personal
-    session.working_state = state
 
 
-def remember_description(session, source: str, path: str | None, description: dict) -> None:
-    """Remember a compacted description and flagged personal columns."""
-    src = _src_key(source)
-    state = _state(session)
-    inspected = dict(state.get("inspected") or {})
-    personal = dict(state.get("personal") or {})
-    described = dict(state.get("described") or {})
-
-    src_personal = dict(personal.get(src) or {})
-    if isinstance(description.get("tables"), list):
-        for table in description["tables"]:
-            if not isinstance(table, dict) or not isinstance(table.get("name"), str):
-                continue
-            key = f"{table['schema']}.{table['name']}" if table.get("schema") else table["name"]
-            note = ", ".join(str(c) for c in table.get("columns") or [])
-            if table.get("personal"):
-                note += " | personales: " + ", ".join(
-                    f"{p['column']} ({p['kind']})" for p in table["personal"]
-                    if isinstance(p, dict) and p.get("column") and p.get("kind")
-                )
-            note = note[:NOTE_CHARS]
-            src_notes = dict(inspected.get(src) or {})
-            if key in src_notes or len(src_notes) < MAX_NOTES_PER_SOURCE:
-                src_notes[key] = note
-            inspected[src] = src_notes
-            for p in table.get("personal") or []:
-                if isinstance(p, dict) and p.get("column") and p.get("kind"):
-                    src_personal[str(p["column"])] = str(p["kind"])
-    elif description.get("shape") is not None and description.get("path"):
-        src_notes = dict(inspected.get(src) or {})
-        key = str(description["path"])
-        if key in src_notes or len(src_notes) < MAX_NOTES_PER_SOURCE:
-            src_notes[key] = json.dumps(description["shape"], ensure_ascii=False)[:NOTE_CHARS]
-        inspected[src] = src_notes
-        if isinstance(description.get("personal"), list):
-            for p in description["personal"]:
-                if isinstance(p, dict) and p.get("column") and p.get("kind"):
-                    leaf = str(p["column"]).split(".")[-1]
-                    src_personal[leaf] = str(p["kind"])
-
-    state["inspected"] = inspected
-    if src_personal:
-        personal[src] = src_personal
-        state["personal"] = personal
-    src_described = list(described.get(src) or [])
-    entry = path or ""
-    if entry not in src_described:
-        src_described.append(entry)
-    described[src] = src_described
-    state["described"] = described
-    session.working_state = state
 
 
-def cached_description(session, source: str, path: str | None) -> dict | None:
-    """Return the cached note when the path was already described this session."""
-    src = _src_key(source)
-    state = _state(session)
-    if (path or "") not in (state.get("described") or {}).get(src, []):
-        return None
-    tables = [
-        {"table": key, "note": note}
-        for key, note in (state.get("inspected") or {}).get(src, {}).items()
-        if not key.startswith("consulta ")
-    ]
-    personal = [
-        {"column": c, "kind": k}
-        for c, k in (state.get("personal") or {}).get(src, {}).items()
-    ]
-    return {
-        "cached": True,
-        "source": source,
-        "path": path,
-        "tables": tables,
-        "personal": personal,
-        "note": ("Estructura ya consultada en esta conversación; usa refresh: true para leerla "
-                 "de nuevo."),
-    }
 
 
 def _error_text(e: Exception) -> str:
@@ -264,302 +175,18 @@ def normalise_table(kind: str | None, table: str) -> str:
     return result
 
 
-def _profile_query(
-    table_ident: pgsql.Composable, columns: list[tuple[str, str]]
-) -> tuple[pgsql.Composed, list[dict]]:
-    fields = [pgsql.SQL("count(*)")]
-    column_positions = []
-    for col, data_type in columns:
-        col_ident = pgsql.Identifier(col)
-        nonnull_pos = len(fields)
-        fields.append(pgsql.SQL("count({})").format(col_ident))
-        if data_type not in NO_DISTINCT:
-            distinct_pos = len(fields)
-            fields.append(pgsql.SQL("count(DISTINCT {})").format(col_ident))
-        else:
-            distinct_pos = None
-        kind = personal_kind(col, data_type)
-        if data_type in DATE_TYPES and kind is None:
-            min_pos = len(fields)
-            fields.append(pgsql.SQL("min({})").format(col_ident))
-            max_pos = len(fields)
-            fields.append(pgsql.SQL("max({})").format(col_ident))
-        else:
-            min_pos = max_pos = None
-        column_positions.append(
-            {"name": col, "type": data_type, "nonnull": nonnull_pos,
-             "distinct": distinct_pos, "min": min_pos, "max": max_pos,
-             "personal": kind}
-        )
-    query = pgsql.SQL("SELECT {} FROM {}").format(
-        pgsql.SQL(", ").join(fields), table_ident
-    )
-    return query, column_positions
 
 
-def _profile_columns(row, positions: list[dict]) -> list[dict]:
-    total = row[0]
-    result_columns = []
-    for meta in positions:
-        nonnull = row[meta["nonnull"]]
-        null_ratio = round((total - nonnull) / total, 4) if total else None
-        entry: dict[str, Any] = {
-            "name": meta["name"],
-            "type": meta["type"],
-            "null_ratio": null_ratio,
-            "distinct": row[meta["distinct"]] if meta["distinct"] is not None else None,
-        }
-        if meta["min"] is not None:
-            min_val = row[meta["min"]]
-            max_val = row[meta["max"]]
-            entry["min"] = min_val.isoformat() if isinstance(min_val, date) else None
-            entry["max"] = max_val.isoformat() if isinstance(max_val, date) else None
-        if meta.get("personal"):
-            entry["personal"] = meta["personal"]
-        result_columns.append(entry)
-    return result_columns
 
 
-def _profile_pg(source, secrets: dict, app, table: str, timeout: int) -> dict:
-    try:
-        schema, rel = _split_table(table)
-        with extract._pg_connect(source.settings, secrets, app, timezone="UTC",
-                                 time_limit_s=timeout, connect_timeout_s=timeout) as conn:
-            cur = conn.execute(
-                """
-                SELECT n.nspname, c.relname
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')
-                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-                  AND has_table_privilege(c.oid, 'SELECT')
-                  AND c.relname = %s
-                  AND (%s::text IS NULL OR n.nspname = %s)
-                """,
-                (rel, schema, schema),
-            )
-            matches = cur.fetchall()
-            if not matches:
-                return {"error": ("La tabla no existe o no se puede leer; usa esquema.tabla "
-                                  "como en describe_source.")}
-            if len(matches) > 1:
-                return {"error": "Hay varias tablas con ese nombre; indica esquema.tabla."}
-            schema_name, rel_name = matches[0]
-
-            cur = conn.execute(
-                """
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_schema = %s AND table_name = %s
-                ORDER BY ordinal_position
-                """,
-                (schema_name, rel_name),
-            )
-            all_columns = [(r[0], r[1]) for r in cur.fetchall()]
-            truncated = len(all_columns) > MAX_PROFILE_COLUMNS
-            columns = all_columns[:MAX_PROFILE_COLUMNS]
-
-            table_ident = pgsql.Identifier(schema_name, rel_name)
-            query, column_positions = _profile_query(table_ident, columns)
-            cur = conn.execute(query)
-            row = cur.fetchone()
-            return {
-                "table": f"{schema_name}.{rel_name}",
-                "row_count": row[0],
-                "columns": _profile_columns(row, column_positions),
-                "truncated": truncated,
-            }
-    except Exception as e:
-        return {"error": _error_text(e)}
 
 
-def _profile_bi(app, table: str, timeout: int) -> dict:
-    try:
-        schema, rel = _split_table(table)
-        schema = schema or "public"
-        if direct.refusal(schema, rel, bi=True):
-            return {"error": direct.PRODUCT_MESSAGE}
-        runner = direct.DirectRunner(
-            "bi",
-            report_id="asistente-perfil",
-            timeout_seconds=timeout,
-            tables={"t": (schema, rel)},
-        )
-        with runner.session() as s:
-            phys = direct.physical_schema(schema)
-            rows = s.query(
-                pgsql.SQL(
-                    "SELECT column_name, data_type "
-                    "FROM information_schema.columns "
-                    "WHERE table_schema = {} AND table_name = {} "
-                    "ORDER BY ordinal_position"
-                ).format(pgsql.Literal(phys), pgsql.Literal(rel)),
-                "UTC",
-            )
-            if not rows:
-                return {
-                    "error": (
-                        "La tabla no existe o no se puede leer; usa esquema.tabla "
-                        "como en describe_source."
-                    )
-                }
-            all_columns = [(row[0], row[1]) for row in rows]
-            truncated = len(all_columns) > MAX_PROFILE_COLUMNS
-            columns = all_columns[:MAX_PROFILE_COLUMNS]
-
-            estimate_rows = s.query(
-                pgsql.SQL(
-                    "SELECT greatest(c.reltuples, 0)::bigint "
-                    "FROM pg_class c "
-                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                    "WHERE n.nspname = {} AND c.relname = {}"
-                ).format(pgsql.Literal(phys), pgsql.Literal(rel)),
-                "UTC",
-            )
-            estimate = estimate_rows[0][0] if estimate_rows else 0
-            if estimate > app.direct_report_warn_rows:
-                return {
-                    "table": f"{schema}.{rel}",
-                    "row_count": estimate,
-                    "estimado": True,
-                    "columns": [
-                        {
-                            "name": col,
-                            "type": data_type,
-                            "personal": personal_kind(col, data_type),
-                        }
-                        for col, data_type in columns
-                    ],
-                    "truncated": truncated,
-                    "note": (
-                        "Tabla grande: total estimado por el catálogo, sin recorrerla; "
-                        "no se calcularon nulos ni distintos."
-                    ),
-                }
-
-            table_ident = pgsql.Identifier(phys, rel)
-            query, column_positions = _profile_query(table_ident, columns)
-            row = s.query(query, "UTC")[0]
-            return {
-                "table": f"{schema}.{rel}",
-                "row_count": row[0],
-                "columns": _profile_columns(row, column_positions),
-                "truncated": truncated,
-            }
-    except direct.DirectError as e:
-        return {"error": e.message}
-    except Exception as e:
-        return {"error": _error_text(e)}
 
 
-def _profile_rest(source, secrets: dict, app, table: str, timeout: int) -> dict:
-    if source.kind == "supabase":
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", table):
-            return {"error": "El nombre de tabla no es válido para Supabase."}
-        request = {"method": "GET", "path": table}
-        extra = {"limit": "0"}
-    else:
-        path = table.strip()
-        if path.startswith("/"):
-            path = path[1:]
-        if "://" in path or ".." in path:
-            return {"error": "La ruta de la petición no es válida."}
-        request = {"method": "GET", "path": path}
-        extra = {}
-    try:
-        if source.kind == "supabase":
-            _payload, headers = extract.supabase_once(
-                source.settings, secrets, app, request, {},
-                extra_params=extra, extra_headers={"Prefer": "count=exact"},
-                time_limit_s=timeout,
-            )
-        else:
-            _payload, headers = extract.rest_once(
-                source.settings, secrets, app, request, {},
-                extra_headers={"Prefer": "count=exact"}, time_limit_s=timeout,
-            )
-    except Exception as e:
-        return {"error": _error_text(e)}
-    content_range = headers.get("content-range", "")
-    match = re.search(r"/(\d+)\s*$", content_range)
-    result: dict[str, Any] = {
-        "table": table,
-        "row_count": int(match.group(1)) if match else None,
-        "columns": [],
-    }
-    if not match:
-        result["note"] = "la fuente no informó el total de filas"
-    return result
 
 
-def profile_source(db, actor, session, args: dict, app, ip) -> tuple[dict, str]:
-    """Profile a table: row count, null ratios, distinct counts, date min/max."""
-    name = args.get("name")
-    table = args.get("table")
-    if (not name or not isinstance(name, str) or not table or not isinstance(table, str)
-            or len(table) > 200):
-        raise OriginToolError("El nombre de la fuente y la tabla son obligatorios.")
-    is_bi = name.strip().lower() == "bi" and bool(app.direct_reports_bi)
-    source = None if is_bi else by_name(db, name)
-    if source is None and not is_bi:
-        return (
-            {"error": "No existe una fuente con ese nombre."},
-            t("assistant.summary.attempted_profile_on_missing_source", table=table),
-        )
-    if source is not None and source.kind in ("supabase", "rest"):
-        table = normalise_table(source.kind, table)
-        if not table:
-            return (
-                {"error": "El nombre de la tabla es obligatorio."},
-                t("assistant.summary.profile_failed", table=args['table'], name=name),
-            )
-    record(db, "source_described", actor_id=getattr(actor, "id", None), ip=ip,
-           detail={"source": "bi" if is_bi else name, "via": "assistant",
-                   "session": session.id, "tool": "profile_source"})
-    secrets = None if is_bi else secrets_of(source)
-    timeout = max(1, math.ceil(app.ai_tool_timeout_seconds))
-    if is_bi:
-        result = _profile_bi(app, table, timeout)
-    elif source.kind == "postgresql":
-        result = _profile_pg(source, secrets, app, table, timeout)
-    elif source.kind in ("supabase", "rest"):
-        result = _profile_rest(source, secrets, app, table, timeout)
-        if "error" not in result:
-            result["solo_conteo"] = True
-            result["note"] = COUNT_ONLY_NOTE
-            if result.get("row_count") is None:
-                result["note"] += " La fuente no informó el total de filas."
-    elif source.kind == "soap":
-        result = {"error": "El perfil no está disponible para fuentes SOAP."}
-    else:
-        result = {"error": "Tipo de fuente no soportado."}
-    if "error" not in result:
-        if (isinstance(result.get("row_count"), int)
-                and result["row_count"] > app.direct_report_warn_rows):
-            result["warning"] = (
-                f"más de {app.direct_report_warn_rows} filas: un reporte directo "
-                "necesita un índice en la columna de fecha; considera una integración "
-                "con materialize: daily"
-            )
-        key = result.get("table", table)
-        remember_source = "bi" if is_bi else name
-        remember(session, remember_source, key,
-                 f"perfil: {result.get('row_count')} filas", append=True)
-        personal_flags = {}
-        for col_entry in result.get("columns", []):
-            if isinstance(col_entry, dict) and col_entry.get("personal"):
-                personal_flags[str(col_entry["name"])] = str(col_entry["personal"])
-        remember_personal(session, remember_source, personal_flags)
-        db.add(real(session))
-        db.flush()
-        return result, t("assistant.summary.profile_succeeded", table=table, name=name)
-    return result, t("assistant.summary.profile_failed", table=table, name=name)
 
 
-def _bump(session, key: str) -> None:
-    stats = dict(session.stats or {})
-    stats[key] = int(stats.get(key) or 0) + 1
-    session.stats = stats
 
 
 def integration_spec(db, files: dict, iid: str) -> dict | None:
@@ -693,7 +320,7 @@ def _run_check_sql(source, secrets: dict, app, text: str,
     start = end - timedelta(days=CHECK_WINDOW_DAYS)
     params = {k: {"window_start": start, "window_end": end}[k] for k in params_names
               if k in ("window_start", "window_end")}
-    timeout = max(1, math.ceil(app.ai_tool_timeout_seconds))
+    timeout = max(1, math.ceil(app.origin_check_timeout_seconds))
     try:
         with extract._pg_connect(source.settings, secrets, app, timezone="UTC",
                                  time_limit_s=timeout, connect_timeout_s=timeout) as conn:
@@ -887,7 +514,7 @@ def _run_check_request(source, secrets: dict, app, text: str,
     end = datetime.now(UTC)
     start = end - timedelta(days=CHECK_WINDOW_DAYS)
     params = {"window_start": start, "window_end": end}
-    timeout = max(1, math.ceil(app.ai_tool_timeout_seconds))
+    timeout = max(1, math.ceil(app.origin_check_timeout_seconds))
 
     def _fetch(req: dict, req_params: dict) -> tuple[Any, dict]:
         if source.kind == "supabase":
@@ -1004,11 +631,7 @@ def _run_check_direct(session, path: str, text: str, app) -> dict:
     if not isinstance(doc, dict) or not isinstance(doc.get("direct"), dict):
         return {**base, "error": "YAML no válido o sin bloque direct."}
     try:
-        version = engine.PreviewVersion(
-            id=None,
-            artifacts={"workspace": {}, "integrations": {}, "reports": {}},
-        )
-        ctx = engine.preview_context(version, rid, doc, {}, set(), session.id)
+        ctx = engine.direct_context(rid, doc)
         metric_ids = _check_metric_ids(doc)
         if not metric_ids:
             return {**base, "error": "El reporte no tiene métricas con sql para comprobar."}
@@ -1019,7 +642,7 @@ def _run_check_direct(session, path: str, text: str, app) -> dict:
         wrapped = pgsql.SQL("SELECT * FROM ({}) AS q LIMIT 0").format(stmt)
         runner = ctx.runner
         runner.timeout_seconds = max(
-            1, min(int(runner.timeout_seconds), math.ceil(app.ai_tool_timeout_seconds))
+            1, min(int(runner.timeout_seconds), math.ceil(app.origin_check_timeout_seconds))
         )
         with runner.session() as direct_session:
             direct_session.query(wrapped, tz)
@@ -1113,146 +736,8 @@ def run_check(db, session, source, secrets: dict, app, *, path: str | None = Non
     return result
 
 
-def _check_direct_report(
-    db, actor, session, source_name: str, path: str, app, ip
-) -> tuple[dict, str] | None:
-    files = (session.draft or {}).get("files") if session.draft else {}
-    text = files.get(path, "")
-    try:
-        doc = yaml.safe_load(text)
-    except yaml.YAMLError:
-        doc = None
-    if not isinstance(doc, dict) or not isinstance(doc.get("direct"), dict):
-        raise OriginToolError(
-            "check_query con reports/<id>/report.yaml solo comprueba reportes "
-            "directos (bloque direct)."
-        )
-    declared = str(doc["direct"].get("source") or "").strip()
-    rid = REPORT_FILE.match(path).group(1)
-    if declared.lower() != source_name.strip().lower():
-        result = {
-            "ok": False,
-            "error": f"El reporte usa la fuente «{declared}»; indica source: {declared}.",
-            "columns": [],
-            "missing": [],
-            "extra": [],
-            "path": path,
-            "report": rid,
-        }
-        return result, t("assistant.summary.attempted_check_with_other_source", path=path)
-    record(
-        db,
-        "source_described",
-        actor_id=getattr(actor, "id", None),
-        ip=ip,
-        detail={"source": declared, "via": "assistant", "session": session.id,
-                "tool": "check_query"},
-    )
-    result = run_check(db, session, None, {}, app, path=path)
-    _bump(session, "query_checks")
-    if result.get("ok"):
-        names = ", ".join(str(item["name"]) for item in result.get("columns", []))
-        note = f"correcta; columnas: {names or 'ninguna'}"
-        status = t("assistant.summary.status_ok")
-    else:
-        note = f"error: {result.get('error') or 'desconocido'}"
-        status = t("assistant.summary.status_error")
-    remember(session, declared, f"consulta {path}", note)
-    db.add(real(session))
-    db.flush()
-    return result, t("assistant.summary.checked_metric", path=path,
-                     declared=declared, status=status)
 
 
-def check_query(db, actor, session, args: dict, app, ip) -> tuple[dict, str]:
-    """Tool entry: validate one draft file or ad-hoc SQL for a source."""
-    source_name = args.get("source")
-    path = args.get("path")
-    sql = args.get("sql")
-    if not source_name or not isinstance(source_name, str):
-        raise OriginToolError("Indica la fuente y una de path (archivo del borrador) o sql.")
-    if not ((path and isinstance(path, str) and not sql)
-            or (sql and isinstance(sql, str) and not path)):
-        raise OriginToolError("Indica la fuente y una de path (archivo del borrador) o sql.")
-    if path:
-        draft_files = (session.draft or {}).get("files") if session.draft else None
-        if not draft_files:
-            raise OriginToolError("No hay un borrador; usa propose_draft primero.")
-        if path not in draft_files or not (
-            QUERY_FILE.match(path)
-            or REQUEST_FILE.match(path)
-            or REPORT_FILE.match(path)
-        ):
-            raise OriginToolError(
-                "La ruta debe ser un archivo del borrador integrations/<id>/queries/*.sql, "
-                "integrations/<id>/requests/*.yaml o reports/<id>/report.yaml "
-                "(reporte directo)."
-            )
-        if REPORT_FILE.match(path):
-            report_result = _check_direct_report(
-                db, actor, session, source_name, path, app, ip
-            )
-            if report_result is not None:
-                return report_result
-    if sql and len(sql) > 20_000:
-        raise OriginToolError("La consulta SQL es demasiado larga (máximo 20000 caracteres).")
-    source = by_name(db, source_name)
-    if source is None:
-        return (
-            {"error": "No existe una fuente con ese nombre."},
-            t("assistant.summary.attempted_query_on_missing_source"),
-        )
-    if sql and source.kind != "postgresql":
-        return (
-            {"ok": False,
-             "error": SQL_NOT_SUPPORTED.format(
-                 kind=SOURCE_KIND_LABELS.get(source.kind, source.kind)),
-             "columns": [], "missing": [], "extra": [], "path": None, "dataset": None},
-            t("assistant.summary.sql_not_supported", source_name=source_name),
-        )
-    record(db, "source_described", actor_id=getattr(actor, "id", None), ip=ip,
-           detail={"source": source_name, "via": "assistant", "session": session.id,
-                   "tool": "check_query"})
-    secrets = secrets_of(source)
-    result = run_check(db, session, source, secrets, app, path=path, sql_text=sql)
-    _bump(session, "query_checks")
-
-    if path:
-        text = (session.draft or {}).get("files", {}).get(path)
-    else:
-        text = sql
-    if text is not None:
-        if path and REQUEST_FILE.match(path):
-            try:
-                request_doc = yaml.safe_load(text)
-            except Exception:
-                request_doc = None
-            names = request_columns(request_doc)
-        else:
-            names = {c["name"] for c in result.get("columns", [])}
-            names.update(query_columns(text))
-        flags = {n: kind for n in names if (kind := personal_kind(n))}
-        if flags:
-            result["personal"] = [{"column": c, "kind": flags[c]} for c in sorted(flags)]
-            remember_personal(session, source_name, flags)
-
-    if result.get("skipped"):
-        note = f"no comprobada: {result['skipped']}"
-    elif path and REQUEST_FILE.match(path):
-        cols = [f["column"] for f in result.get("fields", [])]
-        note = (f"correcta; campos: {', '.join(cols)}" if result["ok"]
-                else f"error: {result.get('error')}")
-    else:
-        cols = [c["name"] for c in result.get("columns", [])]
-        note = (f"correcta; columnas: {', '.join(cols)}" if result["ok"]
-                else f"error: {result.get('error')}")
-    remember(session, source_name, f"consulta {path or 'ad hoc'}", note)
-    db.add(real(session))
-    db.flush()
-    status = (t("assistant.summary.status_ok") if result["ok"]
-              else t("assistant.summary.status_errors"))
-    return result, t("assistant.summary.checked_query", path=path or 'ad hoc',
-                     source_name=source_name, status=status)
 
 
 def recheck_draft(db, session, app) -> list[dict]:

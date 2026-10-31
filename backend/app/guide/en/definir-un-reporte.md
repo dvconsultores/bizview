@@ -7,7 +7,7 @@ reads from, what it measures and how it looks.
 
 ## Who can use it
 
-Only the **Superuser**; the agent usually writes it with `/speckit-implement`.
+Only the **Superuser**; it is written in the project editor or imported already written.
 
 ## How to
 

@@ -1,4 +1,4 @@
-"""Feature 020 T077: upgrade of an existing installation (principal, open drafts)."""
+"""Feature 020 T077: upgrade of an existing installation (the `principal` project)."""
 import shutil
 
 import pytest
@@ -6,7 +6,7 @@ import yaml
 from sqlalchemy import select
 
 from app.config import get_settings
-from app.models import AssistantSession, Project
+from app.models import Project
 from app.projects import importer
 from app.projects import service as project_service
 from app.workspace.service import active
@@ -65,32 +65,3 @@ def test_ensure_principal_imports_the_applied_workspace(applied, db, projects):
     assert importer.ensure_principal(db) is False
     assert sql("SELECT count(*) FROM audit_event WHERE kind = 'project_imported'")[0][0] == 1
 
-
-def test_open_drafts_become_projects(db, superuser, projects):
-    session = AssistantSession(
-        title="Ventas mensuales", created_by=superuser.id, project_id=_backfilled("app"),
-        read_only=True, status="open",
-        draft={"summary": "s", "files": {
-            "specs/integrations/003-ventas-m/spec.md":
-                "# V\n\n**Spec type**: integration\n\n**Status**: Draft\n",
-            "integrations/ventas-m/integration.yaml":
-                "id: ventas-m\nspec: specs/integrations/003-ventas-m\n",
-            "integrations/ventas-m/queries/a.sql": "SELECT 1\n",
-            "bizview.yaml": "name: x\n",
-        }})
-    db.add(session)
-    db.commit()
-
-    assert importer.import_open_drafts(db) == 1
-    db.commit()
-    db.refresh(session)
-    new = db.get(Project, session.project_id)
-    assert (new.name, new.slug) == ("Ventas mensuales (borrador)", "ventas-mensuales-borrador")
-    assert session.read_only is False
-    base = projects / new.slug
-    assert "**Tipo**: integracion" in (base / "specs/001-ventas-m/spec.md").read_text()
-    assert "spec: specs/001-ventas-m" in (
-        base / "integrations/ventas-m/integration.yaml").read_text()
-    assert (base / "integrations/ventas-m/queries/a.sql").read_text() == "SELECT 1\n"
-    assert not (base / "bizview.yaml").exists()
-    assert importer.import_open_drafts(db) == 0

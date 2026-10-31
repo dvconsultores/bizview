@@ -1,9 +1,9 @@
 """Feature 038: a report that cannot render names the piece that failed.
 
-The production defect (2026-10-26, project `coinmarketcap`, version 22 just applied): the preview
-links stayed on the page after the apply dropped the preview schemas, so pressing `panorama-cripto`
-answered the generic «Ocurrió un error inesperado (referencia …)». The fixture is that project:
-one integration with four datasets joined on `snapshot_at` and a report that uses all four.
+The production defect (2026-10-26, project `coinmarketcap`, version 22 just applied): a report
+whose data was gone answered the generic «Ocurrió un error inesperado (referencia …)». The fixture
+is that project: one integration with four datasets joined on `snapshot_at` and a report that uses
+all four. Feature 045 removed the draft preview, so the render runs on applied data only.
 """
 from datetime import UTC, datetime, timedelta
 
@@ -19,11 +19,8 @@ from tests.coinmarketcap_fixture import (
     crypto_origin_data,
     fixture_files,
     integration_definition,
-    preview_schema,
-    project_id,
     put_files,
     report_definition,
-    run_preview,
     validate_project,
 )
 from tests.conftest import reauth, signed_in, sql
@@ -50,58 +47,11 @@ def _yesterday_query(extra: str = "") -> str:
     return f"?period=custom&from={day}&to={day}{extra}"
 
 
-def test_panorama_cripto_renders_from_preview_with_full_empty_and_no_compare_data(
-        db, superuser, crypto_origin):
-    c = reauth(signed_in("root@example.com"))
-    slug = create_project(c)
-    put_files(c, slug, fixture_files())
-    assert validate_project(c, slug)["validation"]["valid"] is True
-    run_preview(c, slug)
-
-    data = c.get(f"/api/projects/{slug}/preview/report/panorama-cripto/data"
-                 + _yesterday_query())
-    assert data.status_code == 200, data.text
-    body = data.json()
-    assert [v["type"] for v in body["views"]] == ["kpis", "trend", "ranking", "table"]
-    assert not [v for v in body["views"] if v.get("error")]
-    kpis = body["views"][0]["items"]
-    assert next(i for i in kpis if i["metric"] == "market_cap")["value"] == 1603
-    assert next(i for i in kpis if i["metric"] == "altseason_index")["value"] == 31
-    assert body["render_reference"]
-
-    content = c.post(f"/api/projects/{slug}/preview/report/panorama-cripto/pdf"
-                     + _yesterday_query())
-    assert content.status_code == 200, content.text
-    assert content.content.startswith(b"%PDF")
-
-    # (b) one dataset with no rows at all: the tiles say «Sin datos», nothing fails.
-    session_id = sql("SELECT preview FROM project WHERE id = :p", p=project_id(slug))[0][0]
-    schema = preview_schema(session_id["session_id"])
-    sql(f'DELETE FROM "{schema}".altcoin_season')
-    empty = c.get(f"/api/projects/{slug}/preview/report/panorama-cripto/data"
-                  + _yesterday_query())
-    assert empty.status_code == 200, empty.text
-    assert not [v for v in empty.json()["views"] if v.get("error")]
-    altseason = next(i for i in empty.json()["views"][0]["items"]
-                     if i["metric"] == "altseason_index")
-    assert altseason["value"] is None
-    assert c.post(f"/api/projects/{slug}/preview/report/panorama-cripto/pdf"
-                  + _yesterday_query()).status_code == 200
-
-    # (c) no comparison period: the same views without the previous series.
-    plain = c.get(f"/api/projects/{slug}/preview/report/panorama-cripto/data"
-                  + _yesterday_query("&compare=none"))
-    assert plain.status_code == 200, plain.text
-    assert plain.json()["selection"]["previous"] is None
-    assert not [v for v in plain.json()["views"] if v.get("error")]
-
-
 def test_applied_panorama_cripto_renders_json_and_pdf(db, superuser, crypto_origin):
     c = reauth(signed_in("root@example.com"))
     slug = create_project(c)
     put_files(c, slug, fixture_files())
     assert validate_project(c, slug)["validation"]["valid"] is True
-    run_preview(c, slug)
 
     applied = c.post(f"/api/projects/{slug}/apply")
     assert applied.status_code == 200, applied.text

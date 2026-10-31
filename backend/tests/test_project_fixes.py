@@ -42,7 +42,6 @@ BAD_FILTER = """
 REPORT_FILE = "reports/ventas-dia/report.yaml"
 
 # The command guard has its own tests: here only the tool's behaviour matters.
-pytestmark = pytest.mark.usefixtures("without_command_guard")
 
 
 @pytest.fixture
@@ -128,27 +127,3 @@ def test_a_fix_never_calls_the_provider(project_without_join, monkeypatch):
                                         "problem_id": problem["problem_id"]}]})
     assert r.status_code == 200 and r.json()["validation"]["errors"] == []
 
-
-def test_the_agent_applies_the_fix_instead_of_rewriting_the_file(
-        project_without_join, db, superuser):
-    from app.assistant import service as assistant_service
-    from app.assistant.tools import run_tool
-    from app.config import get_settings
-    from app.models import AppUser
-    from app.projects import service as projects
-    from app.projects.workview import for_session
-
-    c, slug = project_without_join
-    problem = _problem(_problems(c, slug), "unjoined_sets")
-    project = projects.get(db, slug)
-    session = assistant_service.create_session(db, db.get(AppUser, superuser.id),
-                                              project_id=project.id)
-    db.commit()
-
-    view = for_session(db, session)
-    result, summary = run_tool(db, superuser, view, "apply_fix",
-                               {"problem_id": problem["problem_id"]}, get_settings())
-
-    assert result["applied"]["file"] == REPORT_FILE
-    assert result["validation"]["errors"] == []
-    assert "Arreglo aplicado" in summary

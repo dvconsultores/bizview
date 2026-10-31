@@ -13,7 +13,7 @@ Only the **Superuser**.
 
 1. In the project editor press **Download**: the .zip carries the project with its `.specify/`
    folder and the Spec Kit templates.
-2. Open it in VS Code and work with your agent's `/speckit-…` commands.
+2. Open it in VS Code and work there with your agent; validate with `bizview validate` before pushing.
 3. Validate from the terminal with `bizview validate`. To read the sources' structure use
    `bizview describe` with a token from [Open Access tokens](app:/admin/tokens).
 4. To bring it back, zip it and use **Import project** in [Open Projects](app:/proyectos).

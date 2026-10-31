@@ -6,9 +6,6 @@ and extended from the validated contract; an incompatible change rebuilds the ta
 then loads it in full. All statements run in the caller's transaction, so a failed run leaves the
 previous data untouched.
 """
-import re
-from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import dataclass
 
 from psycopg import Connection, sql
@@ -20,31 +17,13 @@ PG_TYPES = {"text": "text", "integer": "integer", "bigint": "bigint", "numeric":
 SYSTEM_COLUMNS = ("_run_id", "_loaded_at")
 
 
-PREVIEW_PREFIX: ContextVar[str | None] = ContextVar("bizview_preview_prefix", default=None)
 
 
-@contextmanager
-def preview_schemas(prefix: str):
-    """Within this block schema_name() points at the assistant preview schemas (feature 014)."""
-    if not re.match(r"^preview_[0-9]{1,18}$", prefix):
-        raise ValueError(f"Prefijo de vista previa inválido: {prefix!r}")
-    token = PREVIEW_PREFIX.set(prefix)
-    try:
-        yield
-    finally:
-        PREVIEW_PREFIX.reset(token)
-
-
-def preview_prefix(session_id: int) -> str:
-    return f"preview_{session_id}"
 
 
 def schema_name(integration_id: str) -> str:
     """`ds_<id>`; under tests, prefixed with the test schema so the run stays isolated."""
     base = "ds_" + integration_id.replace("-", "_")
-    preview = PREVIEW_PREFIX.get()
-    if preview is not None:
-        base = f"{preview}__{base}"
     settings = get_settings()
     if settings.db_schema != "public":
         return f"{settings.db_schema}__{base}"

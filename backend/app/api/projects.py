@@ -1,8 +1,6 @@
 """BI projects API (feature 020)."""
 
 import os
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from bizview_cli import layout
 from fastapi import APIRouter, Body, Depends, Query, Request, Response
@@ -15,7 +13,7 @@ from app.config import get_settings
 from app.db import DB
 from app.errors import ApiError, not_found, validation
 from app.i18n import M
-from app.models import AppUser, AssistantSession, Project
+from app.models import AppUser, Project
 from app.projects import fs, history, specs
 from app.projects import service as projects
 
@@ -242,22 +240,6 @@ def validate(slug: str, actor: AppUser = Depends(require_superuser), db: Session
     return projects.revalidate(db, projects.get(db, slug), check_origin=True)
 
 
-def _conversation(db: Session, p: Project, actor: AppUser):
-    """The caller's latest conversation of the project (preview requests run in one).
-
-    Feature 037: filtered by the caller, not only by project. Taking any user's newest conversation
-    wrote the request, its outcome message and the project's `preview` into a conversation the
-    caller was not looking at, so the result appeared in somebody else's chat.
-    """
-    from app.assistant import service as assistant
-
-    session = db.scalars(select(AssistantSession)
-                         .where(AssistantSession.project_id == p.id,
-                                AssistantSession.created_by == actor.id)
-                         .order_by(AssistantSession.updated_at.desc()).limit(1)).first()
-    return session or assistant.create_session(db, actor, project_id=p.id)
-
-
 @router.post("/{slug}/apply")
 def apply_project(slug: str, request: Request, actor: AppUser = Depends(require_superuser),
                   _: Auth = Depends(recent_reauth), db: Session = DB):
@@ -310,62 +292,6 @@ def delete_project(slug: str, request: Request, actor: AppUser = Depends(require
                    _: Auth = Depends(recent_reauth), db: Session = DB):
     projects.delete_project(db, actor, projects.get(db, slug), client_ip(request))
     return Response(status_code=204)
-
-
-@router.post("/{slug}/preview")
-def request_preview(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
-    from app.assistant import preview as assistant_preview
-    from app.assistant import service as assistant
-
-    session = _conversation(db, projects.get(db, slug), actor)
-    assistant.ensure_idle(db, session, get_settings())
-    return {"preview": assistant_preview.request_preview(db, actor, session)}
-
-
-@router.get("/{slug}/preview/report/{report_id}")
-def preview_report(slug: str, report_id: str, actor: AppUser = Depends(require_superuser),
-                   db: Session = DB):
-    from app.assistant import preview as assistant_preview
-
-    session = _conversation(db, projects.get(db, slug), actor)
-    return assistant_preview.report_definition(db, session, report_id)
-
-
-def _preview_data(db: Session, session, report_id: str, request: Request) -> dict:
-    from app.assistant import preview as assistant_preview
-
-    settings = get_settings()
-    return assistant_preview.report_data(
-        db, session, report_id, request.query_params.multi_items(),
-        datetime.now(ZoneInfo(settings.timezone)).date(), settings.timezone)
-
-
-@router.get("/{slug}/preview/report/{report_id}/data")
-def preview_report_data(slug: str, report_id: str, request: Request,
-                        actor: AppUser = Depends(require_superuser), db: Session = DB):
-    return _preview_data(db, _conversation(db, projects.get(db, slug), actor), report_id,
-                         request)
-
-
-@router.post("/{slug}/preview/report/{report_id}/pdf")
-def preview_report_pdf(slug: str, report_id: str, request: Request,
-                       actor: AppUser = Depends(require_superuser), db: Session = DB):
-    from app.assistant import preview as assistant_preview
-    from app.reports import palette, pdf
-
-    session = _conversation(db, projects.get(db, slug), actor)
-    definition = assistant_preview.report_definition(db, session, report_id)
-    if not definition["pdf"]:
-        raise not_found(M("report.pdf_not_allowed"))
-    settings = get_settings()
-    content = pdf.render_preview(definition, _preview_data(db, session, report_id, request),
-                                 report_id=report_id,
-                                 organization=settings.organization_name,
-                                 product=settings.product_name, viewer=actor.full_name,
-                                 palette=palette.resolve(definition,
-                                                          palette.installation_preset(db)))
-    return Response(content, media_type="application/pdf", headers={
-        "Content-Disposition": f'attachment; filename="{report_id}-vista-previa.pdf"'})
 
 
 @router.get("/{slug}/history")

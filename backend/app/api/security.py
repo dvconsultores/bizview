@@ -9,7 +9,7 @@ from app.auth.deps import require_superuser
 from app.config import get_settings
 from app.db import DB
 from app.i18n import t
-from app.models import AppUser, AssistantAttachment, DirectReadLog, SecurityState
+from app.models import AppUser, DirectReadLog, SecurityState
 from app.security import crypto
 
 router = APIRouter(prefix="/api/security")
@@ -31,16 +31,6 @@ def _direct_reads(db: Session) -> list[dict]:
             for source, total, failed in rows]
 
 
-def _attachments(db) -> dict:
-    """What the chat has sent to the provider (feature 024, FR-014): counts and sizes only."""
-    s = get_settings()
-    total, size = db.execute(select(func.count(AssistantAttachment.id),
-                                    func.coalesce(func.sum(AssistantAttachment.byte_size),
-                                                  0))).one()
-    return {"total": total, "bytes": int(size),
-            "conversations": db.scalar(select(func.count(
-                func.distinct(AssistantAttachment.session_id)))) or 0,
-            "provider": s.ai_provider, "model": s.ai_model_effective}
 
 
 @router.get("")
@@ -83,4 +73,4 @@ def overview(_: AppUser = Depends(require_superuser), db: Session = DB):
             "http_allowed": s.http_allowed, "checks": checks,
             "legacy_origin_notice": bool(state and state.legacy_origin_notice),
             "legacy_origin_variable_present": bool(s.database_url_origin),
-            "direct_reads": _direct_reads(db), "attachments": _attachments(db)}
+            "direct_reads": _direct_reads(db)}

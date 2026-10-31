@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { BackLink } from "../../components/BackLink";
 import { RotateCcw } from "lucide-react";
 import { ApiError } from "../../api/client";
@@ -149,16 +149,6 @@ export function ProjectHistory() {
               </li>
             ))}
           </ol>
-          {timeline.conversations.length > 0 && (
-            <div className="text-sm">
-              <h3 className="font-semibold text-ink-2">{t.projects.conversationsOfSpec}</h3>
-              <ul className="mt-1 flex flex-wrap gap-2">
-                {timeline.conversations.map((c) => (
-                  <li key={c.id}><Link className="text-accent underline" to={`/proyectos/${slug}?chat=${c.id}`}>{c.title}</Link></li>
-                ))}
-              </ul>
-            </div>
-          )}
         </Card>
       )}
 

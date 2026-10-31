@@ -235,7 +235,6 @@ export function Projects() {
                   <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-muted">
                     <Badge tone={STATUS_TONE[p.status]}>{t.projects.status[p.status]}</Badge>
                     <span>{t.projects.specsCount(p.spec_count)}</span>
-                    <span>{t.projects.chatsCount(p.conversations)}</span>
                     {p.problems ? <Badge tone="red">{t.projects.problemsCount(p.problems)}</Badge> : null}
                     {p.last_activity_at && <span>{t.projects.lastActivity(formatDateTime(p.last_activity_at))}</span>}
                   </span>

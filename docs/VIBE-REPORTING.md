@@ -309,7 +309,7 @@ Limits:
 | `DIRECT_REPORT_WARN_ROWS` | default 5 million (estimated) | tables above this need an index whose first column is the date column (or partitioning by it), otherwise validation says "Tabla grande sin índice por fecha: crea una integración con materialize: daily o indexa <columna>" |
 
 Safety: sessions are read-only and run only SQL the engine generates. Product tables of
-the BI database (users, sessions, audit, credentials, assistant, sharing,
+the BI database (users, sessions, audit, credentials, sharing,
 `alembic_version`, and schemas `pg_catalog`, `information_schema`, `app_test_*`,
 `preview_*`) are refused with "Tabla del producto: no se puede leer en un reporte
 directo"; `ds_*` dataset tables may be read. Views over product tables are refused too;
@@ -367,167 +367,22 @@ failed, and the rest of the dashboard still renders; a preview that an apply rep
 `preview_expired` instead of an anonymous error. See
 [tableros/errores.md](./guides/tableros/errores.md).
 
-## The in-app assistant: Spec Kit commands
+## No in-app assistant
 
-When AI is enabled, each BI project has a chat (Proyectos → a project, or the Asistente panel)
-that follows the same Spec Kit flow as an author in Git, one command at a time. Type `/` in the
-composer to pick a command:
+Since 0.2.0 (features 043 and 045) Bizview does not author. The chat, its slash commands and the
+draft preview are gone: a project is written outside the product — by hand, in the editor of
+**Proyectos**, or with whatever AI the author prefers — and enters through validation and import.
+The Spec Kit flow itself is unchanged; it just lives in the author's repository, driven by the CLI:
 
-| Command | What it changes |
-|---|---|
-| `/speckit-all <request \| spec> [--until <stage>] [--force]` | the whole plan in one run: the eight stages without asking, plus `run-report.md`. `--until tasks` is the dry run |
-| `/speckit-constitution <principles>` | the project constitution (the installation rules block stays) |
-| `/speckit-specify <description>` | a new `specs/NNN-<name>/spec.md` and its quality checklist |
-| `/speckit-clarify` | `spec.md` (answers under `## Clarifications`) |
-| `/speckit-plan` | `plan.md`, `research.md`, `data-model.md`, `quickstart.md` |
-| `/speckit-tasks` | `tasks.md` |
-| `/speckit-analyze` | nothing (read-only report) |
-| `/speckit-checklist <topic>` | a new or extended `checklists/<topic>.md` |
-| `/speckit-implement [--only T025,T026]` | the spec's artifacts, task ticks and `**Status**: Implemented`; `--only` implements and ticks just those tasks |
-| `/speckit-converge` | appends a convergence phase to `tasks.md` |
-| `/speckit-verify` | nothing: validation, one check per query and one preview, with a verdict per user story. It does not start while `tasks.md` has unticked tasks: the plan implements first |
-| `/fix <what to change>` | an artifact that **already exists** — no new spec, no plan (small adjustments) |
+```bash
+bizview init myspec        # the skeleton: presets, rules, schemas, an example project
+bizview validate .         # the same validator the server runs
+bizview describe <source>  # structure and counts only, never rows
+```
 
-In a project the chat lives in the docked panel (the **Asistente** button in the project header,
-or the sparkles button in the top bar); on phones and tablets, where the panel has no room, it is
-the **Chat** tab of the project. Each conversation belongs to one project.
-
-The server enforces those limits: the agent changes files **only** inside a command and only
-the paths above; in a plain message it can look at sources and files and answer, and it offers
-an **Insertar** button with the command to run. `/speckit-implement` asks first when the spec is
-not `Approved` (your "sí" approves it) or when a checklist has unchecked items. A run that waits
-for your answer can be closed with **Terminar**; an interrupted run continues where it stopped
-when you run the same command again. Applying the project is always your action (Aplicar).
-
-### Which spec a command works on
-
-Every command that writes to a spec resolves its target **before the model runs**, in this order:
-
-1. an explicit folder in the message — `/speckit-plan 002-ventas-facturacion`;
-2. a number — `/speckit-plan 002`, `la 002`, `reporte 002`;
-3. a title or folder slug unique in the project — `/speckit-plan Ventas y facturación`;
-4. the conversation's **Spec actual** (the selector in the conversation header).
-
-The resolved spec becomes the conversation's current one, and the transcript shows
-`Spec actual: 002-ventas-facturacion`; `set_current_spec` lets the assistant do the same instead
-of asking you to pick it by hand, and a suggested command carries its spec in the button text.
-When the message names no spec and the conversation has none, the command stops with
-*Indica la spec: /speckit-plan 002-ventas-facturacion* and the project's spec list. A brief that
-creates several specs leaves the **last** one as current and lists all of them with their stage.
-
-If the model tries to write outside the resolved spec (or the artifact folders that spec owns),
-the tool answers with the routing error
-*Este comando corre sobre 001-… Para escribir en specs/002-… ejecuta /speckit-plan 002-…*. A run
-that ends without writing a file and only produced those errors is shown as **mal enrutado**, not
-as completed, with an **Ejecutar sobre 002-…** button that re-runs the same command on the right
-spec.
-
-### Repeated work and cost guards
-
-A command whose target is already complete does not run again: `/speckit-plan` when `plan.md`
-exists and `spec.md` did not change since it was written, `/speckit-tasks` when `tasks.md` exists
-and the plan did not change, `/speckit-implement` when every task is `[X]` and the artifacts are
-validated, and `/speckit-converge` when its last run found no gaps on the same revisions. The
-reply says so and shows the command to use; append **`--force`** to bypass the guard
-(`/speckit-plan 002-ventas-facturacion --force`), which is recorded in the run.
-
-Two more guards keep a run from repeating work: `read_draft` says *sin cambios desde la lectura
-anterior* —and returns the file anyway— when the same run already sent that revision, and
-`get_authoring_guide` returns a pointer after the first use of a topic in a run. There is **no token
-ceiling** on a command any more: the AI is unlimited and tokens are only counted.
-
-`read_draft` returns the content every time on purpose: the provider payload keeps the data of the
-newest exchange only, so an earlier result reaches the model as its one-line summary. Answering with
-just the hash left the model unable to see the file again, and the run stopped saying «no puedo leer
-el contenido real de integration.yaml» (corregido el 2026-10-26).
-
-### Spec-driven and quick changes
-
-Not every change deserves a spec. `/speckit-specify` is for a new piece (a source, an integration,
-a report, a distribution) and gives you plan, tasks and traceability. For a small, precise change to
-something that already exists — a title, a column added to a dataset, a filter, a broken SQL — use
-**`/fix`**: it edits an existing `integration.yaml`, `report.yaml`, query or request, runs the
-checks and the preview, and stops there. The product still validates every write, so the speed does
-not come from removing the guard, only from removing the paperwork.
-
-A brief that covers several pieces (an integration **and** its report) now produces **all** of their
-specs in one `/speckit-specify` run — up to three — instead of asking you to repeat the request.
-
-### Modes: Preguntar and Auto
-
-The composer has one small mode button next to the message box; it belongs to the conversation.
-
-| Mode | What it may do without asking | What still needs you |
-|---|---|---|
-| **Preguntar** / Ask | Read sources structure, profiles, the workspace, specs and guides; answer, explain, propose. | Everything that writes. |
-| **Auto** | Read at once; then chain the Spec Kit stages, write the specs and artifacts, validate, preview, fix and **apply** — and reports at the end. | Picking Auto for that run. Nothing else. |
-
-**Auto is the default.** Selecting it in the chip is the authorisation: it creates the run contract
-with the documented defaults — the entire pipeline up to apply, every configured source, nothing
-existing modified, automatic rollback, no extra visibility — and the transcript shows it. There is no
-form and no password (an installation can ask for one with `AI_AUTO_REQUIRE_STEP_UP=1`).
-
-In Auto the run never stops to ask: a finished stage (plan, tasks…) is followed by the next one on
-its own, and the transcript shows "Etapa /speckit-plan terminada". What the run may do is enforced
-by the product, not by the model, and it has **no token cap** — the contract, the per-command
-ceiling and the conversation budget all leave an Auto run alone (unless a run profile sets a limit):
-**Detener**, or switching to Preguntar, brakes the run with the draft and the working state intact,
-and nothing is applied afterwards. Writing "modo autónomo" in a message never switches the mode.
-
-After an autonomous apply the first scheduled run of the new integration is watched: a failure shows
-up in the conversation and, with rollback on, the previous version comes back. The applied dashboard
-is not granted to any user until a human decides so.
-
-### Asking for an autonomous run
-
-Say it in the brief and the run stops asking: *"modo autónomo"*, *"sin preguntar"* or
-*"decide tú y anota las suposiciones"*. The assistant then picks the most reasonable default,
-writes each assumption into the document it is producing, and only stops for something
-irreversible or about privacy, credentials or scope. A brief that names the decisions it would
-otherwise ask about (for example *"estatus pagada = paid"*) removes those questions entirely.
-
-Two things stay in your hands, by design:
-
-- **Commands do not start each other.** One message runs one command; the **Pipeline** button
-  chains `specify → plan → tasks → implement` and asks once before it sends the four messages.
-- **A personal column** that you did not explicitly ask for is never included silently: either the
-  brief excludes it ("sin columnas personales") or the assistant names it and waits.
-
-The chat only handles reports, integrations, ETL, data sources and the use of BizView. Clearly
-off-topic requests get a fixed answer without calling the AI; documents and tool results are
-passed to the model as data, never as instructions.
-
-### A mockup as the brief
-
-With a model that reads images, the composer's clip button (📎, its tooltip and accessible name
-say *Adjuntar boceto* / *Attach a brief*) takes a picture
-(PNG, JPEG, WebP or GIF, up to `ATTACHMENTS_MAX_MB` — 5 MB by default — and
-`ATTACHMENTS_MAX_PER_MESSAGE` — 4 — waiting to be sent at a time) so you can say *"un reporte
-como este"* and attach the mockup instead of describing its layout in words. The image travels
-with that message only; the answer states what it read, and the spec files are written by the
-command you are in, as with any other request.
-
-- The images live in `ATTACHMENTS_DIR` (`attachments/` next to the product, never inside a
-  project folder): **include that directory in your backups**, and know that it is *outside*
-  the project export, the Git mirror and the applied version.
-- The first time you send an image the chat shows a notice and waits: images go to the AI
-  provider you configured, so use mockups or examples, never screenshots with real customer
-  data. The acknowledgement is remembered per account.
-- The picture is *data*: the message preceding it is labelled as untrusted input, so nothing
-  written inside an image is treated as an instruction.
-- The audit log records who uploaded what (session, size, media type, a short hash) and never
-  the bytes or the original file name.
-- Without a vision model (`AI_VISION=false`, or an OpenAI-compatible endpoint under `auto`) the
-  button is disabled and sending images is refused with a clear message; the rest of the chat
-  works as usual.
-
-Not sure what to run next? Type `/ayuda` for the command list, examples and the next step of each
-spec in the project (answered without calling the AI), or `/ayuda <tema>` — for example
-`/ayuda reporte directo` — for one guide topic. The same topics are on the **Ayuda** page
-(`/ayuda`); the walkthroughs "Un reporte directo paso a paso" and "De la fuente a la
-distribución" follow this guide step by step in the app. You can also ask the chat "explícame este
-proyecto" or "¿qué falta?": it reads the project overview (stages, next command, decisions with
-file and line).
+A project created or imported in the app keeps its files, its history, its validation, apply,
+rollback and export; the assistant-dependent preview route does not exist, so what an author sees
+before applying is the validation result and the file tree.
 
 ## "No spec, no run"
 

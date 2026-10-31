@@ -3,7 +3,6 @@
 import types
 
 from app import db as app_db
-from app.assistant import preview
 from app.config import get_settings
 from app.db import lock_key
 from app.engine import runner
@@ -34,12 +33,10 @@ def test_keys_differ_per_schema(monkeypatch):
     assert lock_key("integration", "x") == "bizview:public:integration:x"
 
 
-def test_runner_and_preview_keys_include_schema():
+def test_runner_and_workspace_keys_include_schema():
     schema = get_settings().db_schema
 
     assert runner._lock_key("ventas") == f"bizview:{schema}:integration:ventas"
-    assert preview.preview_lock_key(7) == f"bizview:{schema}:assistant-preview:7"
-    assert schema in lock_key("preview", 7)
     assert lock_key("workspace") == f"bizview:{schema}:workspace"
 
 
@@ -51,4 +48,3 @@ def test_runner_lock_key_scoped_via_monkeypatch(monkeypatch):
     )
 
     assert runner._lock_key("a") == "bizview:app_test_zzzz:integration:a"
-    assert preview.preview_lock_key(1) == "bizview:app_test_zzzz:assistant-preview:1"

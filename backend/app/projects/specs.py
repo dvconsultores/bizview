@@ -7,7 +7,7 @@ import yaml
 from bizview_cli import layout
 from sqlalchemy import select
 
-from app.models import DataSource, ProjectFileRevision
+from app.models import DataSource
 from app.projects import fs, history
 
 STAGES = ("especificada", "aclarada", "planificada", "tareas", "implementada", "aplicada")
@@ -90,34 +90,6 @@ def linked_artifacts(files: dict[str, str], folder: str) -> dict[str, list[str]]
     return {kind: sorted(paths) for kind, paths in result.items()}
 
 
-def _command(cmd: str | None) -> str:
-    return (cmd or "").lstrip("/").lower()
-
-
-def revised_by(db, project_id: int, path: str, command: str) -> bool:
-    """True when some revision of the file was made by `command` (e.g. speckit-clarify)."""
-    target = _command(command)
-    commands = db.scalars(select(ProjectFileRevision.command).where(
-        ProjectFileRevision.project_id == project_id, ProjectFileRevision.path == path))
-    return any(_command(c) == target for c in commands)
-
-
-def converged(db, project_id: int, path: str, current_text: str | None) -> bool:
-    """The latest tasks.md revision by /speckit-converge added open tasks, still open."""
-    revisions = db.scalars(select(ProjectFileRevision).where(
-        ProjectFileRevision.project_id == project_id, ProjectFileRevision.path == path,
-    ).order_by(ProjectFileRevision.id)).all()
-    latest = predecessor = None
-    for index, rev in enumerate(revisions):
-        if _command(rev.command) == "speckit-converge" and rev.op != "delete":
-            latest = rev
-            predecessor = revisions[index - 1] if index > 0 else None
-    if latest is None or latest.content is None or current_text is None:
-        return False
-    before = predecessor.content if predecessor is not None and predecessor.content else ""
-    return open_tasks(latest.content) > open_tasks(before) and open_tasks(current_text) > 0
-
-
 def applied_files(db, project) -> dict[str, str] | None:
     """{path: sha256} of the project in the active version, None when it is not applied."""
     from app.projects.compose import version_projects
@@ -142,7 +114,6 @@ def stage(
     *,
     applied: dict[str, str] | None,
     sources: dict[str, bool | None],
-    clarify_revision: bool,
 ) -> dict[str, Any]:
     """Stage of a spec folder per R7, with kind, title, status and linked artifacts."""
     spec_path = f"specs/{folder}/spec.md"
@@ -150,7 +121,7 @@ def stage(
         return {"stage": None, "kind": None}
     info = parse_spec(files[spec_path])
     current = "especificada"
-    if info["clarified"] or clarify_revision:
+    if info["clarified"]:
         current = "aclarada"
     if f"specs/{folder}/plan.md" in files:
         current = "planificada"
@@ -184,7 +155,7 @@ def stage(
 
 
 def list_specs(db, project) -> list[dict[str, Any]]:
-    """Spec folders of the project: number, kind, title, status, stage, converged."""
+    """Spec folders of the project: number, kind, title, status and stage."""
     listed, _ = fs.list_files(project.slug)
     files: dict[str, str] = {}
     for path in listed:
@@ -203,11 +174,6 @@ def list_specs(db, project) -> list[dict[str, Any]]:
                for name, ok in db.execute(select(DataSource.name, DataSource.last_test_ok))}
     result = []
     for folder in folders:
-        data = stage(folder, files, applied=applied, sources=sources,
-                     clarify_revision=revised_by(db, project.id, f"specs/{folder}/spec.md",
-                                                 "speckit-clarify"))
-        tasks_path = f"specs/{folder}/tasks.md"
-        result.append({"folder": folder, "number": int(folder[:3]), **data,
-                       "converged": converged(db, project.id, tasks_path,
-                                              files.get(tasks_path))})
+        data = stage(folder, files, applied=applied, sources=sources)
+        result.append({"folder": folder, "number": int(folder[:3]), **data})
     return result

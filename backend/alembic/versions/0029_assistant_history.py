@@ -65,10 +65,10 @@ def upgrade() -> None:
     op.create_index(op.f("ix_assistant_message_assistant_message_id"), "assistant_message",
                     ["assistant_message_id"])
 
-    # Pair what can be paired and flag the rest, logging the orphan count per conversation.
-    from app.assistant import repair
-
-    repair.repair_everything(op.get_bind())
+    # The repair pass that paired legacy rows lived in `app/assistant/repair.py`; feature 045
+    # removed that module (and, in 0041, the table), so a historical migration no longer imports
+    # product code. An installation still carrying unpaired rows is rescued by 0041 before it drops
+    # the table, and transcripts were never kept across that step.
 
     op.drop_constraint(op.f(AUDIT_CHECK), "audit_event", type_="check")
     op.create_check_constraint(op.f(AUDIT_CHECK), "audit_event", f"kind IN {_in(KINDS_029)}")

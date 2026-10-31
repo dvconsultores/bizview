@@ -1,7 +1,6 @@
 """Feature 020 T068: history, diff, restore and spec timeline."""
 import pytest
 
-from app.assistant import service as assistant
 from app.config import get_settings
 from app.models import AppUser
 from app.projects import fs, history
@@ -28,8 +27,8 @@ def w(path, content, base=None):
     return {"op": "write", "path": path, "content": content, "base_sha256": base, "force": False}
 
 
-def by(kind="user", command="edit", user_id=None, session_id=None):
-    return {"kind": kind, "user_id": user_id, "session_id": session_id, "command": command}
+def by(kind="user", command="edit", user_id=None):
+    return {"kind": kind, "user_id": user_id, "command": command}
 
 
 def groups(db, project, **kw):
@@ -91,17 +90,14 @@ def test_restore_creates_new_revision(db, project, projects):
 
 
 def test_history_api_and_timeline(db, project, superuser):
-    session = assistant.create_session(db, db.get(AppUser, superuser.id), project_id=project.id)
-    db.commit()
     fs.apply_ops(project.id, [w("specs/001-a/spec.md", "# A\n\n**Tipo**: reporte\n")],
-                 by("agent", "/speckit-specify", session_id=session.id))
+                 by("agent", "/speckit-specify"))
     fs.apply_ops(project.id, [w("specs/001-a/plan.md", "p\n"), w("specs/001-a/tasks.md",
                                                                   "- [x] T1\n")], by())
     c = signed_in("root@example.com")
     body = c.get("/api/projects/demo/specs/001-a/timeline").json()
     assert [s["stage"] for s in body["stages"]] == [
         "especificada", "planificada", "tareas", "implementada"]
-    assert body["conversations"] == [{"id": session.id, "title": session.title}]
     assert c.get("/api/projects/demo/specs/bad/timeline").status_code == 404
 
     items = c.get("/api/projects/demo/history").json()["items"]

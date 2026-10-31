@@ -207,14 +207,6 @@ export interface SecurityOverview {
   legacy_origin_notice: boolean;
   legacy_origin_variable_present: boolean;
   direct_reads?: DirectReadCount[];
-  /** Feature 024: what the chat has sent to the provider (counts and sizes, never images). */
-  attachments?: {
-    total: number;
-    bytes: number;
-    conversations: number;
-    provider: string;
-    model: string;
-  };
 }
 
 export interface MfaSetup {
@@ -994,7 +986,6 @@ export interface ProjectSummary {
   spec_seq: number;
   status: ProjectStatus;
   spec_count: number;
-  conversations: number;
   created_at: string | null;
   updated_at: string | null;
   last_activity_at: string | null;
@@ -1016,28 +1007,17 @@ export interface SpecInfo {
   stage: SpecStage | null;
   title?: string | null;
   status?: string | null;
-  converged: boolean;
   linked?: Partial<Record<SpecKind, string[]>>;
   source_missing?: { source: string | null; link: string };
-}
-
-export interface ProjectConversation {
-  id: number;
-  title: string;
-  status: string;
-  read_only: boolean;
-  current_spec: string | null;
-  updated_at: string | null;
 }
 
 export interface ChangedFiles { added: string[]; changed: string[]; removed: string[] }
 
 export interface ProjectDetail
-  extends Omit<ProjectSummary, "spec_count" | "conversations" | "artifacts" | "applied" | "problems"> {
+  extends Omit<ProjectSummary, "spec_count" | "artifacts" | "applied" | "problems"> {
   changed_files: ChangedFiles;
   last_applied: ProjectLastApplied | null;
   specs: SpecInfo[];
-  conversations: ProjectConversation[];
 }
 
 export interface TreeEntry { path: string; size: number; sha256: string }
@@ -1046,7 +1026,7 @@ export interface ProjectTree {
   files: TreeEntry[];
   folders: string[];
   ignored: string[];
-  specs: Record<string, { kind: SpecKind | null; stage: SpecStage | null; converged: boolean }>;
+  specs: Record<string, { kind: SpecKind | null; stage: SpecStage | null }>;
   status: ProjectStatus;
 }
 
@@ -1159,7 +1139,6 @@ export interface ProjectDiff { path: string; hunks: DiffHunk[]; truncated: boole
 export interface SpecTimeline {
   folder: string;
   stages: { stage: SpecStage; time: string; version?: number }[];
-  conversations: { id: number; title: string }[];
 }
 
 export interface ProjectImportResult {
