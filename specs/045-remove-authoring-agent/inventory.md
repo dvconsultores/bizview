@@ -59,8 +59,12 @@ AI line describes help-only.
 
 ## 6. Frontend — R
 
-`src/components/assistant/` (9 files: `AssistantChat`, `AssistantHistory`, `AssistantPanelContext`,
-`AssistantPanel`, `AssistantToggle`, `ChatText`, `useAssistantBusy`, `useOpenAssistant`),
+`src/components/assistant/` (28 files: `AgentMap`, `AIPill`, `AssistantChat`, `AssistantHistory`,
+`AssistantPanelContext`, `AssistantPanel`, `AssistantToggle`, `ChatText`, `CommandMenu`,
+`CommandRunChip`, `CommandSuggestion`, `EditableTitle`, `ModeSelector`, `PanelResizer`,
+`PreviewReports`, `ProblemList`, `ProjectProposal`, `ProviderError`, `Readiness`, `RunReportCard`,
+`RunStatus`, `SessionIndicator`, `SpecPicker`, `SpecSelect`, `useAssistantBusy`, `useCommands`,
+`useOpenAssistant`, `WorkingNotes`),
 `src/pages/admin/AssistantSession.tsx`, `src/pages/admin/RunProfiles.tsx`, the assistant routes in
 `App.tsx`, the assistant entries in `routeAccess.ts`, the AI card and pill in `AdminHome.tsx` and
 `adminTiles.ts`, the assistant strings in `i18n/es.ts` and `i18n/en.ts`, the assistant types in
