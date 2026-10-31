@@ -254,7 +254,9 @@ export interface ReportDefinition {
   compare: { default: CompareMode; allowed: CompareMode[] };
   filters: string[];
   pdf: boolean;
-  ai_narrative: boolean;
+  /** Deprecated and ignored since 0.2.0: the narrative generator is gone. The key stays so
+   *  a project written for an older installation still validates. */
+  ai_narrative?: boolean;
   direct?: { source: string; cache_seconds: number };
   /** The declared views, in payload order (`report.yaml` → `views`); `layout.web[].view` binds to
    * their `id` (feature 026). */
@@ -830,295 +832,26 @@ export interface TelegramCheck {
   bot_name?: string;
 }
 
-// --- Vibe-reporting assistant (feature 014) ---
-export interface AssistantSessionSummary {
-  id: number;
-  title: string;
-  status: "open" | "applied" | "archived";
-  updated_at: string;
-  tokens_used: number;
-  busy?: boolean;
-  /** Feature 028: the mode pill of the conversation list. */
-  mode?: AssistantMode;
-  contract_status?: AssistantContractStatus;
+// Feature 021: Spec Kit commands in the chat.
+/** Feature 039: the run report card the last message of a pipeline carries. */
+// Feature 017 (agentic chat)
+export interface ProjectReadiness {
+  ready: boolean;
+  pending: { code: string; file: string | null; message: string }[];
 }
 
-export interface AssistantMessage {
-  id: number;
-  role: "user" | "assistant" | "tool";
-  content: string;
-  created_at: string;
-  tool_name?: string;
-  /** Feature 021: "Insertar" suggestions and the scope pre-check of a reply. */
-  suggestions?: CommandSuggestionItem[];
-  scope?: { path: string; rule: string | null };
-  /** Feature 024: the image briefs this message carries (metadata only). */
-  attachments?: Attachment[];
-  /** Feature 035: why a turn failed — code, provider words, model, action, request id. */
-  error?: ProviderErrorPayload;
-  /** Feature 039: the run report of a finished `/speckit-all` plan. */
-  run_report?: RunReport;
+export interface ShareLinksState {
+  items: ShareLink[];
+  sharing_enabled: boolean;
+  max_active: number;
+  active_count: number;
+  days: { min: number; max: number; default: number };
 }
 
-export interface ProviderErrorPayload {
-  code: string;
-  detail: string | null;
-  provider: string;
-  model: string | null;
-  at: string;
-  request_id: string;
-  action: "admin_ai" | "retry" | null;
-  retry_after?: number | null;
-  blocked?: boolean;
-}
-
-/** Feature 024: an image brief of the chat; `url` serves the bytes back. */
-export interface Attachment {
-  id: number;
-  media_type: string;
-  byte_size: number;
-  original_name: string | null;
+export interface CreatedShareLink extends ShareLink {
+  token: string;
   url: string;
 }
-
-// Feature 021: Spec Kit commands in the chat.
-export interface CommandDef {
-  name: string;
-  description: string;
-  argument_hint: string;
-  needs_spec: boolean;
-  needs_args: boolean;
-}
-export type CommandRunStatus =
-  | "running"
-  | "waiting"
-  | "completed"
-  | "misrouted"
-  | "budget"
-  | "interrupted"
-  | "failed";
-export interface CommandRunFile { path: string; action: string; revision_id: number | null; }
-
-/** Feature 039: where a `/speckit-all` run stands in its eight-stage plan. */
-export interface Pipeline {
-  id: number | null;
-  cursor: number;
-  total: number;
-  stage: string | null;
-  until: string | null;
-  spec: string | null;
-  spec_index: number;
-  /** Feature 040: the convergence round (2 for the re-entry after the first converge). */
-  round?: number;
-}
-
-/** Feature 039: the run report card the last message of a pipeline carries. */
-export interface RunReport {
-  spec: string;
-  path: string;
-  result: "ready" | "applied" | "stopped";
-  stop_reason: string | null;
-  stages: { stage: string; run_id: number; status: CommandRunStatus }[];
-  pending: string[];
-  decisions: string[];
-  verify: { check: string; ok: boolean; detail?: string }[];
-  stories: { story: string; title?: string; test?: string; ok: boolean }[];
-}
-export interface CommandRun {
-  id: number;
-  message_id: number | null;
-  command: string;
-  arguments?: string;
-  spec: string | null;
-  resolved_from?: string | null;
-  forced?: boolean;
-  status: CommandRunStatus;
-  files: CommandRunFile[];
-  misrouted_to?: string | null;
-  /** Feature 039: present on every run of a `/speckit-all` plan. */
-  pipeline?: Pipeline | null;
-  ceiling?: number;
-  tokens: number;
-  started_at: string;
-  ended_at: string | null;
-}
-export interface ActiveCommand {
-  id: number;
-  command: string;
-  spec: string | null;
-  status: CommandRunStatus;
-  pending: { gate: string } | null;
-}
-export interface CommandSuggestionItem { command: string; arguments: string; spec?: string | null; }
-export interface SpecChoice {
-  folder: string;
-  title?: string | null;
-  kind?: string | null;
-  stage?: string | null;
-}
-
-export interface AssistantDraft {
-  files: Record<string, string>;
-  summary: string;
-}
-
-export interface AssistantIssue {
-  entry: string;
-  code: string;
-  message: string;
-  file?: string | null;
-  path?: string | null;
-  expected?: Record<string, unknown> | null;
-  fix?: string | null;
-  /** Feature 035: the correction the product can apply on its own. */
-  fix_data?: ProjectFix | null;
-  problem_id?: string | null;
-}
-
-export interface AssistantValidation {
-  valid: boolean;
-  errors: AssistantIssue[];
-  warnings: AssistantIssue[];
-}
-
-export interface AssistantPreviewResult {
-  status: string;
-  message: string | null;
-  datasets: Record<string, { rows: number }>;
-}
-
-export interface AssistantPreview {
-  status: "pending" | "succeeded" | "failed" | "expired" | "replaced";
-  finished_at?: string;
-  requested_at?: string;
-  integrations?: Record<string, AssistantPreviewResult>;
-  preview_integrations?: string[];
-  message?: string;
-  /** Feature 038: the applied version that replaced this preview. */
-  version?: number;
-}
-
-// Feature 017 (agentic chat)
-export interface AssistantPendingItem {
-  code: string;
-  file: string | null;
-  message: string;
-}
-
-export interface AssistantReadiness {
-  ready: boolean;
-  pending: AssistantPendingItem[];
-}
-
-export interface AssistantWorkingState {
-  goal?: string;
-  decisions?: string[];
-  step?: string;
-  done?: string[];
-  next?: string;
-  progress?: string;
-  inspected?: { [source: string]: { [key: string]: string } };
-  described?: { [source: string]: string[] };
-  personal?: { [source: string]: { [column: string]: string } };
-}
-
-export interface AssistantStats {
-  rounds?: number;
-  validations?: number;
-  probes?: number;
-  previews?: number;
-  query_checks?: number;
-  input_tokens?: number;
-  cached_tokens?: number;
-  output_tokens?: number;
-}
-
-export interface AssistantSession {
-  id: number;
-  title: string;
-  status: "open" | "applied" | "archived";
-  draft: AssistantDraft | null;
-  validation: AssistantValidation | null;
-  preview: AssistantPreview | null;
-  applied_version_id: number | null;
-  tokens_used: number;
-  created_at: string;
-  updated_at: string;
-  messages: AssistantMessage[];
-  working_state?: AssistantWorkingState;
-  readiness?: AssistantReadiness;
-  stats?: AssistantStats;
-  busy?: boolean;
-  model?: string | null;
-  /** The project's specs and stages (conversation header selector). */
-  specs?: SpecChoice[];
-  /** Feature 020: every conversation belongs to a BI project. */
-  project?: ProjectRef | null;
-  current_spec?: string | null;
-  read_only?: boolean;
-  /** Feature 021: the command in progress and the last command runs. */
-  active_command?: ActiveCommand | null;
-  command_runs?: CommandRun[];
-  /** The command that follows the last finished run, computed by the product. */
-  next_step?: { command: string; spec: string | null } | null;
-  /** Feature 028: the composer selector and the run contract. */
-  mode?: AssistantMode;
-  contract?: AssistantAutoRun | null;
-  contract_status?: AssistantContractStatus;
-}
-
-/** Feature 028: mode of a conversation (FR-000). */
-export type AssistantMode = "ask" | "edit" | "auto";
-export type AssistantContractStatus =
-  | "none" | "confirmed" | "running" | "applied" | "stopped" | "failed";
-
-export interface ContractSource { name: string; tables?: string[] }
-
-export interface RunContract {
-  goal: string;
-  sources?: ContractSource[];
-  stages: Array<"draft" | "preview" | "apply">;
-  /** Omitted by the composer: the server fills the installation's defaults. */
-  limits?: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
-  modify_existing?: boolean;
-  auto_rollback?: boolean;
-  visible_to?: Array<"admin" | "user">;
-  profile_id?: number | null;
-}
-
-export interface AssistantAutoRun {
-  id: number;
-  status: "confirmed" | "running" | "applied" | "stopped" | "failed";
-  stop_reason: string | null;
-  stage: string | null;
-  limits: { tokens: number; previews: number; applies: number; wall_clock_seconds: number };
-  used: { tokens: number; previews: number; applies: number; elapsed_seconds: number };
-  stages: Array<"draft" | "preview" | "apply">;
-  sources: ContractSource[];
-  modify_existing: boolean;
-  auto_rollback: boolean;
-  visible_to: Array<"admin" | "user">;
-  version_id: number | null;
-  summary: Record<string, unknown> | null;
-  watch_state: string | null;
-}
-
-export interface RunProfile {
-  id: number;
-  name: string;
-  contract: Partial<RunContract>;
-  updated_at: string;
-}
-
-export type AssistantRunStatus = "running" | "done" | "stopped" | "error" | "budget" | "limit" | "ready";
-export interface AssistantActivityTool { name: string; label: string; status: "running" | "ok" | "error"; started_at: string; ms: number | null; }
-export interface AssistantActivityRound { n: number; tools: AssistantActivityTool[]; }
-export interface AssistantActivityRun { id: number; started_at: string; finished_at: string | null; status: AssistantRunStatus; round: number; tokens: number; tools: number; current: { tool: string; label: string; since: string } | null; }
-export interface AssistantRunSummary { id: number; started_at: string; finished_at: string | null; status: AssistantRunStatus; rounds: number; tokens: number; tools: number; }
-export interface AssistantActivity { busy: boolean; model: string; run: AssistantActivityRun | null; rounds: AssistantActivityRound[]; background: { kind: "preview"; status: "pending" | "running"; since: string }[]; runs: AssistantRunSummary[]; }
-
-// Feature 018: dashboard sharing (expiring links, email, scheduled sends).
-export type ShareLinkOrigin = "manual" | "email" | "subscription";
 
 export interface ShareLink {
   id: number;
@@ -1135,7 +868,6 @@ export interface ShareLink {
   /** Feature 030: the first-load theme chosen when the link was created. */
   theme?: ShareTheme | null;
 }
-
 export interface ShareLinksState {
   items: ShareLink[];
   sharing_enabled: boolean;
@@ -1143,11 +875,11 @@ export interface ShareLinksState {
   active_count: number;
   days: { min: number; max: number; default: number };
 }
-
 export interface CreatedShareLink extends ShareLink {
   token: string;
   url: string;
 }
+export type ShareLinkOrigin = "manual" | "email" | "subscription";
 
 export type EmailDeliveryStatus = "queued" | "sent" | "failed" | "skipped";
 export type EmailSendStatus = "queued" | "sending" | "sent" | "partial" | "failed";
@@ -1363,7 +1095,7 @@ export interface ProjectValidation {
   composed_valid?: boolean;
 }
 
-export interface ProjectCheck { validation: ProjectValidation; readiness: AssistantReadiness }
+export interface ProjectCheck { validation: ProjectValidation; readiness: ProjectReadiness }
 
 export interface SaveResult extends ProjectCheck {
   file: { path: string; sha256: string; revision_id: number | null };

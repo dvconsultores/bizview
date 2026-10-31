@@ -91,7 +91,7 @@ function Version({ v, title }: { v: WorkspaceVersion; title: string }) {
       <a href={`/api/workspace/versions/${v.id}/export.zip`} download
         className={buttonClass("secondary", false, "gap-2")}>
         <Download className="h-5 w-5" aria-hidden />
-        {t.assistant.downloadZip}
+        {t.workspace.downloadZip}
       </a>
     </Card>
   );

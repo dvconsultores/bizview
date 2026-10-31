@@ -65,17 +65,9 @@ async function createProject() {
 }
 
 describe("Projects page", () => {
-  it("with AI off, Nuevo proyecto opens the project without asking for a conversation", async () => {
-    branding.ai_enabled = false;
+  it("Nuevo proyecto opens the project it just created", async () => {
     expect(await createProject()).toBe("/proyectos/demo");
     expect(projectsApi.create).toHaveBeenCalledOnce();
-    expect(projectsApi.createSession).not.toHaveBeenCalled();
-  });
-
-  it("with AI on, the new project opens on its first conversation", async () => {
-    branding.ai_enabled = true;
-    expect(await createProject()).toBe("/proyectos/demo?chat=7");
-    expect(projectsApi.createSession).toHaveBeenCalledWith("demo");
   });
 
   it("cards show artifacts, applied ones and problems; an unwritable folder disables create", async () => {

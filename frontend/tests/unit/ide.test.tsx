@@ -266,9 +266,9 @@ describe("pane tabs at 375 px", () => {
     window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => undefined,
                                            removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
     const onActive = vi.fn();
-    await render(<PaneTabs files={<p>F</p>} editor={<p>E</p>} chat={<p>C</p>} active="files" onActive={onActive} />);
+    await render(<PaneTabs files={<p>F</p>} editor={<p>E</p>} active="files" onActive={onActive} />);
     const tabs = Array.from(container.querySelectorAll('[role="tab"]')) as HTMLElement[];
-    expect(tabs.map((x) => x.textContent)).toEqual([t.projects.files, t.projects.editor, t.projects.chat]);
+    expect(tabs.map((x) => x.textContent)).toEqual([t.projects.files, t.projects.editor]);
     expect(container.querySelector('[role="tabpanel"]')?.textContent).toBe("F");
     await key(tabs[0], "ArrowRight");
     expect(onActive).toHaveBeenCalledWith("editor");

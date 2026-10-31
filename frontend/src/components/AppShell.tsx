@@ -1,7 +1,7 @@
 import { ChevronsLeft, ChevronsRight, CircleHelp, FolderKanban, Home, LayoutDashboard, LayoutGrid, LogOut, Moon, Sun, User as UserIcon, type LucideIcon } from "lucide-react";
 import {
   useCallback, useEffect, useMemo, useRef, useState,
-  type CSSProperties, type ReactNode,
+  type ReactNode,
 } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useAuth } from "../auth/AuthContext";
@@ -18,9 +18,6 @@ import { UpdateBanner } from "./UpdateBanner";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { ViewHost } from "./ViewHost";
-import { AssistantPanel } from "./assistant/AssistantPanel";
-import { AssistantPanelProvider, useAssistantPanel } from "./assistant/AssistantPanelContext";
-import { AssistantToggle } from "./assistant/AssistantToggle";
 
 interface NavItem {
   to: string;
@@ -141,29 +138,15 @@ function AccountMenu() {
   );
 }
 
-/** Content column of the shell. The docked chat takes its own column instead of floating over the
- * page: with the panel open the content keeps its room, so nothing under the panel becomes
- * unreachable (feature 024 polish). That holds in full screen too (feature 025): the chrome steps
- * aside, but the chat's column stays reserved so the project's own controls remain reachable.
- * `children` receives whether the chat is docked, because the content's own padding is tighter next
- * to the panel — the seam between the page and the chat was the widest blank space on the screen. */
-function ShellContent({ hidden, chat, collapsed, children }: {
+/** Content column of the shell: the sidebar's offset and nothing else. */
+function ShellContent({ hidden, collapsed, children }: {
   hidden: boolean;
-  chat: boolean;
   collapsed: boolean;
-  children: (docked: boolean) => ReactNode;
+  children: ReactNode;
 }) {
-  const { mode, width } = useAssistantPanel();
-  const docked = chat && mode === "docked";
   return (
-    <div
-      style={docked ? ({ "--assistant-width": `${width}px` } as CSSProperties) : undefined}
-      className={`${hidden ? "" : collapsed ? "lg:pl-[5rem]" : "lg:pl-64"} ${
-        docked ? "lg:pr-[var(--assistant-width)]" : ""
-      }`}
-      data-assistant-width={docked ? width : undefined}
-    >
-      {children(docked)}
+    <div className={`${hidden ? "" : collapsed ? "lg:pl-[5rem]" : "lg:pl-64"}`}>
+      {children}
     </div>
   );
 }
@@ -174,7 +157,7 @@ export function AppShell() {
   const t = useT();
   const { product_name, organization_name } = useBranding();
   const { full, compact } = useNavItems();
-  const [chrome, setChrome] = useState<{ hidden: boolean; chat: boolean }>({ hidden: false, chat: true });
+  const [chrome, setChrome] = useState<{ hidden: boolean }>({ hidden: false });
   const chromeHidden = chrome.hidden;
   const chromeState = useMemo(() => ({ ...chrome, setHidden: setChrome }), [chrome]);
   const [navCollapsed, setNavCollapsed] = useState(readNavCollapsed);
@@ -185,7 +168,6 @@ export function AppShell() {
 
   return (
     <ShellChromeContext.Provider value={chromeState}>
-      <AssistantPanelProvider>
       <div className="min-h-screen bg-canvas">
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">
           {t.common.skipToContent}
@@ -255,14 +237,11 @@ export function AppShell() {
           </aside>
         ) : null}
 
-        <ShellContent hidden={chromeHidden} chat={chrome.chat} collapsed={navCollapsed}>
-          {(docked) => (
+        <ShellContent hidden={chromeHidden} collapsed={navCollapsed}>
             <>
             {!chromeHidden ? (
             <header className="sticky top-0 z-30 bg-brand-gradient pt-safe text-on-primary shadow-md lg:border-b lg:border-line lg:bg-surface lg:bg-none lg:pt-0 lg:shadow-none">
-              <div className={`flex h-14 items-center justify-between px-4 sm:h-16 sm:px-5 ${
-                  docked ? "lg:pl-4 lg:pr-3" : "lg:px-4"
-                }`}>
+              <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-5 lg:px-4">
                 <Link to="/" className="flex min-w-0 items-center lg:hidden">
                   <Logo className="h-9 w-9 shrink-0" inverted />
                   <span className="ml-3 min-w-0">
@@ -272,7 +251,6 @@ export function AppShell() {
                 </Link>
                 <div className="hidden lg:block" />
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-                  <AssistantToggle />
                   <ThemeToggle />
                   <AccountMenu />
                 </div>
@@ -287,12 +265,7 @@ export function AppShell() {
             className={
               chromeHidden
                 ? "px-4 py-4 sm:px-5 lg:px-5"
-                : `px-4 pb-10 pt-4 sm:pt-5 lg:pb-10 ${
-                    // With the chat docked the content already lost the panel's column, so it uses
-                    // all of what is left: the centered cap would leave canvas in front of the
-                    // panel on a wide screen (the same "exaggerated space" the owner reported).
-                    docked ? "lg:pl-4 lg:pr-0" : `${APP_CONTAINER} ${APP_GUTTER}`
-                  }`
+                : `px-4 pb-10 pt-4 sm:pt-5 lg:pb-10 ${APP_CONTAINER} ${APP_GUTTER}`
             }
           >
             <ViewHost>
@@ -302,7 +275,6 @@ export function AppShell() {
 
             {!chromeHidden ? <SourceFooter className="px-4 pb-28 lg:pb-8" /> : null}
             </>
-          )}
         </ShellContent>
 
         {!chromeHidden ? (
@@ -331,11 +303,7 @@ export function AppShell() {
           </nav>
         ) : null}
 
-        {/* The chat stays available in full screen too (feature 025): the chrome steps aside, the
-            panel does not. Kiosk-like modes (the report's TV mode) ask for it to step aside as well. */}
-        {chrome.chat ? <AssistantPanel /> : null}
       </div>
-      </AssistantPanelProvider>
     </ShellChromeContext.Provider>
   );
 }

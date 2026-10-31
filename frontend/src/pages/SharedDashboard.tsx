@@ -83,9 +83,7 @@ export function SharedDashboard() {
 
   const report = useMemo<ReportDefinition | null>(
     () =>
-      sharedState.status === "ok"
-        ? { ...sharedState.shared.report, ai_narrative: false }
-        : null,
+      sharedState.status === "ok" ? sharedState.shared.report : null,
     [sharedState],
   );
 

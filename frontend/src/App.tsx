@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactElement } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Route, Routes } from "react-router";
 import { AuthProvider, RequireAdmin, RequireAuth, RequireSuperuser } from "./auth/AuthContext";
 import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./components/Toast";
@@ -9,7 +9,6 @@ import { ViewHost } from "./components/ViewHost";
 import { AdminHome } from "./pages/admin/AdminHome";
 import { Appearance } from "./pages/admin/Appearance";
 import { AI } from "./pages/admin/AI";
-import { RunProfiles } from "./pages/admin/RunProfiles";
 import { Security } from "./pages/admin/Security";
 import { SourceForm } from "./pages/admin/SourceForm";
 import { Sources } from "./pages/admin/Sources";
@@ -41,9 +40,6 @@ const ProjectWorkspace = lazy(() =>
   import("./pages/projects/ProjectWorkspace").then((m) => ({ default: m.ProjectWorkspace })));
 const ProjectHistory = lazy(() =>
   import("./pages/projects/ProjectHistory").then((m) => ({ default: m.ProjectHistory })));
-const RedirectToProject = lazy(() =>
-  import("./pages/projects/RedirectToProject").then((m) => ({ default: m.RedirectToProject })));
-
 const lazyPage = (page: ReactElement) => <Suspense fallback={null}>{page}</Suspense>;
 
 export function App() {
@@ -72,7 +68,6 @@ export function App() {
                     <Route path="admin/usuarios/:id" element={<RequireAdmin><UserDetail /></RequireAdmin>} />
                     <Route path="admin/auditoria" element={<RequireSuperuser><Audit /></RequireSuperuser>} />
                     <Route path="admin/ia" element={<RequireSuperuser><AI /></RequireSuperuser>} />
-                    <Route path="admin/ia/perfiles" element={<RequireSuperuser><RunProfiles /></RequireSuperuser>} />
                     <Route path="admin" element={<RequireAdmin><AdminHome /></RequireAdmin>} />
                     <Route path="admin/fuentes" element={<RequireSuperuser><Sources /></RequireSuperuser>} />
                     <Route path="admin/fuentes/nueva" element={<RequireSuperuser><SourceForm /></RequireSuperuser>} />
@@ -85,8 +80,6 @@ export function App() {
                     <Route path="proyectos" element={<RequireSuperuser>{lazyPage(<Projects />)}</RequireSuperuser>} />
                     <Route path="proyectos/:slug" element={<RequireSuperuser>{lazyPage(<ProjectWorkspace />)}</RequireSuperuser>} />
                     <Route path="proyectos/:slug/historial" element={<RequireSuperuser>{lazyPage(<ProjectHistory />)}</RequireSuperuser>} />
-                    <Route path="admin/asistente" element={<Navigate to="/proyectos" replace />} />
-                    <Route path="admin/asistente/:id" element={<RequireSuperuser>{lazyPage(<RedirectToProject />)}</RequireSuperuser>} />
                     <Route path="seguridad/doble-factor" element={<TwoFactorSetup />} />
                     <Route path="no-autorizado" element={<Forbidden />} />
                     <Route path="*" element={<NotFound />} />

@@ -11,7 +11,6 @@ import type {
 import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
-import { Narrative } from "../components/report/Narrative";
 import { ReportViews } from "../components/report/ReportViews";
 import type { LayoutParamsWiring } from "../components/report/LayoutBlocks";
 import { Spinner } from "../components/Spinner";
@@ -147,9 +146,8 @@ export function ReportView() {
   }, [palettePreview, declaredPalette, setPalette]);
   useEffect(() => () => setPalette(null), [setPalette]);
 
-  // TV mode is meant to be looked at, not worked in: the chat steps aside with the rest of the
-  // chrome (feature 025).
-  useHideShellChrome(tv, false);
+  // TV mode is meant to be looked at, not worked in: the chrome steps aside with it.
+  useHideShellChrome(tv);
 
   useEffect(() => {
     return onFullscreenChange(() => {
@@ -606,9 +604,6 @@ export function ReportView() {
               inert={!fresh || loading ? true : undefined}
             >
               {renderViews("normal")}
-              {def.ai_narrative && query !== null ? (
-                <Narrative reportId={id} query={query} />
-              ) : null}
             </div>
           ) : null}
       </div>

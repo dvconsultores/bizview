@@ -11,7 +11,6 @@ import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/Spinner";
-import { useBranding } from "../../config/BrandingContext";
 import { useT } from "../../i18n";
 import { formatDateTime } from "../../lib/format";
 import { fold } from "../../lib/search";
@@ -25,7 +24,6 @@ const inputClass = "min-h-tap w-full rounded-card border border-line bg-surface 
 export function Projects() {
   const t = useT();
   const navigate = useNavigate();
-  const { ai_enabled } = useBranding();
   const [items, setItems] = useState<ProjectSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,12 +67,7 @@ export function Projects() {
     setFormError(null);
     try {
       const project = await projectsApi.create({ name: name.trim(), slug: slug || undefined });
-      if (!ai_enabled) {          // AI is optional: the project works without a conversation
-        navigate(`/proyectos/${project.slug}`);
-        return;
-      }
-      const session = await projectsApi.createSession(project.slug);
-      navigate(`/proyectos/${project.slug}?chat=${session.id}`);
+      navigate(`/proyectos/${project.slug}`);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t.common.unexpected);
     } finally {

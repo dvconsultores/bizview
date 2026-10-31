@@ -90,7 +90,7 @@ topics:
     aliases:
       es: ["privacidad", "ia", "inteligencia artificial", "modelo local", "datos personales"]
       en: ["privacy", "ai", "artificial intelligence", "local model", "personal data"]
-    related: [alcance-del-agente, ia, chat-del-agente]
+    related: [ia]
   - id: ayuda
     section: primeros-pasos
     title: {es: "Obtener ayuda", en: "Get help"}
@@ -104,7 +104,7 @@ topics:
     aliases:
       es: ["ayuda", "soporte", "guía", "preguntar al asistente", "buscar en la ayuda"]
       en: ["help", "support", "guide", "ask the assistant", "search help"]
-    related: [navegacion, chat-del-agente, metodo-spec-kit]
+    related: [navegacion]
   - id: perfil
     section: cuenta
     title: {es: "Tu perfil", en: "Your profile"}
@@ -384,21 +384,7 @@ topics:
     aliases:
       es: ["ia", "proveedor", "modelo", "clave de api", "probar conexión"]
       en: ["ai", "provider", "model", "api key", "test connection"]
-    related: [privacidad-y-ia, chat-del-agente, alcance-del-agente]
-  - id: perfiles-de-ejecucion
-    section: administracion
-    title: {es: "Perfiles de ejecución", en: "Run profiles"}
-    summary:
-      es: "Cómo guardar un contrato de run autónomo y reutilizarlo para repetir un run con un clic."
-      en: "How to save an autonomous run contract and reuse it to repeat a run in one click."
-    roles: [superuser]
-    routes: ["/admin/ia/perfiles"]
-    tiles: []
-    commands: []
-    aliases:
-      es: ["perfiles de ejecución", "perfil de run", "contrato guardado", "modo auto"]
-      en: ["run profiles", "run profile", "saved contract", "auto mode"]
-    related: [ia, chat-del-agente]
+    related: [privacidad-y-ia]
   - id: tokens
     section: administracion
     title: {es: "Tokens de acceso", en: "Access tokens"}
@@ -581,118 +567,6 @@ topics:
       es: ["estructura", "carpetas", "project.yaml", "rutas permitidas"]
       en: ["structure", "folders", "project.yaml", "allowed paths"]
     related: [proyectos, editor-de-proyecto, tipos-de-spec]
-  - id: chat-del-agente
-    section: agente
-    title: {es: "Chat del agente", en: "Agent chat"}
-    summary:
-      es: "El panel del asistente: conversaciones, mapa del agente, presupuesto y vista previa."
-      en: "How to use the assistant panel, its conversations, the agent map, the budget and the preview."
-    roles: [superuser]
-    routes: ["/admin/asistente", "/admin/asistente/:id"]
-    tiles: []
-    commands: []
-    aliases:
-      es: ["asistente", "chat", "conversación", "mapa del agente", "presupuesto"]
-      en: ["assistant", "chat", "conversation", "agent map", "budget"]
-    related: [alcance-del-agente, metodo-spec-kit, ia]
-  - id: brief-con-imagen
-    section: agente
-    title: {es: "Boceto con una imagen", en: "A mockup as the brief"}
-    summary:
-      es: "Bocetos adjuntos al chat: límites, aviso de privacidad y qué no hace la imagen."
-      en: "Images attached to the chat: limits, the privacy notice and what the image does not do."
-    roles: [superuser]
-    routes: ["/admin/asistente", "/proyectos/:slug"]
-    tiles: []
-    commands: []
-    aliases:
-      es: ["boceto", "imagen", "adjunto", "maqueta", "captura", "como este"]
-      en: ["mockup", "image", "attachment", "screenshot", "like this one"]
-    related: [chat-del-agente, alcance-del-agente, definir-un-reporte]
-  - id: alcance-del-agente
-    section: agente
-    title: {es: "Qué hace y qué no hace el agente", en: "What the agent does and does not do"}
-    summary:
-      es: "El agente solo trabaja en temas BI, cambia archivos solo con comandos y nunca ve filas ni credenciales."
-      en: "The agent works only on BI topics, changes files only through commands and never sees rows or credentials."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: []
-    aliases:
-      es: ["alcance", "límites del agente", "solo bi", "datos personales"]
-      en: ["scope", "agent limits", "bi only", "personal data"]
-    related: [chat-del-agente, privacidad-y-ia, metodo-spec-kit]
-  - id: metodo-spec-kit
-    section: agente
-    title: {es: "El método Spec Kit", en: "The Spec Kit method"}
-    summary:
-      es: "Specs numeradas, de especificar a converger y aplicar, y qué comando sigue en cada etapa."
-      en: "How work goes through numbered specs, from specify to converge and apply, and which command comes next."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: []
-    aliases:
-      es: ["spec kit", "método", "etapas", "flujo de trabajo", "qué sigue"]
-      en: ["spec kit", "method", "stages", "workflow", "what next"]
-    related: [comandos-especificar, comandos-planificar, comandos-construir]
-  - id: comandos-especificar
-    section: agente
-    title: {es: "Comandos para especificar", en: "Commands to specify"}
-    summary:
-      es: "Qué hacen /speckit-constitution, /speckit-specify y /speckit-clarify y qué archivos cambian."
-      en: "What /speckit-constitution, /speckit-specify and /speckit-clarify do and which files they change."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: ["/speckit-constitution", "/speckit-specify", "/speckit-clarify"]
-    aliases:
-      es: ["especificar", "constitución", "aclarar", "nueva spec"]
-      en: ["specify", "constitution", "clarify", "new spec"]
-    related: [metodo-spec-kit, comandos-planificar, tipos-de-spec]
-  - id: comandos-planificar
-    section: agente
-    title: {es: "Comandos para planificar", en: "Commands to plan"}
-    summary:
-      es: "Qué hacen /speckit-plan, /speckit-tasks, /speckit-analyze y /speckit-checklist y qué producen."
-      en: "What /speckit-plan, /speckit-tasks, /speckit-analyze and /speckit-checklist do and what they produce."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: ["/speckit-plan", "/speckit-tasks", "/speckit-analyze", "/speckit-checklist"]
-    aliases:
-      es: ["planificar", "plan", "tareas", "analizar", "lista de verificación"]
-      en: ["plan", "tasks", "analyze", "checklist", "planning"]
-    related: [metodo-spec-kit, comandos-especificar, comandos-construir]
-  - id: comandos-construir
-    section: agente
-    title: {es: "Comandos para construir", en: "Commands to build"}
-    summary:
-      es: "Qué hacen /speckit-implement y /speckit-converge y qué pasa si se interrumpen."
-      en: "What /speckit-implement and /speckit-converge do, how they make the project ready and what happens if interrupted."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: ["/speckit-implement", "/speckit-converge", "/fix"]
-    aliases:
-      es: ["implementar", "converger", "construir", "artefactos"]
-      en: ["implement", "converge", "build", "artifacts"]
-    related: [metodo-spec-kit, comandos-planificar, aplicar-proyecto]
-  - id: todo-el-recorrido
-    section: agente
-    title: {es: "Todo el recorrido con un comando", en: "The whole run with one command"}
-    summary:
-      es: "Qué hace /speckit-all: recorre las ocho etapas sin preguntar, decide en tu lugar y termina con el informe y la vista previa."
-      en: "What /speckit-all does: run the eight stages without asking, decide for you and end with the report and the preview."
-    roles: [superuser]
-    routes: []
-    tiles: []
-    commands: ["/speckit-all", "/speckit-verify"]
-    aliases:
-      es: ["todo el recorrido", "todo de una vez", "autónomo", "sin preguntas", "verificar"]
-      en: ["whole run", "all at once", "autonomous", "no questions", "verify"]
-    related: [metodo-spec-kit, comandos-construir, aplicar-proyecto]
   - id: tipos-de-spec
     section: agente
     title: {es: "Tipos de spec", en: "Spec kinds"}

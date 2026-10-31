@@ -18,7 +18,5 @@ command are for the **Superuser**.
 
 ## Options
 
-- **Superuser**: **Ask the assistant** opens the chat with `/ayuda` and the topic.
-- In the chat, `/ayuda` alone shows the commands and what to do next; `/ayuda` followed by a
-  topic (for example `/ayuda direct report`) explains it.
+- The search matches titles, body text and keywords, in the interface's language.
 - You can also ask in your own words, for example "how do I share a dashboard?".

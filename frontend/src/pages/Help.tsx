@@ -1,4 +1,4 @@
-import { ArrowLeft, MessageSquare, Search } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { api } from "../api/client";
@@ -7,7 +7,6 @@ import { useAuth } from "../auth/AuthContext";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { PageHeader } from "../components/PageHeader";
-import { useAssistantPanelOptional } from "../components/assistant/AssistantPanelContext";
 import { MarkdownView } from "../components/ide/MarkdownView";
 import { useLocale, useT } from "../i18n";
 import { resolveAppLink } from "../lib/appLinks";
@@ -22,7 +21,6 @@ export function Help() {
   const t = useT();
   const { locale } = useLocale();
   const { user } = useAuth();
-  const panel = useAssistantPanelOptional();
   const [params, setParams] = useSearchParams();
   const topicId = params.get("tema");
   const [index, setIndex] = useState<GuideIndex | null>(null);
@@ -117,16 +115,6 @@ export function Help() {
                 {t.help.back}
               </Button>
               <h2 id="help-topic" className="sr-only">{topic.title}</h2>
-              {user?.is_superuser && panel && (
-                <Button
-                  variant="secondary"
-                  className="ml-auto"
-                  icon={<MessageSquare className="h-4 w-4" aria-hidden />}
-                  onClick={() => panel.openWith(`/ayuda ${topic.id}`)}
-                >
-                  {t.help.askAssistant}
-                </Button>
-              )}
             </div>
             <MarkdownView text={topic.body} resolveLink={resolveLink} />
             {topic.related.length > 0 && (

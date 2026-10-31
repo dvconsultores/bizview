@@ -1,5 +1,5 @@
 import { CheckCircle2, XCircle } from "lucide-react";
-import type { AssistantReadiness, ProjectLastApplied, ProjectStatus, ProjectValidation } from "../../api/types";
+import type { ProjectReadiness, ProjectLastApplied, ProjectStatus, ProjectValidation } from "../../api/types";
 import { useT } from "../../i18n";
 import { formatDateTime } from "../../lib/format";
 import { Badge } from "../Badge";
@@ -13,7 +13,7 @@ const STATUS_TONE: Record<ProjectStatus, "gray" | "green" | "amber" | "red"> = {
 
 export function StatusBar(props: {
   validation: ProjectValidation | null;
-  readiness: AssistantReadiness | null;
+  readiness: ProjectReadiness | null;
   status: ProjectStatus | null;
   /** The latest apply (version, time, who), not the first one (020 T086). */
   lastApplied: ProjectLastApplied | null;

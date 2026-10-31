@@ -18,7 +18,5 @@ Cualquier persona con una cuenta ve la **Ayuda** con los temas de su rol. El cha
 
 ## Opciones
 
-- **Superusuario**: **Preguntar al asistente** abre el chat con `/ayuda` y el tema.
-- En el chat, `/ayuda` sin nada más muestra los comandos y qué hacer a continuación; `/ayuda`
-  seguido de un tema (por ejemplo `/ayuda reporte directo`) lo explica.
+- La búsqueda encuentra por título, texto y palabras clave, en el idioma de la interfaz.
 - También puedes preguntar con tus palabras, por ejemplo «¿cómo comparto un tablero?».

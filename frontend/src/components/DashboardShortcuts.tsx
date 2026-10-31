@@ -4,7 +4,7 @@ import { useT } from "../i18n";
 import { localized } from "../lib/labels";
 import { readFavorites, readRecents } from "../lib/dashboardPrefs";
 import { dashboardIcon } from "../lib/icons";
-import { relativeTime } from "./assistant/AssistantHistory";
+import { relativeTime } from "../lib/relativeTime";
 
 const CHIP =
   "inline-flex min-h-tap items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-line-accent";

@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Play, Sparkles, Trash2, Upload } from "lucide-react";
-import { api, ApiError } from "../../api/client";
+import { Download, GitBranch, History, Maximize2, Minimize2, Pencil, Play, Trash2, Upload } from "lucide-react";
+import { ApiError } from "../../api/client";
 import { isRevisionGroup, projectsApi } from "../../api/projects";
 import type {
-  AssistantSession, FileChangedCurrent, ProjectCheck, ProjectDetail, ProjectStatus, ProjectTree,
+  FileChangedCurrent, ProjectCheck, ProjectDetail, ProjectStatus, ProjectTree,
 } from "../../api/types";
-import { AssistantChat } from "../../components/assistant/AssistantChat";
-import { SpecSelect } from "../../components/assistant/SpecSelect";
 import { BackLink } from "../../components/BackLink";
-import { PreviewReports } from "../../components/assistant/PreviewReports";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Spinner } from "../../components/Spinner";
-import { useAssistantPanel } from "../../components/assistant/AssistantPanelContext";
 import { useHideShellChrome } from "../../components/ShellChrome";
 import { useToast } from "../../components/Toast";
 import { CodeEditor, type CodeEditorHandle } from "../../components/ide/CodeEditor";
@@ -23,12 +19,11 @@ import { DiffView } from "../../components/ide/DiffView";
 import { EditorTabs, openTab, type OpenTab } from "../../components/ide/EditorTabs";
 import { Explorer } from "../../components/ide/Explorer";
 import { MarkdownView } from "../../components/ide/MarkdownView";
-import { PaneTabs, useWideLayout, type PaneId } from "../../components/ide/PaneTabs";
+import { PaneTabs, type PaneId } from "../../components/ide/PaneTabs";
 import { ProblemsPanel } from "../../components/ide/ProblemsPanel";
 import { StatusBar, type SaveState } from "../../components/ide/StatusBar";
 import { useLeaveGuard } from "../../components/ide/useLeaveGuard";
 import { useProjectChanges } from "../../components/ide/useProjectChanges";
-import { useBranding } from "../../config/BrandingContext";
 import { useT } from "../../i18n";
 import { formatDateTime } from "../../lib/format";
 import {
@@ -94,7 +89,6 @@ export function ProjectWorkspace() {
   const [search, setSearch] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const { ai_enabled } = useBranding();
   // Feature 024 polish: the whole project on the whole screen — the app chrome steps aside and the
   // browser hides its own bars, so the files, the editor and the chat get every pixel back.
   const full = search.get("full") === "1";
@@ -123,13 +117,6 @@ export function ProjectWorkspace() {
   const [check, setCheck] = useState<ProjectCheck | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pane, setPane] = useState<PaneId>("files");
-  // Feature 024 polish: one chat per screen. From 1024 px the docked panel (the same chat as the
-  // rest of the app) shows the conversation and the page does not render a second copy of it;
-  // below that the chat is a pane, because the panel has no room to dock.
-  const wide = useWideLayout();
-  const { mode: chatMode, toggle: toggleChat, open: openChat, setSessionId } = useAssistantPanel();
-  const chatOpen = chatMode !== "closed";
-  const syncedChat = useRef<string | null>(null);
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [buffers, setBuffers] = useState<Record<string, Buffer>>({});
@@ -146,7 +133,6 @@ export function ProjectWorkspace() {
   const [savingDetails, setSavingDetails] = useState(false);
   /** Where the user wanted to go while tabs were unsaved (020 T083); null when not leaving. */
   const [leaving, setLeaving] = useState<string | null>(null);
-  const [session, setSession] = useState<AssistantSession | null>(null);
   const editor = useRef<CodeEditorHandle | null>(null);
 
   const readOnly = project?.origin === "git";
@@ -208,37 +194,11 @@ export function ProjectWorkspace() {
     // the last validation while the new one was in flight, which is another project's problems on
     // this page.
     setCheck(null);
-    setSession(null);
     refresh().then(() => { if (!cancelled) void revalidate(); })
       .catch((e) => !cancelled && setLoadError(errorText(e, t.common.unexpected)));
     return () => { cancelled = true; };
   }, [refresh, revalidate, t]);
 
-  // Conversation of the chat pane: ?chat=<id>, else the viewer's latest one in the project.
-  // Feature 037: a deep link is honoured only when that conversation is one of *this project's*
-  // conversations (the id came from a URL, so it is data, not a promise): a project page can no
-  // longer show another project's chat, its validation or its preview.
-  const ownConversations = project?.conversations ?? [];
-  const linked = search.get("chat");
-  const chatId = (linked && ownConversations.some((c) => String(c.id) === linked) ? linked : null)
-    ?? (ownConversations[0] ? String(ownConversations[0].id) : null);
-  // A deep link (?chat=<id>, what the project history and the old assistant links use) selects the
-  // conversation in the docked panel too, so the link opens what the user asked for.
-  useEffect(() => {
-    if (!wide || !chatId || syncedChat.current === chatId) return;
-    syncedChat.current = chatId;
-    setSessionId(Number(chatId));
-    openChat();
-  }, [wide, chatId, setSessionId, openChat]);
-
-  useEffect(() => {
-    if (!chatId) { setSession(null); return; }
-    let cancelled = false;
-    api.get<AssistantSession>(`/api/assistant/sessions/${chatId}`)
-      .then((s) => !cancelled && setSession(s.project?.slug === slug ? s : null))
-      .catch(() => !cancelled && setSession(null));
-    return () => { cancelled = true; };
-  }, [chatId, slug]);
 
   useLeaveGuard(dirty, setLeaving);
 
@@ -426,12 +386,6 @@ export function ProjectWorkspace() {
         setProject(res.project);
         setResult({ tone: "success", text: `${t.projects.applied(res.version.id)}${res.revalidated ? ` ${t.projects.revalidated}` : ""}` });
         setAppliedReports(res.version.projects?.[slug]?.reports ?? []);
-        // 038: the apply replaced the preview. The page must stop offering its links now, not on
-        // the next reload.
-        if (session) {
-          const fresh = await api.get<AssistantSession>(`/api/assistant/sessions/${session.id}`);
-          setSession(fresh.project?.slug === slug ? fresh : null);
-        }
       } else if (kind === "convert") {
         setProject(await projectsApi.convert(slug));
         setResult({ tone: "success", text: t.projects.converted });
@@ -453,33 +407,8 @@ export function ProjectWorkspace() {
   const preview = async () => {
     try {
       await projectsApi.requestPreview(slug);
-      if (wide) toggleChat();
-      else setPane("chat");
+      void revalidate();
       toast(t.projects.preview);
-    } catch (e) {
-      setResult({ tone: "error", text: errorText(e, t.common.unexpected) });
-    }
-  };
-
-  const pickConversation = (id: string) => {
-    const next = new URLSearchParams(search);
-    next.set("chat", id);
-    setSearch(next, { replace: true });
-  };
-  const newConversation = async () => {
-    try {
-      const s = await projectsApi.createSession(slug);
-      setSession(s);
-      pickConversation(String(s.id));
-      setProject(await projectsApi.get(slug));
-    } catch (e) {
-      setResult({ tone: "error", text: errorText(e, t.common.unexpected) });
-    }
-  };
-  const setSpec = async (folder: string) => {
-    if (!session) return;
-    try {
-      setSession(await projectsApi.setCurrentSpec(session.id, folder));
     } catch (e) {
       setResult({ tone: "error", text: errorText(e, t.common.unexpected) });
     }
@@ -635,49 +564,6 @@ export function ProjectWorkspace() {
     </div>
   );
 
-  const conversations = project.conversations;
-  const chatPane = (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-subtle p-2">
-        <label className="sr-only" htmlFor="project-chat">{t.projects.conversation}</label>
-        {conversations.length > 0 && (
-          <select id="project-chat" value={session ? String(session.id) : ""}
-                  onChange={(e) => pickConversation(e.target.value)}
-                  className="min-h-tap min-w-0 flex-1 rounded-card border border-line bg-surface px-2 text-sm text-ink">
-            {conversations.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </select>
-        )}
-        {ai_enabled && (
-          <Button variant="secondary" onClick={() => void newConversation()}>{t.projects.newChat}</Button>
-        )}
-        {session && project.specs.length > 0 && (
-          <SpecSelect
-            current={session.current_spec ?? null}
-            specs={project.specs}
-            onChange={(folder) => void setSpec(folder)}
-          />
-        )}
-      </div>
-      {!ai_enabled && <div className="p-2"><Alert tone="info">{t.projects.aiOff}</Alert></div>}
-      {session?.read_only && <div className="p-2"><Alert tone="warning">{t.projects.readOnlyChat}</Alert></div>}
-      {ai_enabled && (
-        <div className="min-h-0 flex-1">
-          <AssistantChat
-            session={session}
-            onSession={(s) => setSession(s)}
-            createSession={async () => {
-              const s = await projectsApi.createSession(slug);
-              pickConversation(String(s.id));
-              return s;
-            }}
-            variant="page"
-            onOpenFile={(path) => void openFile(path)}
-          />
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="flex h-[calc(100dvh-7rem)] min-h-[32rem] flex-col gap-3">
       {/* One row from 1024 px (the title truncates, the actions keep their size); on phones the
@@ -718,15 +604,6 @@ export function ProjectWorkspace() {
           <div className="flex items-stretch overflow-hidden rounded-lg border border-line bg-surface">
             <ToolButton iconOnly icon={<Play className="h-4 w-4" aria-hidden />} label={t.projects.preview}
                         onClick={() => void preview()} />
-            {ai_enabled && wide ? (
-              // One chat per screen: opens/closes the docked panel from the project itself, so the
-              // chat is reachable in full screen too (the top bar is hidden there). The label is
-              // stable and `aria-pressed` carries the state.
-              <ToolButton iconOnly icon={<Sparkles className="h-4 w-4" aria-hidden />}
-                          label={t.assistant.panelTitle} pressed={chatOpen}
-                          title={chatOpen ? t.assistant.closePanel : t.assistant.openPanel}
-                          onClick={() => toggleChat()} />
-            ) : null}
             {canFullscreen ? (
               <ToolButton iconOnly
                           icon={full ? <Minimize2 className="h-4 w-4" aria-hidden />
@@ -849,22 +726,9 @@ export function ProjectWorkspace() {
           </ul>
         </details>
       )}
-      {session?.preview?.status === "succeeded" && (
-        <details className="rounded-card border border-line bg-surface p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-ink">{t.projects.preview}</summary>
-          <div className="mt-3">
-            <PreviewReports
-              base={`/api/projects/${encodeURIComponent(slug)}`}
-              reportIds={tree.files.map((f) => f.path.match(/^reports\/([^/]+)\/report\.yaml$/)?.[1])
-                .filter((id): id is string => !!id)}
-            />
-          </div>
-        </details>
-      )}
-      {/* 038: an applied version dropped the preview schemas, so the links point at the dashboard. */}
-      {session?.preview?.status === "replaced" && (
+      {/* An apply replaces the project's preview: the links point at the applied dashboards. */}
+      {(appliedReports ?? []).length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface-2 p-3 text-sm text-ink-2">
-          <span>{t.projects.previewReplaced(session.preview.version ?? project.last_applied?.version ?? 0)}</span>
           {(appliedReports ?? []).map((id) => (
             <Link key={id} to={`/r/${encodeURIComponent(id)}`} className="font-mono text-accent underline">{id}</Link>
           ))}
@@ -879,8 +743,8 @@ export function ProjectWorkspace() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-surface">
         <div className="min-h-0 flex-1">
-          <PaneTabs files={filesPane} editor={editorPane} chat={chatPane} active={pane}
-                    onActive={setPane} showChat={!wide} />
+          <PaneTabs files={filesPane} editor={editorPane} active={pane}
+                    onActive={setPane} />
         </div>
         {/* Below every pane, so phones see readiness without opening the editor. */}
         <StatusBar validation={check?.validation ?? null} readiness={check?.readiness ?? null}
