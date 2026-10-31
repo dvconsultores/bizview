@@ -676,6 +676,14 @@
           "maxLength": 1000
         }
       }
+    },
+    "images": {
+      "description": "Conjuntos de imágenes del reporte, por nombre; los componentes los usan con image: <conjunto>.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/image_set"
+      },
+      "maxProperties": 20
     }
   },
   "$defs": {
@@ -784,7 +792,7 @@
       ],
       "properties": {
         "type": {
-          "description": "Tipo del componente: kpi, line, area, bar, pie, donut, table, text, filters o spacer.",
+          "description": "Tipo del componente: kpi, line, area, bar, pie, donut, table, gauge, share, index, asset, text, filters o spacer.",
           "enum": [
             "kpi",
             "line",
@@ -793,6 +801,10 @@
             "pie",
             "donut",
             "table",
+            "gauge",
+            "share",
+            "index",
+            "asset",
             "text",
             "filters",
             "spacer"
@@ -844,9 +856,53 @@
           "type": "boolean"
         },
         "metric": {
-          "description": "Id de la métrica del componente kpi.",
+          "description": "Id de la métrica del componente kpi, gauge o index.",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "min": {
+          "description": "Mínimo de la escala de gauge/index; por defecto 0.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Máximo de la escala de gauge/index; por defecto 100.",
+          "type": "number"
+        },
+        "low_label": {
+          "description": "Etiqueta del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "low_label_en": {
+          "description": "Etiqueta en inglés del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label": {
+          "description": "Etiqueta del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label_en": {
+          "description": "Etiqueta en inglés del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label": {
+          "description": "Etiqueta del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label_en": {
+          "description": "Etiqueta en inglés del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "limit": {
+          "description": "asset: cuántas filas de la vista se muestran; por defecto 8.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
         },
         "delta": {
           "description": "Comparación del kpi: previous_period (por defecto) o none.",
@@ -910,7 +966,7 @@
           "description": "Etiqueta de la categoría agrupada en inglés (opcional); si falta se usa other_label."
         },
         "columns": {
-          "description": "Columnas de la tabla en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "description": "Columnas de la vista que muestra el componente: para table, en orden (por defecto, las de la vista); para asset, lista posicional [imagen, título, subtítulo, valor, delta] (imagen y delta pueden ser \"\" para omitir).",
           "type": "array",
           "items": {
             "description": "Id de una métrica o dimensión de la tabla.",
@@ -991,6 +1047,11 @@
         "font_name": {
           "description": "Familia tipográfica de un componente de texto; por defecto la de la interfaz.",
           "$ref": "#/$defs/font_name"
+        },
+        "image": {
+          "description": "Conjunto de imágenes (clave de `images`) que usa el componente: en table, la imagen de la celda clave; en kpi y asset, junto a la etiqueta.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
         }
       },
       "allOf": [
@@ -1228,7 +1289,7 @@
       ],
       "properties": {
         "type": {
-          "description": "Tipo del bloque: header, kpi_row, chart, table, text, page_break o footer.",
+          "description": "Tipo del bloque: header, kpi_row, chart, table, text, page_break, footer o uno de los visuales (gauge, index, share, asset).",
           "enum": [
             "header",
             "kpi_row",
@@ -1236,7 +1297,11 @@
             "table",
             "text",
             "page_break",
-            "footer"
+            "footer",
+            "gauge",
+            "index",
+            "share",
+            "asset"
           ]
         },
         "id": {
@@ -1272,7 +1337,7 @@
           ]
         },
         "items": {
-          "description": "Métricas de la fila de indicadores (kpi_row); al menos una.",
+          "description": "Métricas del bloque: en kpi_row, las de la fila de indicadores; en share, las de los segmentos, en orden.",
           "type": "array",
           "items": {
             "description": "Id de una métrica del indicador.",
@@ -1331,7 +1396,7 @@
           "maximum": 200
         },
         "columns": {
-          "description": "Columnas de la tabla del PDF en orden (métricas o dimensiones); por defecto, las de la vista.",
+          "description": "Columnas del PDF en orden: en table, las métricas o dimensiones de la tabla (por defecto, las de la vista); en asset, la lista posicional [imagen, título, subtítulo, valor, delta].",
           "type": "array",
           "items": {
             "description": "Id de una métrica o dimensión de la tabla.",
@@ -1410,6 +1475,64 @@
           "type": "string",
           "maxLength": 200,
           "description": "Línea legal en inglés (opcional): se muestra cuando la interfaz está en inglés; si falta se usa legal."
+        },
+        "metric": {
+          "description": "Métrica del bloque gauge o index.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "min": {
+          "description": "Mínimo de la escala de gauge/index; por defecto 0.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Máximo de la escala de gauge/index; por defecto 100.",
+          "type": "number"
+        },
+        "low_label": {
+          "description": "Etiqueta del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "low_label_en": {
+          "description": "Etiqueta en inglés del extremo inferior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label": {
+          "description": "Etiqueta del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "high_label_en": {
+          "description": "Etiqueta en inglés del extremo superior de la escala de index.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label": {
+          "description": "Etiqueta del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "remainder_label_en": {
+          "description": "Etiqueta en inglés del segmento de resto calculado del componente share.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "image": {
+          "description": "Conjunto de imágenes (clave de `images`) del bloque: en table, la imagen de la celda clave; en asset, junto al nombre.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "sparkline": {
+          "description": "Mostrar la minigráfica del kpi; por defecto false.",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "asset: cuántas filas de la vista se muestran; por defecto 8.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24
         }
       },
       "allOf": [
@@ -1551,6 +1674,51 @@
               "type"
             ]
           }
+        }
+      ]
+    },
+    "image_set": {
+      "description": "Conjunto de imágenes: resuelve la clave de una fila a un archivo del proyecto, a una URL cacheada o al relleno declarado.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "folder": {
+          "description": "Carpeta del proyecto con las imágenes, por ejemplo assets/coins.",
+          "type": "string",
+          "pattern": "^assets/[a-z0-9][a-z0-9._/-]*$"
+        },
+        "column": {
+          "description": "Columna de URL de imagen cuya descarga cachea el worker, por ejemplo l.logo_url.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}\\.[a-z][a-z0-9_]{0,40}$"
+        },
+        "key": {
+          "description": "Dimensión o columna cuyo valor nombra el archivo (BTC → BTC.png).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "fallback": {
+          "description": "Qué dibujar cuando no hay archivo: initial (círculo con la inicial) o none.",
+          "enum": [
+            "initial",
+            "none"
+          ],
+          "default": "initial"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "folder"
+          ]
+        },
+        {
+          "required": [
+            "column"
+          ]
         }
       ]
     }

@@ -151,10 +151,14 @@ for (const scheme of ["light", "dark"] as const) {
         `${LAYOUT_REPORT} must declare a component with image: for this spec to prove SC-001`,
       ).toBeGreaterThan(0);
 
+      // The report paints after the definition arrives: wait for a picture, never for a timer.
+      const pictures = page.locator("[data-layout-id] img");
+      await expect(pictures.first()).toBeVisible();
+
       // A viewer never reaches the third party: every src is one of our own doors.
-      const sources = await page
-        .locator("[data-layout-id] img")
-        .evaluateAll((images) => images.map((image) => image.getAttribute("src") ?? ""));
+      const sources = await pictures.evaluateAll((images) =>
+        images.map((image) => image.getAttribute("src") ?? ""),
+      );
       expect(sources.length).toBeGreaterThan(0);
       for (const src of sources) {
         expect(src, "an image must come from this installation").toMatch(/^\/api\//);
@@ -171,6 +175,54 @@ for (const scheme of ["light", "dark"] as const) {
         await expectNoHorizontalScroll(page);
       }
       await expectAccessible(page, `images in ${scheme}`);
+    });
+
+    test("a cached URL column is served by this installation, with no third-party request", async ({
+      page,
+    }) => {
+      // Every request the page makes, so "the viewer never reaches the CDN" is observed, not assumed.
+      const outbound: string[] = [];
+      page.on("request", (request) => {
+        const url = request.url();
+        if (!url.startsWith("http://localhost")) outbound.push(url);
+      });
+
+      const { query } = await openReport(page, LAYOUT_REPORT);
+      const cached = page.locator("[data-layout-id='catalogo'] img");
+      await expect(cached.first()).toBeVisible();
+
+      // The worker rewrote the loaded column: the row names a file, and this installation serves it.
+      const response = await page.request.get(`/api/reports/${LAYOUT_REPORT}/data?${query}`);
+      const payload = (await response.json()) as { views: { rows?: Record<string, unknown>[] }[] };
+      const values = payload.views.flatMap((view) => (view.rows ?? []).map((row) => row.logo_url));
+      const stored = values.filter((value) => typeof value === "string" && value !== "");
+      expect(stored.length, "the seeded table must carry cached filenames").toBeGreaterThan(0);
+      for (const value of stored) expect(value).toMatch(/^[0-9a-f]{64}\.png$/);
+
+      const sources = await cached.evaluateAll((images) =>
+        images.map((image) => image.getAttribute("src") ?? ""),
+      );
+      expect(sources.length).toBeGreaterThan(0);
+      for (const src of sources) expect(src).toMatch(/^\/api\/reports\/[^/]+\/images\/[0-9a-f]{64}\.png$/);
+
+      // Two addresses with identical bytes share one file; the third row has none and falls back.
+      expect(new Set(sources).size, "deduplicated by content").toBe(1);
+      await expect(page.locator("[data-layout-id='catalogo'] [role='img']").first()).toBeVisible();
+
+      for (const width of [375, 1280]) {
+        await page.setViewportSize({ width, height: width === 375 ? 740 : 900 });
+        await settled(page);
+        const sizes = await cached.evaluateAll((images) =>
+          images.map((image) => Math.round(image.getBoundingClientRect().width)),
+        );
+        for (const size of sizes) expect([20], `cached image width ${size} at ${width}px`).toContain(size);
+        await expectNoHorizontalScroll(page);
+      }
+      await expectAccessible(page, `cached images in ${scheme}`);
+      expect(
+        outbound.filter((url) => !url.includes("localhost")),
+        "a viewer must never contact the address the report declared",
+      ).toEqual([]);
     });
 
     test("every chart announces the engine's summary", async ({ page }) => {
