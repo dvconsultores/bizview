@@ -1,6 +1,6 @@
 # Feature Specification: Remove the in-app authoring agent
 
-**Feature Branch**: `045-remove-authoring-agent`
+**Branch**: `main` (this repository never creates feature branches)
 
 **Created**: 2026-10-31
 

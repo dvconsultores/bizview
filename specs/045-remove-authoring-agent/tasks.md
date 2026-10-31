@@ -7,11 +7,11 @@ green.
 
 ## Phase 1: Inventory (commit 1)
 
-- [ ] T001 Write `specs/045-remove-authoring-agent/inventory.md` enumerating every file, route, table, setting, string key, test and dependency to remove, with the reason, and commit it before deleting anything
+- [x] T001 Write `specs/045-remove-authoring-agent/inventory.md` enumerating every file, route, table, setting, string key, test and dependency to remove, with the reason, and commit it before deleting anything — done in `91f1ed9`, corrected in `08a3a7b`
 
 ## Phase 2: Frontend removal (commit 2)
 
-- [ ] T002 Delete `frontend/src/components/assistant/` (9 files), `frontend/src/pages/admin/AssistantSession.tsx` and `frontend/src/pages/admin/RunProfiles.tsx`
+- [ ] T002 Delete `frontend/src/components/assistant/` (28 files), `frontend/src/pages/admin/AssistantSession.tsx` and `frontend/src/pages/admin/RunProfiles.tsx`
 - [ ] T003 Remove the assistant routes from `frontend/src/App.tsx` and the matching entries from `frontend/src/routeAccess.ts`; keep `/admin/ia` and `Ayuda`
 - [ ] T004 Remove the AI card and the "IA funcionando" pill from `frontend/src/pages/admin/AdminHome.tsx` and `frontend/src/pages/admin/adminTiles.ts`, and set the grid to 3/2/1
 - [ ] T005 Remove the assistant navigation item and the header sparkle from `frontend/src/components/AppShell.tsx`
@@ -54,7 +54,29 @@ green.
 - [ ] T030 Amend the constitution to 2.0.0: principle IX redefined, the folder list without `backend/app/assistant/`
 - [ ] T031 `CHANGELOG.md` 0.2.0 **Removed**, every removed feature by spec number
 
-## Dependencies
+## Dependencies — corrected from what the tree actually shows
 
-Phase 2 and Phase 3 touch disjoint trees and may run in either order; Phase 4 depends on 3 (the
-models are gone), Phase 5 on 4 (the gates must see the final tree), Phase 6 on 5.
+Phase 2 order is **not** the T-number order: the pane host is the first domino, and two shared
+pieces must move **before** the assistant namespace is deleted, or unrelated pages break.
+
+1. **`PaneTabs` first (T002a).** `PaneId = files | editor | chat`; the default layout and the phone
+   tabs are keyed by it. Deleting the chat pane in `ProjectWorkspace` before dropping `chat` from
+   `PaneTabs` leaves a pane that renders nothing. `PaneTabs`' own tests are the gate.
+2. **`justNow` before the i18n strip (T006a).** The string lives inside the `assistant` namespace but
+   `DashboardShortcuts` renders it. It moves to `common` (and `relativeTime` moves out of
+   `AssistantHistory` into `lib/`) before the namespace is deleted.
+3. **`ProjectWorkspace` (T002b).** The chat is a *mode*, not a block: `conversations`, `session`,
+   `pickConversation`, `newConversation`, `setSpec`, `preview`, `ai_enabled`, the `?chat=` deep link
+   and `syncedChat`. Files, editor, problems, history and validation preview stay.
+4. **`Projects.tsx` (T002c).** `create` currently opens a session and navigates to `?chat=<id>`; it
+   navigates to the project.
+5. **`AppShell` / routes / `AdminHome` (T003–T005).** The panel provider, the toggle, the `docked`
+   column and the `chat` flag in `ShellChrome` go together with the routes.
+6. **`ai_narrative` (T007).** The schema key stays (plan D3); the generator, its route, its type and
+   `Narrative.tsx` plus `ReportView`'s block go. `SharedDashboard`'s `ai_narrative: false` override
+   then reads a field nothing consumes — checked, not assumed.
+7. **Tests last (T008, T021).** Each suite is read and classified before deletion; one that covers
+   still-reachable behaviour is updated, not dropped.
+
+Phase 3 depends on nothing in Phase 2, but is done after it so the frontend gate proves the product
+still works. Phase 4 depends on 3 (the models are gone). Phase 5 on 4. Phase 6 on 5.

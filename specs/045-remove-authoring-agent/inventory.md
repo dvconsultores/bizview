@@ -75,12 +75,26 @@ AI line describes help-only.
 
 ## 7. Tests and fixtures — R
 
-Backend (43 files): `test_ai_chat`, `test_ai_deepseek`, `test_ai_status`, `test_assistant_*` (39),
+Backend (**49** files, verified with `git ls-files`): `test_ai_chat`, `test_ai_deepseek`,
+`test_ai_status`, `test_assistant_*` (39: activity, ai_outage, api, apply, attachments, auto_apply,
+auto_contract, auto_loop, auto_mode, auto_unlimited, autonomous, busy, commands_flow,
+commands_guard, commands_prompt, commands_registry, commands_resolution, commands_runs,
+commands_service, direct, guard, loop, loop_state_conflict, origin, preview, readiness,
+request_shape, root_cause_041, root_cause_041_e2e, run_summary, scope, scope_service, speckit_all,
+speckit_all_e2e, speckit_all_rounds, speckit_all_run, stage_bounds, tool_payload, tools),
 `test_history_repair`, `test_i18n_assistant`, `test_lock_scope`, `test_pdf_preview`,
 `test_preview_after_apply`, `test_project_scope`, `test_project_scope_guard`.
 
-Frontend (14 files): `agent-map`, `ai-pill`, `assistant-*` (11), `chat-links`, `command-menu`,
-`command-run-chip`; e2e `assistant*.spec.ts` (4) and `commands.spec.ts`.
+Frontend (**15** unit files): `agent-map`, `ai-pill`, `assistant-agent`, `assistant-attachments`,
+`assistant-autonomous`, `assistant-busy`, `assistant-commands`, `assistant-history`,
+`assistant-mode`, `assistant-panel`, `assistant-rename`, `assistant-repair`, `assistant`,
+`chat-links`, `command-menu`, `command-run-chip` (16 counting `command-run-chip`); e2e
+**5**: `assistant-agent.spec.ts`, `assistant-auto.spec.ts`, `assistant-images.spec.ts`,
+`assistant.spec.ts`, `commands.spec.ts`.
+
+**Before deleting any of these**, each is read and the behaviour it covers is classified: covered
+exclusively by the removed flow (delete) or still reachable (keep and update). T021 and T008 are the
+tasks where that classification is done, not here.
 
 **K**: `tests/test_pdf_visual_components.py` (044), the report/project/share/worker suites,
 `FakeProvider` **only** if the help tests need it — checked while deleting; otherwise it goes too.
