@@ -85,6 +85,8 @@ MESSAGES: dict[str, str] = {
     "validate.image_svg_only": "el conjunto «{name}» sólo tiene SVG en {folder}: el PDF mostrará el relleno; añade un PNG para imprimir con el logo",
     "validate.image_key_unknown": "el conjunto «{name}» usa la clave {key}, que no es una dimensión, columna ni métrica declarada ({dimensions})",
     "validate.fix_add_image_folder": "añade las imágenes en {folder} o corrige la carpeta del conjunto",
+    "validate.image_column_not_projected": "el conjunto «{name}» lee la columna {column}, y la vista «{view}» no la devuelve: el componente dibujará el relleno",
+    "validate.fix_project_image_column": "declara una dimensión con sql {column} y añádela a las dimensiones de la vista (no hace falta mostrarla en la tabla)",
     "validate.fix_declare_image_key": "declara {key} en dimensions o usa una dimensión, columna o métrica existente",
     "validate.direct_source_fix": "activa «Permitir reportes directos» en la fuente o crea una integración (integrations/<id>)",
     "validate.spec_line.mode": "añade la línea **Modo**: directo en spec.md",

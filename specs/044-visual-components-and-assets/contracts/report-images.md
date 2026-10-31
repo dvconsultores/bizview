@@ -91,6 +91,11 @@ browser appends the row key and the server resolves the file.
 }
 ```
 
+- A `column:` set's value is read with `row[<column>]`, so **the view the component uses must
+  project that column**: declare a dimension whose `sql` is the column and list it in the view's
+  dimensions. It need not be shown — the component's own `columns` decides what is displayed. A view
+  that does not project it makes every row fall back, and the validator warns
+  (`image_column_not_projected`).
 - `url` is present for a folder set and names the door the client came through:
   `/api/reports/<id>/assets/<set>/` for a signed-in reader, `/api/shared/<token>/assets/<set>/` for
   a share link. A column set has no `url` until the image cache serves one.

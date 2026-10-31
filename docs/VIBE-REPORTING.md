@@ -237,6 +237,11 @@ layout:
   external references.
 - The PDF prints the raster files; an SVG-only set prints the circle instead, so add a PNG when the
   report is shared on paper.
+- A set fed by a URL column reads the value from the row, so the view that the component uses must
+  return that column: declare a dimension with `sql: <alias>.<columna>` and add it to the view's
+  dimensions — it is not shown unless the component lists it in its own `columns`. A set that names
+  a `column:` and a view that does not project it is a warning (`image_column_not_projected`), and
+  every row would show the fallback.
 - A `kpi` tile has no row, so its set is keyed by the metric id
   (`images: {coins: {folder: assets/coins, key: total_facturado}}`).
 - **Licence**: ship only images you may redistribute. Logos of your own customers' brands, the

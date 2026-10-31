@@ -1471,6 +1471,48 @@ def _check_images(entry: Entry, a: dict, ry: str, issues: list[Issue], root: Pat
                                   dimensions=", ".join(sorted(keys)) or "—"),
                                 file=ry, path=path + "/key",
                                 fix=t("validate.fix_declare_image_key", key=key)))
+    _check_column_projection(entry, a, ry, issues)
+
+
+def _check_column_projection(entry: Entry, a: dict, ry: str, issues: list[Issue]) -> None:
+    """044: una vista que no proyecta la columna de URL deja el conjunto en el relleno.
+
+    El cliente lee `row[<columna>]`, así que la columna tiene que salir en la vista que usa el
+    componente. Es un aviso y no un error: el reporte sigue siendo válido y dibuja el relleno, pero
+    el autor merece saber por qué no ve sus logos."""
+    images = a.get("images") or {}
+    views = {v.get("id"): v for v in (a.get("views") or []) if isinstance(v, dict)}
+    dimensions = a.get("dimensions") or {}
+    components = ((a.get("layout") or {}).get("web") or {}).get("components") or []
+    reported: set[tuple[str, str]] = set()
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+        spec = images.get(component.get("image"))
+        if not isinstance(spec, dict) or not isinstance(spec.get("column"), str):
+            continue
+        column = spec["column"].split(".", 1)[-1]
+        view = views.get(component.get("view"))
+        if view is None:
+            continue
+        projected = set(view.get("dimensions") or []) | set(view.get("metrics") or [])
+        # La vista nombra dimensiones, no columnas: se acepta la dimensión cuyo sql ES la columna.
+        if any(column in projected
+               or (isinstance(dimensions.get(d), dict)
+                   and str(dimensions[d].get("sql", "")).strip().endswith(column))
+               for d in projected):
+            continue
+        if (component.get("image"), column) in reported:
+            continue
+        reported.add((component.get("image"), column))
+        issues.append(Issue(
+            entry.key, "image_column_not_projected",
+            message=t("validate.image_column_not_projected",
+                      name=component.get("image"), column=column,
+                      view=component.get("view")),
+            file=ry, path=f"/layout/web/components/{components.index(component)}/image",
+            level="warning",
+            fix=t("validate.fix_project_image_column", column=column)))
 
 
 def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Issue], root: Path,

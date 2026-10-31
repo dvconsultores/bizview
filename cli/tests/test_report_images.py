@@ -148,3 +148,26 @@ def test_a_column_set_is_refused_on_a_kpi_tile(tmp_path):
          "image": "remotas", "span": 12})
     (root / REPORT).write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
     assert "layout_image_column_on_kpi" not in codes(validate.validate(root))
+
+
+def test_a_view_that_does_not_project_the_url_column_warns(tmp_path):
+    """The client reads `row[<column>]`: without the projection the tile only ever falls back."""
+    root = ws(tmp_path)
+    doc = yaml.safe_load((root / REPORT).read_text())
+    # A dataset column that no dimension names: exactly the case that used to fall back silently.
+    doc.setdefault("images", {})["remotas"] = {"column": "f.monto_total", "key": "estado"}
+    doc["layout"]["web"]["components"].append(
+        {"id": "catalogo", "type": "table", "view": "detalle", "columns": ["estado"],
+         "image": "remotas", "span": 12})
+    (root / REPORT).write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    result = validate.validate(root)
+    warned = [i for i in result.issues if i.code == "image_column_not_projected"]
+    assert warned and warned[0].level == "warning", codes(result)
+    assert "monto_total" in warned[0].message
+
+    # Projecting it — a dimension whose sql is the column, listed in the view — clears the warning.
+    doc = yaml.safe_load((root / REPORT).read_text())
+    doc["dimensions"]["logo_monto"] = {"label": "Logo", "sql": "f.monto_total"}
+    doc["views"][-1]["dimensions"] = ["estado", "moneda", "logo_monto"]
+    (root / REPORT).write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+    assert "image_column_not_projected" not in codes(validate.validate(root))

@@ -93,6 +93,8 @@ MESSAGES: dict[str, str] = {
     "validate.image_svg_only": "the set “{name}” has only SVG in {folder}: the PDF will show the fallback; add a PNG to print with the logo",
     "validate.image_key_unknown": "the set “{name}” uses key {key}, which is not a declared dimension, column or metric ({dimensions})",
     "validate.fix_add_image_folder": "add the images under {folder} or fix the set's folder",
+    "validate.image_column_not_projected": "the set “{name}” reads column {column}, and view “{view}” does not return it: the component will draw the fallback",
+    "validate.fix_project_image_column": "declare a dimension with sql {column} and add it to the view's dimensions (it need not be shown in the table)",
     "validate.fix_declare_image_key": "declare {key} in dimensions or use an existing dimension, column or metric",
     "validate.direct_source_fix": "enable \"Allow direct reports\" in the source or create an integration (integrations/<id>)",
     "validate.spec_line.mode": "add the line **Mode**: direct in spec.md",
