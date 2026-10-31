@@ -91,6 +91,9 @@ LAYOUT_REPORT = """
       product:
         label: Producto
         sql: products.product_code
+      logo_url:
+        label: Logo
+        sql: lines.logo_url
     periods:
       default: mtd
       allowed: [mtd, last_7_days, custom]
@@ -112,13 +115,17 @@ LAYOUT_REPORT = """
         limit: 5
       - id: detalle
         type: table
-        dimensions: [product]
+        dimensions: [product, logo_url]
         metrics: [net_sales, orders]
         limit: 50
     filters: [product]
     images:
       productos:
         folder: assets/productos
+        key: product
+        fallback: initial
+      logos:
+        column: lines.logo_url
         key: product
         fallback: initial
     pdf:
@@ -158,6 +165,13 @@ LAYOUT_REPORT = """
             columns: [product, net_sales, orders]
             image: productos
             totals: true
+            page_size: 25
+            span: 12
+          - id: catalogo
+            type: table
+            view: detalle
+            columns: [product, net_sales]
+            image: logos
             page_size: 25
             span: 12
       pdf:
@@ -212,6 +226,7 @@ def integration_yaml() -> str:
               local_date: {type: date, nullable: false}
               product_code: {type: text, nullable: false}
               net_amount: {type: numeric, nullable: false, min: 0}
+              logo_url: {type: text}
             extract: {query: queries/lines.sql, params: [window_start, window_end]}
             incremental: {window_days: 7, full_rebuild_cron: "0 3 * * *"}
             checks:
@@ -228,10 +243,15 @@ def integration_yaml() -> str:
 def queries(origin: str) -> dict[str, str]:
     """Integration SQL over the origin table (a qualified name, e.g. "app_test_x".origin_sales)."""
     return {
+        # 044: `logo_url` is what a `column:` image set reads. The third product gets none on
+        # purpose, so the browser test can reach the `initial` fallback without a broken address.
         "lines.sql": (f"SELECT doc AS document_id, line AS line_no, kind AS line_kind, "
                       f"completed_at, "
                       f"(completed_at AT TIME ZONE 'America/Caracas')::date AS local_date, "
-                      f"product AS product_code, amount AS net_amount FROM {origin} "
+                      f"product AS product_code, amount AS net_amount, "
+                      f"CASE WHEN line = 2 THEN NULL "
+                      f"ELSE 'https://cdn.example/' || replace(product, ' ', '-') || '.png' END "
+                      f"AS logo_url FROM {origin} "
                       f"WHERE completed_at >= :window_start AND completed_at < :window_end\n"),
         "totals.sql": (f"SELECT (completed_at AT TIME ZONE 'America/Caracas')::date AS local_date, "
                        f"sum(amount) AS net_amount FROM {origin} "
@@ -257,7 +277,9 @@ def build(root: Path, origin: str, *, source: str = "Origen prueba", title: str 
 
 
 #: The products the origin fixture carries, so every row of the seeded table has its picture.
-PRODUCT_CODES = ("P1", "P2")
+#: A file is named after the *normalised* key (`app/projects/assets.normalise_key`), so a name with
+#: spaces is written with underscores; the lookup does the same substitution.
+PRODUCT_CODES = ("Alimento_premium", "Vacuna_triple")
 
 
 def assets(root: Path) -> None:

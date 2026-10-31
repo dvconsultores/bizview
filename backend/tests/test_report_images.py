@@ -1,4 +1,5 @@
 """Feature 044: an image set resolved on the server, so the browser never builds a file name."""
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +7,7 @@ from starlette.requests import Request
 
 from app.api import reports
 from app.config import get_settings
+from app.db import get_sessionmaker
 from app.engine import report as engine
 from app.models import AppUser
 from app.projects import assets as asset_rules
@@ -13,6 +15,10 @@ from app.projects import fs
 from app.projects import service as project_service
 from app.reports import images as report_images
 from app.reports import pdf
+from tests.conftest import signed_in
+from tests.test_runner import origin as origin  # fixture (feature 005 origin table)
+from tests.test_runner import pg_source as pg_source  # fixture
+from tests.test_vibe_reporting import workspace as workspace  # fixture (feature 005)
 
 
 def _png() -> bytes:
@@ -192,3 +198,58 @@ def test_an_svg_or_missing_key_draws_the_initial_circle_instead(project):
     for symbol in ("ETH", "HYPE"):
         content = _render_pdf(project, [symbol], ["symbol", "name", None, "btc"])
         assert b"/Subtype /Image" not in content, symbol
+
+
+def test_an_applied_workspace_hands_the_sets_a_url(workspace, superuser):
+    """The seam the browser depends on: an applied report names its sets with a prefix to read."""
+    from app.engine import report as engine
+    from app.workspace import service as workspace_service
+    from tests.test_vibe_reporting import apply, lock
+
+    lock(workspace)
+    apply(signed_in("root@example.com"))
+    with get_sessionmaker()() as session:
+        version = workspace_service.active(session)
+        assert version is not None
+        out = engine.definition_json(
+            engine.cached_context(version, "ventas-layout"),
+            assets_base="/api/reports/ventas-layout/assets",
+            images_base="/api/reports/ventas-layout/images",
+        )
+    assert set(out["images"]) == {"productos", "logos"}, out.get("images")
+    assert out["images"]["productos"]["url"] == "/api/reports/ventas-layout/assets/productos/"
+    assert out["images"]["logos"]["cached_url"] == "/api/reports/ventas-layout/images/"
+
+    # The door the browser actually uses must say the same thing.
+    r = signed_in("root@example.com").get("/api/reports/ventas-layout")
+    assert r.status_code == 200, r.text
+    served = r.json()["images"]
+    assert served["productos"]["url"] == "/api/reports/ventas-layout/assets/productos/"
+    assert served["logos"]["cached_url"] == "/api/reports/ventas-layout/images/"
+
+
+def test_a_project_keeps_its_images_across_applies(workspace, superuser):
+    """044 FR-001: `assets/` is applied with the project and survives the next apply.
+
+    The mirror compares the applied text tree with the folder and deletes what the tree does not
+    carry; an image has no text form, so without the `assets/` exemption every picture of the
+    project was deleted on each apply — while every unit test stayed green.
+    """
+    from app.config import get_settings
+    from app.db import get_sessionmaker
+    from app.projects import importer
+    from app.workspace import service as workspace_service
+    from tests.test_vibe_reporting import apply, lock
+
+    lock(workspace)
+    apply(signed_in("root@example.com"))
+    folder = Path(get_settings().projects_dir) / "principal" / "assets" / "productos"
+    assert folder.is_dir(), "the applied project must carry the workspace's images"
+    pictures = sorted(p.name for p in folder.iterdir())
+    assert pictures == ["Alimento_premium.png", "Vacuna_triple.png"], pictures
+
+    # The next apply mirrors again; the images the text tree cannot carry must survive it.
+    with get_sessionmaker()() as session:
+        importer.mirror_git_projects(session, workspace_service.active(session), ["principal"])
+        session.commit()
+    assert sorted(p.name for p in folder.iterdir()) == pictures

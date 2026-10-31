@@ -294,6 +294,26 @@ def _rewrite(schema: str, dataset: str, column: str, urls: list[str],
                 pg.execute(query, (name, url))
 
 
+def names(db: Session, urls: list[str]) -> dict[str, str]:
+    """Every URL of the list that already has bytes on disk: {url: file name}.
+
+    The rewrite is a property of "this URL is cached", not of "we cached it just now". Reading the
+    rows is what makes a second load point at the file too — without it, the steady state (every
+    address already known) kept the declared address in the column and the browser went on asking
+    the third party, which is the one case SC-003 cares about.
+    """
+    wanted = [u[:2048] for u in dict.fromkeys(urls) if u]
+    if not wanted:
+        return {}
+    out: dict[str, str] = {}
+    for row in db.scalars(select(ImageCache).where(
+            ImageCache.url.in_(wanted), ImageCache.status == "ok")):
+        name = name_of(row)
+        if name is not None:
+            out[row.url] = name
+    return out
+
+
 def refresh_reports(db: Session, version, integration_id: str) -> dict[str, int]:
     """Cache what the applied reports ask of one integration after its load.
 
@@ -312,9 +332,11 @@ def refresh_reports(db: Session, version, integration_id: str) -> dict[str, int]
         except Exception:      # a missing table is the loader's business, not ours
             log.warning("image cache: cannot read %s.%s", dataset, column, exc_info=True)
             continue
-        cached = refresh(db, urls)
-        counts["fetched"] += len(cached)
-        counts["failed"] += len(urls) - len(cached)
+        fetched = refresh(db, urls)
+        counts["fetched"] += len(fetched)
+        counts["failed"] += len(urls) - len(names(db, urls))
+        # Rewrite everything that is cached, whether it was fetched now or by an earlier run.
+        cached = names(db, urls)
         try:
             _rewrite(schema, dataset, column, urls, cached)
         except Exception:

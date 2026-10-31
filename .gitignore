@@ -12,6 +12,7 @@ playwright-report/
 /workspace/
 /projects/
 /attachments/
+/image-cache/
 
 # Secret-bearing local config must never reach a public repository.
 .env.bak*

@@ -20,6 +20,9 @@ export PROJECTS_DIR
 # Feature 024: chat image briefs in a throwaway folder, never the repository's attachments/.
 ATTACHMENTS_DIR="$(mktemp -d)/attachments"
 export ATTACHMENTS_DIR
+# Feature 044: images cached from a URL column in a throwaway folder, never the repository's.
+IMAGE_CACHE_DIR="$(mktemp -d)/image-cache"
+export IMAGE_CACHE_DIR
 uv run --quiet python -m tests.e2e_schema drop
 uv run --quiet alembic upgrade head
 uv run --quiet python -m app.cli bootstrap

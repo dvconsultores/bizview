@@ -6,6 +6,7 @@
                                                # <folder>, applied version, one integration run;
                                                # feature 017: reference invoice table
 """
+import hashlib
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -75,6 +76,47 @@ def seed_reference(conn, schema: str, now: datetime | None = None) -> str:
     return table
 
 
+def seed_image_cache() -> list[str]:
+    """Feature 044: the pictures a `column:` image set resolves to, written before the run.
+
+    The addresses in the workspace point at `cdn.example`, which this harness never contacts: the
+    rows are recorded as already `ok`, so the worker's cache pass has nothing to fetch and still
+    rewrites the loaded column to the file name. That is what lets the browser spec assert that a
+    viewer opens no third-party connection without needing an internet connection of its own.
+
+    Two addresses share one PNG on purpose: identical bytes must land in one file.
+    """
+    import io
+
+    from PIL import Image as Pillow
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from app.images import cache
+    from app.models import ImageCache
+
+    buffer = io.BytesIO()
+    Pillow.new("RGB", (16, 16), (30, 120, 90)).save(buffer, format="PNG")
+    data = buffer.getvalue()
+    digest = hashlib.sha256(data).hexdigest()
+    folder = Path(get_settings().image_cache_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{digest}.png").write_bytes(data)
+
+    names = []
+    with get_sessionmaker().begin() as db:
+        for product in ("Alimento-premium", "Vacuna-triple"):
+            url = f"https://cdn.example/{product}.png"
+            db.execute(pg_insert(ImageCache).values(
+                url=url, sha256=digest, ext="png", bytes=len(data),
+                fetched_at=datetime.now(UTC), status="ok", error=None).on_conflict_do_update(
+                    index_elements=[ImageCache.url],
+                    set_={"sha256": digest, "ext": "png", "bytes": len(data),
+                          "status": "ok", "error": None}))
+            names.append(cache.name_of(db.scalar(
+                select(ImageCache).where(ImageCache.url == url))))
+    return names
+
+
 def seed(schema: str, folder: Path) -> None:
     from bizview_cli import validate as wsv
 
@@ -111,6 +153,7 @@ def seed(schema: str, folder: Path) -> None:
                 "settings": {"host": url.host, "port": url.port or 5432, "database": url.database,
                              "username": url.username, "sslmode": "prefer"},
                 "secrets": {"password": url.password}}, settings, None)
+    seed_image_cache()
     with get_sessionmaker().begin() as db:
         actor = db.scalar(select(AppUser).where(AppUser.is_superuser))
         version = workspace.apply(db, actor, None)

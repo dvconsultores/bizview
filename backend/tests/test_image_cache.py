@@ -286,3 +286,30 @@ def test_building_the_payload_and_the_pdf_opens_no_connection(db, monkeypatch):
                                 "column": "l.logo_url", "cached_url": "/api/reports/r/images/"}
     assert "cdn.example" not in str(payload)
     assert touched == []
+
+
+def test_a_second_load_rewrites_from_the_cache_without_fetching(db, origin, pg_source, fetched,
+                                                               monkeypatch):
+    """Steady state: every address is already cached, so nothing is fetched and the column still
+    ends up naming the file. This is the case a viewer actually meets every day."""
+    served, _ = fetched
+    served["https://cdn.example/A1.png"] = PNG
+    served["https://cdn.example/A2.png"] = OTHER
+    served["https://cdn.example/OLD.png"] = PNG
+    version_id = _version(db, "ventas-prueba")
+
+    assert _run_with_logos(version_id).status == "succeeded"
+    asked = len(served)
+    first = _logos()
+    assert all(CACHE_NAME.match(value) for value in first), first
+
+    # The cache survives a restart; the run must now rewrite from what is already on disk and
+    # download nothing at all.
+    downloaded: list[str] = []
+    monkeypatch.setattr(cache, "download", lambda url: downloaded.append(url))
+    result = _run_with_logos(version_id)
+
+    assert result.status == "succeeded", result.message
+    assert all(CACHE_NAME.match(value) for value in _logos()), _logos()
+    assert downloaded == [], downloaded
+    assert len(served) == asked      # the fixture was never asked for anything either
