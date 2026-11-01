@@ -166,10 +166,7 @@ def clean(database):
         "email_delivery, email_send, email_subscription, image_cache, theme, "
         "direct_snapshot, app_user "
         "RESTART IDENTITY CASCADE")
-    sql("DELETE FROM dashboard WHERE code <> 'ventas'")
-    sql("UPDATE dashboard SET status = 'coming_soon', name = 'Ventas', icon = 'chart-line', "
-        "description = 'Resumen, tendencias y productos de tus ventas.', sort_order = 10, "
-        "report_id = NULL, managed_by = 'product' WHERE code = 'ventas'")
+    sql("DELETE FROM dashboard")   # 046: the product ships no dashboard, so neither do tests
     # `theme` is truncated with the users that created themes, and the product's own five are what
     # a started installation always has: the same refresh `bootstrap` runs puts them back.
     from app.db import get_sessionmaker

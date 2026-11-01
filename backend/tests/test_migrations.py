@@ -47,7 +47,7 @@ def test_upgrade_is_idempotent_and_stops_downgrading_on_purpose(database):
         command.downgrade(alembic_cfg(), "base")
     # The refusal leaves the tree at head: nothing was half-dropped or half-created.
     assert schema_tables() == APP_TABLES
-    assert sql("SELECT code, status FROM dashboard") == [("ventas", "coming_soon")]
+    assert sql("SELECT code, status FROM dashboard") == []   # 046: no dashboard by default
     assert outside_snapshot() == database
 
 
@@ -122,7 +122,9 @@ def _project(slug: str) -> int:
 
 def test_dashboard_sharing_tables_and_checks(database):
     make_user("share-owner@example.com", role="admin")
-    dashboard_id = sql("SELECT id FROM dashboard WHERE code = 'ventas'")[0][0]
+    dashboard_id = sql(
+        "INSERT INTO dashboard (code, name, description, icon, sort_order, status) "
+        "VALUES ('ventas', 'Ventas', 'd', 'chart-line', 10, 'available') RETURNING id")[0][0]
 
     # share_link defaults and unique token_hash
     sql(

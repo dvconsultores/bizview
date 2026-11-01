@@ -12,6 +12,18 @@ from app.security.crypto import CryptoError, Keyring, source_aad
 from tests.conftest import sql
 
 
+def _dashboard(db):
+    """A dashboard to hang an email link on; the product seeds none (046)."""
+    from app.models import Dashboard
+
+    row = Dashboard(code="ventas", name="Ventas", description="d", icon="chart-line",
+                    sort_order=10, status="available")
+    db.add(row)
+    db.flush()
+    return row.id
+
+
+
 def new_key() -> bytes:
     return os.urandom(32)
 
@@ -126,15 +138,13 @@ def test_missing_key_gives_clear_api_error(superuser, monkeypatch):
 
 
 def test_rotation_reencrypts_email_link_ciphertexts(db):
-    from sqlalchemy import select
-
-    from app.models import Dashboard, EmailSend
+    from app.models import EmailSend
 
     old = new_key()
     new = new_key()
     kr_old = Keyring(old)
     crypto.ensure_key_check(db, kr_old)
-    dash_id = db.scalar(select(Dashboard.id).where(Dashboard.code == "ventas"))
+    dash_id = _dashboard(db)
     ct_a, kid_old = kr_old.encrypt(b"tok-A", crypto.EMAIL_LINK_AAD)
     ct_b, _ = kr_old.encrypt(b"tok-B", crypto.EMAIL_LINK_AAD)
 
@@ -196,11 +206,9 @@ def test_rotation_reencrypts_email_link_ciphertexts(db):
 
 
 def test_encrypted_email_link_requires_key_check(db):
-    from sqlalchemy import select
+    from app.models import EmailSend
 
-    from app.models import Dashboard, EmailSend
-
-    dash_id = db.scalar(select(Dashboard.id).where(Dashboard.code == "ventas"))
+    dash_id = _dashboard(db)
     kr = Keyring(new_key())
     ct, kid = kr.encrypt(b"tok", crypto.EMAIL_LINK_AAD)
     db.add(

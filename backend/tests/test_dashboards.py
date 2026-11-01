@@ -2,9 +2,9 @@
 from tests.conftest import signed_in, sql
 
 
-def add_dashboard(code, status):
+def add_dashboard(code, status, order=20):
     sql("INSERT INTO dashboard (code, name, description, icon, sort_order, status) "
-        "VALUES (:c, :n, 'd', 'chart-pie', 20, :s)", c=code, n=code.title(), s=status)
+        "VALUES (:c, :n, 'd', 'chart-pie', :o, :s)", c=code, n=code.title(), o=order, s=status)
 
 
 def codes(c):
@@ -16,12 +16,14 @@ def test_user_without_grants_sees_nothing(user):
 
 
 def test_admin_sees_all_non_hidden(admin):
+    add_dashboard("ventas", "coming_soon", 10)
     add_dashboard("clinica", "available")
     add_dashboard("secreto", "hidden")
     assert codes(signed_in(admin.email)) == ["ventas", "clinica"]
 
 
 def test_grant_open_and_revoke(admin, user):
+    add_dashboard("ventas", "coming_soon", 10)
     add_dashboard("clinica", "available")
     adm, usr = signed_in(admin.email), signed_in(user.email)
     r = adm.put(f"/api/admin/users/{user.id}/dashboards", json={"codes": ["clinica", "ventas"]})
@@ -49,6 +51,7 @@ def test_hidden_and_unknown_are_404(admin):
 
 
 def test_grant_validation(superuser, admin, user):
+    add_dashboard("ventas", "coming_soon", 10)
     c = signed_in(superuser.email)
     r = c.put(f"/api/admin/users/{user.id}/dashboards", json={"codes": ["nope"]})
     assert r.status_code == 422
@@ -57,6 +60,7 @@ def test_grant_validation(superuser, admin, user):
 
 
 def test_user_detail_lists_catalogue_with_grants(admin, user):
+    add_dashboard("ventas", "coming_soon", 10)
     detail = signed_in(admin.email).get(f"/api/admin/users/{user.id}").json()
     assert detail["dashboards"] == [{"code": "ventas", "name": "Ventas",
                                      "status": "coming_soon", "granted": False}]

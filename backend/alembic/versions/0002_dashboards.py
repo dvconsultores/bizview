@@ -17,7 +17,7 @@ TS = sa.DateTime(timezone=True)
 
 
 def upgrade() -> None:
-    dashboard = op.create_table(
+    op.create_table(
         "dashboard",
         sa.Column("id", sa.SmallInteger, sa.Identity(), nullable=False),
         sa.Column("code", sa.Text, nullable=False),
@@ -49,14 +49,8 @@ def upgrade() -> None:
         sa.Column("granted_at", TS, nullable=False, server_default=sa.func.now()),
         sa.PrimaryKeyConstraint("user_id", "dashboard_id", name="pk_dashboard_access"),
     )
-    op.bulk_insert(dashboard, [{
-        "code": "ventas",
-        "name": "Ventas",
-        "description": "Resumen, tendencias y productos de tus ventas.",
-        "icon": "chart-line",
-        "sort_order": 10,
-        "status": "coming_soon",
-    }])
+    # No seed: a fresh installation has no dashboards. 0046 removed the placeholder this used to
+    # insert here ("Ventas", coming soon), so a new installation and one upgraded to 0046 agree.
 
 
 def downgrade() -> None:
