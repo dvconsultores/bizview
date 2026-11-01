@@ -114,7 +114,7 @@ scripts/gates/all.sh` green and the documents describing what 0.2.0 ships.
 - [x] T024 Run the full gate suite, `ruff`, `tsc`, `vitest`, the guide/i18n backend suites and
   `sh deploy/tests/test_install.sh`; record every command and its result in
   `specs/046-release-docs-governance/evidence.md`
-- [ ] T025 Tag `v0.2.0` locally and write the release notes from the changelog plus 045's
+- [x] T025 Tag `v0.2.0` locally and write the release notes from the changelog plus 045's
   before/after numbers; record the external dependency on `bizview-site`'s hero line with its owner
 
 ## Dependencies
