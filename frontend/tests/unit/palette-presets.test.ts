@@ -17,8 +17,8 @@ import {
 } from "../../src/theme/palette";
 
 const ROOT = join(process.cwd(), "..");
-const FRONTEND_DIR = join(process.cwd(), "src", "theme", "palettes");
-const BACKEND_DIR = join(ROOT, "backend", "app", "reports", "palettes");
+const FRONTEND_DIR = join(process.cwd(), "src", "theme", "themes");
+const BACKEND_DIR = join(ROOT, "backend", "app", "reports", "themes");
 
 type Triplet = [number, number, number];
 
@@ -166,7 +166,7 @@ describe("palette presets (feature 030)", () => {
     }
   });
 
-  it("keeps the PDF mirror byte-identical", () => {
+  it("keeps the PDF mirror byte-identical (themes, feature 047)", () => {
     const mirrored = readdirSync(BACKEND_DIR).filter((file) => file.endsWith(".json")).sort();
     expect(mirrored).toEqual(PRESET_IDS.map((id) => `${id}.json`).sort());
     for (const file of mirrored) {

@@ -1,0 +1,60 @@
+{
+  "id": "impacto",
+  "name": "Impacto",
+  "name_en": "Impact",
+  "version": 1,
+  "strategy": "categorical",
+  "light": {
+    "surface": "#FFFFFF",
+    "card": "#F8FAFC",
+    "text": "#0F172A",
+    "muted": "#334155",
+    "grid": "#E2E8F0",
+    "primary": "#0B63F6",
+    "positive": "#166534",
+    "negative": "#B91C1C",
+    "neutral": "#334155",
+    "delta_positive": "#BBF7D0",
+    "delta_negative": "#FECDD3",
+    "series": [
+      "#0B63F6",
+      "#00897B",
+      "#B45309",
+      "#DB2777",
+      "#7C3AED",
+      "#166534",
+      "#C2410C",
+      "#0E7490"
+    ]
+  },
+  "dark": {
+    "surface": "#0F172A",
+    "card": "#111C2E",
+    "text": "#F8FAFC",
+    "muted": "#CBD5E1",
+    "grid": "#1E293B",
+    "primary": "#60A5FA",
+    "positive": "#4ADE80",
+    "negative": "#FB7185",
+    "neutral": "#CBD5E1",
+    "delta_positive": "#064E3B",
+    "delta_negative": "#450A0A",
+    "series": [
+      "#60A5FA",
+      "#2DD4BF",
+      "#FBBF24",
+      "#F472B6",
+      "#A78BFA",
+      "#4ADE80",
+      "#FB923C",
+      "#22D3EE"
+    ]
+  },
+  "shape": {
+    "radius": "md",
+    "density": "normal",
+    "kpi_scale": "lg",
+    "font": "sans",
+    "badge": "filled"
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bizview.dev/schemas/theme.schema.json",
+  "title": "Bizview theme",
+  "description": "A theme is data: the colour tokens and shape choices a dashboard, a share link and a PDF paint with. It carries no CSS, no font file and no markup, so it can be written by a person or by any AI and accepted only through validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "name_en",
+    "version",
+    "light",
+    "dark"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,39}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "name_en": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "strategy": {
+      "enum": [
+        "categorical",
+        "sequential"
+      ]
+    },
+    "light": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface",
+        "card",
+        "text",
+        "muted",
+        "grid",
+        "primary",
+        "positive",
+        "negative",
+        "neutral",
+        "delta_positive",
+        "delta_negative",
+        "series"
+      ],
+      "properties": {
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "card": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "grid": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "positive": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "negative": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "neutral": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "delta_positive": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "delta_negative": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "series": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      }
+    },
+    "dark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface",
+        "card",
+        "text",
+        "muted",
+        "grid",
+        "primary",
+        "positive",
+        "negative",
+        "neutral",
+        "delta_positive",
+        "delta_negative",
+        "series"
+      ],
+      "properties": {
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "card": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "grid": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "positive": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "negative": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "neutral": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "delta_positive": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "delta_negative": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "series": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius": {
+          "enum": [
+            "sm",
+            "md",
+            "lg"
+          ]
+        },
+        "density": {
+          "enum": [
+            "compact",
+            "normal"
+          ]
+        },
+        "kpi_scale": {
+          "enum": [
+            "md",
+            "lg",
+            "xl"
+          ]
+        },
+        "font": {
+          "enum": [
+            "sans",
+            "serif",
+            "mono"
+          ]
+        },
+        "badge": {
+          "enum": [
+            "filled",
+            "outline"
+          ]
+        }
+      }
+    }
+  }
+}

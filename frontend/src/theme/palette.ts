@@ -1,34 +1,15 @@
-/** Palette presets (feature 030): product data in `./palettes/*.json`, resolved from semantic roles
- * to CSS custom properties so every existing token class (`fill-chart-3`, `text-chart-positive`)
- * follows the preset in both themes. No hex value lives in a report definition (026 FR-005); the
- * installation or the report only names a preset. The same files exist, byte-identical, under
- * `backend/app/reports/palettes/` for the PDF renderer (`tests/unit/palette-presets.test.ts` fails
- * on drift). */
+/** Palette presets (feature 030) as themes (feature 047): the five built-ins are **themes** in the
+ * published format (`./themes/*.json`), and the roles every token class paints with
+ * (`fill-chart-3`, `text-chart-positive`) are derived from their tokens. No hex value lives in a
+ * report definition (026 FR-005); the installation or the report only names a theme.
+ *
+ * The built-in files exist byte-identical under `backend/app/reports/themes/` for the PDF renderer
+ * (`tests/unit/themes.test.ts` fails on drift), and `cli/bizview_cli/theme.py` validates both with
+ * the same rules the server applies to an uploaded one. */
 import type { PaletteId } from "../api/types";
-import clasicoJson from "./palettes/clasico.json";
-import contrasteJson from "./palettes/contraste.json";
-import daltonicoJson from "./palettes/daltonico.json";
-import impactoJson from "./palettes/impacto.json";
-import monocromoJson from "./palettes/monocromo.json";
+import { BUILTIN_THEMES, deriveTokens, type Theme, type ThemeMode } from "./themes";
 
-export interface PaletteTheme {
-  primary: string;
-  series1: string;
-  series2: string;
-  series3: string;
-  series4: string;
-  series5: string;
-  series6: string;
-  series7: string;
-  series8: string;
-  positive: string;
-  negative: string;
-  neutral: string;
-  grid: string;
-  surface: string;
-  kpi_text: string;
-  kpi_delta_bg: { positive: string; negative: string };
-}
+export type PaletteTheme = ReturnType<typeof deriveTokens>;
 
 export interface PalettePreset {
   id: PaletteId;
@@ -39,13 +20,23 @@ export interface PalettePreset {
   dark: PaletteTheme;
 }
 
-// The JSON files widen their string literals; the palette test re-checks every value and role.
+function presetOf(theme: Theme): PalettePreset {
+  return {
+    id: theme.id as PaletteId,
+    label_key: `palette.${theme.id}`,
+    strategy: theme.strategy ?? "categorical",
+    light: deriveTokens(theme, "light" as ThemeMode),
+    dark: deriveTokens(theme, "dark" as ThemeMode),
+  };
+}
+
+// Derived from the themes: one authored source, and the palette test re-checks every value and role.
 export const PALETTES: Record<PaletteId, PalettePreset> = {
-  impacto: impactoJson as PalettePreset,
-  clasico: clasicoJson as PalettePreset,
-  monocromo: monocromoJson as PalettePreset,
-  contraste: contrasteJson as PalettePreset,
-  daltonico: daltonicoJson as PalettePreset,
+  impacto: presetOf(BUILTIN_THEMES.impacto),
+  clasico: presetOf(BUILTIN_THEMES.clasico),
+  monocromo: presetOf(BUILTIN_THEMES.monocromo),
+  contraste: presetOf(BUILTIN_THEMES.contraste),
+  daltonico: presetOf(BUILTIN_THEMES.daltonico),
 };
 
 export const PRESET_IDS: readonly PaletteId[] = [

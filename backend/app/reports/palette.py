@@ -1,9 +1,13 @@
-"""Report palette (feature 030, research R5): the light variant of a preset as ReportLab colours.
+"""Report palette (feature 030, research R5) resolved from a theme (feature 047).
 
-Presets are product data — one JSON file per preset under `palettes/`, a byte-identical
-mirror of `frontend/src/theme/palettes/` — so an installation only chooses *which* one applies and
-no customer hue lives in code. The PDF always renders light (FR-006, FR-011); the dark variant
-exists for the web and is never resolved here.
+The five built-ins are **themes** — one JSON file per theme under `themes/`, a byte-identical
+mirror of `frontend/src/theme/themes/`, in the format `cli/bizview_cli/schemas/theme.schema.json`
+publishes — so an installation only chooses *which* one applies and no customer hue lives in code.
+The runtime roles the PDF paints with (`series1..8`, `kpi_text`, `kpi_delta_bg`, …) are derived
+from the theme's tokens by the same function the CLI and the web app use.
+
+The PDF always renders the theme's **light** variant (FR-006, FR-011 and 047 FR-021); the dark
+variant exists for the web and is never resolved here.
 
 Standard library plus ReportLab only: nothing in this module imports from `frontend/`.
 """
@@ -17,7 +21,7 @@ from reportlab.lib.colors import Color, HexColor
 
 PRESET_IDS: tuple[str, ...] = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
 DEFAULT_PRESET = "impacto"
-PALETTE_DIR = Path(__file__).resolve().parent / "palettes"
+THEME_DIR = Path(__file__).resolve().parent / "themes"
 SERIES_ROLES = tuple(f"series{i}" for i in range(1, 9))
 THEME_ROLES = ("primary", *SERIES_ROLES, "positive", "negative", "neutral", "grid", "surface",
                "kpi_text")
@@ -66,15 +70,29 @@ class ReportPalette:
 
 
 @cache
-def load_preset(preset_id: str) -> dict:
-    """The preset's data, both themes included.
+def load_theme(theme_id: str) -> dict:
+    """The authored theme, both modes included.
 
     An id outside `PRESET_IDS` raises `KeyError`: installs and definitions validate the id before
     they store it, so reaching this with an unknown one is a caller bug, not user input.
     Malformed shipped data raises `ValueError`."""
-    if preset_id not in PRESET_IDS:
-        raise KeyError(preset_id)
-    data = json.loads((PALETTE_DIR / f"{preset_id}.json").read_text(encoding="utf-8"))
+    if theme_id not in PRESET_IDS:
+        raise KeyError(theme_id)
+    data = json.loads((THEME_DIR / f"{theme_id}.json").read_text(encoding="utf-8"))
+    from bizview_cli.theme import validate_theme
+
+    problems = validate_theme(data)
+    if problems:
+        raise ValueError(f"theme {theme_id}: {problems[0].message}")
+    return data
+
+
+@cache
+def load_preset(preset_id: str) -> dict:
+    """The preset shape the renderers consume, derived from the theme (feature 047)."""
+    from bizview_cli.theme import theme_to_preset
+
+    data = theme_to_preset(load_theme(preset_id))
     _check(preset_id, data)
     return data
 

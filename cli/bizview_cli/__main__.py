@@ -1,4 +1,4 @@
-"""`bizview` command: init, project, validate, describe, version."""
+"""`bizview` command: init, project, validate, describe, theme, version."""
 import argparse
 import sys
 from pathlib import Path
@@ -100,12 +100,45 @@ def _run(args) -> int:
         from bizview_cli.init import init
         return init(Path(args.path), args.name, agent=args.agent, git=not args.no_git,
                     layout=args.layout)
+    if args.command == "theme":
+        return _theme(args)
     if args.command == "project":
         from bizview_cli.project import new_project
         return new_project(Path(args.path), args.name, slug=args.slug, agent=args.agent,
                            speckit_init=not args.no_speckit)
     from bizview_cli.describe import describe
     return describe(args.source, path=args.path, as_json=args.json)
+
+
+def _theme(args) -> int:
+    from bizview_cli.i18n import t
+    from bizview_cli.theme import load_theme_text
+
+    path = Path(args.file)
+    try:
+        text = path.read_text("utf-8")
+    except (OSError, UnicodeDecodeError):
+        print(t("cli.theme_unreadable", path=str(path)), file=sys.stderr)
+        return 2
+    data, problems = load_theme_text(text)
+    if problems:
+        print(t("cli.theme_problems", count=len(problems)), file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem.path}: {problem.message}", file=sys.stderr)
+        return 1
+    if args.theme_command == "validate":
+        print(t("cli.theme_ok", id=data["id"], name=data["name"]))
+        return 0
+
+    from bizview_cli.theme_preview import preview_svg
+
+    out = Path(args.out or f"{data['id']}-preview.svg")
+    if out.suffix.lower() != ".svg":
+        print(t("cli.theme_preview_format", suffix=out.suffix or out.name), file=sys.stderr)
+        return 2
+    out.write_text(preview_svg(data), "utf-8")
+    print(t("cli.theme_preview_written", path=str(out)))
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,6 +172,13 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("source", help=t("cli.describe_source_help"))
     d.add_argument("--path", help=t("cli.describe_path_help"))
     d.add_argument("--json", action="store_true")
+    th = sub.add_parser("theme", help=t("cli.theme_help"))
+    theme_sub = th.add_subparsers(dest="theme_command", required=True)
+    tv = theme_sub.add_parser("validate", help=t("cli.theme_validate_help"))
+    tv.add_argument("file")
+    tp = theme_sub.add_parser("preview", help=t("cli.theme_preview_help"))
+    tp.add_argument("file")
+    tp.add_argument("--out", help=t("cli.theme_preview_out_help"))
     sub.add_parser("version")
     args = parser.parse_args(argv)
     with use_lang(args.lang):
