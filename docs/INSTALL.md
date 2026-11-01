@@ -202,7 +202,7 @@ super user; later starts only apply new migrations.
 | `DEFAULT_LOCALE` | Interface, API messages, emails and Telegram fall back to this language (`es` or `en`, default `es`) when neither the account nor the browser decides. It does NOT affect the `bizview` CLI. |
 | `TIMEZONE` | time zone of integration schedules and report periods (e.g. `America/Caracas`) |
 | `DIRECT_REPORTS_BI` | default `true`: direct reports may read tables of the BI database; `false` turns `source: bi` off |
-| `DIRECT_REPORT_CONCURRENCY` | default 2, 1–20: direct queries at once per source |
+| `DIRECT_REPORT_CONCURRENCY` | installation default, 1–20: direct queries at once per source that has no declaration of its own (feature 048) |
 | `DIRECT_REPORT_WARN_ROWS` | default 5000000: above this estimated row count a direct table needs an index led by its date column |
 | `DIRECT_BI_ROLE` | optional read-only database role for `source: bi`; required on the `internet` profile when `DIRECT_REPORTS_BI=true`; see §5 |
 | `AI_*` | optional AI provider (see below) |
@@ -264,6 +264,12 @@ The super user registers the origin systems in **Administración → Fuentes de 
 (PostgreSQL, SOAP/SAP, REST). Credentials are write-only and encrypted. Use read-only accounts —
 the connection test warns otherwise. Installations upgraded from a version that used
 `DATABASE_URL_ORIGIN` import it once as "Origen (importado)"; delete the variable afterwards.
+
+These three (and `DIRECT_BI_ROLE`) are the installation's **defaults**. From feature 048 each
+PostgreSQL source carries its own declaration — the schemas and objects it exposes, its timeout, its
+cache, its row cap and its concurrency — so one warehouse can be given five seconds and another two
+minutes without changing the installation. A source without a declaration inherits what is set here,
+which is why upgrading changes nothing until somebody declares one.
 
 ### Direct reports on the BI database (`DIRECT_BI_ROLE`)
 

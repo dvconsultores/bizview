@@ -13,10 +13,11 @@ direct by the live data mark.
 ## How to
 
 1. If the table is in a PostgreSQL source, open the source in
-   [Open Data sources](app:/admin/fuentes) and tick **Allow direct reports** (your password is
-   asked). The installation's BI database already allows it.
-2. Write a `reporte` spec in direct mode and let the agent implement it (see A direct report step
-   by step).
+   [Open Data sources](app:/admin/fuentes), tick **BI-ready** and declare the schemas (and, if you
+   want, the objects) reports may read, with their timeout, cache and row cap (your password is
+   asked). Bizview then proves the credential cannot write, and proves it again every day. The
+   installation's BI database is already declared.
+2. Write a `reporte` spec in direct mode (see A direct report step by step).
 3. When viewed, the report reads "Live data · … · viewed …".
 
 ## Options

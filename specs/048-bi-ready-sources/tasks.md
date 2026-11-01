@@ -65,12 +65,12 @@ rendering. Nothing in Phase 1 changes behaviour until Phase 2 reads the declarat
 
 ## Phase 5: document what ships
 
-- [ ] T019 `describe` marks the source BI-ready and lists only the allowed objects; `PROMPT.md` and
+- [X] T019 `describe` marks the source BI-ready and lists only the allowed objects; `PROMPT.md` and
   `docs/AUTHORING.md` explain the short table form, when an integration is the better answer, and the
   limits; `docs/INSTALL.md` records that the `DIRECT_*` variables are now defaults
-- [ ] T020 The guide topic `fuentes-lista-para-bi` in both languages plus its `index.yaml` entry and
+- [X] T020 The guide topic `fuentes-lista-para-bi` in both languages plus its `index.yaml` entry and
   the counts the drift tests keep; `CHANGELOG.md` under *Unreleased*
-- [ ] T021 The gates and the suites; `evidence.md`
+- [X] T021 The gates and the suites; `evidence.md`
 
 ## Dependencies
 

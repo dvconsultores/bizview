@@ -8,6 +8,26 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A source can be declared BI-ready (feature 048)**: instead of one installation-wide switch, each
+  PostgreSQL source carries its own declaration — the schemas and objects reports may read, the query
+  timeout, the cache lifetime, the row cap, the concurrency and the timezone its dates are read in.
+  Bizview proves the credential read-only when it is saved and once a day (a write attempted and
+  refused, inside a transaction that is rolled back), the source page shows the declaration, the
+  limits in force and the last 24 hours of direct reads, and an object outside the declaration is
+  refused by the validator and again by the engine.
+- **A direct report needs no column list (048)**: for a BI-ready source, `direct.tables` accepts
+  `alias: schema.object` and the columns come from the source's structure; the 019 shape and
+  `source: bi` keep working untouched.
+- **A direct report can keep its figures for a day (048)**: `materialize: daily` makes the worker run
+  the report once and store the payload it already produces, so every viewer reads that with the
+  notice that it is yesterday's. Figures only — no rows, no `ds_` schema.
+
+### Changed
+
+- `DIRECT_REPORT_CONCURRENCY`, `DIRECT_REPORT_WARN_ROWS` and the rest of the `DIRECT_*` variables are
+  now the defaults a source inherits, not the whole truth of what may be read.
+
+
 - **Themes are data an author writes outside Bizview (feature 047)**: the five looks the product
   shipped are now themes in a published format
   ([`cli/bizview_cli/schemas/theme.schema.json`](./cli/bizview_cli/schemas/theme.schema.json)) — a

@@ -138,7 +138,27 @@ views:
 - `views` are what the reader sees: `kpis`, `trend`, `ranking`, `table`, `gauge`, `index`, `share`,
   `asset`.
 - A report over an existing table without ETL declares `direct:` instead of `uses:` (see
-  [VIBE-REPORTING.md](./VIBE-REPORTING.md) for the direct-source contract).
+  [VIBE-REPORTING.md](./VIBE-REPORTING.md) for the direct-source contract). When the source is
+  **BI-ready** (the super user declared what it exposes) a table needs no column list: write
+  `alias: schema.object` and the columns come from the source's own structure, exactly what the
+  structure pack shows you.
+
+  ```yaml
+  direct:
+    source: Almacén ventas
+    tables:
+      v: reporting.v_ventas_dia     # columns read from the source
+      p: reporting.dim_producto
+  joins:
+    - {left: v.producto_id, right: p.id}
+  date: v.fecha
+  materialize: none               # none | daily (daily: the figure is stored once a day)
+  ```
+
+  The declaration is the whole truth: an object outside it is refused when you validate, and again
+  when the report renders. Choose an integration instead when the origin is transactional, when you
+  need history, cross-source joins or heavy transformation — a BI-ready source is for data another
+  process already shaped.
 
 ### Distribution — `distributions/<id>.yaml`
 

@@ -13,8 +13,10 @@ es directo por la marca de datos en vivo.
 ## Cómo se hace
 
 1. Si la tabla está en una fuente PostgreSQL, abre la fuente en
-   [Abrir Fuentes de datos](app:/admin/fuentes) y marca **Permitir reportes directos** (se pide
-   confirmar tu contraseña). La base BI de la instalación ya lo permite.
+   [Abrir Fuentes de datos](app:/admin/fuentes), marca **Lista para BI** y declara los esquemas (y,
+   si quieres, los objetos) que los reportes pueden leer, con su tiempo máximo, su caché y su tope
+   de filas (se pide confirmar tu contraseña). Bizview comprueba entonces que la credencial no puede
+   escribir, y lo vuelve a comprobar cada día. La base BI de la instalación ya está declarada.
 2. Escribe una spec `reporte` en modo directo y deja que el agente la implemente (ver Un reporte
    directo paso a paso).
 3. Al verlo, el reporte dice «Datos en vivo · … · consultado …».
@@ -23,6 +25,9 @@ es directo por la marca de datos en vivo.
 
 ¿Directo o integración?
 
+- Con `materialize: daily`, si la fuente tarda: el reporte guarda sus cifras una vez al día y
+  todos lo leen de ahí, con el aviso de que son de ayer. No guarda filas ni crea tablas intermedias:
+  es la misma consulta, una vez al día.
 - **Directo**: los datos ya los prepara otro proceso (por ejemplo, un cierre nocturno o una
   vista), la tabla tiene un índice por fecha, el volumen es moderado y quieres verlos al momento.
 - **Integración**: necesitas guardar historia, cargar por partes desde sistemas operativos,
