@@ -19,7 +19,7 @@ virtualenv (`/home/andres/vsCodeProjects/bizview/.venv`). Nothing is projected.
 
 | What | Command | Result |
 |---|---|---|
-| The library, the upload, the refusals, the ETag | `pytest backend/tests/test_themes.py` | 11 passed |
+| The library, the upload, the refusals, the ETag, the built-in refresh | `pytest backend/tests/test_themes.py` | 12 passed |
 | The migration creates, seeds and refuses to downgrade | `pytest backend/tests/test_migrations.py` | 9 passed |
 | 030's appearance endpoint is untouched | `pytest backend/tests/test_appearance_api.py` | 7 passed |
 | Every backend audit kind has a label | `npx vitest run tests/unit/audit-labels.test.ts` | 1 passed |
@@ -67,6 +67,11 @@ virtualenv (`/home/andres/vsCodeProjects/bizview/.venv`). Nothing is projected.
 - **The pack does not ship copies of the five built-ins.** They already exist twice with a drift
   test; a third copy would be a third place to forget, so `THEME.md` carries one complete theme and
   Apariencia's **Descargar** hands over the real ones (research R12).
+- **`scripts/gates/05-migration.sh` was not run here.** It needs `DATABASE_URL_BI`, and the only
+  one configured in `.env` points at a shared server; creating and dropping `app_test_*` schemas on
+  it is not this feature's decision to take. The migration itself is covered by
+  `tests/test_migrations.py` (upgrade to head, the five rows seeded from the shipped files, the
+  downgrade refusal, and no drift between the models and the migrations).
 - **The backend's full test suite was not run in one pass**: on this machine it needs roughly twenty
   minutes per database module. Every module this feature touches was run, and the numbers above are
   those runs.

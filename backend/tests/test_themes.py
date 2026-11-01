@@ -180,3 +180,25 @@ def test_the_installation_choice_is_saved_and_audited(superuser):
         ("clasico", "clasico")]
     assert c.put("/api/admin/settings/theme",
                  json={"theme_id": "nadie"}).status_code == 422
+
+
+def test_bootstrap_brings_a_shipped_colour_back_to_an_installation_that_never_touched_it(superuser):
+    """047 T012: a correction to a built-in reaches installations that already migrated."""
+    from app.services import themes as store
+
+    c = signed_in(superuser.email)
+    assert c.get("/api/admin/themes").json()["themes"]
+    # Somebody edited the row (or a release changed the file): the refresh puts the product back.
+    sql("UPDATE theme SET tokens = jsonb_set(tokens, '{light,surface}', '\"#123456\"') "
+        "WHERE id = 'impacto'")
+    edited = next(t for t in c.get("/api/admin/themes").json()["themes"] if t["id"] == "impacto")
+    assert edited["tokens"]["light"]["surface"] == "#123456"
+
+    from app.db import get_sessionmaker
+
+    with get_sessionmaker().begin() as session:
+        changed = store.refresh_builtins(session, store.builtin_files())
+    assert changed == 1
+    row = next(t for t in c.get("/api/admin/themes").json()["themes"] if t["id"] == "impacto")
+    assert row["tokens"]["light"]["surface"] == "#FFFFFF"
+    assert row["origin"] == "builtin"
