@@ -98,6 +98,9 @@ export interface PublicConfig {
   /** Feature 030: the installation's palette preset (default "impacto") and the ids it may use. */
   palette_preset?: PaletteId;
   palette_presets?: PaletteId[];
+  /** Feature 047: the theme the installation chose, which may be one it uploaded (`impacto` when
+   * the row or the table cannot be read). */
+  theme_id?: string;
 }
 
 export type AIProvider = "none" | "anthropic" | "openai_compatible";
@@ -602,7 +605,14 @@ export interface LayoutDocument {
   pdf?: PdfLayout;
   /** Feature 030: the report's own palette, overriding the installation's (026 FR-005 holds — a
    * preset id, never a colour). */
-  theme?: { palette?: PaletteId };
+  theme?: {
+    /** Feature 047: any theme of the installation, uploaded ones included. */
+    id?: string;
+    /** The deprecated alias of `id`, accepted for one version (047 R10). */
+    palette?: PaletteId;
+    /** `auto` follows the application's appearance; `light`/`dark` fix the report's own area. */
+    mode?: "auto" | "light" | "dark";
+  };
 }
 
 /** Feature 030: the palette presets shipped with the product (`frontend/src/theme/palettes/`). */

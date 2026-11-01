@@ -747,7 +747,7 @@ def _process_send(
                     product=settings.product_name,
                     viewer=requester.full_name if send.subscription_id is None else None,
                     locale=loc,
-                    palette=palette.resolve(definition, palette.installation_preset(db)),
+                    palette=palette.resolve(definition, palette.installation_preset(db), db),
                     images=images.reader(ctx),
                 )
                 if len(content) > mail_send.MAX_ATTACHMENT:

@@ -1,4 +1,4 @@
-import { CalendarClock, FileDown, Mail, Share2, Tv } from "lucide-react";
+import { CalendarClock, FileDown, Mail, Moon, Share2, Sun, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { api, ApiError } from "../api/client";
@@ -16,6 +16,7 @@ import type { LayoutParamsWiring } from "../components/report/LayoutBlocks";
 import { Spinner } from "../components/Spinner";
 import { ParamsForm } from "../components/report/ParamsForm";
 import { ReportActions } from "../components/report/ReportActions";
+import { ReportArea } from "../components/report/ReportArea";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
 import { ParamBar } from "../components/report/ParamBar";
 import { ReportSheet } from "../components/report/ReportSheet";
@@ -24,6 +25,8 @@ import { View } from "../components/View";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { useAuth } from "../auth/AuthContext";
 import { recordRecent } from "../lib/dashboardPrefs";
+import { readViewerMode, reportMode, writeViewerMode, type ReportMode } from "../theme/library";
+import type { ThemeMode } from "../theme/themes";
 import { t as liveT, useT } from "../i18n";
 import { localized } from "../lib/labels";
 import {
@@ -117,7 +120,7 @@ export function ReportView() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   // Feature 030: filters open the side/bottom sheet; parameters open a compact inline panel.
   const [panel, setPanel] = useState<"filters" | "params" | null>(null);
-  const { setPalette } = useTheme();
+  const { setPalette, tokens, resolved } = useTheme();
   const [shownAt, setShownAt] = useState<Date | null>(null);
   const [storedMode, setStoredMode] = useAutoRefreshMode(id);
   const [fs, setFs] = useState(() => isFullscreen());
@@ -137,14 +140,26 @@ export function ReportView() {
   );
   const closePanel = useCallback(() => setPanel(null), []);
 
-  /** The report's own palette (`layout.theme.palette`) wins over the installation's; the "Paleta"
-   * selector applies a viewer-side preview until the declared value is edited in the project. */
-  const declaredPalette = def?.layout?.theme?.palette ?? null;
+  /** The report's own theme (`layout.theme.id`, or its deprecated alias `palette`) wins over the
+   * installation's; the selector in Parámetros applies a viewer-side preview until the declared
+   * value is edited in the project. */
+  const declaredTheme = def?.layout?.theme;
+  const declaredPalette = declaredTheme?.id ?? declaredTheme?.palette ?? null;
+  const declaredMode: ReportMode = reportMode(declaredTheme);
   const [palettePreview, setPalettePreview] = useState<string | null>(null);
+  /** The viewer's own light/dark for this report, for the session only (047 FR-019). */
+  const [viewerMode, setViewerMode] = useState<ThemeMode | null>(() => readViewerMode(id));
   useEffect(() => {
     setPalette(palettePreview ?? declaredPalette);
   }, [palettePreview, declaredPalette, setPalette]);
   useEffect(() => () => setPalette(null), [setPalette]);
+  const areaMode: ThemeMode =
+    viewerMode ?? (declaredMode === "auto" ? resolved : declaredMode);
+  const toggleMode = () => {
+    const next: ThemeMode = areaMode === "dark" ? "light" : "dark";
+    setViewerMode(next);
+    writeViewerMode(id, next);
+  };
 
   // TV mode is meant to be looked at, not worked in: the chrome steps aside with it.
   useHideShellChrome(tv);
@@ -473,13 +488,15 @@ export function ReportView() {
         ) : null}
 
         {data ? (
-          <div
+          <ReportArea
+            theme={tokens}
+            mode={areaMode}
             className={`space-y-6 transition-opacity motion-reduce:transition-none ${loading || !fresh ? "opacity-60" : ""}`}
             aria-busy={loading || undefined}
             inert={!fresh || loading ? true : undefined}
           >
             {renderViews("tv")}
-          </div>
+          </ReportArea>
         ) : null}
       </TvLayout>
     );
@@ -535,6 +552,13 @@ export function ReportView() {
                   show: user?.role === "admin" && !!dashCode,
                 },
                 {
+                  id: "mode",
+                  label: areaMode === "dark" ? t.reportActions.modeLight : t.reportActions.modeDark,
+                  icon: areaMode === "dark" ? Sun : Moon,
+                  onClick: toggleMode,
+                  show: true,
+                },
+                {
                   id: "tv",
                   label: t.reportActions.tv,
                   icon: Tv,
@@ -576,7 +600,9 @@ export function ReportView() {
         />
       ) : null}
 
-      <div className="mt-5 min-w-0 space-y-5">
+      {/* The report's own area paints from its theme and its mode: with `mode: dark` inside a
+          light application the chrome stays as the viewer chose and only this block turns. */}
+      <ReportArea theme={tokens} mode={areaMode} className="mt-5 min-w-0 space-y-5">
           <AutoRefreshStatusLine status={autoStatus} lastAt={shownAt} />
 
           {pdfError ? <Alert tone="error">{pdfError}</Alert> : null}
@@ -606,7 +632,7 @@ export function ReportView() {
               {renderViews("normal")}
             </div>
           ) : null}
-      </div>
+      </ReportArea>
 
       <ReportSheet
         open={panel === "filters"}

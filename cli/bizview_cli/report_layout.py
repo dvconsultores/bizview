@@ -48,8 +48,12 @@ TEXT_ALIGNS = ("left", "center", "right")
 KPI_DELTAS = ("previous_period", "none")
 BAR_ORIENTATIONS = ("vertical", "horizontal")
 SPACER_SIZES = ("sm", "md", "lg")
-# Presets de paleta (FR-008): los ids que comparten el CLI, el backend y la interfaz.
+# Presets de paleta (FR-008): los ids que comparten el CLI, el backend y la interfaz. Con 047 un
+# informe también puede nombrar un tema que no es del producto, así que aquí solo se comprueba la
+# forma del id; que exista lo decide el servidor, que es quien tiene la biblioteca.
 PALETTE_PRESETS = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
+THEME_MODES = ("auto", "light", "dark")
+THEME_ID = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
 
 SPAN_BOUNDS = (1, 12)
 TOP_N_BOUNDS = (2, 12)
@@ -105,7 +109,7 @@ def check_layout(definition: dict, *, file: str, entry: str = "report") -> list[
     theme = layout.get("theme")
     if isinstance(theme, dict):
         _theme(theme, file, entry, out)
-        if "palette" not in theme:
+        if "palette" not in theme and "id" not in theme:
             # A theme was started and left without a palette: the installation's applies, so this
             # is a warning with a one-click pin (035 FR-013). A report with no theme at all says
             # nothing on purpose and stays quiet.
@@ -233,13 +237,22 @@ def _legacy_pdf(definition: dict) -> bool:
 
 
 def _theme(theme: dict, file: str, entry: str, out: list[Issue]) -> None:
-    """Comprueba layout.theme: solo el id de un preset de paleta (FR-008).
+    """Comprueba layout.theme: el tema con el que se pinta y el modo de su área (FR-008, 047).
 
+    `palette` sigue admitiéndose como alias obsoleto de `id`. Un `id` con la forma correcta pero
+    que no existe en la instalación lo rechaza el servidor al importar: el CLI valida sin red.
     Un color literal aquí lo denuncia el recorrido de textos de `check_layout`, no `_enum`.
     """
 
     _enum(out, entry, file, "/layout/theme/palette", "palette", theme.get("palette"),
           PALETTE_PRESETS)
+    _enum(out, entry, file, "/layout/theme/mode", "mode", theme.get("mode"), THEME_MODES)
+    theme_id = theme.get("id")
+    if isinstance(theme_id, str) and not THEME_ID.match(theme_id) and not _LITERAL.search(theme_id):
+        out.append(_issue(
+            entry, "layout_range", f"id '{theme_id}' no es un id de tema", file=file,
+            path="/layout/theme/id", expected={"pattern": THEME_ID.pattern},
+            fix=_use("un id de tema, por ejemplo", ("impacto",))))
 
 
 # ------------------------------------------------------------------ layout.web

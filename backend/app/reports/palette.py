@@ -23,6 +23,7 @@ PRESET_IDS: tuple[str, ...] = ("impacto", "clasico", "monocromo", "contraste", "
 DEFAULT_PRESET = "impacto"
 THEME_DIR = Path(__file__).resolve().parent / "themes"
 SERIES_ROLES = tuple(f"series{i}" for i in range(1, 9))
+THEME_MODES = ("auto", "light", "dark")
 THEME_ROLES = ("primary", *SERIES_ROLES, "positive", "negative", "neutral", "grid", "surface",
                "kpi_text")
 THEMES = ("light", "dark")
@@ -130,16 +131,36 @@ def is_preset(value: Any) -> bool:
     return isinstance(value, str) and value in PRESET_IDS
 
 
-def declared_preset(definition: dict | None) -> str | None:
-    """`layout.theme.palette` of a report definition, or None when it declares none (§3)."""
+def declared_theme(definition: dict | None) -> str | None:
+    """`layout.theme.id` of a report definition, or None when it declares none.
+
+    `layout.theme.palette` is the deprecated alias of the same field (047 R10): a project written
+    before themes had ids keeps applying, and the id wins when both appear."""
     layout = (definition or {}).get("layout")
     theme = layout.get("theme") if isinstance(layout, dict) else None
-    palette = theme.get("palette") if isinstance(theme, dict) else None
-    return palette if isinstance(palette, str) else None
+    if not isinstance(theme, dict):
+        return None
+    for key in ("id", "palette"):
+        value = theme.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def declared_mode(definition: dict | None) -> str:
+    """`layout.theme.mode` of a report definition: `auto` unless it says otherwise (§3)."""
+    layout = (definition or {}).get("layout")
+    theme = layout.get("theme") if isinstance(layout, dict) else None
+    mode = theme.get("mode") if isinstance(theme, dict) else None
+    return mode if mode in THEME_MODES else "auto"
+
+
+# Kept for the callers written against 030; `palette` is the same field as `id`.
+declared_preset = declared_theme
 
 
 def installation_preset(db: Any = None) -> str:
-    """The installation's preset (`appearance_settings`, feature 030).
+    """The installation's theme (`appearance_settings`, features 030 and 047).
 
     Best effort, like `/api/config`: a missing table, row or unreachable database falls back to
     `DEFAULT_PRESET` instead of failing a PDF. Imported lazily so this module stays dependency-free
@@ -150,24 +171,64 @@ def installation_preset(db: Any = None) -> str:
         from app.models import AppearanceSettings
 
         row = db.get(AppearanceSettings, 1)
-        return row.palette_preset if row is not None else DEFAULT_PRESET
+        if row is None:
+            return DEFAULT_PRESET
+        return row.theme_id or row.palette_preset or DEFAULT_PRESET
     except Exception:   # the PDF must render even with the settings unreadable
         return DEFAULT_PRESET
 
 
-def resolve(definition: dict | None = None,
-            installation_preset: str | None = None) -> ReportPalette:
-    """The effective palette: the report's override, else the installation's, else `impacto`.
+def resolve(definition: dict | None = None, installation_preset: str | None = None,
+            db: Any = None) -> ReportPalette:
+    """The effective palette: the report's theme, else the installation's, else `impacto`.
 
-    Always the light variant (data-model §4). An unknown id falls back to `DEFAULT_PRESET` instead
-    of failing: the web and the PDF keep rendering when a value slipped past the checker."""
-    chosen = declared_preset(definition) or installation_preset or DEFAULT_PRESET
-    return _report_palette(chosen if is_preset(chosen) else DEFAULT_PRESET)
+    Always the light variant (data-model §4, FR-021): paper has no dark mode. An unknown id falls
+    back to `DEFAULT_PRESET` instead of failing: the web and the PDF keep rendering when a value
+    slipped past the checker. `db` is needed only for a theme the installation uploaded — a
+    built-in is a file this build ships."""
+    chosen = declared_theme(definition) or installation_preset or DEFAULT_PRESET
+    return report_palette(chosen, db)
+
+
+def report_palette(theme_id: str, db: Any = None) -> ReportPalette:
+    """One theme as drawing colours: a built-in from its file, anything else from its row."""
+    if is_preset(theme_id):
+        return _report_palette(theme_id)
+    tokens = _stored_tokens(theme_id, db)
+    if tokens is None:
+        return _report_palette(DEFAULT_PRESET)
+    return _palette_from(theme_id, tokens)
+
+
+def _stored_tokens(theme_id: str, db: Any) -> dict | None:
+    """The authored file of an uploaded or project theme, or None when it is not there."""
+    if db is None:
+        return None
+    try:
+        from app.models import Theme
+
+        row = db.get(Theme, theme_id)
+    except Exception:   # a PDF must not fail because the library could not be read
+        return None
+    if row is None or not isinstance(row.tokens, dict):
+        return None
+    return row.tokens
+
+
+def _palette_from(theme_id: str, tokens: dict) -> ReportPalette:
+    """The runtime roles, through the same derivation the web app and the CLI use."""
+    from bizview_cli.theme import derive_tokens
+
+    return _palette_values(theme_id, derive_tokens(tokens, "light"))
 
 
 @cache
 def _report_palette(preset_id: str) -> ReportPalette:
     values = load_preset(preset_id)["light"]
+    return _palette_values(preset_id, values)
+
+
+def _palette_values(preset_id: str, values: dict) -> ReportPalette:
     ink = HexColor(values["kpi_text"])
     neutral = HexColor(values["neutral"])
     grid = HexColor(values["grid"])

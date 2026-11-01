@@ -56,21 +56,25 @@ rendered before.
 
 ## Phase 4: Report fields, resolution, mode, share, PDF (commit 4)
 
-- [ ] T017 `layout.theme.id` and `layout.theme.mode` accepted by the report schema, `palette` kept
-  as a deprecated alias; the project validator reports an unknown theme id as a problem
-- [ ] T018 Resolve the theme once per report into CSS custom properties on the report's container
+- [X] T017 `layout.theme.id` and `layout.theme.mode` accepted by the report schema, `palette` kept
+  as a deprecated alias; the CLI validator refuses an id with the wrong shape and a mode outside
+  the three (it validates offline and cannot know the installation's library, so *whether the id
+  exists* is checked where the library is: T022)
+- [X] T018 Resolve the theme once per report into CSS custom properties on the report's container
   (colours, plus `--t-radius`, `--t-density`, `--t-kpi-scale`, `--t-font`, `--t-badge`), with the
   report → installation → `impacto` order
-- [ ] T019 The mode: `auto|light|dark` on the container's `data-mode`, the sun/moon toggle writing
+- [X] T019 The mode: `auto|light|dark` on the container's `data-mode`, the sun/moon toggle writing
   `sessionStorage` per report, and the share link opening in the report's mode
-- [ ] T020 The PDF resolves the theme's **light** variant through `reports/palette.py`
-- [ ] T021 Tests: the tokens flip on a rendered report (now and after reload), a dark report inside
+- [X] T020 The PDF resolves the theme's **light** variant through `reports/palette.py`
+- [X] T021 Tests: the tokens flip on a rendered report (now and after reload), a dark report inside
   a light app keeps the chrome light, the share link opens dark, the PDF uses the light variant
 
 ## Phase 5: Projects carry themes (commit 5)
 
 - [ ] T022 Import `themes/*.yaml` from a project zip, validating with `validate_theme`, storing with
-  `origin = project` and the project id, and reporting a refusal as a problem (never a half-store)
+  `origin = project` and the project id, and reporting a refusal as a problem (never a half-store);
+  a report's `layout.theme.id` that names neither a theme of the library nor one the project brings
+  is a validation problem
 - [ ] T023 Collisions: rename, replace or skip when the id exists, naming the owner (a built-in can
   only be renamed or skipped); removal when the project is deleted
 - [ ] T024 Export writes the project's themes back into the zip

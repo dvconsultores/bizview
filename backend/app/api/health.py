@@ -79,13 +79,19 @@ def _telegram_config() -> dict:
 
 
 def _palette_config() -> dict:
-    """Installation palette (feature 030); the default preset whenever the row cannot be read."""
+    """Installation theme (features 030 and 047); the default whenever the row cannot be read.
+
+    `palette_preset` is what 030's pages read and stays for them; `theme_id` is the choice itself,
+    which from 047 may also be a theme the installation uploaded."""
     preset = PALETTE_PRESET_IDS[0]
+    theme_id = preset
     try:
         with get_read_sessionmaker()() as db:   # one round trip, no BEGIN/ROLLBACK
             row = db.get(AppearanceSettings, 1)
             if row is not None:
                 preset = row.palette_preset
+                theme_id = row.theme_id or preset
     except Exception:
         log.warning("palette preset could not be read")
-    return {"palette_preset": preset, "palette_presets": list(preset_ids())}
+    return {"palette_preset": preset, "palette_presets": list(preset_ids()),
+            "theme_id": theme_id}

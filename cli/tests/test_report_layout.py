@@ -540,3 +540,53 @@ def test_catalogues_cover_every_type() -> None:
         report_layout.PDF_BLOCK_TYPES)
     assert schema["$defs"]["color_role"]["enum"] == list(report_layout.COLOR_ROLES)
     assert schema["$defs"]["palette_id"]["enum"] == list(report_layout.PALETTE_PRESETS)
+
+
+# ------------------------------------------------------------------- tema (047: id y modo)
+
+
+def test_a_report_may_name_any_theme_id(ws) -> None:
+    """047: el informe nombra un tema, que puede no ser del producto (lo sube la instalación)."""
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"id": "acme-azul"}})
+    result = validate.validate(ws)
+    assert result.issues == [], result.issues
+
+
+def test_a_theme_id_with_the_wrong_shape_is_reported(ws) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"id": "Acme Azul"}})
+    issue = _issue(_layout_issues(ws), "layout_range", "/layout/theme/id")
+    assert issue.level == "error"
+    assert "id 'Acme Azul' no es un id de tema" in issue.message
+    assert issue.expected == {"pattern": report_layout.THEME_ID.pattern}
+
+
+@pytest.mark.parametrize("mode", report_layout.THEME_MODES)
+def test_the_report_mode_is_one_of_three(ws, mode) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"id": "impacto", "mode": mode}})
+    assert validate.validate(ws).issues == []
+
+
+def test_an_unknown_mode_is_reported(ws) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"id": "impacto", "mode": "sepia"}})
+    issue = _issue(_layout_issues(ws), "layout_range", "/layout/theme/mode")
+    assert "mode 'sepia' no es un valor admitido" in issue.message
+    assert issue.expected == {"enum": list(report_layout.THEME_MODES)}
+
+
+def test_a_theme_with_an_id_is_not_missing_a_palette(ws) -> None:
+    """El aviso de 035 solo tiene sentido cuando el tema no nombra nada."""
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"id": "clasico"}})
+    codes = [issue.code for issue in _layout_issues(ws)]
+    assert "layout_palette_missing" not in codes
+
+
+def test_a_theme_block_with_neither_id_nor_palette_still_warns(ws) -> None:
+    _with_view_ids(ws)
+    _edit_report(ws, layout={**_web(_kpi()), "theme": {"mode": "dark"}})
+    codes = [issue.code for issue in _layout_issues(ws)]
+    assert "layout_palette_missing" in codes

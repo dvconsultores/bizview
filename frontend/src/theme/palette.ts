@@ -7,7 +7,7 @@
  * (`tests/unit/themes.test.ts` fails on drift), and `cli/bizview_cli/theme.py` validates both with
  * the same rules the server applies to an uploaded one. */
 import type { PaletteId } from "../api/types";
-import { BUILTIN_THEMES, deriveTokens, type Theme, type ThemeMode } from "./themes";
+import { BUILTIN_THEMES, deriveTokens, shapeVariables, type Theme, type ThemeMode } from "./themes";
 
 export type PaletteTheme = ReturnType<typeof deriveTokens>;
 
@@ -101,10 +101,34 @@ export function paletteVariables(preset: PalettePreset, theme: "light" | "dark")
 /** Applies the preset for the resolved theme on `<html>`; `data-palette` lets `index.css` add the
  * preset's own typography/surfaces (FR-009). Idempotent and cheap: called on theme or preset change. */
 export function applyPalette(presetId: PaletteId, theme: "light" | "dark"): void {
-  const root = document.documentElement;
   const preset = PALETTES[presetId] ?? PALETTES[DEFAULT_PRESET];
+  const root = document.documentElement;
   for (const [name, value] of Object.entries(paletteVariables(preset, theme))) {
     root.style.setProperty(`--c-${name}`, value);
   }
   root.dataset.palette = preset.id;
+}
+
+/** The same, for any theme — a built-in or one the installation uploaded (feature 047). An
+ * uploaded theme has no rules of its own in `index.css`, so `data-palette` only carries its id. */
+export function applyThemeVariables(theme: Theme, mode: "light" | "dark", id?: string): void {
+  const root = document.documentElement;
+  for (const [name, value] of Object.entries(variablesForTokens(deriveTokens(theme, mode)))) {
+    root.style.setProperty(`--c-${name}`, value);
+  }
+  for (const [name, value] of Object.entries(shapeVariables(theme))) {
+    root.style.setProperty(`--${name}`, value);
+  }
+  root.dataset.palette = id ?? theme.id;
+}
+
+/** The custom properties of one theme for one mode, as a JSX `style`: a report whose mode differs
+ * from the application's repaints its own area without touching the chrome (047 FR-019). */
+export function themeStyle(theme: Theme, mode: "light" | "dark"): Record<string, string> {
+  const style: Record<string, string> = {};
+  for (const [name, value] of Object.entries(variablesForTokens(deriveTokens(theme, mode)))) {
+    style[`--c-${name}`] = value;
+  }
+  for (const [name, value] of Object.entries(shapeVariables(theme))) style[`--${name}`] = value;
+  return style;
 }

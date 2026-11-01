@@ -636,13 +636,21 @@
           "$ref": "#/$defs/pdf_layout"
         },
         "theme": {
-          "description": "Ajustes de tema del informe. Ausente = la paleta de la instalación.",
+          "description": "Ajustes de tema del informe. Ausente = el tema de la instalación.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "id": {
+              "description": "Tema con el que se pinta el informe (uno de la instalación o uno que el proyecto trae); ausente = el de la instalación.",
+              "$ref": "#/$defs/theme_id"
+            },
             "palette": {
-              "description": "Paleta con la que se pinta el informe; ausente = la de la instalación.",
+              "description": "Alias obsoleto de id, aceptado una versión para que un proyecto escrito antes siga aplicándose.",
               "$ref": "#/$defs/palette_id"
+            },
+            "mode": {
+              "description": "Modo del área del informe: auto sigue la apariencia de la aplicación; light y dark la ignoran.",
+              "enum": ["auto", "light", "dark"]
             }
           }
         }
@@ -745,6 +753,11 @@
         "serif",
         "mono"
       ]
+    },
+    "theme_id": {
+      "description": "Id de un tema: el de un preset del producto o el de uno escrito fuera de Bizview.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,39}$"
     },
     "palette_id": {
       "description": "Paleta con nombre del informe; nunca un color literal (hexadecimal, rgb() o hsl()).",

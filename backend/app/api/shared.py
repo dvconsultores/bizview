@@ -138,7 +138,7 @@ def shared_pdf(
         organization=settings.organization_name,
         product=settings.product_name,
         viewer=None,
-        palette=palette.resolve(definition, palette.installation_preset(db)),
+        palette=palette.resolve(definition, palette.installation_preset(db), db),
         images=images.reader(ctx),
     )
     period = payload["selection"]["current"]

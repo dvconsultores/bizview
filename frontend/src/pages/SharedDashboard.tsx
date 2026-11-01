@@ -12,12 +12,15 @@ import { ReportActions } from "../components/report/ReportActions";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
 import { ParamBar } from "../components/report/ParamBar";
 import { ReportSheet } from "../components/report/ReportSheet";
+import { ReportArea } from "../components/report/ReportArea";
 import { ReportViews } from "../components/report/ReportViews";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { Logo } from "../components/Logo";
 import { useBranding } from "../config/BrandingContext";
+import { readViewerMode, reportMode } from "../theme/library";
+import type { ThemeMode } from "../theme/themes";
 import { useT } from "../i18n";
 import { localized } from "../lib/labels";
 import { downloadPdf } from "../lib/download";
@@ -69,7 +72,7 @@ export function SharedDashboard() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const previousTitleRef = useRef<string>(document.title);
-  const { setPalette, setPreference } = useTheme();
+  const { setPalette, setPreference, tokens, resolved } = useTheme();
   const linkThemeApplied = useRef(false);
 
   // Feature 030 (contracts/share-theme.md): the sharer's theme applies on the first load only, and
@@ -92,12 +95,18 @@ export function SharedDashboard() {
     [params, report],
   );
 
-  // Feature 030: the report's declared palette wins over the installation's in the shared view too.
+  // Feature 030/047: the report's declared theme wins over the installation's in the shared view
+  // too, and the link opens in the report's own mode before the viewer chooses (FR-020).
+  const link = report?.layout?.theme;
   useEffect(() => {
     if (!report) return;
-    setPalette(report.layout?.theme?.palette ?? null);
-  }, [report, setPalette]);
+    setPalette(link?.id ?? link?.palette ?? null);
+  }, [report, link, setPalette]);
   useEffect(() => () => setPalette(null), [setPalette]);
+  const linkMode = reportMode(link);
+  // A viewer who already toggled this report keeps that choice for the session (FR-019).
+  const viewerMode = readViewerMode(report?.id ?? "");
+  const areaMode: ThemeMode = viewerMode ?? (linkMode === "auto" ? resolved : linkMode);
 
   const activeCount = useMemo(() => {
     if (!applied || !report) return 0;
@@ -376,7 +385,9 @@ export function SharedDashboard() {
           {dataError && <Alert tone="error">{dataError}</Alert>}
           {fresh && data && isStale(data) && <Alert tone="warning">{staleText(data)}</Alert>}
 
-          <div
+          <ReportArea
+            theme={tokens}
+            mode={areaMode}
             className={`space-y-5 transition-opacity motion-reduce:transition-none ${
               dataLoading || !fresh ? "opacity-60" : ""
             }`}
@@ -390,7 +401,7 @@ export function SharedDashboard() {
               </div>
             )}
             {data && <ReportViews data={data} def={report} />}
-          </div>
+          </ReportArea>
         </div>
       </PageContainer>
 

@@ -1359,6 +1359,8 @@ export const en: Catalogue = {
     email: "Send by email",
     schedules: "Scheduled sends",
     tv: "TV mode",
+    modeDark: "View in dark",
+    modeLight: "View in light",
     more: "More actions",
   },
   /** Feature 030: palette presets (product data in src/theme/palettes). */

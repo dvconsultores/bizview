@@ -1343,6 +1343,8 @@ export const es = {
     email: "Enviar por correo",
     schedules: "Envíos programados",
     tv: "Modo TV",
+    modeDark: "Ver en oscuro",
+    modeLight: "Ver en claro",
     more: "Más acciones",
   },
   /** Feature 030: palette presets (product data in src/theme/palettes). */

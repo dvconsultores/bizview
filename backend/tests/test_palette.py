@@ -1,9 +1,33 @@
 """Feature 030 T033: the palette presets and how the PDF resolves them."""
+import json
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from app.reports import palette as palettes
+
+
+@pytest.fixture
+def db_row():
+    """An uploaded theme in the library, with a live session: what the PDF reads it from."""
+    from app.db import get_sessionmaker
+    from app.services import themes as store
+
+    themes_dir = Path(__file__).resolve().parents[2] / "frontend" / "src" / "theme" / "themes"
+    tokens = json.loads((themes_dir / "impacto.json").read_text(encoding="utf-8"))
+    tokens = {**tokens, "id": "acme-azul", "name": "Acme · azul", "name_en": "Acme · blue",
+              "light": {**tokens["light"], "surface": "#101828", "primary": "#7DD3FC"},
+              "dark": {**tokens["dark"], "surface": "#F8FAFC"}}
+    session = get_sessionmaker()()
+    try:
+        row, _ = store.save(session, tokens, origin="upload")
+        session.commit()
+        session.expire_all()
+        yield SimpleNamespace(session=session, id=row.id, tokens=tokens)
+    finally:
+        session.close()
 
 ROLES = (
     "primary", "series1", "series2", "series3", "series4", "series5", "series6", "series7",
@@ -102,3 +126,60 @@ def test_preset_ids_match_the_model_when_it_exists():
     if declared is None:
         pytest.skip("app.models.PALETTE_PRESET_IDS not landed yet")
     assert set(palettes.PRESET_IDS) == set(declared)
+
+
+# --- Feature 047: the report names a theme, and a theme may live in the database ------------------
+
+
+def test_the_report_names_a_theme_by_id_and_palette_is_the_deprecated_alias():
+    assert palettes.declared_theme({"layout": {"theme": {"id": "acme-azul"}}}) == "acme-azul"
+    assert palettes.declared_theme({"layout": {"theme": {"palette": "contraste"}}}) == "contraste"
+    assert palettes.declared_theme({"layout": {"theme": {"id": "acme", "palette": "clasico"}}}) \
+        == "acme"
+    assert palettes.declared_theme({"layout": {"theme": {}}}) is None
+    assert palettes.declared_theme({}) is None
+    assert palettes.declared_theme(None) is None
+
+
+def test_the_mode_defaults_to_auto():
+    assert palettes.declared_mode({"layout": {"theme": {"mode": "dark"}}}) == "dark"
+    assert palettes.declared_mode({"layout": {"theme": {"mode": "light"}}}) == "light"
+    assert palettes.declared_mode({"layout": {"theme": {}}}) == "auto"
+    assert palettes.declared_mode({"layout": {"theme": {"mode": "sepia"}}}) == "auto"
+    assert palettes.declared_mode(None) == "auto"
+
+
+def test_an_uploaded_theme_reaches_the_pdf_through_its_row(db_row):
+    theme_id, tokens = db_row.id, db_row.tokens
+    palette = palettes.resolve({"layout": {"theme": {"id": theme_id}}}, None, db_row.session)
+    assert palette.preset == theme_id
+    assert _hex(palette.surface) == tokens["light"]["surface"]
+    assert _hex(palette.primary) == tokens["light"]["primary"]
+
+
+def test_the_pdf_uses_the_light_variant_of_an_uploaded_theme(db_row):
+    theme_id, tokens = db_row.id, db_row.tokens
+    palette = palettes.resolve({"layout": {"theme": {"id": theme_id, "mode": "dark"}}},
+                               None, db_row.session)
+    assert _hex(palette.surface) == tokens["light"]["surface"]
+    assert _hex(palette.surface) != tokens["dark"]["surface"]
+
+
+def test_a_deleted_theme_falls_back_to_the_product_default(db_row):
+    palette = palettes.resolve({"layout": {"theme": {"id": "borrado"}}}, None, db_row.session)
+    assert palette.preset == "impacto"
+    # And with no session at all: the PDF still renders.
+    assert palettes.resolve({"layout": {"theme": {"id": "borrado"}}}).preset == "impacto"
+
+
+def test_the_installation_choice_is_read_before_the_old_preset_column(db_row):
+    from app.models import AppearanceSettings
+
+    session = db_row.session
+    session.merge(AppearanceSettings(id=1, palette_preset="clasico", theme_id=db_row.id))
+    session.flush()
+    assert palettes.installation_preset(session) == db_row.id
+    row = session.get(AppearanceSettings, 1)
+    row.theme_id = None
+    session.flush()
+    assert palettes.installation_preset(session) == "clasico"
