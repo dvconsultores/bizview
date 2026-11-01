@@ -8,7 +8,7 @@ rendering. Nothing in Phase 1 changes behaviour until Phase 2 reads the declarat
 
 ## Phase 0: the constitution says so first
 
-- [ ] T001 Amend `.specify/memory/constitution.md` to **3.2.0** (MINOR): principle II gains the
+- [X] T001 Amend `.specify/memory/constitution.md` to **3.2.0** (MINOR): principle II gains the
   BI-ready exception with its guardrails (read-only proof, scope, timeout, row cap, concurrency,
   cache); Constraints gains the declaration's limits; a Sync Impact Report records what changed,
   that 048's brief numbered it 2.1.0 (stale — 046 already moved it to 3.1.0) and that no principle

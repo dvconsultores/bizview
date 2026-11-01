@@ -1,4 +1,34 @@
 <!--
+Sync Impact Report (amendment 2026-11-01, feature 048)
+- Version change: 3.1.0 → 3.2.0 (MINOR: II materially strengthened — the exception it already
+  granted is now a declared, scoped, proven and observable contract. No principle removed or
+  redefined incompatibly, so not MAJOR. The 048 brief calls this "2.1.0" because it was written
+  against a copy of this file from before 046's amendment; renumbering downwards would contradict
+  the history below, exactly as recorded for 046.)
+- Modified principles:
+  - II. Backend as ETL, Direct Reads by Exception: the direct-read exception stops being an
+    installation-wide switch. A source the super user declares **BI-ready** is an optimized model
+    *by declaration*: it names the schemas and objects reports may read, the query timeout, the
+    result cache, the row cap, the concurrency and the timezone in which its dates are read; the
+    credential must be proven read-only at declaration and daily; anything outside the declaration
+    is refused by the validator and again by the engine. The environment variables
+    (`DIRECT_REPORTS_BI`, `DIRECT_BI_ROLE`, `DIRECT_REPORT_CONCURRENCY`, `DIRECT_REPORT_WARN_ROWS`)
+    become the installation defaults a source overrides, not the whole truth.
+- Added constraints:
+  - A BI-ready declaration MUST NOT widen itself: the deny-list (reserved schemas, `app_test_*`,
+    `preview_*`, product tables) is never overridable by declaration, and an empty scope means
+    "nothing", never "everything".
+  - A read-only credential MUST be proven empirically (a write refused inside a rolled-back
+    transaction) at declaration and once a day; reading grants is not proof.
+  - Direct reads MUST leave a record (`direct_read_log`) of the report, source, duration, rows,
+    outcome and whether a cached or snapshotted answer was served: the declaration is only
+    trustworthy while it is observable.
+- Removed constraints: none.
+- Deprecated feature specs: none.
+- Trigger: owner request 2026-10-31 (`pendind_specs/048-bi-ready-sources-spec.md`, feature 048).
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-10-31, release 0.2.0)
 - Version change: 3.0.0 → 3.1.0 (MINOR: IV and VIII materially expanded, the preamble and the
   constraints completed; no principle removed or redefined incompatibly, so not MAJOR). The
@@ -240,14 +270,24 @@ fails exactly where the product is used.
 - By default the FastAPI backend MUST NOT query the origin database on every request: origin data
   MUST be transformed by a dedicated worker into optimized models stored in PostgreSQL, and the
   API MUST serve pre-computed, denormalized data tuned for fast response.
-- Exception — direct reports: a report spec MAY declare direct mode when its data is already
-  shaped and maintained by another process (an existing, tested BI table or a reporting schema of
-  a PostgreSQL source). Direct reads MUST use only engine-generated aggregate SQL over the tables
-  and columns the spec declares, in a read-only session with a statement timeout, a row cap and a
-  result cache; the source MUST be explicitly enabled for direct reads by the super user; product
-  tables MUST never be readable this way.
+- Exception — direct reports over a BI-ready source: a source whose data is already shaped and
+  maintained by another process (a warehouse, a reporting schema, a replica with views) MAY be
+  declared **BI-ready** by the super user, and from then on it is an optimized model *by
+  declaration*. The declaration MUST name the schemas and objects reports may reach, the query
+  timeout, the result cache lifetime, the row cap, the concurrency and the timezone in which its
+  dates are read; it MUST prove the credential read-only when it is saved and once a day; and it
+  MUST be visible on the source page together with the last day's activity. Anything outside the
+  declaration is refused by the validator **and** again by the engine, whichever door the request
+  came through. An empty scope means nothing, never everything, and the deny-list (reserved
+  schemas, ephemeral schemas, product tables) is never overridable by declaration.
+- Direct reads MUST use only engine-generated aggregate SQL over the objects the declaration
+  allows, in a read-only session with the declared statement timeout, row cap and result cache.
+- The installation-wide direct-read variables (`DIRECT_REPORTS_BI`, `DIRECT_BI_ROLE`,
+  `DIRECT_REPORT_CONCURRENCY`, `DIRECT_REPORT_WARN_ROWS`) are the defaults a source without a
+  declaration inherits, not the whole truth: one warehouse needs 5 s and another 120 s.
 - "Fast response" means the API answers typical queries on the optimized models in under 200ms;
-  direct reports answer from cache in under 200ms and cold within the declared timeout.
+  direct reports answer from cache or a snapshot in under 200ms and cold within the declared
+  timeout.
 
 Rationale: the origin schema is usually not shaped for mobile reads, so heavy work is done ahead of
 time; when another process already did that work, copying it again adds delay and failure points
@@ -417,6 +457,12 @@ Bizview stays the runtime that validates, runs and shares: "vibe reporting".
   escapes the project folder. A rejected import MUST leave nothing half-imported.
 - The product schema MUST be versioned with Alembic. Integration dataset schemas
   (`ds_<integration>`) are created and altered only by the engine from validated contracts.
+- A BI-ready source's declaration is the whole truth for what may be read from it, and it MUST NOT
+  widen itself: the deny-list is never overridable, an empty scope means nothing, and the read-only
+  credential is proven by a refused write inside a rolled-back transaction, at save and once a day.
+- Every direct read MUST be recorded (`direct_read_log`: report, source, duration, rows, outcome,
+  whether a cached or snapshotted answer was served). A declaration nobody can observe is not a
+  contract.
 - The worker MUST be idempotent: re-running it does not duplicate data.
 - The worker MUST be safe to restart at any time without corrupting state.
 - The frontend MUST NOT call the origin database directly, only the FastAPI API.
@@ -460,4 +506,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.1.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-31
+**Version**: 3.2.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-01
