@@ -72,9 +72,10 @@ function triplet(hex: string): string {
   return `${parseInt(v.slice(0, 2), 16)} ${parseInt(v.slice(2, 4), 16)} ${parseInt(v.slice(4, 6), 16)}`;
 }
 
-/** The custom properties of `contracts/palette-preset.md` → "Web token mapping". */
-export function paletteVariables(preset: PalettePreset, theme: "light" | "dark"): Record<string, string> {
-  const t = preset[theme];
+/** The custom properties any theme's tokens resolve to, one mode at a time: what a preview card or
+ * a report container paints with. Shared by the built-ins and by an uploaded theme, so a preview
+ * cannot disagree with the page it previews. */
+export function variablesForTokens(t: PaletteTheme): Record<string, string> {
   const vars: Record<string, string> = {
     "chart-positive": triplet(t.positive),
     "chart-negative": triplet(t.negative),
@@ -90,6 +91,11 @@ export function paletteVariables(preset: PalettePreset, theme: "light" | "dark")
   };
   for (const n of SERIES) vars[`chart-${n}`] = triplet(t[`series${n}`]);
   return vars;
+}
+
+/** The custom properties of `contracts/palette-preset.md` → "Web token mapping". */
+export function paletteVariables(preset: PalettePreset, theme: "light" | "dark"): Record<string, string> {
+  return variablesForTokens(preset[theme]);
 }
 
 /** Applies the preset for the resolved theme on `<html>`; `data-palette` lets `index.css` add the

@@ -45,14 +45,14 @@ rendered before.
 
 ## Phase 3: Apariencia (commit 3)
 
-- [ ] T013 `frontend/src/pages/admin/Appearance.tsx` becomes the library: a grid of cards (light and
+- [X] T013 `frontend/src/pages/admin/Appearance.tsx` becomes the library: a grid of cards (light and
   dark side by side, drawn from the theme's tokens), origin badge, and the actions upload,
   download, duplicate, delete, apply
-- [ ] T014 The upload dialog: paste or choose a `.yaml`, show every problem the server returned with
+- [X] T014 The upload dialog: paste or choose a `.yaml`, show every problem the server returned with
   its path, and offer the replace confirmation when the id exists
-- [ ] T015 `frontend/tests/unit/themes.test.tsx`: the grid renders every theme, a refusal shows its
+- [X] T015 `frontend/tests/unit/themes.test.tsx`: the grid renders every theme, a refusal shows its
   message, applying calls the endpoint and the store invalidates
-- [ ] T016 i18n `es.ts`/`en.ts` for every new label, and `no-literals.test.ts` stays green
+- [X] T016 i18n `es.ts`/`en.ts` for every new label, and `no-literals.test.ts` stays green
 
 ## Phase 4: Report fields, resolution, mode, share, PDF (commit 4)
 

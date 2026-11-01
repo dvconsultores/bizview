@@ -1,5 +1,6 @@
 import type { ThemePreference } from "../theme/resolve";
 import type { Locale, LocalePreference } from "../i18n/resolve";
+import type { Theme } from "../theme/themes";
 
 export type { ThemePreference, Locale, LocalePreference };
 export type Role = "admin" | "user";
@@ -611,6 +612,37 @@ export type PaletteId = "impacto" | "clasico" | "monocromo" | "contraste" | "dal
 export interface AppearanceSettings {
   palette_preset: PaletteId;
   presets: PaletteId[];
+}
+
+/** Feature 047: where a theme came from (contracts/theme-api.md). */
+export type ThemeOrigin = "builtin" | "upload" | "project";
+
+/** One row of the theme library; `tokens` is the authored file the schema validated. */
+export interface ThemeRow {
+  id: string;
+  name: string;
+  name_en: string;
+  version: number;
+  origin: ThemeOrigin;
+  project: number | null;
+  tokens: Theme;
+}
+
+export interface ThemeLibrary {
+  themes: ThemeRow[];
+  installation: string;
+}
+
+/** What a report page reads to paint: the theme plus the roles already derived for each mode. */
+export interface ThemeRead {
+  id: string;
+  name: string;
+  name_en: string;
+  version: number;
+  origin: ThemeOrigin;
+  tokens: Theme;
+  light: Record<string, string>;
+  dark: Record<string, string>;
 }
 
 /** data-model §8: the CLI's `Issue` shape, as the engine sends it in `layout_problems`. */
