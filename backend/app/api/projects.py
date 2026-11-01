@@ -390,16 +390,20 @@ def export_zip(slug: str, request: Request, actor: AppUser = Depends(require_sup
 def import_zip(request: Request, data: bytes = Body(..., media_type="application/zip"),
                name: str | None = Query(None, max_length=80),
                slug: str | None = Query(None, max_length=50),
+               themes: str = Query("skip", pattern="^(skip|replace|rename)$"),
                actor: AppUser = Depends(require_superuser), _: Auth = Depends(recent_reauth),
                db: Session = DB):
-    """A zip with one project (raw `application/zip` body) becomes a new project (R13)."""
+    """A zip with one project (raw `application/zip` body) becomes a new project (R13).
+
+    `themes` answers a theme id the installation already has: skip it (default), replace it, or
+    rename the project's copy so both survive (047)."""
     from app.projects import zip as project_zip
 
     if len(data) > get_settings().project_max_mb * 1024 * 1024:
         raise ApiError(413, "too_large", M("projects.zip_invalid", reason="size"))
     try:
         return project_zip.import_zip(db, actor, data, name=name, slug=slug,
-                                      ip=client_ip(request))
+                                      themes_on_conflict=themes, ip=client_ip(request))
     except project_zip.ZipRejected as e:
         raise ApiError(413 if e.code == "too_large" else 422, e.code, e.message) from e
 

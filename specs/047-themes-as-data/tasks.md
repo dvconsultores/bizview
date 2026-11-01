@@ -71,14 +71,14 @@ rendered before.
 
 ## Phase 5: Projects carry themes (commit 5)
 
-- [ ] T022 Import `themes/*.yaml` from a project zip, validating with `validate_theme`, storing with
+- [X] T022 Import `themes/*.yaml` from a project zip, validating with `validate_theme`, storing with
   `origin = project` and the project id, and reporting a refusal as a problem (never a half-store);
   a report's `layout.theme.id` that names neither a theme of the library nor one the project brings
   is a validation problem
-- [ ] T023 Collisions: rename, replace or skip when the id exists, naming the owner (a built-in can
+- [X] T023 Collisions: rename, replace or skip when the id exists, naming the owner (a built-in can
   only be renamed or skipped); removal when the project is deleted
-- [ ] T024 Export writes the project's themes back into the zip
-- [ ] T025 Tests over the import/export round trip and the three collision answers
+- [X] T024 Export writes the project's themes back into the zip
+- [X] T025 Tests over the import/export round trip and the three collision answers
 
 ## Phase 6: CLI, pack, docs, changelog (commit 6)
 

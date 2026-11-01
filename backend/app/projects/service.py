@@ -313,6 +313,11 @@ def delete_project(db: Session, actor: AppUser, project: Project, ip: str | None
         trash.mkdir(parents=True, exist_ok=True)
         root.rename(trash / _trash_name(project.slug, now))
     project.deleted_at = now
+    # 047: the themes the project brought leave the library with it — they were never the
+    # installation's. A report of another project that named one now reports `theme_unknown`.
+    from app.services import themes as theme_store
+
+    theme_store.drop_project_themes(db, project.id)
     db.flush()
     audit(db, "project_deleted", actor_id=actor.id, ip=ip,
           detail={"project_id": project.id, "project": project.slug})

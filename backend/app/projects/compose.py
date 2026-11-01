@@ -283,6 +283,7 @@ def validate_project(db, project) -> dict:
                 "fix": t("tree.report_id_max_length_fix", max=MAX_DASHBOARD_CODE),
                 "line": 1, "project": project.slug,
             })
+    own_errors += _theme_errors(db, project, result)
     own_warnings += _subscription_cap_warnings(db, project, result)
     files, _ = fs.list_files(project.slug)
     composed_errors = (len(own_errors) + workspace["errors"]
@@ -296,6 +297,48 @@ def validate_project(db, project) -> dict:
         "fingerprint": _fingerprint(files),
         "project_ok": not own_errors,
     }
+
+
+def _theme_errors(db, project, result) -> list[dict]:
+    """047: a report naming a theme that exists nowhere is an error, not a silent fallback.
+
+    Read from the project's own files rather than from the validator's report entries: a report
+    that also broke the schema must still say which theme it wanted. The library is the
+    installation's, so the check lives here and not in the CLI — a report may name a theme the
+    installation uploaded, one this project brings in `themes/<id>.yaml`, or a built-in.
+    """
+    import yaml
+    from sqlalchemy import select
+
+    from app.i18n import t
+    from app.models import Theme
+    from app.projects import fs
+
+    # The library is the truth, not the project's folder: a theme file that was refused on import
+    # is still on disk and must not make its own reference look satisfied.
+    known = set(db.scalars(select(Theme.id)))
+    root = fs.project_root(project.slug)
+    out: list[dict] = []
+    for path in sorted((root / "reports").glob("*/report.yaml")):
+        try:
+            definition = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError, UnicodeDecodeError):
+            continue
+        layout = definition.get("layout") if isinstance(definition, dict) else None
+        theme = layout.get("theme") if isinstance(layout, dict) else None
+        if not isinstance(theme, dict):
+            continue
+        named = theme.get("id") or theme.get("palette")
+        if not (isinstance(named, str) and named) or named in known:
+            continue
+        rel = f"reports/{path.parent.name}/report.yaml"
+        out.append({
+            "entry": f"reports/{path.parent.name}", "code": "theme_unknown",
+            "message": t("tree.theme_unknown", id=named), "file": rel,
+            "path": "/layout/theme/id", "expected": {"theme": sorted(known)}, "line": None,
+            "project": project.slug, "fix": t("tree.theme_unknown_fix", id=named),
+        })
+    return out
 
 
 def _subscription_cap_warnings(db, project, result) -> list[dict]:

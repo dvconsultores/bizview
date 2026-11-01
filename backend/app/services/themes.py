@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models import THEME_ORIGINS, AppearanceSettings, Project, Theme
 
 BUILTIN_ORIGIN = "builtin"
+BUILTIN_IDS: tuple[str, ...] = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
 # A theme file is a few hundred bytes; the cap is the schema's, in characters so pydantic can hold
 # the body before the validator measures bytes.
 MAX_UPLOAD_CHARS = MAX_BYTES
@@ -167,3 +168,29 @@ def refresh_builtins(db: Session, themes: Iterable[dict]) -> int:
 def validated(data: dict) -> list[Problem]:
     """The look checks, for a theme that arrived parsed by some other route."""
     return validate_theme(data)
+
+
+def project_themes(db: Session, project_id: int) -> list[Theme]:
+    """The themes a project brought, newest first: what its export and its deletion care about."""
+    return list(db.scalars(select(Theme).where(Theme.project_id == project_id)
+                           .order_by(Theme.id)))
+
+
+def drop_project_themes(db: Session, project_id: int) -> int:
+    """Remove the themes a project brought (FR-016): they were never the installation's."""
+    rows = project_themes(db, project_id)
+    for row in rows:
+        db.delete(row)
+    db.flush()
+    return len(rows)
+
+
+def free_id(db: Session, theme_id: str) -> str:
+    """`<id>-2`, `<id>-3`…: the first id neither the library nor the product is using."""
+    if get(db, theme_id) is None and theme_id not in BUILTIN_IDS:
+        return theme_id
+    for suffix in range(2, 100):
+        candidate = f"{theme_id[:36]}-{suffix}"
+        if get(db, candidate) is None and candidate not in BUILTIN_IDS:
+            return candidate
+    raise ValueError(f"no free id for {theme_id}")

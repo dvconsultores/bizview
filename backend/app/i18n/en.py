@@ -483,6 +483,8 @@ MESSAGES: dict[str, str] = {
     "tree.regenerate_folder_docs": "regenerate {folder}/spec.md, plan.md and tasks.md in the draft",
     "projects.path_not_allowed": "{path}: path not allowed in a project. Allowed paths: {allowed}",
     "projects.path_unsafe": "{path}: unsafe path",
+    "tree.theme_unknown": "This report uses the theme {id}, which neither the installation nor the project has.",
+    "tree.theme_unknown_fix": "Add themes/{id}.yaml to the project, upload it in Appearance, or change the report's theme.",
     "projects.path_outside_project": "{path}: path outside the project. Use a path relative to the project folder (for example reports/<id>/report.yaml).",
     "projects.folder_missing": "The folder of project {slug} is not in {path}: it is not applied, because the version would go out without its files.",
     "projects.other_projects_block": "the workspace has problems in other projects: {projects}",

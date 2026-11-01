@@ -473,6 +473,8 @@ MESSAGES: dict[str, str] = {
     "tree.regenerate_folder_docs": "regenera {folder}/spec.md, plan.md y tasks.md en el borrador",
     "projects.path_not_allowed": "{path}: ruta no permitida en un proyecto. Rutas permitidas: {allowed}",
     "projects.path_unsafe": "{path}: ruta no segura",
+    "tree.theme_unknown": "El informe usa el tema {id}, que no existe en esta instalación ni lo trae el proyecto.",
+    "tree.theme_unknown_fix": "Crea themes/{id}.yaml en el proyecto, súbelo en Apariencia o cambia el tema del informe.",
     "projects.path_outside_project": "{path}: ruta fuera del proyecto. Usa una ruta relativa a la carpeta del proyecto (por ejemplo reports/<id>/report.yaml).",
     "projects.folder_missing": "La carpeta del proyecto {slug} no está en {path}: no se aplica, porque la versión saldría sin sus archivos.",
     "projects.other_projects_block": "el espacio de trabajo tiene problemas en otros proyectos: {projects}",

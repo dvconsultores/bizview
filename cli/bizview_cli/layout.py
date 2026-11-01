@@ -22,6 +22,8 @@ PROJECT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(rf"integrations/{_ID}/requests/[a-z0-9][a-z0-9._-]{{0,58}}\.yaml"),
     re.compile(rf"reports/{_ID}/report\.yaml"),
     re.compile(rf"distributions/{_ID}\.yaml"),
+    # 047: a project may bring its own themes; the file name is the theme id.
+    re.compile(r"themes/[a-z][a-z0-9-]{1,39}\.(?:yaml|yml)"),
     # 044: images shipped inside the project. A folder level is allowed so an author can group
     # logos by vendor or currency; the file name keeps upper case on purpose (coin tickers:
     # `assets/coins/BTC.png`), and the extension decides what may be stored (assets.py sniffs it).
@@ -48,6 +50,7 @@ FOLDER_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"reports"),
     re.compile(rf"reports/{_ID}"),
     re.compile(r"distributions"),
+    re.compile(r"themes"),
     re.compile(r"assets"),
     re.compile(r"assets/[a-z0-9][a-z0-9._-]{0,40}"),
 )
@@ -64,7 +67,7 @@ ALLOWED_TEXT: str = (
     "{spec,plan,tasks,research,data-model,quickstart,run-report}.md; "
     "specs/NNN-nombre/checklists/<nombre>.md; integrations/<id>/integration.yaml; "
     "integrations/<id>/queries/<nombre>.sql; integrations/<id>/requests/<nombre>.yaml; "
-    "reports/<id>/report.yaml; distributions/<id>.yaml; "
+    "reports/<id>/report.yaml; distributions/<id>.yaml; themes/<id>.yaml; "
     "assets/[<carpeta>/]<nombre>.{png,jpg,jpeg,webp,svg}"
 )
 

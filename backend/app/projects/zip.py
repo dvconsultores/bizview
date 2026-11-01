@@ -141,10 +141,18 @@ def _strip_top(names: list[str]) -> str | None:
     return None if top in LAYOUT_TOPS else f"{top}/"
 
 
+THEME_PATH = re.compile(r"^themes/([a-z][a-z0-9-]{1,39})\.(?:yaml|yml)$")
+THEME_POLICIES = ("skip", "replace", "rename")
+
+
 def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | None = None,
-               ip: str | None = None) -> dict:
+               themes_on_conflict: str = "skip", ip: str | None = None) -> dict:
     """New project from a zip: layout files imported (`command=import`), the rest ignored;
-    validation problems are reported, never blocking."""
+    validation problems are reported, never blocking.
+
+    Feature 047: `themes/*.yaml` inside the zip also enters the installation's library, with
+    `origin = project`. An id that already exists is answered by `themes_on_conflict` — skip it
+    (the library keeps its own), replace it, or rename the project's so both survive."""
     entries = _entries(data)
     prefix = _strip_top([n for n, _ in entries]) or ""
     files: dict[str, str] = {}
@@ -180,6 +188,7 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
             raise
         project = project_service.create(db, actor, title,
                                          project_service.suggest_slug(db, wanted), "", ip)
+    themes_report = _project_themes(db, project.id, files, themes_on_conflict)
     db.commit()
     if "project.yaml" in files:
         files["project.yaml"] = re.sub(r"^slug:.*$", f"slug: {project.slug}",
@@ -208,4 +217,72 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
                          "files": len(files), "ignored": len(ignored), "source": "zip"})
     db.flush()
     return {"project": project_service.project_json(project), "ignored": sorted(ignored),
-            "validation": result["validation"]}
+            "themes": themes_report, "validation": result["validation"]}
+
+
+def _project_themes(db, project_id: int, files: dict[str, str], policy: str) -> list[dict]:
+    """The `themes/*.yaml` of an imported project into the library (047 FR-016).
+
+    Returns one line per theme file: what happened to it (`imported`, `replaced`, `renamed`,
+    `skipped`) or why it could not be used. The project's folder keeps its own copy of every file,
+    including a skipped one, so the project still exports what it brought."""
+    from app.services import themes as store
+
+    if policy not in THEME_POLICIES:
+        policy = "skip"
+    report: list[dict] = []
+    for path in sorted(p for p in files if p.startswith("themes/")):
+        data, problems = store.parse(files[path])
+        if problems or data is None:
+            report.append({"file": path, "outcome": "refused",
+                           "problems": [{"path": p.path, "code": p.code, "message": p.message}
+                                        for p in problems]})
+            continue
+        theme_id = str(data["id"])
+        existing = store.get(db, theme_id)
+        if existing is not None and existing.origin == store.BUILTIN_ORIGIN:
+            # The product's own look is never replaced by an import: the project's copy is kept
+            # as a file and simply does not become the installation's theme.
+            report.append({"file": path, "outcome": "skipped", "id": theme_id,
+                           "reason": "builtin"})
+            continue
+        if existing is not None and policy == "skip":
+            report.append({"file": path, "outcome": "skipped", "id": theme_id,
+                           "reason": existing.origin})
+            continue
+        outcome = "imported"
+        if existing is not None and policy == "rename":
+            renamed = store.free_id(db, theme_id)
+            files[path] = yaml.safe_dump({**data, "id": renamed}, sort_keys=False,
+                                         allow_unicode=True, width=100)
+            _repoint_reports(files, theme_id, renamed)
+            data, theme_id = {**data, "id": renamed}, renamed
+            outcome = "renamed"
+        elif existing is not None:
+            outcome = "replaced"
+        store.save(db, data, origin=store.PROJECT_ORIGIN, project_id=project_id)
+        report.append({"file": path, "outcome": outcome, "id": theme_id})
+    return report
+
+
+def _repoint_reports(files: dict[str, str], old: str, new: str) -> None:
+    """A renamed theme carries the project's own references with it, so no report dangles.
+
+    Only the `theme:` block is touched: a report's own `id:` may equal a theme id by coincidence,
+    and rewriting it would rename the report."""
+    for path in [p for p in files if p.startswith("reports/")]:
+        lines = files[path].splitlines()
+        in_theme = False
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped == "theme:":
+                in_theme = True
+                continue
+            if in_theme and stripped and not line[:1].isspace():
+                in_theme = False
+            if not in_theme:
+                continue
+            match = re.match(r"^(\s*(?:id|palette):\s*)(\S+)\s*$", line)
+            if match and match.group(2) == old:
+                lines[index] = f"{match.group(1)}{new}"
+        files[path] = "\n".join(lines) + ("\n" if files[path].endswith("\n") else "")
