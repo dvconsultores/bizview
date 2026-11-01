@@ -30,17 +30,17 @@ rendered before.
 
 ## Phase 2: Storage, API, migration (commit 2)
 
-- [ ] T008 `Theme` model in `backend/app/models.py` (data-model §Theme stored row) with the
+- [X] T008 `Theme` model in `backend/app/models.py` (data-model §Theme stored row) with the
   `ck_theme_origin` and `ck_theme_version` checks and an index on `project_id`
-- [ ] T009 Migration `0042_themes`: create the table, seed the five built-ins from the mirrored
+- [X] T009 Migration `0042_themes`: create the table, seed the five built-ins from the mirrored
   JSON, add `appearance_settings.theme_id`, and backfill it from `palette_preset`
-- [ ] T010 `backend/app/api/themes.py` with the endpoints of contracts/theme-api.md (list, upload
+- [X] T010 `backend/app/api/themes.py` with the endpoints of contracts/theme-api.md (list, upload
   with replace confirmation, delete with the in-use refusal, download, viewer read with `ETag`,
   installation setting) and the four audit kinds
-- [ ] T011 `tests/test_themes.py` over a real database: upload → listed with origin; replace bumps
+- [X] T011 `tests/test_themes.py` over a real database: upload → listed with origin; replace bumps
   `version` and needs `?replace=true`; delete refused with the report named; built-in immutable;
   viewer read 304s on the second call with the same `ETag`
-- [ ] T012 The bootstrap refreshes a built-in row from the product's file so a shipped colour change
+- [X] T012 The bootstrap refreshes a built-in row from the product's file so a shipped colour change
   reaches an installation that never touched it
 
 ## Phase 3: Apariencia (commit 3)

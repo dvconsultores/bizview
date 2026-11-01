@@ -128,6 +128,11 @@ def _shape_problems(theme: dict) -> list[Problem]:
                 f"{mode}.text", "contrast",
                 f"{mode}.text vs {mode}.surface: {contrast(tokens['text'], surface):.2f}:1 "
                 f"(needs {TEXT_CONTRAST:.1f}:1)"))
+        ratio = contrast(tokens["primary"], surface)
+        if ratio < floor:
+            problems.append(Problem(
+                f"{mode}.primary", "contrast",
+                f"{mode}.primary vs {mode}.surface: {ratio:.2f}:1 (needs {floor:.1f}:1)"))
         for index, colour in enumerate(series):
             ratio = contrast(colour, surface)
             if ratio < floor:

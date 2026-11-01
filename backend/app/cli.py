@@ -63,6 +63,11 @@ def bootstrap(db: Session) -> str:
     result = _superuser_step(db)
     from app.projects.importer import upgrade
     upgrade(db)   # feature 020: `principal` and open drafts become projects (idempotent)
+    from app.services import themes as theme_store
+    refreshed = theme_store.refresh_builtins(db, theme_store.builtin_files())
+    if refreshed:
+        # 047: a colour corrected in the product reaches an installation that never touched it.
+        log.info("refreshed %d built-in theme(s) from the product's files", refreshed)
     return result
 
 

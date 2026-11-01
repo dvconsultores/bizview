@@ -25,7 +25,8 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "telegram_link", "telegram_request", "integration_control",
               "share_link", "email_send", "email_delivery", "email_subscription",
               "direct_read_log", "report_rollup", "project", "project_file_revision",
-              "google_link", "ai_status", "appearance_settings", "image_cache"}
+              "google_link", "ai_status", "appearance_settings", "image_cache",
+              "theme"}
 
 
 def schema_tables():
@@ -38,8 +39,8 @@ def test_migrations_create_only_the_product_schema(database):
     assert outside_snapshot() == database  # public untouched, no extension installed
 
 
-def test_upgrade_is_idempotent_and_stops_downgrading_at_0041(database):
-    """A second `upgrade head` changes nothing; going back stops at 0041 on purpose (045)."""
+def test_upgrade_is_idempotent_and_stops_downgrading_at_0042(database):
+    """A second `upgrade head` changes nothing; going back stops on purpose (045, 047)."""
     command.upgrade(alembic_cfg(), "head")  # second run: no-op
     assert schema_tables() == APP_TABLES
     with pytest.raises(RuntimeError, match="cannot be downgraded"):
@@ -48,6 +49,14 @@ def test_upgrade_is_idempotent_and_stops_downgrading_at_0041(database):
     assert schema_tables() == APP_TABLES
     assert sql("SELECT code, status FROM dashboard") == [("ventas", "coming_soon")]
     assert outside_snapshot() == database
+
+
+def test_0042_seeds_the_themes_the_product_ships():
+    """The five built-ins come from the files the app and the PDF read, not from a copy in SQL."""
+    assert sql("SELECT id, origin, version FROM theme ORDER BY id") == [
+        ("clasico", "builtin", 1), ("contraste", "builtin", 1), ("daltonico", "builtin", 1),
+        ("impacto", "builtin", 1), ("monocromo", "builtin", 1)]
+    assert sql("SELECT tokens ->> 'id' FROM theme WHERE id = 'impacto'") == [("impacto",)]
 
 
 def test_models_match_migrations():

@@ -163,12 +163,19 @@ def clean(database):
     sql("TRUNCATE audit_event, user_session, dashboard_access, recovery_code, data_source, "
         "security_state, login_throttle, integration_run_request, integration_run, "
         "report_cache, api_token, workspace_version, integration_control, share_link, "
-        "email_delivery, email_send, email_subscription, image_cache, app_user "
+        "email_delivery, email_send, email_subscription, image_cache, theme, app_user "
         "RESTART IDENTITY CASCADE")
     sql("DELETE FROM dashboard WHERE code <> 'ventas'")
     sql("UPDATE dashboard SET status = 'coming_soon', name = 'Ventas', icon = 'chart-line', "
         "description = 'Resumen, tendencias y productos de tus ventas.', sort_order = 10, "
         "report_id = NULL, managed_by = 'product' WHERE code = 'ventas'")
+    # `theme` is truncated with the users that created themes, and the product's own five are what
+    # a started installation always has: the same refresh `bootstrap` runs puts them back.
+    from app.db import get_sessionmaker
+    from app.services import themes as theme_store
+
+    with get_sessionmaker().begin() as session:
+        theme_store.refresh_builtins(session, theme_store.builtin_files())
     yield
 
 

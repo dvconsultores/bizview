@@ -60,6 +60,8 @@ AUDIT_KINDS = (
     "google_sign_in", "google_sign_in_refused", "google_linked",
     # feature 030
     "appearance_updated",
+    # feature 047
+    "theme_uploaded", "theme_replaced", "theme_deleted", "theme_applied",
 )
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
@@ -85,6 +87,10 @@ PALETTE_PRESET_IDS: tuple[str, ...] = (
 DEFAULT_PALETTE_PRESET = "impacto"
 # Feature 030 (T047): the theme a share link forces on its first load; NULL follows the viewer.
 SHARE_THEMES = ("light", "dark")
+# Feature 047: where a theme came from. A built-in is refreshed from the product's file and can be
+# neither replaced nor deleted; an upload is the super user's; a project row arrives with a zip.
+THEME_ORIGINS = ("builtin", "upload", "project")
+THEME_MODES = ("light", "dark")
 
 
 def _in(column: str, values: tuple[str, ...]) -> str:
@@ -473,7 +479,10 @@ class TelegramSettings(Base):
 
 
 class AppearanceSettings(Base):
-    """Installation appearance (feature 030): singleton row holding the palette preset."""
+    """Installation appearance (feature 030, widened by 047): the theme the whole install uses.
+
+    `theme_id` is the choice; `palette_preset` is kept and read as the fallback so an installation
+    that chose before themes were data keeps the look it chose (the ids are the same)."""
     __tablename__ = "appearance_settings"
     __table_args__ = (
         CheckConstraint("id = 1", name="singleton"),
@@ -483,6 +492,7 @@ class AppearanceSettings(Base):
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
     palette_preset: Mapped[str] = mapped_column(
         String(32), server_default=text(f"'{DEFAULT_PALETTE_PRESET}'"))
+    theme_id: Mapped[str | None] = mapped_column(Text, ForeignKey("theme.id"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
@@ -580,6 +590,34 @@ REVISION_OPS = ("create", "update", "delete", "rename", "restore", "import", "ex
 REVISION_ACTORS = ("user", "agent", "system", "external", "git")
 SLUG_PATTERN = "^[a-z][a-z0-9-]{1,49}$"
 SPEC_FOLDER_PATTERN = "^[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}$"
+
+
+class Theme(Base):
+    """An authored theme (feature 047): tokens a person or any AI wrote outside Bizview.
+
+    `tokens` is the authored file verbatim, so a downloaded theme is the one that was uploaded;
+    `light`/`dark` are read out of it by `app.services.themes.derived()`, never stored twice."""
+
+    __tablename__ = "theme"
+    __table_args__ = (
+        CheckConstraint(_in("origin", THEME_ORIGINS), name="theme_origin"),
+        CheckConstraint("version >= 1", name="theme_version"),
+        Index("ix_theme_project", "project_id"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    name_en: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    tokens: Mapped[dict] = mapped_column(JSONB)
+    origin: Mapped[str] = mapped_column(Text, server_default=text("'upload'"))
+    project_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("project.id", ondelete="CASCADE"))
+    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Project(Base):
