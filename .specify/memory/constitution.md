@@ -1,4 +1,32 @@
 <!--
+Sync Impact Report (amendment 2026-10-31, release 0.2.0)
+- Version change: 3.0.0 → 3.1.0 (MINOR: IV and VIII materially expanded, the preamble and the
+  constraints completed; no principle removed or redefined incompatibly, so not MAJOR). The
+  0.2.0 release brief calls this "constitution 2.0.0" because it was written against a copy of
+  this file from before 043's own amendment; the substance it asks for is what is applied here,
+  and renumbering a MAJOR amendment downwards would contradict the history recorded below.
+- Modified principles:
+  - Preamble: states what the product is after 043/045 — it ingests, transforms, serves, and
+    takes projects authored outside it through validation and import.
+  - IV. Separated Concerns by Folder: `custom_queries/` marked superseded by project folders;
+    `cli/bizview_cli/workspace_template/` named as the source of the authoring pack (shipped as
+    package data, not as an `examples/` folder in this repository); `backend/app/assistant/`
+    absent (removed by 045).
+  - VIII. AI Is Optional and Private: adds the structure-pack boundary — what an external AI
+    may receive is structure, counts and shapes, never credentials, hosts or row values.
+- Added constraints:
+  - The validator schemas in `cli/` are the single source of the contract, read by the CLI, the
+    backend and the authoring pack; a change to them changes one place and its copies are checks.
+  - Import limits: file types, per-file and per-project sizes, image types and sizes, and the
+    content checks (byte sniffing, SVG sanitisation) that make a project safe to import.
+- Removed constraints: none.
+- Deprecated feature specs (whose purpose was the in-app authoring agent): 014, 015 is NOT one
+  (it is dashboard auto-refresh and TV mode) — the removed set is 014, 017, 021, 024, 028, 035,
+  036, 039, 040, now under `specs/_deprecated/`.
+- Trigger: owner request 2026-10-31 (feature 046, release 0.2.0).
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-10-29)
 - Version change: 2.1.0 → 3.0.0 (MAJOR: principle IX is redefined incompatibly — the in-app
   authoring agent is removed from the product). Feature 043 names this amendment "2.0.0"; that
@@ -188,10 +216,11 @@ Previous report (1.0.0):
 
 # Sales Dashboard for Customers Constitution
 
-Provide customers with a mobile-first dashboard that lets them read their sales data in a clear,
-fast, and simple way. The system ingests raw sales data from an existing source database,
-transforms it into optimized models for fast response, and serves it through a FastAPI backend to
-a React mobile-first frontend.
+Bizview ingests raw data from existing sources, transforms it into optimized models and serves
+mobile-first dashboards and PDFs through a FastAPI backend to a React frontend. Projects
+(integrations and reports) are authored **outside** Bizview — by people or by any AI — against a
+published contract, and enter only through validation and import: the product describes sources,
+validates, imports, runs and shares, and never authors.
 
 ## Core Principles
 
@@ -243,18 +272,20 @@ and must not put it at risk.
 - `integration/` — Worker process that reads origin data and writes to the optimized models.
   Runs on its own schedule.
 - `frontend/` — React mobile-first application.
-- `custom_queries/` — Versioned SQL queries against the origin database, isolated so schema
-  changes in the origin are easy to track.
+- `custom_queries/` — **superseded** by project folders (feature 020): queries now live with the
+  project that owns them, under `integrations/<id>/queries/`. The folder stays only for a legacy
+  workspace that has not been migrated.
 - `deploy/` — Edge proxy (Caddy) configuration and image, compose overrides, per-deployment
   branding assets. No application logic.
 - Customer projects (one folder per project with its numbered Spec Kit specs and artifacts) live
   in the installation's `projects/` folder, never in this repository.
 - `cli/` — `bizview-cli` (workspace init, validation, describe, offline request checking with
   `check-request`) and the artifact schemas shared with the backend.
-- `cli/bizview_cli/workspace_template/` — the authoring skeleton for customer workspaces
-  (package data of the CLI): Spec Kit preset, extension and agent rules, `PROMPT.md`,
-  `REQUEST.md`, the validator schemas, and the golden example project `examples/ventas-basico/`.
-  Customer workspaces themselves live in the customer's private repository, never here.
+- `cli/bizview_cli/workspace_template/` — the source of the authoring pack: it ships as package
+  data of the CLI (Spec Kit preset, extension, agent rules, `PROMPT.md`, `REQUEST.md`) and
+  `bizview init` writes it into a customer workspace. Customer workspaces live in the customer's
+  private repository, never here; the golden example that the product renders on every test run
+  is `backend/tests/fixtures/projects/coinmarketcap/`.
 
 PDF report code belongs to the backend (`backend/app/reports/`), since reports are rendered from
 the same services as the JSON API.
@@ -336,6 +367,10 @@ Rationale: one codebase serves every customer and every customer receives every 
 - Customers MUST be able to choose a local model so no data leaves their infrastructure.
 - Bizview does not author artifacts with AI. AI inside the product is limited to read-only help
   and to connectors that consume approved reports.
+- A **structure pack** — what a customer hands to an external AI — contains structure, counts and
+  shapes only: table and column names, types, cardinalities and value distributions. It MUST NOT
+  contain credentials, hosts, connection strings or row values. The CLI produces it; the product
+  never sends one.
 
 Rationale: customers trust the product with their business data; AI must add value without
 becoming a data leak or a hard dependency.
@@ -372,6 +407,14 @@ Bizview stays the runtime that validates, runs and shares: "vibe reporting".
   plain HTTP for the product and its sources; `internet` requires HTTPS/TLS for the product and
   every source connection, two-step sign-in for administrators, sign-in throttling, and step-up
   confirmation. Installations reachable from the internet MUST run `internet`.
+- The validator schemas in `cli/bizview_cli/schemas/` and the SQL rules beside them are the
+  single source of the authoring contract. The CLI, the backend and the authoring pack MUST read
+  them from that one place; a duplicated copy is a defect, and `scripts/gates/03-dependencies.sh`
+  and the CLI's own tests are what notice.
+- A project enters the product only through import, and import MUST apply limits before it writes
+  anything: the layout's file types only, `PROJECT_MAX_MB` per project (20 by default), 300 KB per
+  image and 25 MB of images per project, byte-sniffed image types, sanitised SVG, and no path that
+  escapes the project folder. A rejected import MUST leave nothing half-imported.
 - The product schema MUST be versioned with Alembic. Integration dataset schemas
   (`ds_<integration>`) are created and altered only by the engine from validated contracts.
 - The worker MUST be idempotent: re-running it does not duplicate data.
@@ -417,4 +460,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.0.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-29
+**Version**: 3.1.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-10-31
