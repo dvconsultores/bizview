@@ -1,7 +1,7 @@
 [project]
 name = "bizview-cli"
-version = "0.3.0"
-description = "Vibe reporting toolkit for Bizview AI Powered workspaces: init, validate, describe."
+version = "0.2.0"
+description = "Authoring toolkit for Bizview workspaces: init, validate, describe."
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = ["pyyaml>=6", "jsonschema>=4.23", "sqlglot>=26", "httpx>=0.27"]

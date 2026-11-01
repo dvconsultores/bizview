@@ -1,21 +1,24 @@
 #!/bin/sh
-# 043 WS-A / SC-002: the product no longer speaks the authoring agent's vocabulary.
+# 043 WS-A / SC-002 and 046: the product no longer speaks the authoring agent's vocabulary, and it
+# is no longer "AI Powered".
 #
-# Fails when one of these words appears in shipped code or shipped docs:
+# Fails when one of these words appears in shipped code, shipped docs or the community documents:
 #   asistente      the in-app chat (removed: specs 014/017/021/024/028/039/040)
 #   speckit-       the in-app slash commands (the CLI's own are spelled /speckit.<stage>)
 #   run_contract   the Auto-mode contract
 #   token_budget   the retired conversation budget
+#   AI Powered     the name the product dropped in 0.2.0 (046)
 #
 # Excluded on purpose: cli/bizview_cli/workspace_template/ (the external authoring contract),
-# specs/ (historical feature documents), CHANGELOG.md (it records what was removed) and
-# alembic/versions/ (a migration has to name the tables it drops).
+# specs/ (historical feature documents, and specs/_deprecated/ is where the removed features live),
+# CHANGELOG.md (it records what was removed) and alembic/versions/ (a migration has to name the
+# tables it drops).
 set -eu
 cd "$(dirname "$0")/.."
 
-PATHS=${*:-"backend/app frontend/src docs README.md README.es.md"}
+PATHS=${*:-"backend/app frontend/src docs README.md README.es.md SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md"}
 
-hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget' $PATHS \
+hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget|AI Powered' $PATHS \
          --exclude-dir=workspace_template --exclude-dir=node_modules 2>/dev/null || true)
 
 if [ -n "$hits" ]; then

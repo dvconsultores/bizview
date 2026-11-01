@@ -39,7 +39,7 @@ test("sign-in page, errors, and protected-route redirect", async ({ page }) => {
   await page.goto("/admin/usuarios");
   await expect(page).toHaveURL(/\/ingresar\?next=%2Fadmin%2Fusuarios/);
   await expect(page.getByRole("heading", { name: "Ingresa a tu cuenta" })).toBeVisible();
-  await expect(page).toHaveTitle(/Bizview AI Powered · Cliente Demo/);
+  await expect(page).toHaveTitle(/Bizview · Cliente Demo/);
   await check(page);
 
   await page.getByRole("button", { name: "Ingresar", exact: true }).click();

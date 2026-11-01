@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { PublicConfig } from "../api/types";
 
 const DEFAULT: PublicConfig = {
-  product_name: "Bizview AI Powered",
+  product_name: "Bizview",
   organization_name: "",
   logo_url: null,
   version: "",

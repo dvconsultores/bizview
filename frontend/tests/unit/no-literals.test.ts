@@ -14,7 +14,6 @@ const SRC = join(process.cwd(), "src");
  */
 const ALLOWED_TEXT: Record<string, string> = {
   BizView: "brand name",
-  "Bizview AI Powered": "brand name",
   PDF: "technical format",
   CSV: "technical format",
   SQL: "technical format",

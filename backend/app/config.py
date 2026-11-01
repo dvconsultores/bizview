@@ -148,7 +148,7 @@ class Settings(BaseSettings):
     # Interface language when neither the account nor the browser decides (feature 022)
     default_locale: Literal["es", "en"] = "es"
 
-    product_name: str = "Bizview AI Powered"
+    product_name: str = "Bizview"
     organization_name: str = ""
     logo_url: str | None = None
     # Who publishes the installation, shown after the license in the footer (feature 024 polish).

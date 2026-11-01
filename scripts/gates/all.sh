@@ -8,6 +8,8 @@
 #   04-routes        no /assistant, /commands, /runs or /contracts endpoint, no assistant page
 #   05-migration     a seeded database upgrades, its applied specs survive, the tables are gone
 #   06-settings      no AI_CHAT_*, AI_AGENT_*, AI_AUTO_* or fake-provider switch left behind
+#   07-version       one version in VERSION, every copy equal, /api/health agreeing (046)
+#   08-markdown      fences, tables, relative links, headings and README parity (046)
 #
 # `all.sh` runs every gate that needs no database; 05 needs DATABASE_URL_BI and runs alone.
 # CI runs them all: .github/workflows/gates.yml.

@@ -1,7 +1,7 @@
 import { useBranding } from "../config/BrandingContext";
 import { initials } from "../lib/format";
 
-/** Configured logo, or a text mark from the product name's first word, e.g. "Bizview AI Powered"
+/** Configured logo, or a text mark from the product name's first word, e.g. "Bizview"
  * → "BI" (no customer hard-coded). */
 export function Logo({ className = "h-9 w-9", inverted = false }: { className?: string; inverted?: boolean }) {
   const { logo_url, product_name } = useBranding();

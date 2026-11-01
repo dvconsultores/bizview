@@ -27,7 +27,7 @@ vi.mock("../../src/api/client", () => ({
 
 // Feature 027: the installation's public config decides whether the Google action exists.
 const branding = {
-  product_name: "Bizview AI Powered",
+  product_name: "Bizview",
   organization_name: "",
   logo_url: null,
   version: "0.1.0",
