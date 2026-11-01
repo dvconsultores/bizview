@@ -253,3 +253,4 @@ def test_unquoted_created_date_accepted(tmp_path: Path) -> None:
     edit(root / P / "project.yaml", 'created: "2026-10-01"', "created: 2026-10-01")
     result = validate.validate(root)
     assert result.ok
+

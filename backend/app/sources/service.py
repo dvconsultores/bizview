@@ -136,6 +136,10 @@ def update(db: Session, actor: AppUser, src: DataSource, data: dict, app: Settin
         old_direct = bool(src.direct_reports)
         if new_direct != old_direct:
             src.direct_reports = new_direct
+            # 048: the 019 switch and the declaration answer the same question, so turning the
+            # switch off turns the declaration off too — its scope is kept for turning it back on.
+            if not new_direct and bi_ready.declaration(src).get("enabled"):
+                src.bi_ready = {**bi_ready.declaration(src), "enabled": False}
             audit.record(db, "source_direct_reports_changed", actor_id=actor.id, ip=ip,
                          detail={"source": src.name, "before": old_direct, "value": new_direct})
     elif src.kind != "postgresql" and src.direct_reports:

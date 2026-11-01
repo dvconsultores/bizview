@@ -128,7 +128,7 @@ describe("source direct reports flag", () => {
     await renderForm("/admin/fuentes/nueva");
     await flush();
 
-    const label = t.directSources.flag;
+    const label = t.biReady.flag;
     expect(document.querySelector(`button[role="switch"][aria-label="${label}"]`)).toBeTruthy();
 
     const restRadio = document.querySelector(`input[type="radio"][value="rest"]`) as HTMLInputElement;
@@ -151,7 +151,7 @@ describe("source direct reports flag", () => {
 
     expect(document.body.textContent).toContain("ERP");
 
-    const label = t.directSources.flag;
+    const label = t.biReady.flag;
     const sw = document.querySelector(`button[role="switch"][aria-label="${label}"]`) as HTMLButtonElement;
     expect(sw).toBeTruthy();
     expect(sw.getAttribute("aria-checked")).toBe("true");
@@ -166,7 +166,49 @@ describe("source direct reports flag", () => {
     await act(async () => { save.click(); });
     await flush();
 
-    expect(api.patch).toHaveBeenCalledWith("/api/sources/7", expect.objectContaining({ direct_reports: false }));
+    expect(api.patch).toHaveBeenCalledWith("/api/sources/7",
+      expect.objectContaining({ direct_reports: false, bi_ready: expect.any(Object) }));
+  });
+
+  it("sends the declaration with its scope and limits", async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+      if (path === "/api/sources/types") return types;
+      if (path === "/api/sources/9") {
+        return { ...pgSource, id: 9, bi_ready_enabled: true,
+                 bi_ready_health: { runs: 4, failures: 0, p50_ms: 30, p95_ms: 90,
+                                    served_from_cache: 2, cache_share: 0.5 },
+                 bi_ready: { enabled: true, schemas: ["reporting"],
+                                                 timeout_s: 45, verified_ok: true,
+                                                 verified_at: "2026-11-01T10:00:00Z" } };
+      }
+      return null;
+    });
+    (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({ ...pgSource, id: 9 });
+
+    await renderForm("/admin/fuentes/9");
+    await flush();
+
+    // The declaration the source already has is shown, and the badge says the credential held.
+    expect(document.body.textContent).toContain(t.biReady.verified);
+    const schemas = document.querySelector('input[value="reporting"]') as HTMLInputElement;
+    expect(schemas).toBeTruthy();
+    // Editar la lista es lo que marca el formulario como modificado.
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(schemas, "reporting, ventas");
+      schemas.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flush();
+
+    const save = Array.from(document.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes("Guardar")) as HTMLButtonElement;
+    await act(async () => { save.click(); });
+    await flush();
+
+    const [, body] = (api.patch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(body.bi_ready).toEqual(expect.objectContaining({
+      enabled: true, schemas: ["reporting", "ventas"], objects: [], timeout_s: 45,
+    }));
   });
 
   it("hides switch for REST edit", async () => {
@@ -181,7 +223,7 @@ describe("source direct reports flag", () => {
 
     expect(document.body.textContent).toContain("Legacy");
 
-    const label = t.directSources.flag;
+    const label = t.biReady.flag;
     expect(document.querySelector(`button[role="switch"][aria-label="${label}"]`)).toBeNull();
   });
 

@@ -912,7 +912,7 @@ def test_prune_log():
     assert remaining[0][0] == 1
 
 
-def test_worker_preview_housekeeping_calls_prune(monkeypatch):
+def test_worker_housekeeping_prunes_the_direct_read_log(monkeypatch):
     from app import worker as worker_module
     from app.worker import Worker
     _clear_direct_read_log()
@@ -922,30 +922,28 @@ def test_worker_preview_housekeeping_calls_prune(monkeypatch):
         calls.append(1)
         return 1
 
-    monkeypatch.setattr(worker_module.assistant_preview, "cleanup_stale", lambda db: None)
     monkeypatch.setattr(worker_module.direct, "prune_log", fake_prune)
     w = Worker()
     try:
-        w.preview_housekeeping()
+        w.housekeeping()
         assert calls == [1]
-        w.preview_housekeeping()
+        w.housekeeping()
         assert calls == [1]
     finally:
         w.pool.shutdown(wait=False)
 
 
-def test_worker_preview_housekeeping_swallows_prune_error(monkeypatch):
+def test_worker_housekeeping_swallows_a_prune_error(monkeypatch):
     from app import worker as worker_module
     from app.worker import Worker
 
     def failing_prune(db):
         raise RuntimeError("prune boom")
 
-    monkeypatch.setattr(worker_module.assistant_preview, "cleanup_stale", lambda db: None)
     monkeypatch.setattr(worker_module.direct, "prune_log", failing_prune)
     w = Worker()
     try:
-        w.preview_housekeeping()
+        w.housekeeping()
     finally:
         w.pool.shutdown(wait=False)
 
@@ -1315,7 +1313,7 @@ def test_us1_single_flight_runner_sessions(bi_ventas, monkeypatch):
     direct._inflight.clear()
     direct.clear_cache()
     ctx = report._build_context("bi-ventas", US1_REPORT,
-                                report.PreviewVersion(id=901, artifacts={}), {}, None)
+                                report.DetachedVersion(id=901, artifacts={}), {}, None)
     sel, filters = report.selection(ctx, {"period": "custom", "from": "2026-09-01",
                                           "to": "2026-09-30", "compare": "none"},
                                     date(2026, 9, 30))
@@ -1423,7 +1421,7 @@ def test_every_product_table_refused_at_context_build():
         }
         with pytest.raises(ApiError) as excinfo:
             report._build_context("evil", rep,
-                                  report.PreviewVersion(id=902, artifacts={}), {}, None)
+                                  report.DetachedVersion(id=902, artifacts={}), {}, None)
         assert excinfo.value.status == 409
         assert excinfo.value.code == "direct_product_table"
 

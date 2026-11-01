@@ -17,6 +17,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.engine import direct
 from app.engine import report as engine
 from app.errors import ApiError, forbidden, not_found, validation
 from app.i18n import M
@@ -57,7 +58,14 @@ def report_context(db: Session, dash: Dashboard | None) -> engine.Context | None
     version = workspace.active_for_reads(db)
     if version is None or dash.report_id not in version.artifacts.get("reports", {}):
         return None
-    return engine.cached_context(version, dash.report_id)
+    ctx = engine.cached_context(version, dash.report_id)
+    # Feature 048: a shared link and a scheduled email are two more doors into the same report, so
+    # the declaration's scope is asked here too.
+    cfg = ctx.definition.get("direct")
+    if isinstance(cfg, dict) and direct.scope_refusal(
+            db, str(cfg.get("source", "")), cfg.get("tables") or {}):
+        return None
+    return ctx
 
 
 def is_active(link: ShareLink, now: datetime | None = None) -> bool:

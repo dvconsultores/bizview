@@ -81,6 +81,36 @@ def refusal(schema: str, table: str, *, bi: bool) -> str | None:
     return None
 
 
+def scope_refusal(db, source: str, tables: dict) -> str | None:
+    """Refuse a direct read whose objects the source's declaration does not expose (048).
+
+    The validator asked the same question when the project was checked; asking it again here is
+    what makes the answer hold for a definition that arrived another way — an applied version, an
+    import, a shared link. `db` is a session, because the declaration is data.
+    """
+    from app.models import DataSource
+    from app.sources import bi_ready
+
+    if source.strip().lower() == "bi":
+        return None                      # the installation's own database: declared by the product
+    from sqlalchemy import func, select
+
+    row = db.scalar(select(DataSource).where(func.lower(DataSource.name) == source.strip().lower()))
+    if row is None:
+        return None                      # resolve() reports the unknown source, with its message
+    if not bi_ready.enabled(row):
+        return None                      # resolve() says «this source does not allow direct reads»
+    for value in (tables or {}).values():
+        name = value if isinstance(value, str) else (value or {}).get("table")
+        if not isinstance(name, str) or "." not in name:
+            continue
+        schema, _, table = name.partition(".")
+        if not bi_ready.permitted(row, schema, table):
+            return (f"{name}: fuera del alcance declarado de {row.name}. "
+                    "Añádelo a la declaración lista para BI o usa otro objeto.")
+    return None
+
+
 def physical_schema(schema: str) -> str:
     """Logical BI-database schema name → physical PostgreSQL schema name.
 
@@ -1054,6 +1084,46 @@ def structure(source: str | DirectSource, tables: list[str]) -> dict:
         return {"error": e.message}
 
 
+def resolve_tables(source: str, tables: dict) -> dict:
+    """`direct.tables` with every entry as `{table, columns}` (feature 048).
+
+    The short form (`alias: schema.object`) carries no column contract: the source declares its
+    columns, so they are read from the structure the same way the validator reads them. A report
+    whose columns cannot be read is refused here rather than rendered wrong — the engine is the last
+    door, and it does not open on a guess.
+    """
+    short = {alias: value for alias, value in (tables or {}).items()
+             if isinstance(value, str)}
+    out = {alias: dict(value) for alias, value in (tables or {}).items()
+           if isinstance(value, dict)}
+    if not short:
+        return out
+    wanted = sorted({value.lower() for value in short.values()})
+    found = structure(source, wanted)
+    error = found.get("error") if isinstance(found, dict) else "structure"
+    if error:
+        raise DirectError("structure_changed", str(error))
+    live = {str(key).lower(): value for key, value in (found.get("tables") or {}).items()}
+    for alias, object_name in short.items():
+        info = live.get(object_name.lower()) or {}
+        columns = {column: {"type": _logical_type(dtype)}
+                   for column, dtype in (info.get("columns") or {}).items()}
+        if not columns:
+            raise DirectError("structure_changed",
+                              f"{object_name}: no columns readable from the source")
+        out[alias] = {"table": object_name, "columns": columns}
+    return out
+
+
+_LOGICAL_TYPES = {"date": "date", "timestamp with time zone": "timestamptz",
+                  "timestamp without time zone": "timestamp"}
+
+
+def _logical_type(data_type: str) -> str:
+    lowered = (data_type or "").strip().lower()
+    return _LOGICAL_TYPES.get(lowered, lowered)
+
+
 def describe_bi() -> dict:
     """Structure of the installation BI database for direct reports.
 
@@ -1533,6 +1603,18 @@ def validation_context(db, app=None) -> wsv.DirectContext:
         memo[skey] = result
         return result
 
+    from app.sources import bi_ready
+
+    rows_by_name = {src.name.strip().lower(): src
+                    for src in db.scalars(select(DataSource))}
+
+    def allowed(source: str, schema: str, table: str) -> bool:
+        """048: whether the source's declaration exposes this object to reports."""
+        if source.strip().lower() == "bi":
+            return True
+        row = rows_by_name.get(source.strip().lower())
+        return True if row is None else bi_ready.permitted(row, schema, table)
+
     return wsv.DirectContext(
         sources=sources,
         bi_enabled=bool(app.direct_reports_bi),
@@ -1540,4 +1622,5 @@ def validation_context(db, app=None) -> wsv.DirectContext:
         structure=structured,
         personal_kind=lambda col: personal_kind(col),
         warn_rows=app.direct_report_warn_rows, dataset_rows=rows,
+        allowed=allowed,
     )

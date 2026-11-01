@@ -1,8 +1,11 @@
 import { AlertTriangle, Clock, Plus, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
+import { formatDateTime } from "../../lib/format";
 import { api, ApiError } from "../../api/client";
-import type { DataSource, FieldDef, HeaderDef, SourceKind, SourceTest, SourceTypes } from "../../api/types";
+import type {
+  BiReadyDeclaration, DataSource, FieldDef, HeaderDef, SourceKind, SourceTest, SourceTypes,
+} from "../../api/types";
 import { Alert } from "../../components/Alert";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { Badge } from "../../components/Badge";
@@ -61,6 +64,11 @@ function headerRows(source: DataSource | null): HeaderRow[] {
   }));
 }
 
+/** "a, b ,c" → ["a", "b", "c"]: the declaration's lists are typed, not picked from a widget. */
+function splitList(text: string): string[] {
+  return text.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
 export function SourceForm() {
   const t = useT();
   const T = t.admin.sourceForm;
@@ -76,7 +84,11 @@ export function SourceForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [enabled, setEnabled] = useState(true);
-  const [directReports, setDirectReports] = useState(false);
+  // Feature 048: the BI-ready declaration — the scope and the limits, as data.
+  const [biReady, setBiReady] = useState<BiReadyDeclaration>({ enabled: false, schemas: [],
+                                                               objects: [] });
+  const [schemasText, setSchemasText] = useState("");
+  const [objectsText, setObjectsText] = useState("");
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [secrets, setSecrets] = useState<Secrets>({});
   const [headers, setHeaders] = useState<HeaderRow[]>([]);
@@ -100,7 +112,13 @@ export function SourceForm() {
     setName(src?.name ?? "");
     setDescription(src?.description ?? "");
     setEnabled(src?.enabled ?? true);
-    setDirectReports(src?.direct_reports ?? false);
+    // A source declared before 048 (or the 019 switch on its own) still starts with the toggle on,
+    // which is what the person configured; the first save writes the declaration.
+    const declaration = { enabled: src?.bi_ready_enabled ?? src?.direct_reports ?? false,
+                          schemas: [], objects: [], ...(src?.bi_ready ?? {}) };
+    setBiReady({ ...declaration });
+    setSchemasText((declaration.schemas ?? []).join(", "));
+    setObjectsText((declaration.objects ?? []).join(", "));
     setValues(src ? { ...src.settings } : defaultsFor(ty[k].fields));
     setSecrets({});
     setHeaders(headerRows(src));
@@ -161,7 +179,13 @@ export function SourceForm() {
     const sec: Record<string, string | null> = {};
     for (const f of shown) if (f.secret && secrets[f.name] !== undefined) sec[f.name] = secrets[f.name] as string | null;
     return { name: name.trim(), kind, description: description.trim(), enabled,
-             direct_reports: kind === "postgresql" ? directReports : false,
+             // 019's switch and the declaration answer the same question: one toggle, two fields.
+             direct_reports: kind === "postgresql" ? biReady.enabled : false,
+             bi_ready: kind === "postgresql" ? {
+               ...biReady,
+               schemas: splitList(schemasText),
+               objects: splitList(objectsText),
+             } : {},
              settings, secrets: sec };
   };
 
@@ -361,7 +385,9 @@ export function SourceForm() {
                   <label key={k} className={`flex min-h-tap cursor-pointer items-center rounded-xl border p-3 focus-within:ring-2 focus-within:ring-accent-line-strong ${
                     selected ? "border-primary bg-accent-soft ring-1 ring-primary" : "border-line-strong bg-surface hover:border-accent-line-strong"}`}>
                     <input type="radio" name="kind" value={k} checked={selected} className="sr-only"
-                      onChange={() => { setKind(k); setValues(defaultsFor(types[k].fields)); setSecrets({}); setHeaders([]); setDirectReports(false); touch(); }} />
+                      onChange={() => { setKind(k); setValues(defaultsFor(types[k].fields)); setSecrets({}); setHeaders([]);
+                                 setBiReady({ enabled: false, schemas: [], objects: [] });
+                                 touch(); }} />
                     <Icon className={`mr-2 h-5 w-5 ${selected ? "text-accent" : "text-ink-soft"}`} aria-hidden />
                     <span className="font-medium text-ink">{types[k].label}</span>
                   </label>
@@ -384,12 +410,62 @@ export function SourceForm() {
           <Switch checked={enabled} label={T.enabled} onChange={(v) => { setEnabled(v); touch(); }} />
         </div>
         {kind === "postgresql" ? (
-          <div className="space-y-1">
+          <div className="space-y-3" data-bi-ready>
             <div className="flex items-center justify-between">
-              <span id="direct-reports-label" className="text-sm font-semibold text-ink-2">{t.directSources.flag}</span>
-              <Switch checked={directReports} label={t.directSources.flag} onChange={(v) => { setDirectReports(v); touch(); }} />
+              <span id="direct-reports-label" className="text-sm font-semibold text-ink-2">{t.biReady.flag}</span>
+              <Switch checked={biReady.enabled} label={t.biReady.flag}
+                      onChange={(v) => { setBiReady({ ...biReady, enabled: v }); touch(); }} />
             </div>
-            <p className="text-sm text-ink-soft">{t.directSources.help}</p>
+            <p className="text-sm text-ink-soft">{t.biReady.help}</p>
+            {errors["bi_ready"] ? <p className="text-sm text-danger">{errors["bi_ready"]}</p> : null}
+
+            {biReady.enabled ? (
+              <div className="space-y-3 rounded-xl bg-surface-2 p-4">
+                <Input label={t.biReady.schemas} value={schemasText}
+                       placeholder={t.biReady.schemasPlaceholder}
+                       onChange={(e) => { setSchemasText(e.target.value); touch(); }} />
+                <Input label={t.biReady.objects} value={objectsText}
+                       placeholder={t.biReady.objectsPlaceholder}
+                       onChange={(e) => { setObjectsText(e.target.value); touch(); }} />
+                <p className="text-sm text-ink-soft">{t.biReady.scopeHelp}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(["timeout_s", "cache_ttl_s", "max_rows", "max_parallel"] as const).map((key) => (
+                    <Input key={key} type="number" label={t.biReady.limits[key]}
+                           value={String(biReady[key] ?? "")}
+                           onChange={(e) => {
+                             const raw = e.target.value === "" ? undefined : Number(e.target.value);
+                             setBiReady({ ...biReady, [key]: raw });
+                             touch();
+                           }} />
+                  ))}
+                </div>
+                <Input label={t.biReady.timezone} value={biReady.timezone ?? ""}
+                       placeholder="America/Caracas"
+                       onChange={(e) => { setBiReady({ ...biReady, timezone: e.target.value });
+                                          touch(); }} />
+                {source?.bi_ready_enabled ? (
+                  <div className="space-y-1" data-bi-ready-health>
+                    <Badge tone={source.bi_ready?.verified_ok ? "green" : "red"}>
+                      {source.bi_ready?.verified_ok ? t.biReady.verified : t.biReady.unverified}
+                    </Badge>
+                    {source.bi_ready?.verified_at ? (
+                      <p className="text-xs text-ink-muted">
+                        {t.biReady.verifiedAt(formatDateTime(source.bi_ready.verified_at))}
+                      </p>
+                    ) : null}
+                    <p className="text-sm text-ink-2">{t.biReady.healthTitle}</p>
+                    <p className="text-sm text-ink-soft">
+                      {t.biReady.health(
+                        source.bi_ready_health?.runs ?? 0,
+                        source.bi_ready_health?.p50_ms ?? 0,
+                        source.bi_ready_health?.p95_ms ?? 0,
+                        source.bi_ready_health?.failures ?? 0,
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {errors.direct_reports ? <p className="text-sm text-danger">{errors.direct_reports}</p> : null}
           </div>
         ) : null}

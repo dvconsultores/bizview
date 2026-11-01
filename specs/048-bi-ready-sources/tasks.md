@@ -30,26 +30,26 @@ rendering. Nothing in Phase 1 changes behaviour until Phase 2 reads the declarat
 
 ## Phase 2: the scope holds, and the short table form works
 
-- [ ] T007 `engine/direct.py`: `permitted(source, schema, object)` reading the declaration; called
+- [X] T007 `engine/direct.py`: `permitted(source, schema, object)` reading the declaration; called
   before a connection is opened, and by the validator through the sources API
-- [ ] T008 `cli/bizview_cli/` report schema and `report_layout`: `direct.tables` accepts
+- [X] T008 `cli/bizview_cli/` report schema and `report_layout`: `direct.tables` accepts
   `alias: schema.object` and `alias: {table, columns}`, `allow_personal`, `materialize`; the
   problems name file and path
-- [ ] T009 `engine/direct.py`: the short form resolves its columns from `describe`'s structure, and a
+- [X] T009 `engine/direct.py`: the short form resolves its columns from `describe`'s structure, and a
   column that is not there is a validation problem, not a 500
-- [ ] T010 `backend/tests/test_bi_ready_scope.py`: an object outside the scope refused at validation
+- [X] T010 `backend/tests/test_bi_ready_scope.py`: an object outside the scope refused at validation
   **and** at execution; the short form renders the same numbers as the long form; `source: bi` and a
   019 report unchanged; a personal-data column refused and then allowed by a recorded decision
-- [ ] T011 `pytest backend/tests/test_direct*.py` (all of 019's suite) green with the declaration
+- [X] T011 `pytest backend/tests/test_direct*.py` (all of 019's suite) green with the declaration
   absent, present, and narrowed
 
 ## Phase 3: the person responsible can see it
 
-- [ ] T012 `backend/app/api/sources.py`: health over `direct_read_log` (24 h: count, p50/p95,
+- [X] T012 `backend/app/api/sources.py`: health over `direct_read_log` (24 h: count, p50/p95,
   failures by outcome, cache share) and the declaration in the source payload
-- [ ] T013 `frontend/src/pages/sources/`: the "Lista para BI" section — toggle, schema and object
+- [X] T013 `frontend/src/pages/sources/`: the "Lista para BI" section — toggle, schema and object
   pickers from `describe`, the limits, the timezone, the proof badge with its date, the health tiles
-- [ ] T014 i18n `es.ts`/`en.ts` for every new label; `no-literals.test.ts` and `audit-labels.test.ts`
+- [X] T014 i18n `es.ts`/`en.ts` for every new label; `no-literals.test.ts` and `audit-labels.test.ts`
   green; `frontend/tests/unit/bi-ready-source.test.tsx`
 
 ## Phase 4: a heavy warehouse once a day

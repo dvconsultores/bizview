@@ -17,7 +17,7 @@ from app.config import get_settings
 from app.db import DB
 from app.engine import direct
 from app.engine import report as engine
-from app.errors import not_found
+from app.errors import ApiError, not_found
 from app.i18n import M
 from app.images import cache as images_cache
 from app.models import AppUser, Dashboard, ReportCache
@@ -31,12 +31,27 @@ router = APIRouter(prefix="/api/reports")
 log = logging.getLogger("app.reports")
 
 
+def _check_scope(db: Session, definition: dict) -> None:
+    """048: a direct report may only read what its source's declaration exposes.
+
+    The validator refused it when the project was checked; this refuses it again for a definition
+    that reached the workspace some other way, so the answer does not depend on which door it
+    came through."""
+    cfg = definition.get("direct")
+    if not isinstance(cfg, dict):
+        return
+    message = direct.scope_refusal(db, str(cfg.get("source", "")), cfg.get("tables") or {})
+    if message:
+        raise ApiError(409, "direct_not_allowed", message)
+
+
 def _context(db: Session, user: AppUser, report_id: str) -> engine.Context:
     version = workspace.active_for_reads(db)
     dash = db.scalar(select(Dashboard).where(Dashboard.report_id == report_id))
     if version is None or dash is None or report_id not in version.artifacts.get("reports", {}):
         raise not_found(M("report.not_found"))
     ctx = engine.cached_context(version, report_id)
+    _check_scope(db, ctx.definition)
     access = ctx.definition.get("access") or {}
     roles = access.get("roles") or ["admin"]
     # `grants: true` in the report means per-user grants are **also** required (schema:

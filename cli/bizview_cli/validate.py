@@ -207,6 +207,8 @@ class DirectContext:
     personal_kind: Callable[[str], str | None] | None = None
     warn_rows: int | None = None
     dataset_rows: Callable[[str, str], int | None] | None = None
+    #: Feature 048: (source, schema, object) -> whether the declaration exposes it.
+    allowed: Callable[[str, str, str], bool] | None = None
 
 
 def _sha(data: bytes) -> str:
@@ -1052,6 +1054,72 @@ def _direct_source(entry: Entry, ry: str, direct: dict, ctx: DirectContext | Non
     return bool((info or {}).get("bi"))
 
 
+_PG_DATE_TYPES = {"date": "date", "timestamp with time zone": "timestamptz",
+                  "timestamp without time zone": "timestamp", "time with time zone": "timetz",
+                  "time without time zone": "time"}
+
+
+def _direct_type(data_type: str) -> str:
+    lowered = (data_type or "").strip().lower()
+    return _PG_DATE_TYPES.get(lowered, lowered)
+
+
+def _resolve_short_tables(entry: Entry, direct: dict | None, ctx: DirectContext | None,
+                          issues: list[Issue]) -> None:
+    """047's short form: `alias: schema.object`, with the columns read from the source (048).
+
+    A BI-ready source already declares its columns; asking the author to copy them into the report
+    is the thing this form removes. When the structure cannot be read (an offline validation), the
+    form stays syntactically valid and the column checks are skipped with a warning — the server
+    repeats the whole check when the project is imported or applied.
+    """
+
+    if not direct:
+        return
+    tables = direct.get("tables") or {}
+    short = {alias: value for alias, value in tables.items() if isinstance(value, str)}
+    if not short:
+        return
+    ry = f"{entry.folder.as_posix()}/report.yaml"
+    source = str(direct.get("source", "")).strip()
+
+    def unresolved(reason: str | None) -> None:
+        for alias, name in short.items():
+            tables[alias] = {"table": name, "columns": {}, "unresolved": True}
+        issues.append(Issue(
+            entry.key, "direct_columns_unresolved",
+            t("validate.direct_columns_unresolved", source=source),
+            level="warning", file=ry, path="/direct/tables",
+            fix=t("validate.fix_check_source_and_revalidate")))
+
+    if ctx is None or ctx.structure is None:
+        unresolved(None)
+        return
+    wanted = sorted({name.lower() for name in short.values()})
+    try:
+        result = ctx.structure(source, wanted)
+    except Exception as exc:
+        result = {"error": type(exc).__name__}
+    error = result.get("error") if isinstance(result, dict) else t("validate.invalid_response")
+    if error:
+        unresolved(str(error))
+        return
+    live = {str(key).lower(): value for key, value in (result.get("tables") or {}).items()}
+    for alias, name in sorted(short.items()):
+        info = live.get(name.lower())
+        columns = {column: {"type": _direct_type(dtype), "nullable": True}
+                   for column, dtype in ((info or {}).get("columns") or {}).items()}
+        if not columns:
+            issues.append(Issue(
+                entry.key, "direct_table_missing",
+                t("validate.table_not_exists_or_unreadable", table=name, source=source),
+                file=ry, path=_pointer(["direct", "tables", alias]),
+                fix=t("validate.fix_check_source_and_revalidate")))
+            tables[alias] = {"table": name, "columns": {}, "unresolved": True}
+            continue
+        tables[alias] = {"table": name, "columns": columns}
+
+
 def _direct_aliases(entry: Entry, direct: dict | None, ctx: DirectContext | None,
                     issues: list[Issue]) -> dict[str, dict[str, dict]]:
     """Alias columns from a direct report contract (T006 adds checks)."""
@@ -1066,8 +1134,17 @@ def _direct_aliases(entry: Entry, direct: dict | None, ctx: DirectContext | None
                             expected={"enum": ["none"]},
                             fix=t("validate.fix_remove_materialize_or_none")))
     is_bi = _direct_source(entry, ry, direct, ctx, issues)
+    source = str(direct.get("source", "")).strip()
     for alias, tbl in direct["tables"].items():
         schema, table = tbl["table"].split(".", 1)
+        if (ctx is not None and ctx.allowed is not None and not direct_reserved(schema, table)
+                and not ctx.allowed(source, schema, table)):
+            issues.append(Issue(
+                entry.key, "direct_out_of_scope",
+                t("validate.direct_out_of_scope", table=tbl["table"], source=source),
+                file=ry, path=_pointer(["direct", "tables", alias]),
+                expected={"in": "the source's BI-ready declaration"},
+                fix=t("validate.fix_add_object_to_scope", table=tbl["table"])))
         if direct_reserved(schema, table):
             _product_table_issue(entry, ry, issues, alias)
         elif (ctx is not None and is_bi and ctx.product_tables
@@ -1527,6 +1604,7 @@ def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Iss
     _check_direct_spec(entry, issues)
     if "direct" in a:
         before = len(issues)
+        _resolve_short_tables(entry, a["direct"], direct, issues)
         aliases = _direct_aliases(entry, a["direct"], direct, issues)
         blocked = any(i.code in ("unknown_source", "direct_not_allowed")
                       for i in issues[before:])

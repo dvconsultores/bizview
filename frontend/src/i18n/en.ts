@@ -511,6 +511,9 @@ export const en: Catalogue = {
     email_subscription_updated: "Scheduled send updated",
     email_subscription_deleted: "Scheduled send deleted",
     source_direct_reports_changed: "Source direct reports changed",
+    source_bi_ready_changed: "Source declared BI-ready",
+    source_bi_ready_verified: "Read-only credential proven",
+    source_bi_ready_unverified: "Source credential unproven or writable",
   } as Record<string, string>,
   ai: {
     title: "Artificial intelligence",
@@ -882,6 +885,28 @@ export const en: Catalogue = {
         none: "No changes from the active version.",
       },
     },
+  },
+  biReady: {
+    flag: "BI-ready",
+    help: "Declares that this database is already prepared to be read directly (a warehouse, a reporting schema or a replica with views). Reports will read only what you declare here, with these limits, and the credential is proven on save and once a day.",
+    schemas: "Schemas reports may read",
+    schemasPlaceholder: "reporting, sales",
+    objects: "Allowed objects (optional)",
+    objectsPlaceholder: "reporting.v_sales_day, sales.dim_product",
+    scopeHelp: "An empty list of schemas exposes nothing: it is a closed list, never \"everything\". System and test schemas can never be exposed.",
+    limits: {
+      timeout_s: "Query timeout (s)",
+      cache_ttl_s: "Cache lifetime (s)",
+      max_rows: "Row cap",
+      max_parallel: "Concurrent queries",
+    },
+    timezone: "Source timezone",
+    verified: "Read-only credential, proven",
+    unverified: "Credential unproven or allowed to write",
+    verifiedAt: (when: string) => `Proven on ${when}`,
+    healthTitle: "Direct reads in the last 24 h",
+    health: (runs: number, p50: number, p95: number, failures: number) =>
+      `${runs} reads · median ${p50} ms · p95 ${p95} ms · ${failures} failed`,
   },
   directSources: {
     flag: "Allow direct reports",

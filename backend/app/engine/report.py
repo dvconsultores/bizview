@@ -131,8 +131,9 @@ def _build_direct_context(report_id: str, d: dict, version) -> Context:
     bi = source.lower() == "bi"
     label = source  # raw id ("bi" or a source name); clients render "bi" in their language
 
+    resolved = direct.resolve_tables(source, cfg["tables"])
     logical, tables, columns = {}, {}, {}
-    for alias, tbl in cfg["tables"].items():
+    for alias, tbl in resolved.items():
         schema, _, table = tbl["table"].partition(".")
         msg = direct.refusal(schema, table, bi=bi)
         if msg:

@@ -107,38 +107,48 @@
             "pattern": "^[a-z][a-z0-9_]{0,40}$"
           },
           "additionalProperties": {
-            "description": "Definición de una tabla o vista de lectura directa.",
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "table",
-              "columns"
-            ],
-            "properties": {
-              "table": {
-                "description": "Tabla o vista como esquema.tabla, p. ej. public.bi_ventas.",
+            "description": "Una tabla o vista de lectura directa: `esquema.objeto`, con las columnas leídas de la fuente (048), o la definición de 019 con su contrato de columnas.",
+            "oneOf": [
+              {
+                "description": "Forma corta: el objeto, y las columnas que la fuente declara.",
                 "type": "string",
                 "pattern": "^[a-z_][a-z0-9_]{0,62}\\.[a-z_][a-z0-9_]{0,62}$"
               },
-              "columns": {
-                "description": "Columnas del contrato disponibles para el reporte.",
+              {
+                "description": "Forma de 019: el objeto y las columnas que el informe declara.",
                 "type": "object",
-                "minProperties": 1,
-                "propertyNames": {
-                  "description": "Nombre de columna pública; se usa como alias.columna.",
-                  "type": "string",
-                  "pattern": "^[a-z][a-z0-9_]{0,40}$"
-                },
-                "additionalProperties": {
-                  "$ref": "#/$defs/column"
+                "additionalProperties": false,
+                "required": [
+                  "table",
+                  "columns"
+                ],
+                "properties": {
+                  "table": {
+                    "description": "Tabla o vista como esquema.tabla, p. ej. public.bi_ventas.",
+                    "type": "string",
+                    "pattern": "^[a-z_][a-z0-9_]{0,62}\\.[a-z_][a-z0-9_]{0,62}$"
+                  },
+                  "columns": {
+                    "description": "Columnas del contrato disponibles para el reporte.",
+                    "type": "object",
+                    "minProperties": 1,
+                    "propertyNames": {
+                      "description": "Nombre de columna pública; se usa como alias.columna.",
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,40}$"
+                    },
+                    "additionalProperties": {
+                      "$ref": "#/$defs/column"
+                    }
+                  },
+                  "description": {
+                    "description": "Descripción libre de la tabla o vista.",
+                    "type": "string",
+                    "maxLength": 300
+                  }
                 }
-              },
-              "description": {
-                "description": "Descripción libre de la tabla o vista.",
-                "type": "string",
-                "maxLength": 300
               }
-            }
+            ]
           }
         },
         "cache_seconds": {

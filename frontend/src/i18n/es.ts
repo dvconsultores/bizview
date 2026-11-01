@@ -491,6 +491,9 @@ export const es = {
     email_subscription_updated: "Envío programado editado",
     email_subscription_deleted: "Envío programado eliminado",
     source_direct_reports_changed: "Reportes directos modificados",
+    source_bi_ready_changed: "Fuente declarada lista para BI",
+    source_bi_ready_verified: "Credencial de solo lectura comprobada",
+    source_bi_ready_unverified: "Credencial de la fuente sin comprobar o con escritura",
   } as Record<string, string>,
   ai: {
     title: "Inteligencia artificial",
@@ -863,6 +866,28 @@ export const es = {
         none: "Sin cambios respecto a la versión activa.",
       },
     },
+  },
+  biReady: {
+    flag: "Lista para BI",
+    help: "Declara que esta base ya está preparada para leerla directamente (un almacén, un esquema de reportes o una réplica con vistas). Los reportes leerán solo lo que declares aquí, con estos límites, y la credencial se comprueba al guardar y una vez al día.",
+    schemas: "Esquemas que los reportes pueden leer",
+    schemasPlaceholder: "reporting, ventas",
+    objects: "Objetos permitidos (opcional)",
+    objectsPlaceholder: "reporting.v_ventas_dia, ventas.dim_producto",
+    scopeHelp: "Un esquema vacío no expone nada: es una lista cerrada, no «todos». Los esquemas del sistema y los de prueba nunca se pueden exponer.",
+    limits: {
+      timeout_s: "Tiempo máximo de consulta (s)",
+      cache_ttl_s: "Vida de la caché (s)",
+      max_rows: "Máximo de filas",
+      max_parallel: "Consultas a la vez",
+    },
+    timezone: "Zona horaria de la fuente",
+    verified: "Credencial de solo lectura, comprobada",
+    unverified: "Credencial sin comprobar o con permiso de escritura",
+    verifiedAt: (when: string) => `Comprobada el ${when}`,
+    healthTitle: "Lecturas directas de las últimas 24 h",
+    health: (runs: number, p50: number, p95: number, failures: number) =>
+      `${runs} lecturas · mediana ${p50} ms · p95 ${p95} ms · ${failures} con error`,
   },
   directSources: {
     flag: "Permitir reportes directos",

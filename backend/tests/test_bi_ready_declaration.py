@@ -168,3 +168,61 @@ def test_health_summarises_the_last_day_from_the_log():
     assert bi_ready.health_summary([]) == {"runs": 0, "failures": 0, "p50_ms": None,
                                            "p95_ms": None, "served_from_cache": 0,
                                            "cache_share": None}
+
+
+# --- the scope reaches execution, not only validation ------------------------------------------
+
+
+def test_the_engine_refuses_an_object_outside_the_declaration(client, superuser, monkeypatch):
+    """FR-003: whichever door a definition came through, the same question is asked."""
+    from app.engine import direct
+
+    src = make_source(client, name="Almacén estricto")
+    monkeypatch.setattr("app.sources.describe.postgresql",
+                        lambda settings, secrets, app, write_probe=False: {
+                            "kind": "postgresql", "tables": [], "truncated": False,
+                            "write_allowed": False})
+    r = reauth(client).patch(f"/api/sources/{src['id']}",
+                             json={"bi_ready": {"enabled": True, "schemas": ["reporting"]}})
+    assert r.status_code == 200, r.text
+
+    from app.db import get_sessionmaker
+
+    with get_sessionmaker()() as session:
+        inside = direct.scope_refusal(session, "Almacén estricto",
+                                      {"v": {"table": "reporting.v_ventas_dia",
+                                             "columns": {}}})
+        outside = direct.scope_refusal(session, "Almacén estricto",
+                                       {"v": {"table": "public.ventas", "columns": {}}})
+        short_outside = direct.scope_refusal(session, "Almacén estricto",
+                                             {"v": "public.ventas"})
+        bi = direct.scope_refusal(session, "bi", {"v": {"table": "public.cualquiera",
+                                                        "columns": {}}})
+    assert inside is None
+    assert "fuera del alcance" in outside
+    assert "public.ventas" in short_outside
+    assert bi is None
+
+
+def test_a_report_that_reads_outside_the_scope_is_refused_when_it_renders(superuser, monkeypatch):
+    """The refusal reaches the page, with the code the UI already knows."""
+    from app.api import reports as reports_api
+    from app.db import get_sessionmaker
+    from app.errors import ApiError
+
+    src = None
+    c = signed_in(superuser.email)
+    src = make_source(c, name="Almacén en vivo")
+    monkeypatch.setattr("app.sources.describe.postgresql",
+                        lambda settings, secrets, app, write_probe=False: {
+                            "kind": "postgresql", "tables": [], "truncated": False,
+                            "write_allowed": False})
+    assert reauth(c).patch(f"/api/sources/{src['id']}",
+                           json={"bi_ready": {"enabled": True,
+                                              "schemas": ["reporting"]}}).status_code == 200
+    with get_sessionmaker()() as db:
+        with pytest.raises(ApiError) as raised:
+            reports_api._check_scope(db, {"direct": {"source": "Almacén en vivo",
+                                                     "tables": {"v": "public.ventas"}}})
+    assert raised.value.code == "direct_not_allowed"
+    assert "fuera del alcance" in raised.value.text

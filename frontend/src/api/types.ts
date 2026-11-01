@@ -189,6 +189,11 @@ export interface DataSource {
   description: string;
   enabled: boolean;
   direct_reports: boolean;
+  /** Feature 048: the declaration, whether it is on, the limits in force and the last day. */
+  bi_ready?: BiReadyDeclaration;
+  bi_ready_enabled?: boolean;
+  bi_ready_limits?: Partial<BiReadyDeclaration>;
+  bi_ready_health?: BiReadyHealth;
   settings: Record<string, unknown>;
   secret_fields: string[];
   imported: boolean;
@@ -617,6 +622,30 @@ export interface LayoutDocument {
 
 /** Feature 030: the palette presets shipped with the product (`frontend/src/theme/palettes/`). */
 export type PaletteId = "impacto" | "clasico" | "monocromo" | "contraste" | "daltonico";
+
+/** Feature 048: the BI-ready declaration of a PostgreSQL source: what it exposes, and its limits. */
+export interface BiReadyDeclaration {
+  enabled: boolean;
+  schemas: string[];
+  objects?: string[];
+  timeout_s?: number;
+  cache_ttl_s?: number;
+  max_rows?: number;
+  max_parallel?: number;
+  timezone?: string;
+  verified_at?: string | null;
+  verified_ok?: boolean | null;
+}
+
+/** Feature 048: the last 24 hours of direct reads, as the source page shows them. */
+export interface BiReadyHealth {
+  runs: number;
+  failures: number;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  served_from_cache: number;
+  cache_share: number | null;
+}
 
 /** Feature 030: Administración → Apariencia (contracts/appearance-api.md). */
 export interface AppearanceSettings {
