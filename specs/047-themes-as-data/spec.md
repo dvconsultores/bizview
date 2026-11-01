@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-31
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "047-themes-as-data — a theme is a data file of tokens (never CSS, fonts or markup) that anyone, a person or any AI, writes outside BizView against a published schema, uploads in Apariencia or ships inside a project zip, and applies to the installation or to any dashboard. Built-in presets become themes in the same format. Every dashboard, share link, TV mode and PDF renders from the theme's tokens only."
 
