@@ -1,4 +1,5 @@
 """Data-source catalogue (feature 004): super user only; changes and tests need step-up."""
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -28,6 +29,8 @@ class SourceIn(BaseModel):
     description: str = Field(default="", max_length=300)
     enabled: bool = True
     direct_reports: bool | None = None
+    #: Feature 048: the BI-ready declaration (scope and limits), when the source is one.
+    bi_ready: dict[str, Any] | None = None
     settings: dict[str, Any] = Field(default_factory=dict)
     secrets: dict[str, str | None] = Field(default_factory=dict)
 
@@ -38,6 +41,7 @@ class SourcePatch(BaseModel):
     description: str | None = Field(default=None, max_length=300)
     enabled: bool | None = None
     direct_reports: bool | None = None
+    bi_ready: dict[str, Any] | None = None
     settings: dict[str, Any] | None = None
     secrets: dict[str, str | None] | None = None
 
@@ -54,7 +58,30 @@ def list_sources(_: AppUser = Depends(require_superuser), db: Session = DB):
 
 @router.get("/{source_id}")
 def get_source(source_id: int, _: AppUser = Depends(require_superuser), db: Session = DB):
-    return service.to_json(service.get(db, source_id))
+    """The source, its BI-ready declaration, and the last day of direct reads (feature 048)."""
+    src = service.get(db, source_id)
+    payload = service.to_json(src)
+    payload["bi_ready_health"] = health(db, src)
+    return payload
+
+
+def health(db: Session, src) -> dict:
+    """Counts and durations of the direct reads this source answered in the last 24 hours.
+
+    Read from the log 019 already writes: a declaration nobody can observe is not a contract."""
+    from sqlalchemy import select
+
+    from app.models import DirectReadLog
+
+    since = datetime.now(UTC) - timedelta(hours=24)
+    rows = db.execute(
+        select(DirectReadLog.duration_ms, DirectReadLog.outcome, DirectReadLog.stale_served)
+        .where(DirectReadLog.source == src.name, DirectReadLog.occurred_at >= since)
+    ).all()
+    from app.sources import bi_ready
+
+    return bi_ready.health_summary(
+        [{"duration_ms": row[0], "outcome": row[1], "stale_served": row[2]} for row in rows])
 
 
 @router.post("", status_code=201)

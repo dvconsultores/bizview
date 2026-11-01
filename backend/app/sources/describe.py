@@ -19,7 +19,13 @@ from app.sources.connectors.base import temp_pem
 MAX_TABLES, MAX_COLUMNS, MAX_OPERATIONS, MAX_DEPTH = 500, 200, 200, 6
 
 
-def postgresql(settings: dict, secrets: dict, app: Settings) -> dict:
+def postgresql(settings: dict, secrets: dict, app: Settings,
+               write_probe: bool = False) -> dict:
+    """Structure of a PostgreSQL source; with `write_probe`, whether the credential can write.
+
+    The probe (048) attempts one harmless write inside a transaction that is always rolled back: a
+    credential that can create a temporary table can write, whatever its grants look like on paper.
+    """
     with _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30) as conn:
         tables = conn.execute(
             "SELECT n.nspname, c.relname, c.relkind, greatest(c.reltuples, 0)::bigint "
@@ -52,7 +58,27 @@ def postgresql(settings: dict, secrets: dict, app: Settings) -> dict:
     out = [{"schema": s, "name": t, "kind": kinds[k], "estimated_rows": n,
             "primary_key": pks.get((s, t), []), "columns": cols.get((s, t), [])[:MAX_COLUMNS]}
            for s, t, k, n in tables[:MAX_TABLES]]
-    return {"kind": "postgresql", "tables": out, "truncated": len(tables) > MAX_TABLES}
+    report = {"kind": "postgresql", "tables": out, "truncated": len(tables) > MAX_TABLES}
+    if write_probe:
+        report["write_allowed"] = _write_probe(settings, secrets, app)
+    return report
+
+
+def _write_probe(settings: dict, secrets: dict, app: Settings) -> bool:
+    """True when the credential managed to write. The table is never created: always rolled back."""
+    with _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30) as conn:
+        conn.autocommit = False
+        try:
+            with conn.cursor() as cur:
+                cur.execute("CREATE TEMP TABLE bizview_write_probe (id int)")
+            return True
+        except Exception:
+            return False
+        finally:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
 
 def shape(value, depth: int = 0):
@@ -170,10 +196,10 @@ def soap_operations(settings: dict, secrets: dict, app: Settings) -> dict:
 
 
 def describe(kind: str, settings: dict, secrets: dict, app: Settings,
-             path: str | None = None) -> dict:
+             path: str | None = None, write_probe: bool = False) -> dict:
     try:
         if kind == "postgresql":
-            return postgresql(settings, secrets, app)
+            return postgresql(settings, secrets, app, write_probe=write_probe)
         if kind == "rest":
             return rest_shape(settings, secrets, app, path)
         if kind == "soap":

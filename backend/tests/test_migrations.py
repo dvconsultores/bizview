@@ -39,7 +39,7 @@ def test_migrations_create_only_the_product_schema(database):
     assert outside_snapshot() == database  # public untouched, no extension installed
 
 
-def test_upgrade_is_idempotent_and_stops_downgrading_at_0042(database):
+def test_upgrade_is_idempotent_and_stops_downgrading_on_purpose(database):
     """A second `upgrade head` changes nothing; going back stops on purpose (045, 047)."""
     command.upgrade(alembic_cfg(), "head")  # second run: no-op
     assert schema_tables() == APP_TABLES

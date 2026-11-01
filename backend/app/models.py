@@ -62,6 +62,8 @@ AUDIT_KINDS = (
     "appearance_updated",
     # feature 047
     "theme_uploaded", "theme_replaced", "theme_deleted", "theme_applied",
+    # feature 048
+    "source_bi_ready_changed", "source_bi_ready_verified", "source_bi_ready_unverified",
 )
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
@@ -247,6 +249,9 @@ class DataSource(Base):
     secret_fields: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     imported: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     direct_reports: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # Feature 048: what reports may read from this source, and with which limits. `{}` means the
+    # source is not BI-ready; `direct_reports` above is the 019 switch it overrides.
+    bi_ready: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_test_ok: Mapped[bool | None] = mapped_column(Boolean)
     last_test: Mapped[dict | None] = mapped_column(JSONB)

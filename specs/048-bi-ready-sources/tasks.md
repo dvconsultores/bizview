@@ -16,16 +16,16 @@ rendering. Nothing in Phase 1 changes behaviour until Phase 2 reads the declarat
 
 ## Phase 1: the declaration and its proof
 
-- [ ] T002 Migration `0044_bi_ready_sources`: `data_source.bi_ready` JSONB default `{}`, the
+- [X] T002 Migration `0044_bi_ready_sources`: `data_source.bi_ready` JSONB default `{}`, the
   `source_bi_ready_changed` audit kind, and the backfill from `direct_reports = true` (research R10)
-- [ ] T003 `backend/app/sources/service.py`: read and validate the declaration (bounds, the
+- [X] T003 `backend/app/sources/service.py`: read and validate the declaration (bounds, the
   deny-list is never overridable), the "is this source BI-ready" question the rest asks
-- [ ] T004 `backend/app/sources/bi_ready.py`: the empirical read-only proof (a rolled-back
+- [X] T004 `backend/app/sources/bi_ready.py`: the empirical read-only proof (a rolled-back
   `CREATE TEMP TABLE` must fail, `SELECT 1` must succeed), the daily re-check on the worker, the
   audit and the notification when it changes
-- [ ] T005 `PATCH /api/sources/{id}` accepts the declaration for PostgreSQL only, refuses a writable
+- [X] T005 `PATCH /api/sources/{id}` accepts the declaration for PostgreSQL only, refuses a writable
   credential naming why, audits the change; `GET` returns it with `verified_at`
-- [ ] T006 `backend/tests/test_bi_ready_declaration.py`: bounds, non-PostgreSQL refusal, the
+- [X] T006 `backend/tests/test_bi_ready_declaration.py`: bounds, non-PostgreSQL refusal, the
   deny-list refused inside `schemas`, the proof passing and failing, the backfill of a 019 source
 
 ## Phase 2: the scope holds, and the short table form works

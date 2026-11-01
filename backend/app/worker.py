@@ -35,6 +35,7 @@ from app.models import (
     WorkspaceVersion,
 )
 from app.security import crypto
+from app.sources import bi_ready
 from app.telegram import service as telegram
 from app.telegram.poller import TelegramPoller
 
@@ -209,6 +210,10 @@ class Worker:
             except Exception:
                 log.exception("direct read log pruning failed")
             self.last_housekeeping = now
+            try:
+                bi_ready.recheck_all(get_sessionmaker, self.settings)
+            except Exception:      # a proof that cannot run must not stop the worker
+                log.exception("BI-ready re-check failed")
 
     def take_email_sends(self, force: bool = False) -> Future | None:
         now = time.monotonic()

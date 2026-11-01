@@ -13,7 +13,8 @@ from app.models import AppUser, DataSource, SecurityState
 from app.security import crypto
 from app.security.crypto import source_aad
 from app.services import audit
-from app.sources import schemas
+from app.sources import bi_ready, schemas
+from app.sources import describe as describer
 from app.sources.connectors import TestResult, test_source
 
 log = logging.getLogger("app.sources")
@@ -43,7 +44,10 @@ def to_json(src: DataSource) -> dict:
     return {"id": src.id, "name": src.name, "kind": src.kind, "description": src.description,
             "enabled": src.enabled, "settings": src.settings, "secret_fields": src.secret_fields,
             "imported": src.imported, "last_test": last, "created_at": src.created_at,
-            "updated_at": src.updated_at, "direct_reports": bool(src.direct_reports)}
+            "updated_at": src.updated_at, "direct_reports": bool(src.direct_reports),
+            "bi_ready": bi_ready.declaration(src),
+            "bi_ready_enabled": bi_ready.enabled(src),
+            "bi_ready_limits": bi_ready.limits(src)}
 
 
 def get(db: Session, source_id: int) -> DataSource:
@@ -109,6 +113,8 @@ def create(db: Session, actor: AppUser, data: dict, app: Settings, ip: str | Non
     if direct_reports:
         audit.record(db, "source_direct_reports_changed", actor_id=actor.id, ip=ip,
                      detail={"source": name, "before": False, "value": True})
+    if data.get("bi_ready"):
+        _store_declaration(db, actor, src, data["bi_ready"], app, ip)
     _invalidate_direct()
     return src
 
@@ -134,6 +140,8 @@ def update(db: Session, actor: AppUser, src: DataSource, data: dict, app: Settin
                          detail={"source": src.name, "before": old_direct, "value": new_direct})
     elif src.kind != "postgresql" and src.direct_reports:
         src.direct_reports = False
+    if "bi_ready" in data and data["bi_ready"] is not None:
+        _store_declaration(db, actor, src, data["bi_ready"], app, ip)
     if "description" in data:
         src.description = (data["description"] or "")[:300]
     if "settings" in data or "secrets" in data:
@@ -235,3 +243,47 @@ def import_legacy_origin(db: Session, app: Settings) -> str:
     log.warning("DATABASE_URL_ORIGIN imported as data source %r; remove it from .env",
                 LEGACY_NAME)
     return "imported"
+
+
+def _store_declaration(db: Session, actor: AppUser, src: DataSource, data: dict,
+                       app: Settings, ip: str | None) -> None:
+    """Validate the BI-ready declaration, prove the credential, store it, audit the change.
+
+    The proof runs against the credential the source has *now* — which is the one the caller just
+    saved in the same request — and a credential that can write is refused before anything is
+    stored: a declaration is only worth what its proof is.
+    """
+    if src.kind != "postgresql":
+        raise validation({"bi_ready": "not_allowed"}, M("sources.bi_ready_postgresql_only"))
+    try:
+        declaration = bi_ready.validate(data)
+    except bi_ready.DeclarationError as e:
+        raise validation({e.field: "invalid"}, e.message) from None
+    if declaration.get("enabled"):
+        probe = describer.describe("postgresql", src.settings, secrets_of(src), app,
+                                   write_probe=True)
+        allowed = bool(probe.get("write_allowed"))
+        declaration["verified_at"] = bi_ready.now()
+        declaration["verified_ok"] = not allowed
+        if allowed:
+            raise validation({"bi_ready": "writable"}, M("sources.bi_ready_writable"))
+        audit.record(db, "source_bi_ready_verified", actor_id=actor.id, ip=ip,
+                     detail={"source": src.name, "mode": "read_only"})
+    previous = bi_ready.declaration(src)
+    src.bi_ready = declaration
+    src.direct_reports = bool(declaration.get("enabled"))
+    audit.record(db, "source_bi_ready_changed", actor_id=actor.id, ip=ip,
+                 detail={"source": src.name, "before": _summary(previous),
+                         "value": _summary(declaration)})
+    db.flush()
+    _invalidate_direct()
+
+
+def _summary(declaration: dict) -> dict:
+    """What the audit keeps of a declaration: the shape of the decision, never a credential."""
+    if not declaration:
+        return {}
+    return {"enabled": bool(declaration.get("enabled")),
+            "schemas": list(declaration.get("schemas") or ()),
+            "objects": len(declaration.get("objects") or ()),
+            "limits": {key: declaration[key] for key in bi_ready.BOUNDS if key in declaration}}
