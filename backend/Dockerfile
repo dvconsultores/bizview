@@ -16,6 +16,9 @@ ENV BIZVIEW_VERSION=${BIZVIEW_VERSION} SOURCE_URL=${BIZVIEW_SOURCE_URL} \
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"
+# uv gives up after 30 s per request; the multi-megabyte wheels (polars, lxml, pillow) do not fit in
+# that on a slow link and the build fails with a network timeout rather than a dependency problem.
+ENV UV_HTTP_TIMEOUT=600
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 
 # Build context: repository root (the backend depends on the shared cli/ package).
