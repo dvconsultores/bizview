@@ -90,7 +90,7 @@ def speckit(path: Path, agent: str) -> None:
 
 
 ROOT_FILES = (("README.md", "README.md"), ("bizview.yaml", "bizview.yaml"),
-              ("AGENTS.md", "AGENTS.md"),
+              ("AGENTS.md", "AGENTS.md"), ("THEME.md", "THEME.md"),
               (".github/copilot-instructions.md", ".github/copilot-instructions.md"))
 
 

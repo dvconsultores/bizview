@@ -153,20 +153,30 @@ Periods (today … last 12 months, custom), comparisons (previous period, previo
 → "Nuevo"), freshness and PDF are provided by the product. The AI narrative receives **only** the
 metrics listed in `inputs` — aggregated, never rows.
 
-### Palette per report (optional)
+### Theme per report (optional)
 
-Every installation picks a colour palette for its charts in **Administración → Apariencia**
-(`Impacto`, `Clásico`, `Monocromo`, `Contraste alto`, `Daltónico`). A report may declare its own;
-it then travels with the workspace version and applies to the web page and the PDF:
+Every installation manages the themes of its reports in **Administración → Apariencia**: the five it
+ships (`Impacto`, `Clásico`, `Monocromo`, `Contraste alto`, `Daltónico`), the ones uploaded there and
+the ones a project brought. A report may declare its own; it then travels with the workspace version
+and applies to the web page and the PDF:
 
 ```yaml
 layout:
   theme:
-    palette: contraste   # impacto | clasico | monocromo | contraste | daltonico
+    id: contraste        # any theme of the installation, uploaded ones included
+    mode: auto           # auto | light | dark
 ```
 
-The value is a preset name, never a colour: report definitions carry semantic roles only, so the
-palette check can guarantee contrast and distinguishability in both themes.
+The value is a theme id, never a colour: report definitions carry semantic roles only, so the
+validators can guarantee contrast and distinguishability in both modes. `palette:` is accepted for
+one version as the deprecated alias of `id`, so a report written before themes had ids keeps
+applying. `mode: dark` paints the report's own area dark even when the viewer's application is
+light — the chrome stays as they chose — and a sun/moon toggle on the report lets the viewer override
+it for the session. The PDF always uses the theme's light variant.
+
+`id` must name a theme that exists: the installation's library or one the project brings in
+`themes/<id>.yaml`. A report naming a theme nobody has is a validation problem, not a silent
+fallback. See [THEMES.md](./THEMES.md) for the theme file itself.
 
 ### English labels (optional)
 

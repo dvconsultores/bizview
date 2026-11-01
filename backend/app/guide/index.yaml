@@ -361,16 +361,30 @@ topics:
     section: administracion
     title: {es: "Apariencia", en: "Appearance"}
     summary:
-      es: "Cómo elegir la paleta de colores de todos los reportes de la instalación."
-      en: "How to choose the colour palette of every report in the installation."
+      es: "Cómo elegir, subir y eliminar los temas de la instalación."
+      en: "How to choose, upload and delete the installation's themes."
     roles: [superuser]
     routes: ["/admin/apariencia"]
     tiles: ["/admin/apariencia"]
     commands: []
     aliases:
-      es: ["apariencia", "paleta", "colores", "tema de los reportes", "impacto", "contraste"]
-      en: ["appearance", "palette", "colours", "report theme", "impact", "contrast"]
-    related: [administracion, definir-un-reporte, actualizacion-y-modo-tv]
+      es: ["apariencia", "paleta", "colores", "tema de los reportes", "impacto", "contraste", "biblioteca de temas"]
+      en: ["appearance", "palette", "colours", "report theme", "impact", "contrast", "theme library"]
+    related: [administracion, definir-un-reporte, temas]
+  - id: temas
+    section: proyectos
+    title: {es: "Escribir un tema", en: "Writing a theme"}
+    summary:
+      es: "Cómo escribir un tema fuera de Bizview, validarlo y verlo antes de subirlo."
+      en: "How to write a theme outside Bizview, validate it and preview it before uploading."
+    roles: [superuser, user]
+    routes: ["/admin/apariencia"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["tema", "temas", "colores del reporte", "paleta propia", "contraste", "modo oscuro"]
+      en: ["theme", "themes", "report colours", "own palette", "contrast", "dark mode"]
+    related: [apariencia, definir-un-reporte, estructura-de-proyecto]
   - id: ia
     section: administracion
     title: {es: "Inteligencia artificial", en: "Artificial intelligence"}

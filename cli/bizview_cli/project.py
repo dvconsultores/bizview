@@ -1,6 +1,7 @@
 """`bizview project new`: a BI project folder inside a v2 workspace (feature 020)."""
 import json
 import re
+import shutil
 import sys
 import unicodedata
 from datetime import date
@@ -10,7 +11,7 @@ from bizview_cli import layout
 from bizview_cli.i18n import t
 from bizview_cli.init import _template, speckit
 
-FOLDERS = ("specs", "integrations", "reports", "distributions")
+FOLDERS = ("specs", "integrations", "reports", "distributions", "themes")
 
 
 def slug_for(name: str) -> str:
@@ -55,5 +56,7 @@ def new_project(root: Path, name: str, *, slug: str | None = None, agent: str = 
     for folder in FOLDERS:
         (base / folder).mkdir(exist_ok=True)
         (base / folder / ".gitkeep").touch()
+    # 047: the page an author (or any AI) reads to write `themes/<id>.yaml`.
+    shutil.copyfile(files / "THEME.md", base / "THEME.md")
     print(t("project.created", slug=slug, path=base))
     return 0

@@ -152,3 +152,17 @@ name.
 
 **Alternatives considered**: add Pillow — a new runtime dependency for one developer command; add a
 headless browser — the heaviest possible dependency, and the very thing 045 removed from the stack.
+
+## R12. The pack carries one worked theme, not the five built-ins
+
+**Decision**: `THEME.md` in the authoring pack shows one complete theme inline; the pack does not
+ship copies of the five built-ins. An author who wants a real one downloads it from Apariencia
+(**Descargar**), which serves the row's authored file.
+
+**Rationale**: the built-ins already exist twice (the web app and the PDF's byte-identical mirror)
+and a test fails on drift between them. A third copy inside the CLI package would be a third place
+to forget.
+
+**Alternatives considered**: copy the five JSON files under `workspace_template/files/themes/` —
+more to keep in sync than it buys; a `bizview theme example <id>` command — a new verb for a file
+the product can already hand over.

@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Themes are data an author writes outside Bizview (feature 047)**: the five looks the product
+  shipped are now themes in a published format
+  ([`cli/bizview_cli/schemas/theme.schema.json`](./cli/bizview_cli/schemas/theme.schema.json)) — a
+  file of colour tokens and shape choices, never CSS — that a person or any AI can write, validate
+  and preview without a server (`bizview theme validate`, `bizview theme preview`). The validator
+  refuses a shape and a look alike: contrast of text, accents and every series against its own
+  surface, series separation, polarity, a grid that stays out of the way, each refusal naming the
+  tokens and the measurement.
+- **A theme library (047)**: Administración → Apariencia lists the product's themes, the ones
+  uploaded there and the ones a project brought, each with a light and a dark preview, its origin
+  and its version; upload, download, duplicate, delete and apply, with the upload printing every
+  problem it found and a collision asking before replacing. A theme a report uses cannot be deleted.
+- **A report chooses its theme and its own mode (047)**: `layout.theme.id` names any theme of the
+  installation and `layout.theme.mode` (`auto|light|dark`) decides the report's area, so a dashboard
+  can be dark inside a light application while the chrome stays as the viewer chose; a sun/moon
+  action overrides it for the session and a share link opens in the report's mode. The PDF always
+  uses the theme's light variant. A report naming a theme that exists nowhere is a validation
+  problem instead of a silent fallback.
+- **A project carries its themes (047)**: `themes/<id>.yaml` inside a zip is validated and enters
+  the library with the project as origin; a collision offers skip, replace or rename (the project's
+  own references follow the rename), and the themes leave with the project when it is deleted.
+- `THEME.md` in the authoring pack and [docs/THEMES.md](./docs/THEMES.md), plus the guide topic
+  *Escribir un tema* in both languages.
+
+### Changed
+
+- `layout.theme.palette` is the deprecated alias of `layout.theme.id`, accepted for one version so
+  every project written before this release keeps applying.
+- An installation's choice is stored as a theme (`appearance_settings.theme_id`), with the old
+  `palette_preset` read as the fallback: the five ids are unchanged, so nobody's look moves.
+
 ## [0.2.0] - 2026-10-31
 
 Bizview stops authoring. The in-app agent never worked well enough to trust (owner, 2026-10-29:

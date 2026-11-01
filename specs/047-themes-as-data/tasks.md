@@ -82,12 +82,15 @@ rendered before.
 
 ## Phase 6: CLI, pack, docs, changelog (commit 6)
 
-- [ ] T026 `THEME.md` and `theme.schema.json` in `cli/bizview_cli/workspace_template/files/`, plus
-  the five built-ins as examples so an author has something to start from
-- [ ] T027 `docs/THEMES.md` (the contract, the authoring steps, the accessibility table, the mode
+- [X] T026 `THEME.md` in `cli/bizview_cli/workspace_template/files/` (copied by `bizview init` and by
+  `bizview project new`) with one complete worked theme; `theme.schema.json` already reaches the pack
+  through `.bizview/schemas/`. The five built-ins are *not* copied into the pack — they would be a
+  third mirror to drift; the theme's own **Descargar** in Apariencia is the up-to-date example
+  (research R12)
+- [X] T027 `docs/THEMES.md` (the contract, the authoring steps, the accessibility table, the mode
   rules) and a help topic `temas` in both languages with its `index.yaml` entry
-- [ ] T028 `CHANGELOG.md` under *Unreleased* and the field reference in `docs/VIBE-REPORTING.md`
-- [ ] T029 Run the gates and the suites, record every result in `evidence.md`
+- [X] T028 `CHANGELOG.md` under *Unreleased* and the field reference in `docs/VIBE-REPORTING.md`
+- [X] T029 Run the gates and the suites, record every result in `evidence.md`
 
 ## Dependencies
 
