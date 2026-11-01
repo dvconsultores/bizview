@@ -413,6 +413,25 @@ export const es = {
     systemActor: "Sistema",
   },
   audit: {
+    // Histórico: eventos que la base de datos conserva de antes de 045. Se muestran, no
+    // se emiten; el catálogo que la aplicación escribe es el del backend (AUDIT_KINDS).
+    assistant_draft_applied: "Borrador del agente aplicado (histórico)",
+    assistant_session_archived: "Conversación del agente archivada (histórico)",
+    assistant_session_deleted: "Conversación del agente eliminada (histórico)",
+    assistant_budget_extended: "Presupuesto del agente ampliado (histórico)",
+    assistant_conversation_repaired: "Conversación del agente reparada (histórico)",
+    assistant_attachment_uploaded: "Adjunto del agente subido (histórico)",
+    assistant_attachment_deleted: "Adjunto del agente eliminado (histórico)",
+    assistant_mode_changed: "Modo del agente cambiado (histórico)",
+    assistant_contract_confirmed: "Contrato del agente confirmado (histórico)",
+    assistant_run_started: "Ejecución del agente iniciada (histórico)",
+    assistant_run_applied: "Ejecución del agente aplicada (histórico)",
+    assistant_run_stopped: "Ejecución del agente detenida (histórico)",
+    assistant_run_rolled_back: "Ejecución del agente revertida (histórico)",
+    assistant_profile_created: "Perfil del agente creado (histórico)",
+    assistant_profile_edited: "Perfil del agente editado (histórico)",
+    assistant_profile_deleted: "Perfil del agente eliminado (histórico)",
+
     login_ok: "Ingreso",
     login_failed: "Ingreso fallido",
     login_locked: "Cuenta bloqueada",

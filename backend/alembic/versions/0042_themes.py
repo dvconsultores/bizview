@@ -28,6 +28,19 @@ TS = sa.DateTime(timezone=True)
 
 # The audit allowlist is an explicit list in every migration that extends it (see 0003/0027/0041);
 # the four 047 kinds are appended to the list `app.models.AUDIT_KINDS` carries.
+#: Kinds a database may already contain and the product no longer emits: feature 045 removed the
+#: in-app authoring agent, and audit history is immutable, so the constraint must keep accepting
+#: them (048). `app.models.AUDIT_KINDS` remains the catalogue of what may be *written*.
+HISTORICAL_COMPAT = (
+    "assistant_draft_applied", "assistant_session_archived", "assistant_session_deleted",
+    "assistant_budget_extended", "assistant_conversation_repaired",
+    "assistant_attachment_uploaded", "assistant_attachment_deleted",
+    "assistant_mode_changed", "assistant_contract_confirmed",
+    "assistant_run_started", "assistant_run_applied", "assistant_run_stopped",
+    "assistant_run_rolled_back",
+    "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
+)
+
 AUDIT_CHECK = "ck_audit_event_ck_audit_event_kind"
 KINDS_0042 = (
     "login_ok", "login_failed", "login_locked", "logout", "user_created", "user_updated",
@@ -50,6 +63,7 @@ KINDS_0042 = (
     "project_converted", "project_fix_applied", "google_sign_in", "google_sign_in_refused",
     "google_linked", "appearance_updated",
     "theme_uploaded", "theme_replaced", "theme_deleted", "theme_applied",
+    *HISTORICAL_COMPAT,
 )
 
 ORIGINS = ("builtin", "upload", "project")

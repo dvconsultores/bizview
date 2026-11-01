@@ -10,7 +10,7 @@ product still has."""
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
 from alembic import command
@@ -231,3 +231,67 @@ def test_dashboard_sharing_tables_and_checks(database):
     sql("DELETE FROM share_link")
     sql("DELETE FROM audit_event WHERE kind = 'share_link_created'")
 
+
+
+# --- 048 hotfix: the audit constraint accepts history -------------------------------------------
+
+HISTORICAL = (
+    "assistant_attachment_deleted", "assistant_attachment_uploaded", "assistant_budget_extended",
+    "assistant_contract_confirmed", "assistant_conversation_repaired", "assistant_draft_applied",
+    "assistant_mode_changed", "assistant_profile_created", "assistant_profile_deleted",
+    "assistant_profile_edited", "assistant_run_applied", "assistant_run_rolled_back",
+    "assistant_run_started", "assistant_run_stopped", "assistant_session_archived",
+    "assistant_session_deleted",
+)
+
+
+def _migration(name: str):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(f"mig_{name}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_model_keeps_the_two_catalogues_apart():
+    from app.models import AUDIT_KINDS, AUDIT_KINDS_ALLOWED, HISTORICAL_AUDIT_KINDS
+
+    assert set(HISTORICAL_AUDIT_KINDS) == set(HISTORICAL)
+    assert not set(AUDIT_KINDS) & set(HISTORICAL_AUDIT_KINDS)
+    assert set(AUDIT_KINDS_ALLOWED) == set(AUDIT_KINDS) | set(HISTORICAL_AUDIT_KINDS)
+
+
+def test_every_migration_that_recreates_the_constraint_accepts_history():
+    """A migration may not narrow the constraint: the rows it would reject cannot be deleted."""
+    forties = _migration("0041_drop_authoring_agent")._audit_kinds_for_constraint()
+    themes = _migration("0042_themes").KINDS_0042
+    bi_ready = _migration("0044_bi_ready_sources").KINDS_0044
+    for name, kinds in (("0041", forties), ("0042", themes), ("0044", bi_ready)):
+        missing = [kind for kind in HISTORICAL if kind not in kinds]
+        assert not missing, f"{name} would reject historical rows: {missing}"
+    # And they agree on what may be written: the later one is a superset of the earlier one.
+    assert set(forties) <= set(themes) <= set(bi_ready)
+
+
+def test_the_constraint_in_the_database_accepts_history_and_refuses_the_unknown():
+    """The rule the migration leaves behind, checked where it is enforced."""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    from app.db import get_engine
+
+    with get_engine().begin() as c:
+        c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+        c.execute(text(
+            "INSERT INTO audit_event (kind, detail) VALUES "
+            "('assistant_run_applied', '{}'::jsonb), ('project_applied', '{}'::jsonb)"))
+    assert sql("SELECT count(*) FROM audit_event") == [(2,)]
+    with pytest.raises(IntegrityError):
+        with get_engine().begin() as c:
+            c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+            c.execute(text(
+                "INSERT INTO audit_event (kind, detail) VALUES ('not_a_kind', '{}'::jsonb)"))
+    assert sql("SELECT count(*) FROM audit_event") == [(2,)]

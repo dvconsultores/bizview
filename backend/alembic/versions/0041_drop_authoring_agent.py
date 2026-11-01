@@ -125,22 +125,68 @@ def _rescue(bind) -> None:
     log.info("045: rescate terminado (%d documentos escritos, %d ya presentes)", written, skipped)
 
 
-def _audit_kinds_without_assistant(bind) -> list[str]:
-    """The audit kinds the product still records: the model's catalogue, minus the agent's."""
-    from app.models import AUDIT_KINDS
+#: Kinds a database may already contain and the product no longer emits (feature 045 removed the
+#: in-app authoring agent; 048 found that narrowing the constraint to the live catalogue made the
+#: upgrade fail on 165 historical rows). The constraint must accept them: audit history is
+#: immutable, and a migration is not allowed to delete or rewrite it. `app.models.AUDIT_KINDS`
+#: stays the catalogue of what may be *written*, and `audit.record()` enforces it.
+HISTORICAL_COMPAT = (
+    "assistant_draft_applied", "assistant_session_archived", "assistant_session_deleted",
+    "assistant_budget_extended", "assistant_conversation_repaired",
+    "assistant_attachment_uploaded", "assistant_attachment_deleted",
+    "assistant_mode_changed", "assistant_contract_confirmed",
+    "assistant_run_started", "assistant_run_applied", "assistant_run_stopped",
+    "assistant_run_rolled_back",
+    "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
+)
 
-    return [kind for kind in AUDIT_KINDS]
+def _audit_kinds_for_constraint() -> list[str]:
+    """Every kind the constraint must accept: the ones the product writes, plus history.
+
+    Frozen in this file on purpose. Importing `app.models.AUDIT_KINDS` here — which is what this
+    migration did until 048 — makes an applied migration change its meaning every time the model
+    is edited, and that is how the upgrade failed: the catalogue no longer held the assistant
+    kinds the database still had rows for.
+    """
+    return [*KINDS_AFTER_045, *HISTORICAL_COMPAT]
+
+
+#: The kinds the product wrote when the agent was removed. Copied here so this file never changes.
+KINDS_AFTER_045 = (
+    "login_ok", "login_failed", "login_locked", "logout", "user_created", "user_updated",
+    "user_deactivated", "user_reactivated", "role_changed", "password_changed",
+    "password_reset", "dashboard_granted", "dashboard_revoked", "superuser_created",
+    "superuser_promoted", "superuser_recovered", "source_created", "source_updated",
+    "source_deleted", "source_tested", "source_enabled", "source_disabled", "source_imported",
+    "mfa_enabled", "mfa_disabled", "mfa_reset", "recovery_code_used",
+    "recovery_codes_regenerated", "reauth_ok", "reauth_failed", "login_rate_limited",
+    "admin_address_refused", "secret_key_rotated", "workspace_validated", "workspace_applied",
+    "workspace_rolled_back", "integration_run_requested", "token_created", "token_revoked",
+    "source_described", "telegram_settings_updated", "telegram_checked", "telegram_enabled",
+    "telegram_disabled", "telegram_linked", "telegram_unlinked", "integration_paused",
+    "integration_resumed", "integration_schedule_changed", "integration_run_stopped",
+    "share_link_created", "share_link_revoked", "sharing_toggled", "email_settings_updated",
+    "email_test_sent", "email_sent", "email_subscription_created",
+    "email_subscription_updated", "email_subscription_deleted",
+    "source_direct_reports_changed", "project_created", "project_updated", "project_deleted",
+    "project_purged", "project_applied", "project_withdrawn", "project_imported",
+    "project_exported", "project_converted", "project_fix_applied", "google_sign_in",
+    "google_sign_in_refused", "google_linked", "appearance_updated",
+)
 
 
 def upgrade() -> None:
     bind = op.get_bind()
     _rescue(bind)
 
-    kinds = _audit_kinds_without_assistant(bind)
+    kinds = _audit_kinds_for_constraint()
     op.drop_constraint(op.f("ck_audit_event_ck_audit_event_kind"), "audit_event", type_="check")
     op.create_check_constraint(
         op.f("ck_audit_event_ck_audit_event_kind"), "audit_event",
-        "kind IN (" + ", ".join(f"'{k}'" for k in kinds) + ")")
+        "kind IN (" + ", ".join(f"'{k}'" for k in kinds) + ")"
+        # 048: this constraint may only ever grow. Narrowing it to the live catalogue is what made
+        # the upgrade fail on the historical assistant rows the database still holds.
+    )
 
     # PostgreSQL drops an index with its last column; naming it first keeps the intent readable and
     # covers an installation where the index was already gone.

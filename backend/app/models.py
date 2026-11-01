@@ -66,6 +66,24 @@ AUDIT_KINDS = (
     # feature 048
     "source_bi_ready_changed", "source_bi_ready_verified", "source_bi_ready_unverified",
 )
+#: Audit kinds a database may already contain that the product no longer emits (feature 045
+#: removed the in-app authoring agent). They exist so historical rows stay readable and so the
+#: database's check constraint keeps accepting them: `AUDIT_KINDS` above is what may be *written*,
+#: this tuple is what may be *found*. Never add a kind here to emit it — add it to `AUDIT_KINDS`.
+HISTORICAL_AUDIT_KINDS: tuple[str, ...] = (
+    # 014, 017, 024, 028, 036 — the removed in-app authoring agent
+    "assistant_draft_applied", "assistant_session_archived", "assistant_session_deleted",
+    "assistant_budget_extended", "assistant_conversation_repaired",
+    "assistant_attachment_uploaded", "assistant_attachment_deleted",
+    "assistant_mode_changed", "assistant_contract_confirmed",
+    "assistant_run_started", "assistant_run_applied", "assistant_run_stopped",
+    "assistant_run_rolled_back",
+    "assistant_profile_created", "assistant_profile_edited", "assistant_profile_deleted",
+)
+#: Every kind the `audit_event.kind` check constraint accepts: what may be written, plus what the
+#: history already holds. Migrations that recreate the constraint use this set, frozen by each one.
+AUDIT_KINDS_ALLOWED: tuple[str, ...] = AUDIT_KINDS + HISTORICAL_AUDIT_KINDS
+
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
 RUN_KINDS = ("incremental", "full", "manual_incremental", "manual_full")

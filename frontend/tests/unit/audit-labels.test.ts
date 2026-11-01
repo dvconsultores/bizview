@@ -13,14 +13,21 @@ const MODELS = join(process.cwd(), "..", "backend", "app", "models.py");
 describe.skipIf(!existsSync(MODELS))("audit event kind labels", () => {
   it("has a label for every backend audit kind, and no stale label keys", () => {
     const sourceText = readFileSync(MODELS, "utf8");
-    const match = sourceText.match(/AUDIT_KINDS\s*=\s*\((.*?)\)/s);
-    expect(match, "AUDIT_KINDS tuple not found in models.py").not.toBeNull();
-
-    const kindMatches = match![1].matchAll(/"([a-z0-9_]+)"/g);
-    const backendKinds = new Set<string>();
-    for (const m of kindMatches) {
-      backendKinds.add(m[1]);
-    }
+    // Two catalogues (hotfix 045-audit): what the product writes, and what the database may still
+    // hold from before 045. Both must be labelled — history is readable — but only the first is
+    // emittable, and that distinction stays in the backend.
+    const kindsOf = (name: string): Set<string> => {
+      // `AUDIT_KINDS = (` and `HISTORICAL_AUDIT_KINDS: tuple[str, ...] = (` both count.
+      const match = sourceText.match(
+        new RegExp(`${name}(?:\\s*:\\s*[^=]+)?\\s*=\\s*\\((.*?)\\)`, "s"),
+      );
+      expect(match, `${name} tuple not found in models.py`).not.toBeNull();
+      return new Set([...match![1].matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]));
+    };
+    const writable = kindsOf("AUDIT_KINDS");
+    const historical = kindsOf("HISTORICAL_AUDIT_KINDS");
+    expect([...historical].filter((kind) => writable.has(kind))).toEqual([]);
+    const backendKinds = new Set([...writable, ...historical]);
 
     // The backend catalogue is stable; guard against accidentally deleting most entries.
     expect(backendKinds.size).toBeGreaterThanOrEqual(60);

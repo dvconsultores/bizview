@@ -433,6 +433,25 @@ export const en: Catalogue = {
     systemActor: "System",
   },
   audit: {
+    // Historical: events the database keeps from before 045. Displayed, never emitted;
+    // the catalogue the application writes is the backend's (AUDIT_KINDS).
+    assistant_draft_applied: "Agent draft applied (historical)",
+    assistant_session_archived: "Agent conversation archived (historical)",
+    assistant_session_deleted: "Agent conversation deleted (historical)",
+    assistant_budget_extended: "Agent budget extended (historical)",
+    assistant_conversation_repaired: "Agent conversation repaired (historical)",
+    assistant_attachment_uploaded: "Agent attachment uploaded (historical)",
+    assistant_attachment_deleted: "Agent attachment deleted (historical)",
+    assistant_mode_changed: "Agent mode changed (historical)",
+    assistant_contract_confirmed: "Agent contract confirmed (historical)",
+    assistant_run_started: "Agent run started (historical)",
+    assistant_run_applied: "Agent run applied (historical)",
+    assistant_run_stopped: "Agent run stopped (historical)",
+    assistant_run_rolled_back: "Agent run rolled back (historical)",
+    assistant_profile_created: "Agent profile created (historical)",
+    assistant_profile_edited: "Agent profile edited (historical)",
+    assistant_profile_deleted: "Agent profile deleted (historical)",
+
     login_ok: "Sign-in",
     login_failed: "Failed sign-in",
     login_locked: "Account locked",
