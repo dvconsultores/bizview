@@ -54,13 +54,13 @@ rendering. Nothing in Phase 1 changes behaviour until Phase 2 reads the declarat
 
 ## Phase 4: a heavy warehouse once a day
 
-- [ ] T015 Migration `0045_direct_snapshot` and the model: the payload the engine already produces,
+- [X] T015 Migration `0045_direct_snapshot` and the model: the payload the engine already produces,
   keyed by report, day and selection
-- [ ] T016 The worker's daily job: run each `materialize: daily` direct report once, store the
+- [X] T016 The worker's daily job: run each `materialize: daily` direct report once, store the
   payload, keep the last 30 days, record the outcome
-- [ ] T017 The engine reads the snapshot for such a report and labels it ("datos de ayer"), falling
+- [X] T017 The engine reads the snapshot for such a report and labels it ("datos de ayer"), falling
   back to live when there is none; the PDF and share links use the same path
-- [ ] T018 Tests: the snapshot is written once, read by the dashboard, aged out, and a failing run
+- [X] T018 Tests: the snapshot is written once, read by the dashboard, aged out, and a failing run
   leaves yesterday's in place
 
 ## Phase 5: document what ships

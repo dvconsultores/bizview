@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import current_user
 from app.config import get_settings
 from app.db import DB
-from app.engine import direct
+from app.engine import direct, snapshot
 from app.engine import report as engine
 from app.errors import ApiError, not_found
 from app.i18n import M
@@ -99,6 +99,14 @@ def _data(db: Session, ctx: engine.Context, params: Iterable[tuple[str, str]]) -
     sel, filters = engine.selection(ctx, params, _today())
     key = engine.selection_hash(sel, filters)
     if ctx.direct is not None:
+        # 048: a `materialize: daily` report reads the figures the worker stored, and says so.
+        if snapshot.is_daily(ctx.definition):
+            stored = snapshot.latest(db, ctx.report_id, selection=sel.to_json(),
+                                     filters=filters)
+            if stored is not None:
+                payload = snapshot.labelled(stored["payload"], stored["day"])
+                fr = payload.get("freshness") or {}
+                return {**payload, "etag": f'"{fr.get("data_version")}-{key}-snap"'}
         payload = direct.cached_data(db, ctx, sel, filters, key, tz)
         fr = payload.get("freshness") or {}
         etag = (f'"{fr.get("data_version")}-{key}-stale"' if fr.get("stale")

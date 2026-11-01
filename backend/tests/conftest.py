@@ -163,7 +163,8 @@ def clean(database):
     sql("TRUNCATE audit_event, user_session, dashboard_access, recovery_code, data_source, "
         "security_state, login_throttle, integration_run_request, integration_run, "
         "report_cache, api_token, workspace_version, integration_control, share_link, "
-        "email_delivery, email_send, email_subscription, image_cache, theme, app_user "
+        "email_delivery, email_send, email_subscription, image_cache, theme, "
+        "direct_snapshot, app_user "
         "RESTART IDENTITY CASCADE")
     sql("DELETE FROM dashboard WHERE code <> 'ventas'")
     sql("UPDATE dashboard SET status = 'coming_soon', name = 'Ventas', icon = 'chart-line', "

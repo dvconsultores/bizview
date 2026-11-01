@@ -1127,11 +1127,14 @@ def _direct_aliases(entry: Entry, direct: dict | None, ctx: DirectContext | None
     if not direct:
         return out
     ry = f"{entry.folder.as_posix()}/report.yaml"
-    if entry.artifact.get("materialize", "none") != "none":
+    # 048: `materialize: daily` is allowed on a direct report — the worker stores its figures once
+    # a day so a warehouse is queried per day instead of per viewer. Nothing else is allowed.
+    materialize = entry.artifact.get("materialize", "none")
+    if materialize not in ("none", "daily"):
         issues.append(Issue(entry.key, "direct_materialize",
                             t("validate.materialize_not_applicable_direct_report"),
                             file=ry, path="/materialize",
-                            expected={"enum": ["none"]},
+                            expected={"enum": ["none", "daily"]},
                             fix=t("validate.fix_remove_materialize_or_none")))
     is_bi = _direct_source(entry, ry, direct, ctx, issues)
     source = str(direct.get("source", "")).strip()

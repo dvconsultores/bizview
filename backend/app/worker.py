@@ -24,7 +24,7 @@ from sqlalchemy import select, text, update
 
 from app.config import get_settings
 from app.db import get_sessionmaker
-from app.engine import direct, rollup, runner, schedule, transform
+from app.engine import direct, rollup, runner, schedule, snapshot, transform
 from app.i18n import M, to_stored
 from app.mail import sends as mail_sends
 from app.mail import subscriptions as mail_subscriptions
@@ -214,6 +214,10 @@ class Worker:
                 bi_ready.recheck_all(get_sessionmaker, self.settings)
             except Exception:      # a proof that cannot run must not stop the worker
                 log.exception("BI-ready re-check failed")
+            try:
+                snapshot.snapshot_all(get_sessionmaker, self.settings)
+            except Exception:
+                log.exception("daily snapshot failed")
 
     def take_email_sends(self, force: bool = False) -> Future | None:
         now = time.monotonic()

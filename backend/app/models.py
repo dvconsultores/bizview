@@ -1,12 +1,13 @@
 """ORM models (see specs/002-auth-admin-home/data-model.md). Tables live in the database's
 default schema, `public`; no schema is hard-coded."""
 import uuid
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -392,6 +393,29 @@ class ReportCache(Base):
     kind: Mapped[str] = mapped_column(Text, primary_key=True, server_default=text("'data'"))
     payload: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DirectSnapshot(Base):
+    """The figures a `materialize: daily` direct report stored for one day (feature 048).
+
+    `payload` is what the engine returned — the JSON a tile receives — never rows: this is a
+    cheaper query cadence, not an ETL, so no `ds_` schema and no typing of its own."""
+
+    __tablename__ = "direct_snapshot"
+    __table_args__ = (
+        UniqueConstraint("report_id", "day", "selection_hash", name="uq_direct_snapshot"),
+        Index("ix_direct_snapshot_report_day", "report_id", text("day DESC")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    report_id: Mapped[str] = mapped_column(Text)
+    day: Mapped[date] = mapped_column(Date)
+    selection_hash: Mapped[str] = mapped_column(Text)
+    selection: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    source: Mapped[str] = mapped_column(Text, server_default=text("''"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
 
 
 class ReportRollup(Base):
