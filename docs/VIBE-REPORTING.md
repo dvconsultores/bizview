@@ -1,18 +1,12 @@
-# Vibe reporting — author guide
+# Report reference — the report and integration contract in depth
 
-**Every integration and every report is a spec.** You describe what you need to an AI agent
-(Claude Code, GitHub Copilot, Cursor…) in the customer's *workspace*; GitHub Spec Kit turns it
-into spec → plan → tasks → declarative files; Bizview runs exactly what the spec says, and nothing
-without one.
+**Every integration and every report is a spec, and Bizview runs exactly what the spec says.**
+The *workflow* — the eight steps, the workspace, importing — lives in
+[AUTHORING.md](./AUTHORING.md) and [IMPORT.md](./IMPORT.md). This page is the reference those two
+point at: the fields of an integration, of a report, of a direct report, and the rules the
+validator enforces.
 
-```text
-you: "Reporte de ventas por marca, mes en curso vs mes anterior, con PDF"
- └─ /speckit.specify → spec.md (Status: Draft → Approved)
- └─ /speckit.plan    → plan.md (which files)
- └─ /speckit.tasks   → tasks.md
- └─ /speckit.implement → reports/<id>/report.yaml  (+ `bizview validate` hook, mandatory)
- └─ git commit + push → the installation validates and applies it (Administración)
-```
+If you are starting a project, read AUTHORING.md first; come back here when you need a field.
 
 ## 1. Create the workspace (once per customer)
 
@@ -363,26 +357,9 @@ rest of the workspace — if another project breaks the composition, the apply n
 
 When a dashboard cannot be painted (a dataset is gone, a metric divides by zero, a format is outside
 the catalogue, a PDF block cannot be drawn) the tile shows a card with its code and the piece that
-failed, and the rest of the dashboard still renders; a preview that an apply replaced answers
-`preview_expired` instead of an anonymous error. See
+failed, and the rest of the dashboard still renders; a report whose dataset was never loaded answers
+`dataset_missing` instead of an anonymous error. See
 [tableros/errores.md](./guides/tableros/errores.md).
-
-## No in-app assistant
-
-Since 0.2.0 (features 043 and 045) Bizview does not author. The chat, its slash commands and the
-draft preview are gone: a project is written outside the product — by hand, in the editor of
-**Proyectos**, or with whatever AI the author prefers — and enters through validation and import.
-The Spec Kit flow itself is unchanged; it just lives in the author's repository, driven by the CLI:
-
-```bash
-bizview init myspec        # the skeleton: presets, rules, schemas, an example project
-bizview validate .         # the same validator the server runs
-bizview describe <source>  # structure and counts only, never rows
-```
-
-A project created or imported in the app keeps its files, its history, its validation, apply,
-rollback and export; the assistant-dependent preview route does not exist, so what an author sees
-before applying is the validation result and the file tree.
 
 ## "No spec, no run"
 

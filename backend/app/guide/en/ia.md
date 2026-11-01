@@ -30,37 +30,36 @@ Only aggregated figures are sent; never detailed records, passwords or personal 
 
 ## Common problems
 
-When the provider fails, the chat and this screen show a short code with its meaning and the text
-the provider returned. Every code has exactly one way out:
+When the provider fails, the help page and this screen show a short code with its meaning and the
+text the provider returned. Every code has exactly one way out:
 
 - `not_configured` — **The AI is not configured.** Fill in `AI_PROVIDER`, `AI_API_KEY` and
   `AI_MODEL` and restart the installation.
 - `no_credit` — **The AI provider account has no balance.** Top up the provider account. While it
-  stays like this the agent does not call the provider: every attempt is refused instantly and
-  burns no tokens. The **Blocked until it is fixed** band says so on this screen.
+  stays like this no call is made: every attempt is refused instantly. The **Blocked until it is fixed** band says so on this screen.
 - `bad_key` — **The API key is not valid or is not allowed to use this model.** Check `AI_API_KEY`
   (no stray spaces or quotes) and that the key belongs to the same provider as `AI_BASE_URL`.
 - `model_not_found` — **The configured model does not exist or is not available.** Compare
   `AI_MODEL` with **Models the provider reports** below: if the name is not there, fix `AI_MODEL`.
-- `rate_limited` — **The provider rate-limited the requests.** Wait and press **Retry**: the agent
-  honours the wait the provider asks for (up to 60 s) and retries once only.
-- `context_too_long` — **The conversation exceeded the model's maximum context.** Start a new
-  session or sum up the brief in fewer words.
+- `rate_limited` — **The provider rate-limited the requests.** Wait and press **Retry**: the wait
+  the provider asks for is honoured (up to 60 s) and retried once only.
+- `context_too_long` — **The conversation exceeded the model's maximum context.** Open a shorter topic
+  or ask for the page again later.
 - `provider_down` — **The AI provider does not answer or returns a server error.** Retry in a few
   minutes; if it stays the same, check the provider's status page.
-- `invalid_tool_call` — **The model returned a malformed tool call.** Retry; if it repeats with the
-  same model, change `AI_MODEL`.
+- `invalid_tool_call` — **The model returned a malformed tool call.** Retry; if it repeats with the same
+  model, change `AI_MODEL`.
 - `refused` — **The provider refused the request.** Rephrase the message; if it insists, change
   model.
 - `provider_error` — **The AI provider returned an error.** The detail is in the server log
   (below).
 
-If the agent stops by itself, the summary names the reason (`blocked:ai_<code>`): it is not a
-network glitch, it is the provider. A "continue" or "fix it" message during a block is refused the
-same way, without calling the provider, until the code is fixed.
+The code is kept in `Administration → AI` and in `GET /api/health` (`healthy`,
+`blocking_code`), so a block is visible from outside the application too, and the help page reports
+it to the reader.
 
-**Test failed** also shows when **Incomplete configuration** lists missing settings. The test does
-two things: a one-token answer and a tool call; **Tool call** tells you which of the two failed.
+**Test failed** also shows when **Incomplete configuration** lists missing settings. The test is
+one real request of a few tokens: it proves the key, the endpoint and the model answer together.
 
 ### Where the detail is
 

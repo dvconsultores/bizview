@@ -13,14 +13,14 @@ Solo el **Superusuario**.
 
 1. Abre [Abrir Proyectos](app:/proyectos).
 2. Pulsa **Nuevo proyecto**, escribe el **Nombre** (el **Identificador** se propone solo) y pulsa
-   **Crear proyecto**. Se abre el editor del proyecto con un chat nuevo.
+   **Crear proyecto**. Se abre el editor del proyecto, listo para escribir sus archivos.
 3. Para traer un proyecto descargado o hecho en VS Code, pulsa **Importar proyecto** y elige el
    archivo .zip (se pide confirmar tu contraseña).
 
 ## Opciones
 
-- Cada proyecto muestra sus specs, sus conversaciones y su estado: **Borrador** (nunca aplicado),
-  **Aplicado**, **Cambios sin aplicar** o **Retirado**.
+- Cada proyecto muestra sus specs y su estado: **Borrador** (nunca aplicado), **Aplicado**,
+  **Cambios sin aplicar** o **Retirado**.
 - **Descargar** baja el proyecto como .zip.
 - **Eliminar proyecto** (solo si no está aplicado) lo lleva a la papelera 30 días.
 - Tras actualizar BizView, lo que ya estaba aplicado aparece como el proyecto `principal`.

@@ -1,7 +1,7 @@
 # App guide (feature 023)
 
-The guide the chat and the **Ayuda** page answer from. It ships with each release, so answers
-match the installed version. Spec: [specs/023-chat-app-guide](../../../../specs/023-chat-app-guide/spec.md).
+The guide the **Ayuda** page answers from. It ships with each release, so answers match the
+installed version. Spec: `specs/023-chat-app-guide` (repository root).
 
 | File | Holds |
 |---|---|

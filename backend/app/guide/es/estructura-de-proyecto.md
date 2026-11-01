@@ -26,10 +26,8 @@ Un proyecto es una carpeta con:
 
 ## Opciones
 
-- El chat del proyecto vive en el panel **Asistente** (el botón del encabezado del proyecto o el
-  de la barra superior); en el teléfono es la pestaña **Chat**.
-- **Pantalla completa** oculta el menú y la barra superior y pone el explorador, el editor y el
-  chat a toda la pantalla; se sale con el mismo botón o con Esc.
+- **Pantalla completa** oculta el menú y la barra superior y pone el explorador y el editor a
+  toda la pantalla; se sale con el mismo botón o con Esc.
 - Cada artefacto apunta a su spec con el campo `spec:`, por ejemplo `spec: specs/002-ventas`.
 - Los ids de integraciones, reportes y distribuciones son únicos en toda la instalación.
 - Hay un tamaño máximo por archivo y por proyecto; el editor avisa al pasarlo.

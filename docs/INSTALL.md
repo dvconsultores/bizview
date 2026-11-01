@@ -1,4 +1,4 @@
-# Installing Bizview AI Powered for a customer
+# Installing Bizview for a customer
 
 Bizview is one open-source product. Each customer gets an **installation**: a folder on their
 server with the settings and a compose file that runs the published images of one product
@@ -329,13 +329,17 @@ such a recreation. For a stable setup, create a dedicated reporting schema maint
 the external process, apply the grants there, and keep `ds_*` schemas out of direct
 reports. Set `DIRECT_BI_ROLE=bizview_direct` in `.env` and restart the application.
 
-## 6. Vibe reporting
+## 6. Projects
 
-Integrations (ETL) and reports are **specs**. They come from **BI projects** (feature 020), edited
-in the app and applied from **Proyectos**: applying a project creates a workspace version with it
+Integrations (ETL) and reports are **specs**, and they live in **BI projects**: one folder per
+project under `PROJECTS_DIR`, written outside the product and brought in through **Proyectos →
+Importar** (see [IMPORT.md](./IMPORT.md)). Applying a project creates a workspace version with it
 and the other applied projects, and that version is what reports and integrations read. There is
 nothing to copy to the server and nothing to mount, and the compose file already runs everything
 the product needs, so there is no extra process to install or schedule.
+
+The product does not author: no chat, no in-app commands, no draft. What you write and validate on
+your machine (with the CLI, `bizview validate`) is what the server validates again and applies.
 
 A `bizview init` checkout can still be applied through **Espacio de trabajo → Validar → Aplicar**
 (`/admin/espacio`, which has no tile in Administración since the 024 polish); the shipped
@@ -407,10 +411,8 @@ A failed call records its code and a redacted detail in `ai_status`, which
 `GET /api/health` reads (`configured`, `provider`, `model`, `healthy`, `blocking_code`) and
 **Administración → IA** shows with the provider's own words.
 
-### Projects (Proyectos)
-
-There is no in-app authoring agent since 043/045: projects are authored outside Bizview — by
-people or by any AI — against the published contract, and enter through validation and import.
+Since 0.2.0 the AI is used **only** by the read-only help page: authoring moved outside Bizview
+(see [AUTHORING.md](./AUTHORING.md)) and no data, no project and no query is ever sent to a provider.
 
 ### Sign in with Telegram (optional)
 

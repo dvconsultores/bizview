@@ -7,7 +7,7 @@ qué mide y cómo se ve.
 
 ## Quién puede usarlo
 
-Solo el **Superusuario**; se escribe en el editor del proyecto o se importa ya escrito.
+Solo el **Superusuario**; se escribe fuera y entra importado.
 
 ## Cómo se hace
 
@@ -109,9 +109,9 @@ Campos por tipo:
 - Para estar listo para aplicar, el reporte necesita `pdf.enabled: true`, dimensiones y filtros.
 - Los colores son roles, nunca literales: `primary`, `positive`, `negative`, `neutral`, `muted` y
   `series1` a `series8`; los resuelven el tema y la marca de la instalación.
-- Las tipografías van por nombre (`sans`, `sans_bold`, `serif` y `mono`), y `font_name` solo se
-  admite en un componente o bloque de texto.
+- Las tipografías van por nombre (`sans`, `sans_bold`, `serif`, `mono`); `font_name` solo en un
+  componente o bloque de texto.
 - Los textos con versión en inglés son `text_en`, `other_label_en` y `legal_en`.
 - Un layout no lleva direcciones ni rutas: el logo usa el rol `logo_role`.
-- `bizview validate` comprueba el layout con el mismo esquema que el servidor.
-- El ejemplo completo: `reports/facturas-dia/report.yaml`.
+- `bizview validate` comprueba el layout con el mismo esquema del servidor.
+- Ejemplo completo: `reports/facturas-dia/report.yaml`.

@@ -2,13 +2,12 @@
 
 ## What it is for
 
-The **Help** page gathers these guides, and the chat's `/ayuda` command answers about the app and
-the Spec Kit method.
+The **Help** page gathers these guides: what each screen does, how a project is written and
+applied, and what an installation needs.
 
 ## Who can use it
 
-Anyone with an account sees **Help** with the topics of their role. The chat and the `/ayuda`
-command are for the **Superuser**.
+Anyone with an account sees **Help** with the topics of their role.
 
 ## How to
 
@@ -19,4 +18,5 @@ command are for the **Superuser**.
 ## Options
 
 - The search matches titles, body text and keywords, in the interface's language.
-- You can also ask in your own words, for example "how do I share a dashboard?".
+- If the installation has AI configured you can also ask in your own words, for example "how do I
+  share a dashboard?"; without AI, the search and the topics work the same.

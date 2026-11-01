@@ -26,10 +26,8 @@ A project is a folder with:
 
 ## Options
 
-- The project chat lives in the **Assistant** panel (the button in the project header or the one
-  in the top bar); on phones it is the **Chat** tab.
-- **Full screen** hides the menu and the top bar and gives the explorer, the editor and the chat
-  the whole screen; leave it with the same button or with Esc.
+- **Full screen** hides the menu and the top bar and gives the explorer and the editor the whole
+  screen; leave it with the same button or with Esc.
 - Each artifact points to its spec with the `spec:` field, for example `spec: specs/002-ventas`.
 - Integration, report and distribution ids are unique across the whole installation.
 - There is a maximum size per file and per project; the editor warns when it is exceeded.

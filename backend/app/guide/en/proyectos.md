@@ -13,7 +13,7 @@ Only the **Superuser**.
 
 1. Open [Open Projects](app:/proyectos).
 2. Press **New project**, type the **Name** (the **Identifier** is proposed for you) and press
-   **Create project**. The project editor opens with a new chat.
+   **Create project**. The project editor opens, ready for its files.
 3. To bring in a downloaded project or one made in VS Code, press **Import project** and choose
    the .zip file (your password is asked).
 

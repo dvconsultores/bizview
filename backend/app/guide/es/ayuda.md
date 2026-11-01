@@ -2,13 +2,12 @@
 
 ## Para qué sirve
 
-La página **Ayuda** reúne estas guías y el comando `/ayuda` del chat responde sobre la aplicación
-y el método Spec Kit.
+La página **Ayuda** reúne estas guías: qué hace cada pantalla, cómo se escribe y aplica un
+proyecto, y qué necesita una instalación.
 
 ## Quién puede usarlo
 
-Cualquier persona con una cuenta ve la **Ayuda** con los temas de su rol. El chat y el comando
-`/ayuda` son del **Superusuario**.
+Cualquier persona con una cuenta ve la **Ayuda** con los temas de su rol.
 
 ## Cómo se hace
 
@@ -19,4 +18,5 @@ Cualquier persona con una cuenta ve la **Ayuda** con los temas de su rol. El cha
 ## Opciones
 
 - La búsqueda encuentra por título, texto y palabras clave, en el idioma de la interfaz.
-- También puedes preguntar con tus palabras, por ejemplo «¿cómo comparto un tablero?».
+- Si la instalación tiene la IA configurada, puedes preguntar con tus palabras, por ejemplo
+  «¿cómo comparto un tablero?»; sin IA, la búsqueda y los temas funcionan igual.
