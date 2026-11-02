@@ -3,6 +3,7 @@ import { api, ApiError, askReauth, qs } from "./client";
 import { currentLocale, t } from "../i18n/live";
 import type {
   HistoryItem,
+  ImportLimits,
   ProjectChanges,
   ProjectCheck,
   ProjectDetail,
@@ -27,10 +28,10 @@ export const projectsApi = {
   list: () => api.get<{ projects: ProjectSummary[] }>("/api/projects").then((r) => r.projects),
   /** The list plus whether PROJECTS_DIR can be written (020 T090). */
   listing: () => api.get<{ projects: ProjectSummary[]; folder_writable: boolean }>("/api/projects"),
-  suggestSlug: (name: string) =>
-    api.get<{ slug: string }>(`/api/projects/slug${qs({ name })}`).then((r) => r.slug),
-  create: (body: { name: string; slug?: string; description?: string }) =>
-    api.post<ProjectSummary>("/api/projects", body),
+  /** Feature 049: the two import allowances in force, so the browser can refuse before uploading. */
+  limits: () => api.get<ImportLimits>("/api/projects/limits"),
+  saveLimits: (body: Record<string, number | null>) =>
+    api.put<ImportLimits>("/api/projects/limits", body),
   get: (slug: string) => api.get<ProjectDetail>(base(slug)),
   update: (slug: string, body: { name?: string; description?: string; slug?: string }) =>
     api.patch<ProjectDetail>(base(slug), body),

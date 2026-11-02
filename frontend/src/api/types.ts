@@ -1216,6 +1216,30 @@ export interface ProjectImportResult {
   project: ProjectSummary;
   ignored: string[];
   validation: ProjectValidation;
+  /** Feature 049: what the import actually cost, per allowance. */
+  budgets?: ImportTally;
+}
+
+/** Feature 049: one import allowance — how many files, how big each, how big in total. */
+export interface ImportBudget {
+  name: "artifacts" | "assets";
+  max_files: number;
+  max_kb: number;
+  max_mb: number;
+  label: string;
+}
+
+export interface ImportTally {
+  artifacts: ImportBudget & { files: number; bytes: number; over: string[] };
+  assets: ImportBudget & { files: number; bytes: number; over: string[] };
+}
+
+export interface ImportLimits {
+  artifacts: ImportBudget;
+  assets: ImportBudget;
+  zip_max_mb: number;
+  /** The raw overrides: `null` where this installation inherits the deployment default. */
+  stored: Record<string, number | null>;
 }
 
 // Feature 023: the app guide (Ayuda).

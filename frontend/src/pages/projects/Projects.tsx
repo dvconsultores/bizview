@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ChevronRight, FolderKanban, FolderPlus, GitBranch, Search, Upload, X } from "lucide-react";
+import { ChevronRight, FolderKanban, GitBranch, Image as ImageIcon, Package, Search, Upload, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { importProjectZip, projectsApi } from "../../api/projects";
-import type { ProjectImportResult, ProjectStatus, ProjectSummary } from "../../api/types";
+import type { ImportLimits, ProjectImportResult, ProjectStatus, ProjectSummary } from "../../api/types";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
@@ -13,7 +13,9 @@ import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/Spinner";
 import { useT } from "../../i18n";
 import { formatDateTime } from "../../lib/format";
+import { describeTally, tallyIndex, type Preflight } from "../../lib/importPreflight";
 import { fold } from "../../lib/search";
+import { readZipIndex } from "../../lib/zipIndex";
 
 const STATUS_TONE: Record<ProjectStatus, "gray" | "green" | "amber" | "red"> = {
   borrador: "gray", aplicado: "green", cambios: "amber", retirado: "red",
@@ -28,16 +30,15 @@ export function Projects() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [imported, setImported] = useState<ProjectImportResult | null>(null);
   const [importing, setImporting] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [folderWritable, setFolderWritable] = useState(true);
+  // 049: read the archive's index before uploading, so an over-limit zip is never sent.
+  const [limits, setLimits] = useState<ImportLimits | null>(null);
+  const [preflight, setPreflight] = useState<Preflight | null>(null);
+  const [preflightFailed, setPreflightFailed] = useState(false);
+  const [pending, setPending] = useState<File | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,31 +52,30 @@ export function Projects() {
     return () => { cancelled = true; };
   }, [attempt, t]);
 
-  // Suggested slug follows the name until the user edits it.
+  // 049: the allowances, so the pre-flight has something to measure against.
   useEffect(() => {
-    if (!creating || slugTouched || !name.trim()) return;
-    const id = window.setTimeout(() => {
-      projectsApi.suggestSlug(name.trim()).then(setSlug).catch(() => undefined);
-    }, 250);
-    return () => window.clearTimeout(id);
-  }, [name, creating, slugTouched]);
+    let cancelled = false;
+    projectsApi.limits().then((r) => !cancelled && setLimits(r)).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [attempt]);
 
-  const create = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setBusy(true);
-    setFormError(null);
-    try {
-      const project = await projectsApi.create({ name: name.trim(), slug: slug || undefined });
-      navigate(`/proyectos/${project.slug}`);
-    } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.common.unexpected);
-    } finally {
-      setBusy(false);
+  /** Chosen, not yet sent: read the archive's table of contents and decide whether to send it. */
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    setImported(null);
+    setError(null);
+    setPending(file);
+    setPreflight(null);
+    setPreflightFailed(false);
+    const entries = await readZipIndex(file);
+    if (entries === null || limits === null) {
+      setPreflightFailed(entries === null && limits !== null);
+      return;         // no index, or no limits yet: upload and let the server answer
     }
+    setPreflight(tallyIndex(entries, limits));
   };
 
-  const importZip = async (file: File | undefined) => {
+  const importZip = async (file: File | undefined = pending ?? undefined) => {
     if (!file) return;
     setImporting(true);
     setImported(null);
@@ -83,6 +83,8 @@ export function Projects() {
     try {
       setImported(await importProjectZip(file));
       setAttempt((n) => n + 1);
+      setPending(null);
+      setPreflight(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.common.unexpected);
     } finally {
@@ -90,6 +92,8 @@ export function Projects() {
       if (fileInput.current) fileInput.current.value = "";
     }
   };
+
+  const blocked = preflight?.over ?? null;
 
   // Feature 025: finding a project in the list — by name, identifier or description, ignoring case
   // and accents. The filtering is local: the page already holds every project of the installation.
@@ -135,43 +139,70 @@ export function Projects() {
           <div className="ml-auto flex flex-wrap justify-end gap-2">
             <input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" id="project-zip"
                    aria-label={t.projects.chooseZip}
-                   onChange={(e) => void importZip(e.target.files?.[0])} />
+                   onChange={(e) => void choose(e.target.files?.[0])} />
             <Button variant="secondary" loading={importing} icon={<Upload className="h-5 w-5" aria-hidden />}
-                    disabled={!folderWritable} onClick={() => fileInput.current?.click()}>
+                    disabled={!folderWritable || pending !== null} onClick={() => fileInput.current?.click()}>
               {importing ? t.projects.importing : t.projects.importProject}
             </Button>
-            {!creating && (
-              <Button icon={<FolderPlus className="h-5 w-5" aria-hidden />} disabled={!folderWritable}
-                      onClick={() => setCreating(true)}>
-                {t.projects.newProject}
-              </Button>
-            )}
           </div>
         </div>
         <p className="text-sm text-ink-muted">{t.projects.importHint}</p>
-        {creating && (
-          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2" aria-label={t.projects.newProject}>
-            <label className="space-y-1 text-sm font-semibold text-ink-2">
-              <span>{t.projects.name}</span>
-              <input className={inputClass} value={name} maxLength={80} autoFocus required
-                     onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className="space-y-1 text-sm font-semibold text-ink-2">
-              <span>{t.projects.slug}</span>
-              <input className={`${inputClass} font-mono`} value={slug} maxLength={50}
-                     pattern="[a-z][a-z0-9\-]{1,49}" aria-describedby="slug-hint"
-                     onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }} />
-              <span id="slug-hint" className="block text-xs font-normal text-ink-muted">{t.projects.slugHint}</span>
-            </label>
-            {formError && <div className="sm:col-span-2"><Alert tone="error">{formError}</Alert></div>}
-            <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <Button type="submit" loading={busy} disabled={!name.trim()}>{t.projects.create}</Button>
-              <Button variant="ghost" onClick={() => { setCreating(false); setFormError(null); }}>
-                {t.projects.cancel}
+        {pending && (
+          <div className="space-y-2 rounded-card border border-line bg-subtle/40 p-3" role="status">
+            <h2 className="text-sm font-semibold text-ink-2">{t.projects.preflight.title}</h2>
+            {preflightFailed ? (
+              <p className="text-sm text-ink-muted">{t.projects.preflight.readFailed}</p>
+            ) : preflight === null ? (
+              <p className="text-sm text-ink-muted">{t.projects.preflight.reading}</p>
+            ) : (
+              <>
+                <ul className="grid gap-1 text-sm text-ink-2 sm:grid-cols-2">
+                  <li className="flex items-center gap-2">
+                    <Package className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
+                    <span>{t.projects.preflight.artifacts}</span>
+                    <span className={`ml-auto font-mono text-xs ${
+                      preflight.artifacts.over.length ? "text-danger" : "text-ink-muted"}`}>
+                      {describeTally(preflight.artifacts, limits!.artifacts)}
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
+                    <span>{t.projects.preflight.assets}</span>
+                    <span className={`ml-auto font-mono text-xs ${
+                      preflight.assets.over.length ? "text-danger" : "text-ink-muted"}`}>
+                      {describeTally(preflight.assets, limits!.assets)}
+                    </span>
+                  </li>
+                </ul>
+                {preflight.ignored.length > 0 && (
+                  <p className="text-xs text-ink-muted">{t.projects.preflight.ignored(preflight.ignored.length)}</p>
+                )}
+                {blocked && (
+                  <Alert tone="error">
+                    {t.projects.preflight.over(blocked === "artifacts"
+                      ? t.projects.preflight.artifacts : t.projects.preflight.assets,
+                      (preflight[blocked].over[0]))}
+                  </Alert>
+                )}
+              </>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button loading={importing} disabled={!folderWritable || blocked !== null}
+                      onClick={() => void importZip()}>
+                {t.projects.importNow}
+              </Button>
+              <Button variant="ghost" onClick={() => { setPending(null); setPreflight(null);
+                                                      setPreflightFailed(false); }}>
+                {t.common.cancel}
               </Button>
             </div>
-          </form>
+          </div>
         )}
+        <ImportLimitsPanel limits={limits} onSaved={(next) => {
+          setLimits(next);
+          setPreflight(null);
+          setPreflightFailed(false);
+        }} />
       </Card>
 
       {imported && (
@@ -209,7 +240,11 @@ export function Projects() {
         </div>
       ) : items.length === 0 ? (
         <EmptyState icon={<FolderKanban className="h-7 w-7" aria-hidden />} title={t.projects.empty}>
-          {t.projects.emptyText}
+          <p>{t.projects.emptyText}</p>
+          <Button className="mt-3" icon={<Upload className="h-5 w-5" aria-hidden />}
+                  disabled={!folderWritable} onClick={() => fileInput.current?.click()}>
+            {t.projects.importFirst}
+          </Button>
         </EmptyState>
       ) : shown && shown.length === 0 ? (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-surface p-4">
@@ -254,6 +289,106 @@ export function Projects() {
             ))}
           </ul>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Feature 049: the two import allowances, editable by the super user.
+ *
+ * An empty field means "the deployment default" — the placeholder names it, and the server keeps
+ * the value from the environment until someone writes a number here. Collapsed by default: this is
+ * a setting an installation touches once, not something in the way of importing.
+ */
+function ImportLimitsPanel({ limits, onSaved }: {
+  limits: ImportLimits | null;
+  onSaved: (next: ImportLimits) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [problems, setProblems] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!limits) return;
+    setDraft(Object.fromEntries(Object.entries(limits.stored)
+      .map(([key, value]) => [key, value === null ? "" : String(value)])));
+  }, [limits]);
+
+  if (!limits) return null;
+
+  const field = (kind: "artifacts" | "assets", column: "files" | "kb" | "mb") => {
+    const key = `${kind === "artifacts" ? "artifact" : "asset"}_max_${column}`;
+    const inherited = limits[kind][column === "files" ? "max_files" : `max_${column}` as
+      "max_kb" | "max_mb"];
+    return (
+      <label className="space-y-1 text-sm font-semibold text-ink-2" key={key}>
+        <span>{column === "files" ? t.projects.limits.files
+          : column === "kb" ? t.projects.limits.kb : t.projects.limits.mb}</span>
+        <input className={`${inputClass} font-mono`} inputMode="numeric" min={1} type="number"
+               value={draft[key] ?? ""} placeholder={t.projects.limits.inherited(inherited)}
+               aria-invalid={problems[key] ? true : undefined}
+               onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+        {problems[key] && (
+          <span className="block text-xs font-normal text-danger">
+            {t.projects.limits.fieldProblem[problems[key]] ?? problems[key]}
+          </span>
+        )}
+      </label>
+    );
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setProblems({});
+    setSaved(false);
+    try {
+      const body: Record<string, number | null> = {};
+      for (const key of Object.keys(limits.stored)) {
+        const raw = (draft[key] ?? "").trim();
+        body[key] = raw === "" ? null : Number(raw);
+      }
+      onSaved(await projectsApi.saveLimits(body));
+      setSaved(true);
+    } catch (err) {
+      const fields = err instanceof ApiError ? (err as ApiError & { fields?: Record<string, string> }).fields : null;
+      if (fields) setProblems(fields);
+      else setError(err instanceof ApiError ? err.message : t.common.unexpected);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-line pt-3">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}
+              className="inline-flex min-h-tap items-center gap-2 text-sm font-semibold text-accent hover:underline">
+        {open ? t.projects.limits.close : t.projects.limits.open}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ink-2">{t.projects.limits.title}</h2>
+            <p className="text-xs text-ink-muted">{t.projects.limits.hint}</p>
+          </div>
+          <fieldset className="grid gap-3 sm:grid-cols-3">
+            <legend className="mb-1 text-sm font-semibold text-ink-2">{t.projects.limits.artifacts}</legend>
+            {field("artifacts", "files")}{field("artifacts", "kb")}{field("artifacts", "mb")}
+          </fieldset>
+          <fieldset className="grid gap-3 sm:grid-cols-3">
+            <legend className="mb-1 text-sm font-semibold text-ink-2">{t.projects.limits.assets}</legend>
+            {field("assets", "files")}{field("assets", "kb")}{field("assets", "mb")}
+          </fieldset>
+          <p className="text-xs text-ink-muted">{t.projects.limits.zipTotal(limits.zip_max_mb)}</p>
+          {error && <Alert tone="error">{error}</Alert>}
+          {saved && <Alert tone="success">{t.projects.limits.saved}</Alert>}
+          <Button loading={saving} onClick={() => void save()}>{t.projects.limits.save}</Button>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
-/** Feature 020 T082 (Constitution VIII): a new project opens with AI off, without a conversation;
- * T084/T090: cards show artifacts and problems, and an unwritable folder is said up front. */
+/** Feature 020 T082/T084/T090: cards show artifacts and problems, and an unwritable folder is said
+ * up front. Feature 049: the page is import-only — no create affordance in any state — and the two
+ * import allowances are shown before the zip is uploaded. */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -9,17 +10,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const branding = { ai_enabled: false };
 vi.mock("../../src/config/BrandingContext", () => ({ useBranding: () => branding }));
+const LIMITS = {
+  artifacts: { name: "artifacts", max_files: 400, max_kb: 2048, max_mb: 20, label: "specs/" },
+  assets: { name: "assets", max_files: 2000, max_kb: 300, max_mb: 25, label: "assets/" },
+  zip_max_mb: 45,
+  stored: { artifact_max_files: null, artifact_max_kb: null, artifact_max_mb: null,
+            asset_max_files: null, asset_max_kb: null, asset_max_mb: null },
+};
+
 vi.mock("../../src/api/projects", () => ({
   projectsApi: {
     listing: vi.fn(async () => ({ projects: [], folder_writable: true })),
-    suggestSlug: vi.fn(async () => "demo"),
-    create: vi.fn(async () => ({ slug: "demo" })),
-    createSession: vi.fn(async () => ({ id: 7 })),
+    limits: vi.fn(async () => LIMITS),
+    saveLimits: vi.fn(async () => LIMITS),
   },
   importProjectZip: vi.fn(),
 }));
 
-import { projectsApi } from "../../src/api/projects";
+const index = vi.fn(async () => [
+  { name: "ventas/project.yaml", size: 120 },
+  { name: "ventas/assets/coins/BTC.png", size: 3800 },
+]);
+vi.mock("../../src/lib/zipIndex", () => ({ readZipIndex: (...args: unknown[]) => index(...args) }));
+
+import { importProjectZip, projectsApi } from "../../src/api/projects";
 import { t } from "../../src/i18n/es";
 import { Projects } from "../../src/pages/projects/Projects";
 
@@ -41,7 +55,7 @@ function Where() {
   return <p data-testid="where">{location.pathname + location.search}</p>;
 }
 
-async function createProject() {
+async function open() {
   await act(async () => root.render(
     <MemoryRouter initialEntries={["/proyectos"]}>
       <Routes>
@@ -50,27 +64,78 @@ async function createProject() {
       </Routes>
     </MemoryRouter>,
   ));
-  const button = (label: string) =>
-    Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(label))!;
-  await act(async () => button(t.projects.newProject).click());
-  const input = container.querySelector("form input") as HTMLInputElement;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Demo");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await act(async () => {
-    container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  });
-  return container.querySelector('[data-testid="where"]')?.textContent;
+}
+
+const buttons = () => Array.from(container.querySelectorAll("button"));
+const button = (label: string) => buttons().find((b) => b.textContent?.includes(label));
+
+/** Choose a zip: the page reads its index and shows what it carries before anything is sent. */
+async function chooseZip() {
+  const input = container.querySelector("#project-zip") as HTMLInputElement;
+  const file = new File([new Uint8Array([1, 2, 3])], "ventas.zip", { type: "application/zip" });
+  Object.defineProperty(input, "files", { value: [file], configurable: true });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => { await Promise.resolve(); });
+  return file;
 }
 
 describe("Projects page", () => {
-  it("Nuevo proyecto opens the project it just created", async () => {
-    expect(await createProject()).toBe("/proyectos/demo");
-    expect(projectsApi.create).toHaveBeenCalledOnce();
+  it("imports a zip and opens the project it created", async () => {
+    vi.mocked(importProjectZip).mockResolvedValueOnce({
+      project: { slug: "ventas" } as never, ignored: [], validation: { errors: [] } as never,
+    });
+    await open();
+    await chooseZip();
+    await act(async () => { button(t.projects.importNow)!.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(importProjectZip).toHaveBeenCalledOnce();
+    expect(projectsApi).not.toHaveProperty("create");
   });
 
-  it("cards show artifacts, applied ones and problems; an unwritable folder disables create", async () => {
+  it("offers no create affordance in either state (049)", async () => {
+    await open();
+    const labels = buttons().map((b) => b.textContent ?? "");
+    expect(labels.some((label) => label.includes(t.projects.importProject))).toBe(true);
+    expect(container.textContent).not.toContain("Nuevo proyecto");
+    expect(container.querySelector("form")).toBeNull();
+  });
+
+  it("shows what the zip carries before uploading it", async () => {
+    await open();
+    await chooseZip();
+    const text = container.textContent ?? "";
+    expect(text).toContain(t.projects.preflight.title);
+    expect(text).toContain(t.projects.preflight.artifacts);
+    expect(text).toContain(t.projects.preflight.assets);
+    expect(text).toContain("1/400");            // one artifact, of four hundred allowed
+    expect(text).toContain("1/2000");           // one image
+    expect(button(t.projects.importNow)!.disabled).toBe(false);
+  });
+
+  it("refuses an over-limit zip before it is uploaded, naming the allowance", async () => {
+    index.mockResolvedValueOnce(Array.from({ length: 2001 }, (_, i) => ({
+      name: `ventas/assets/coins/${i}.png`, size: 1000,
+    })));
+    await open();
+    await chooseZip();
+    const text = container.textContent ?? "";
+    expect(text).toContain(t.projects.preflight.assets);
+    expect(text).toContain("2001/2000");
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain(t.projects.preflight.assets);
+    expect(button(t.projects.importNow)!.disabled).toBe(true);
+    expect(importProjectZip).not.toHaveBeenCalled();
+  });
+
+  it("lets the server decide when the zip cannot be read", async () => {
+    index.mockResolvedValueOnce(null);
+    await open();
+    await chooseZip();
+    expect(container.textContent).toContain(t.projects.preflight.readFailed);
+    expect(button(t.projects.importNow)!.disabled).toBe(false);
+  });
+
+  it("cards show artifacts, applied ones and problems; an unwritable folder disables importing", async () => {
     branding.ai_enabled = true;
     vi.mocked(projectsApi.listing).mockResolvedValueOnce({
       folder_writable: false,
@@ -92,9 +157,9 @@ describe("Projects page", () => {
     expect(text).toContain(t.projects.artifactsSummary(1, 2, 0));
     expect(text).toContain(t.projects.appliedSummary(2));
     expect(text).toContain(t.projects.problemsCount(2));
-    const create = Array.from(container.querySelectorAll("button"))
-      .find((b) => b.textContent?.includes(t.projects.newProject))!;
-    expect(create.disabled).toBe(true);
+    const upload = Array.from(container.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes(t.projects.importProject))!;
+    expect(upload.disabled).toBe(true);
   });
 });
 
@@ -177,5 +242,7 @@ describe("Projects page search", () => {
     ));
     expect(field()).toBeNull();
     expect(container.textContent).toContain(t.projects.emptyText);
+    expect(button(t.projects.importFirst)).toBeTruthy();     // 049: the empty state imports
+    expect(container.textContent).not.toContain("Crea un proyecto");
   });
 });
