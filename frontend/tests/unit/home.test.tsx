@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("../../src/api/client", () => ({ api: { get: vi.fn() }, ApiError: class ApiError extends Error {} }));
-vi.mock("../../src/auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 7, full_name: "Ana Pérez" } }) }));
+vi.mock("../../src/auth/AuthContext", () => ({ useAuth: vi.fn() }));
 
 import { api } from "../../src/api/client";
+import { useAuth } from "../../src/auth/AuthContext";
 import { matches, readRecents, recordRecent } from "../../src/lib/dashboardPrefs";
 import { Dashboards } from "../../src/pages/Dashboards";
 import { Home } from "../../src/pages/Home";
@@ -24,6 +25,7 @@ let root: Root;
 
 beforeEach(() => {
   localStorage.clear();
+  vi.mocked(useAuth).mockReturnValue({ user: { id: 7, full_name: "Ana Pérez" } } as any);
   vi.mocked(api.get).mockResolvedValue({ items } as any);
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -81,6 +83,14 @@ describe("Inicio", () => {
     expect(container.textContent).toContain("Aún no tienes tableros asignados");
     expect(container.textContent).toContain("0 disponibles");
     expect(container.querySelector('a[href="/tableros"]')).toBeNull();
+  });
+
+  it("tells a super user what creates the first dashboard instead of sending them to an admin", async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 7, full_name: "Ana Pérez", is_superuser: true } } as any);
+    vi.mocked(api.get).mockResolvedValueOnce({ items: [] } as any);
+    await render();
+    expect(container.textContent).toContain("Todavía no hay tableros");
+    expect(container.textContent).not.toContain("Contacta a tu administrador");
   });
 });
 

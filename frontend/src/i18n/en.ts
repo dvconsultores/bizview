@@ -100,6 +100,8 @@ export const en: Catalogue = {
     subtitle: "These are the dashboards available to you.",
     title: "Dashboards",
     empty: "You have no dashboards assigned yet. Contact your administrator.",
+    emptyAdmin: "There are no dashboards yet. Apply a project or import one and its "
+      + "reports show up here.",
     comingSoon: "Coming soon",
     available: "Available",
     open: "Open",

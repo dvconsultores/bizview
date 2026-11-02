@@ -190,7 +190,8 @@ export function DashboardCatalog({ heading }: {
           {[0, 1, 2].map((i) => <div key={i} className="h-20 animate-pulse rounded-card bg-fill/70" />)}
         </div>
       ) : dashboards.length === 0 ? (
-        <EmptyState icon={<LayoutDashboard className="h-7 w-7" aria-hidden />} title={t.home.empty} />
+        <EmptyState icon={<LayoutDashboard className="h-7 w-7" aria-hidden />}
+          title={user.is_superuser ? t.home.emptyAdmin : t.home.empty} />
       ) : (
         <>
           <h2 className="mb-3 text-sm font-semibold text-ink-2">{t.home.all(shown.length)}</h2>

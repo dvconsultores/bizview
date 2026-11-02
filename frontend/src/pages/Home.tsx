@@ -50,7 +50,7 @@ export function Home() {
           {dashboards && dashboards.length === 0 ? (
             <EmptyState
               icon={<LayoutDashboard className="h-7 w-7" aria-hidden />}
-              title={t.home.empty}
+              title={user.is_superuser ? t.home.emptyAdmin : t.home.empty}
             />
           ) : dashboards ? (
             <>

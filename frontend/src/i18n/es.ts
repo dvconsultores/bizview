@@ -88,6 +88,8 @@ export const es = {
     subtitle: "Estos son los tableros disponibles para ti.",
     title: "Tableros",
     empty: "Aún no tienes tableros asignados. Contacta a tu administrador.",
+    emptyAdmin: "Todavía no hay tableros. Aplica un proyecto o importa uno y sus reportes "
+      + "aparecen aquí.",
     comingSoon: "Próximamente",
     available: "Disponible",
     open: "Abrir",
