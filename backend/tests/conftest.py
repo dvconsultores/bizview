@@ -164,7 +164,7 @@ def clean(database):
         "security_state, login_throttle, integration_run_request, integration_run, "
         "report_cache, api_token, workspace_version, integration_control, share_link, "
         "email_delivery, email_send, email_subscription, image_cache, theme, "
-        "direct_snapshot, app_user "
+        "direct_snapshot, project_limits, app_user "
         "RESTART IDENTITY CASCADE")
     sql("DELETE FROM dashboard")   # 046: the product ships no dashboard, so neither do tests
     # `theme` is truncated with the users that created themes, and the product's own five are what
@@ -264,6 +264,25 @@ def signed_in(email: str, password: str = PASSWORD) -> TestClient:
     r = c.post("/api/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
     return c
+
+
+def make_project(name: str = "Proyecto", slug: str | None = None) -> str:
+    """A project, made the way the product makes one since 049: through the importer's service.
+
+    Manual creation is gone from the API on purpose (a project is authored outside and imported),
+    so a test that needs a project calls the service instead of a route.
+    """
+    from sqlalchemy import select
+
+    from app.db import get_sessionmaker
+    from app.models import AppUser
+    from app.projects import service as project_service
+
+    with get_sessionmaker()() as db:
+        actor = db.scalar(select(AppUser).where(AppUser.is_superuser.is_(True)))
+        project = project_service.create(db, actor, name, slug, "", None)
+        db.commit()
+        return project.slug
 
 
 def sql(query: str, **params):

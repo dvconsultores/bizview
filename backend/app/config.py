@@ -138,9 +138,17 @@ class Settings(BaseSettings):
     workspace_path: str = "/app/data/workspace"
     timezone: str = "UTC"
     worker_poll_seconds: int = Field(default=10, ge=1, le=3600)
-    # BI projects (feature 020): one writable folder per project (backend only), size cap in MB.
+    # BI projects (feature 020): one writable folder per project (backend only).
+    # Feature 049: two allowances, counted separately — the project's own files and its images.
+    # These are the deployment defaults; a super user may override any of them in the app, and a
+    # stored override wins over these.
     projects_dir: str = Field(default_factory=lambda: str(ROOT / "projects"))
+    project_max_files: int = Field(default=400, ge=1, le=100_000)
+    project_max_kb: int = Field(default=2048, ge=1, le=1_048_576)
     project_max_mb: int = Field(default=20, ge=1, le=500)
+    project_asset_max_files: int = Field(default=2000, ge=1, le=100_000)
+    project_asset_max_kb: int = Field(default=300, ge=1, le=1_048_576)
+    project_asset_max_mb: int = Field(default=25, ge=1, le=2000)
     # Images fetched once from an `image_url` column of a report (feature 044): content-addressed
     # files outside PROJECTS_DIR, shared by every project that asks for the same URL.
     image_cache_dir: str = Field(default_factory=lambda: str(ROOT / "image-cache"))

@@ -57,6 +57,8 @@ AUDIT_KINDS = (
     "project_created", "project_updated", "project_deleted", "project_purged", "project_applied",
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
     "project_fix_applied",
+    # feature 049
+    "project_limits_changed",
     # feature 027
     "google_sign_in", "google_sign_in_refused", "google_linked",
     # feature 030
@@ -540,6 +542,48 @@ class AppearanceSettings(Base):
     palette_preset: Mapped[str] = mapped_column(
         String(32), server_default=text(f"'{DEFAULT_PALETTE_PRESET}'"))
     theme_id: Mapped[str | None] = mapped_column(Text, ForeignKey("theme.id"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+class ProjectLimits(Base):
+    """The installation's import allowances (feature 049): one row, every column optional.
+
+    A NULL means "use the deployment default" (`PROJECT_MAX_FILES` and friends), so an operator who
+    set those in `.env` keeps their value until a super user writes an explicit number here. Two
+    allowances, counted separately: the project's own files and its images."""
+    __tablename__ = "project_limits"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint("artifact_max_files IS NULL OR artifact_max_files > 0",
+                        name="ck_project_limits_artifact_max_files"),
+        CheckConstraint("artifact_max_kb IS NULL OR artifact_max_kb > 0",
+                        name="ck_project_limits_artifact_max_kb"),
+        CheckConstraint("artifact_max_mb IS NULL OR artifact_max_mb > 0",
+                        name="ck_project_limits_artifact_max_mb"),
+        CheckConstraint("asset_max_files IS NULL OR asset_max_files > 0",
+                        name="ck_project_limits_asset_max_files"),
+        CheckConstraint("asset_max_kb IS NULL OR asset_max_kb > 0",
+                        name="ck_project_limits_asset_max_kb"),
+        CheckConstraint("asset_max_mb IS NULL OR asset_max_mb > 0",
+                        name="ck_project_limits_asset_max_mb"),
+        # A per-file limit above the total is a configuration mistake, not a preference.
+        CheckConstraint("artifact_max_kb IS NULL OR artifact_max_mb IS NULL "
+                        "OR artifact_max_kb <= artifact_max_mb * 1024",
+                        name="ck_project_limits_artifact_kb_vs_mb"),
+        CheckConstraint("asset_max_kb IS NULL OR asset_max_mb IS NULL "
+                        "OR asset_max_kb <= asset_max_mb * 1024",
+                        name="ck_project_limits_asset_kb_vs_mb"),
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    artifact_max_files: Mapped[int | None] = mapped_column(Integer)
+    artifact_max_kb: Mapped[int | None] = mapped_column(Integer)
+    artifact_max_mb: Mapped[int | None] = mapped_column(Integer)
+    asset_max_files: Mapped[int | None] = mapped_column(Integer)
+    asset_max_kb: Mapped[int | None] = mapped_column(Integer)
+    asset_max_mb: Mapped[int | None] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
