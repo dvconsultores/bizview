@@ -10,6 +10,7 @@ import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
 import { IconButton } from "../../components/IconButton";
 import { PageHeader } from "../../components/PageHeader";
+import { CARD_GRID_3, CARD_PAD, PAGE_STACK } from "../../lib/layout";
 import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../components/Toast";
 import { View } from "../../components/View";
@@ -30,7 +31,7 @@ interface Problem {
 function ThemePreview({ tokens }: { tokens: Theme }) {
   const t = useT();
   return (
-    <div className="flex flex-col gap-2" data-theme="preview">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2" data-theme="preview">
       {MODES.map((mode) => {
         const style = Object.fromEntries(
           Object.entries(variablesForTokens(deriveTokens(tokens, mode))).map(([name, value]) => [
@@ -42,25 +43,25 @@ function ThemePreview({ tokens }: { tokens: Theme }) {
           <div
             key={mode}
             style={style}
-            className="rounded-lg border border-line bg-[var(--c-kpi-surface)] p-3"
+            className="rounded-lg border border-line bg-[var(--c-kpi-surface)] p-2"
             data-theme-preview={mode}
           >
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-bold tabular-nums text-[var(--c-kpi-text)]">1.284</span>
+              <span className="text-base font-bold tabular-nums text-[var(--c-kpi-text)]">1.284</span>
               <span className="rounded-full bg-[var(--c-kpi-delta-bg-positive)] px-2 py-0.5 text-[10px] font-semibold text-[var(--c-chart-positive)]">
                 +12,4 %
               </span>
             </div>
-            <div className="mt-2 flex items-end gap-1" aria-hidden>
-              {[14, 22, 18, 28, 24].map((height, index) => (
+            <div className="mt-1.5 flex items-end gap-1" aria-hidden>
+              {[10, 16, 13, 20, 17].map((height, index) => (
                 <span
                   key={index}
-                  className="w-3 rounded-sm"
+                  className="w-2.5 rounded-sm"
                   style={{ height, backgroundColor: `var(--c-chart-${(index % 8) + 1})` }}
                 />
               ))}
             </div>
-            <svg viewBox="0 0 120 24" className="mt-1 h-6 w-full" aria-hidden>
+            <svg viewBox="0 0 120 24" className="mt-1 h-4 w-full" aria-hidden>
               <polyline
                 points="0,18 20,14 40,16 60,8 80,10 100,4 120,6"
                 fill="none"
@@ -201,7 +202,7 @@ export function Appearance() {
   };
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className={PAGE_STACK}>
       <BackLink to="/admin" />
       <PageHeader title={t.appearance.title} subtitle={t.appearance.subtitle} />
 
@@ -214,8 +215,8 @@ export function Appearance() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-ink">{t.appearance.library}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-ink sm:text-lg">{t.appearance.library}</h2>
             <Button
               variant="primary"
               icon={<Upload className="h-5 w-5" aria-hidden />}
@@ -229,11 +230,14 @@ export function Appearance() {
             <EmptyState title={t.appearance.library}>{t.appearance.uploadHint}</EmptyState>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2" data-theme-grid>
+          {/* One column on a phone, two on a tablet, three when the container is wide enough to
+              keep the preview readable — the defect was a fixed two columns in a 56 rem column. */}
+          <div className={CARD_GRID_3} data-theme-grid>
             {library.themes.map((row) => {
               const installed = library.installation === row.id;
               return (
-                <Card key={row.id} className={`p-4 ${installed ? "ring-2 ring-primary" : ""}`}>
+                <Card key={row.id}
+                      className={`flex h-full flex-col ${CARD_PAD} ${installed ? "ring-2 ring-primary" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-ink">{nameOf(row)}</p>
@@ -246,7 +250,7 @@ export function Appearance() {
                       </p>
                     </div>
                     {installed ? (
-                      <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                      <span className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
                         <Check className="h-4 w-4" aria-hidden />
                         {t.appearance.current}
                       </span>
@@ -257,7 +261,7 @@ export function Appearance() {
                     <ThemePreview tokens={row.tokens} />
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
                     <Button
                       variant={installed ? "secondary" : "primary"}
                       loading={busy === row.id}

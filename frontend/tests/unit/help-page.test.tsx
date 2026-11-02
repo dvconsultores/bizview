@@ -55,6 +55,8 @@ async function render(url: string) {
   ));
   await act(async () => new Promise((r) => setTimeout(r, 0)));
 }
+const searchField = () => container.querySelector('input[type="search"]') as HTMLInputElement;
+
 async function type(value: string) {
   const input = container.querySelector('input[type="search"]') as HTMLInputElement;
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
@@ -95,5 +97,41 @@ describe("Ayuda page", () => {
     const back = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(t.help.back));
     await act(async () => back!.click());
     expect(container.querySelector("article")).toBeNull();
+  });
+
+  it("bounds both panes so the article scrolls, not the page (050, evidence 5 and 6)", async () => {
+    await render("/ayuda?tema=tableros");
+    const split = container.querySelector("section[aria-label]")!.parentElement as HTMLElement;
+    // A max-height, never a fixed height: a short viewport scrolls inside the panel.
+    expect(split.className).toContain("lg:max-h-[calc(100dvh-");
+    expect(split.className).toContain("lg:grid-cols-");
+    const list = container.querySelector("section[aria-label]") as HTMLElement;
+    expect(list.className).toContain("lg:overflow-y-auto");
+    expect(list.className).toContain("lg:min-h-0");
+    const article = container.querySelector("article[aria-labelledby='help-topic']") as HTMLElement;
+    expect(article.className).toContain("overflow-y-auto");
+    expect(article.className).toContain("min-h-0");
+  });
+
+  it("on a phone a topic replaces the list and Back returns to it (050 SC-006)", async () => {
+    await render("/ayuda");
+    const list = container.querySelector("section[aria-label]") as HTMLElement;
+    expect(list.className).not.toContain("hidden");
+
+    await type("table");
+    const first = Array.from(list.querySelectorAll("button"))
+      .find((b) => b.textContent?.includes("Tableros"))!;
+    await act(async () => first.click());
+
+    const listOpen = container.querySelector("section[aria-label]") as HTMLElement;
+    expect(listOpen.className).toContain("hidden");            // the article owns the screen
+    expect(container.querySelector("article")).toBeTruthy();
+
+    const back = Array.from(container.querySelectorAll("button"))
+      .find((b) => b.getAttribute("aria-label") === t.help.backToList)!;
+    await act(async () => back.click());
+    const listBack = container.querySelector("section[aria-label]") as HTMLElement;
+    expect(listBack.className).not.toContain("hidden");
+    expect(searchField().value).toBe("table");                  // the search survives the trip
   });
 });

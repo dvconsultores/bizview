@@ -651,6 +651,7 @@ export const es = {
     noMatch: (q: string) => `Ningún tema coincide con «${q}».`,
     related: "Temas relacionados",
     back: "Volver",
+    backToList: "Volver a la lista de temas",
     loadFailed: "No se pudo cargar la ayuda.",
     topicsCount: (n: number) => (n === 1 ? "1 tema" : `${n} temas`),
   },

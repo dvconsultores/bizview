@@ -67,12 +67,17 @@ function AccountMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      trigger.current?.focus();       // focus must not be lost when the menu closes
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("touchstart", onDown);
     document.addEventListener("keydown", onKey);
@@ -88,6 +93,7 @@ function AccountMenu() {
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
@@ -109,15 +115,21 @@ function AccountMenu() {
         </span>
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl bg-surface text-ink-2 shadow-raised ring-1 ring-line">
+        /* Feature 050, evidence 3: identity, appearance, language and links in four labelled groups,
+           compact controls, and the whole menu bounded by the viewport so a short window scrolls
+           inside it instead of pushing items off the screen. */
+        <div role="menu"
+             className="absolute right-0 z-40 mt-2 max-h-[calc(100dvh-5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl bg-surface text-ink-2 shadow-raised ring-1 ring-line">
           <div className="border-b border-line-soft px-4 py-3">
             <p className="truncate font-semibold">{user.full_name}</p>
             <p className="truncate text-sm text-ink-soft">{user.email}</p>
           </div>
-          <div className="border-b border-line-soft px-3 py-2">
+          <div className="space-y-1 border-b border-line-soft px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{t.theme.label}</p>
             <ThemeSwitcher inMenu />
           </div>
-          <div className="border-b border-line-soft px-3 py-2">
+          <div className="space-y-1 border-b border-line-soft px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{t.language.label}</p>
             <LanguageSwitcher inMenu />
           </div>
           <Link role="menuitem" to="/perfil" onClick={() => setOpen(false)} className="flex min-h-tap items-center px-4 hover:bg-subtle">

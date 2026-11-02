@@ -670,6 +670,7 @@ export const en: Catalogue = {
     noMatch: (q: string) => `No topic matches "${q}".`,
     related: "Related topics",
     back: "Back",
+    backToList: "Back to the topic list",
     loadFailed: "Couldn't load the help.",
     topicsCount: (n: number) => (n === 1 ? "1 topic" : `${n} topics`),
   },

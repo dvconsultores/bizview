@@ -10,6 +10,7 @@ import { PageHeader } from "../components/PageHeader";
 import { MarkdownView } from "../components/ide/MarkdownView";
 import { useLocale, useT } from "../i18n";
 import { resolveAppLink } from "../lib/appLinks";
+import { PANEL_MAX_H, PANEL_SCROLL, SPLIT_COLS } from "../lib/layout";
 
 function fold(text: string): string {
   return text.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -62,7 +63,8 @@ export function Help() {
   const resolveLink = (to: string) => resolveAppLink(to, user ?? null);
 
   const list = (
-    <section aria-label={t.help.title} className={`space-y-4 ${topicId ? "hidden lg:block" : ""}`}>
+    <section aria-label={t.help.title}
+             className={`space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${topicId ? "hidden lg:block" : ""}`}>
       <label className="relative block">
         <span className="sr-only">{t.help.search}</span>
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden />
@@ -106,19 +108,28 @@ export function Help() {
     <div>
       <PageHeader title={t.help.title} subtitle={t.help.subtitle} />
       {error && <div className="mb-4"><Alert tone="error">{t.help.loadFailed}</Alert></div>}
-      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,22rem)_1fr]">
+      {/* Two bounded panes from `lg` up: the topic list keeps its place while the article scrolls,
+          and the page itself does not scroll (feature 050, evidence 5 and 6). Below `lg` the list is
+          the first view and a topic replaces it, with Back to return to the same search. */}
+      <div className={`${SPLIT_COLS} ${PANEL_MAX_H}`}>
         {list}
         {topicId && topic && (
-          <article aria-labelledby="help-topic" className="min-w-0 space-y-4 rounded-card border border-line bg-surface">
-            <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-              <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" aria-hidden />} onClick={back}>
+          <article aria-labelledby="help-topic"
+                   className={`flex min-w-0 flex-col rounded-card border border-line bg-surface ${PANEL_SCROLL}`}>
+            <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-t-card border-b border-line bg-surface p-3">
+              <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
+                      onClick={back} aria-label={t.help.backToList}>
                 {t.help.back}
               </Button>
-              <h2 id="help-topic" className="sr-only">{topic.title}</h2>
+              <h2 id="help-topic" className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+                {topic.title}
+              </h2>
             </div>
-            <MarkdownView text={topic.body} resolveLink={resolveLink} />
+            <div className="min-w-0 p-4">
+              <MarkdownView text={topic.body} resolveLink={resolveLink} />
+            </div>
             {topic.related.length > 0 && (
-              <nav aria-label={t.help.related} className="space-y-2 border-t border-line p-4">
+              <nav aria-label={t.help.related} className="mt-auto space-y-2 border-t border-line p-4">
                 <h3 className="text-sm font-semibold text-ink">{t.help.related}</h3>
                 <ul className="flex flex-wrap gap-2">
                   {topic.related.map((rel) => (

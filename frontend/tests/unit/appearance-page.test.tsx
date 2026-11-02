@@ -105,6 +105,30 @@ describe("Appearance library", () => {
     expect(text).toContain(t.appearance.version.replace("{version}", "2"));
   });
 
+  it("fills the page container with a responsive grid (050, evidence 1 and 2)", async () => {
+    await render();
+    // The defect: the library sat in a 56 rem column with a fixed two-column grid, so a wide screen
+    // had an unexplained empty half and the previews were the tallest thing on it.
+    const grid = container.querySelector("[data-theme-grid]") as HTMLElement;
+    expect(grid.className).toContain("grid-cols-1");
+    expect(grid.className).toContain("sm:grid-cols-2");
+    expect(grid.className).toContain("xl:grid-cols-3");
+    // No page-level narrow width anywhere in the rendered tree.
+    expect(container.innerHTML).not.toMatch(/max-w-(?:2xl|3xl|4xl|5xl)/);
+    // Cards fill their cell so a row has one height.
+    const card = grid.firstElementChild as HTMLElement;
+    expect(card.className).toContain("h-full");
+    expect(card.className).toContain("flex-col");
+  });
+
+  it("marks the selected theme with a word, not only a colour (050 SC-003)", async () => {
+    await render();
+    const current = Array.from(container.querySelectorAll("span"))
+      .find((el) => el.textContent?.trim() === t.appearance.current);
+    expect(current).toBeTruthy();
+    expect(current!.className).toContain("bg-accent-soft");
+  });
+
   it("draws the preview with the theme's own colours", async () => {
     await render();
     const preview = document.querySelector('[data-theme-preview="light"]') as HTMLElement;
