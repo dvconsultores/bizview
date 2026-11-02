@@ -497,20 +497,34 @@ topics:
       es: ["espacio de trabajo", "git", "versión activa", "volver a la versión anterior", "validar"]
       en: ["workspace", "git", "active version", "previous version", "validate"]
     related: [aplicar-proyecto, proyectos, proyectos-en-vs-code]
+  - id: importar-un-proyecto
+    section: proyectos
+    title: {es: "Importar un proyecto", en: "Import a project"}
+    summary:
+      es: "Cómo entra un proyecto en BizView: el zip, los dos límites que se miden antes de subirlo y los archivos que se ignoran."
+      en: "How a project enters Bizview: the zip, the two limits measured before uploading and the files that are skipped."
+    roles: [superuser]
+    routes: ["/proyectos"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["importar", "subir proyecto", "zip", "límites de importación", "archivos ignorados"]
+      en: ["import", "upload project", "zip", "import limits", "ignored files"]
+    related: [proyectos, proyectos-en-vs-code, aplicar-proyecto, estructura-de-proyecto]
   - id: proyectos
     section: proyectos
     title: {es: "Proyectos", en: "Projects"}
     summary:
-      es: "Cómo crear, importar y descargar proyectos BI y entender su estado."
-      en: "How to create, import and download BI projects and understand their status."
+      es: "Cómo importar y descargar proyectos BI y entender su estado."
+      en: "How to import and download BI projects and understand their status."
     roles: [superuser]
     routes: ["/proyectos"]
     tiles: ["/proyectos"]
     commands: []
     aliases:
-      es: ["proyectos", "nuevo proyecto", "importar proyecto", "papelera", "principal", "buscar proyecto", "filtrar proyectos"]
-      en: ["projects", "new project", "import project", "trash", "principal", "search projects", "filter projects"]
-    related: [editor-de-proyecto, aplicar-proyecto, estructura-de-proyecto]
+      es: ["proyectos", "importar proyecto", "papelera", "principal", "buscar proyecto", "filtrar proyectos"]
+      en: ["projects", "import project", "trash", "principal", "search projects", "filter projects"]
+    related: [importar-un-proyecto, editor-de-proyecto, aplicar-proyecto, estructura-de-proyecto]
   - id: editor-de-proyecto
     section: proyectos
     title: {es: "Editor de proyecto", en: "Project editor"}

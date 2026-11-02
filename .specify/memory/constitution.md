@@ -1,4 +1,22 @@
 <!--
+Sync Impact Report (amendment 2026-11-01, feature 049)
+- Version change: 3.2.0 → 3.2.1 (PATCH: the numbers in one Constraint bullet, and one clause made
+  true. No principle added, removed or redefined.)
+- Modified constraints:
+  - **Import**: the single budget becomes **two allowances** counted apart — artifacts (the
+    project's own files: 400 files, 2 MB each, 20 MB in total) and assets (`assets/**`: 2 000 files,
+    300 KB each, 25 MB in total), both editable by a super user. One budget for both made a project
+    that ships a logo set impossible to import — the reported failure — because the images spent the
+    room the specs needed. A refusal must name the allowance that was exceeded, never a combined
+    figure.
+  - The same bullet's opening sentence — "a project enters the product only through import" — was
+    aspirational while the app still offered a "Nuevo proyecto" button. That button, its form and
+    its endpoint are gone: import is now the only path, and the route answers 410.
+  - Files that belong to no allowance (an authoring pack zipped by mistake) are listed and skipped;
+    executable content anywhere still refuses the import.
+- Unchanged: every principle, and every other constraint.
+-->
+<!--
 Sync Impact Report (amendment 2026-11-01, feature 048)
 - Version change: 3.1.0 → 3.2.0 (MINOR: II materially strengthened — the exception it already
   granted is now a declared, scoped, proven and observable contract. No principle removed or
@@ -451,10 +469,16 @@ Bizview stays the runtime that validates, runs and shares: "vibe reporting".
   single source of the authoring contract. The CLI, the backend and the authoring pack MUST read
   them from that one place; a duplicated copy is a defect, and `scripts/gates/03-dependencies.sh`
   and the CLI's own tests are what notice.
-- A project enters the product only through import, and import MUST apply limits before it writes
-  anything: the layout's file types only, `PROJECT_MAX_MB` per project (20 by default), 300 KB per
-  image and 25 MB of images per project, byte-sniffed image types, sanitised SVG, and no path that
-  escapes the project folder. A rejected import MUST leave nothing half-imported.
+- A project enters the product only through import — there is no interface, route or command that
+  creates an empty one — and import MUST apply limits before it writes anything, counted as two
+  separate allowances so images never spend what the project's own files need: **artifacts**
+  (`project.yaml`, `specs/`, `integrations/`, `reports/`, `themes/`, `distributions/`) at 400 files,
+  2 MB per file and 20 MB in total, and **assets** (`assets/`) at 2 000 files, 300 KB per image and
+  25 MB in total; both are settings an installation may raise, and a refusal MUST name the one that
+  was exceeded. Also: the layout's file types only, byte-sniffed image types, sanitised SVG, no
+  path that escapes the project folder, and no executable content anywhere. Files that belong to no
+  allowance (an authoring pack zipped by mistake) are listed and skipped; a rejected import MUST
+  leave nothing half-imported.
 - The product schema MUST be versioned with Alembic. Integration dataset schemas
   (`ds_<integration>`) are created and altered only by the engine from validated contracts.
 - A BI-ready source's declaration is the whole truth for what may be read from it, and it MUST NOT
@@ -506,4 +530,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.2.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-01
+**Version**: 3.2.1 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-01

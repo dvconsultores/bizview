@@ -2,8 +2,9 @@
 
 ## Para qué sirve
 
-Un proyecto BI es una carpeta con sus specs, integraciones, reportes y distribuciones. Aquí se
-crean, se importan, se descargan y se ve su estado.
+Un proyecto BI es una carpeta con sus specs, integraciones, reportes y distribuciones. Se escribe
+fuera de BizView, con la herramienta que prefieras, y aquí se importa, se descarga y se ve su
+estado.
 
 ## Quién puede usarlo
 
@@ -12,10 +13,11 @@ Solo el **Superusuario**.
 ## Cómo se hace
 
 1. Abre [Abrir Proyectos](app:/proyectos).
-2. Pulsa **Nuevo proyecto**, escribe el **Nombre** (el **Identificador** se propone solo) y pulsa
-   **Crear proyecto**. Se abre el editor del proyecto, listo para escribir sus archivos.
-3. Para traer un proyecto descargado o hecho en VS Code, pulsa **Importar proyecto** y elige el
-   archivo .zip (se pide confirmar tu contraseña).
+2. Pulsa **Importar proyecto** y elige el archivo .zip (se pide confirmar tu contraseña).
+   BizView lee lo que trae el zip antes de subirlo y muestra los dos límites: artefactos (los
+   archivos del proyecto) e imágenes (las de `assets/`). Si uno se pasa, no lo sube y dice cuál.
+3. El proyecto se crea con lo que trajo el zip y se abre su editor. No hay un botón para crear un
+   proyecto vacío: un proyecto entra siempre por importación.
 
 ## Opciones
 

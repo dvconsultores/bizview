@@ -14,8 +14,8 @@ Only the **Superuser**.
 1. If the table is in a PostgreSQL source, open the source in
    [Open Data sources](app:/admin/fuentes), tick **Allow direct reports** and save (your password
    is asked). If it is in this installation's BI database, use the `bi` source.
-2. In [Open Projects](app:/proyectos) press **New project**, name it and press
-   **Create project**; its editor opens.
+2. Write the project on your machine (or ask your AI to) and import it: in
+   [Open Projects](app:/proyectos) press **Import project** and choose the .zip.
 3. Write the **Report** spec with the `**Modo**: directo`, `**Fuente**:` and `**Tablas**:` lines,
    and add what you want to see (metrics, dimensions, period).
 4. Write `reports/<id>/report.yaml` with those metrics, dimensions and views.

@@ -8,6 +8,27 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Import limits that account for project images (feature 049)**: the import is charged to two
+  allowances counted apart — **artifacts** (`project.yaml`, `specs/`, `integrations/`, `reports/`,
+  `themes/`, `distributions/`: 400 files, 2 MB each, 20 MB total) and **assets** (`assets/`: 2 000
+  files, 300 KB each, 25 MB total). Before this, images spent the room the specs needed, so a
+  project that shipped a logo set was refused with a message about a budget the author could not
+  act on: 483 logos and 40 artifacts could never be imported. Every refusal now names the allowance
+  that was exceeded, the folders it counted and the numbers, never a combined figure. All six
+  numbers are settings a super user edits in **Administración → Proyectos → Límites de
+  importación**; an empty field keeps the deployment default, so an operator's
+  `PROJECT_MAX_MB` still applies.
+- **The import screen reads the zip before uploading it (049)**: the browser reads the archive's
+  table of contents — no decompression, no library — and shows both tallies against their limits.
+  Over a limit, the import action is disabled and the reason names which; the server re-checks.
+- **`bizview import --dry-run <zip|folder>` (049)**: the same two tallies, the ignored files and the
+  verdict from the command line, from the code the server uses (`--json` for a machine). `bizview
+  validate` now reports the two allowances too.
+- **A project folder that still carries the authoring pack imports (049)**: `PROMPT.md`,
+  `REQUEST.md`, `request/`, `sources/`, `.bizview/`, `README.md`, `.DS_Store` and `__MACOSX/` are
+  listed as ignored and the project imports. Executable content — by extension or by its first
+  bytes — refuses the whole import and names the path.
+- **The guide topic *Importar un proyecto* (049)** in both languages.
 - **A source can be declared BI-ready (feature 048)**: instead of one installation-wide switch, each
   PostgreSQL source carries its own declaration — the schemas and objects reports may read, the query
   timeout, the cache lifetime, the row cap, the concurrency and the timezone its dates are read in.
@@ -21,6 +42,24 @@ All notable changes to this project are documented here. The format follows
 - **A direct report can keep its figures for a day (048)**: `materialize: daily` makes the worker run
   the report once and store the payload it already produces, so every viewer reads that with the
   notice that it is yesterday's. Figures only — no rows, no `ds_` schema.
+
+### Removed
+
+- **Manual project creation (feature 049)**: the "Nuevo proyecto" button, its form and
+  `GET /api/projects/slug` are gone, and `POST /api/projects` answers `410`
+  (`project_creation_removed`) instead of creating anything. Projects are authored outside Bizview
+  and arrive only by import — which is what the constitution already said, and what the empty state
+  now offers. Existing projects, their files, reports and history are untouched.
+
+### Fixed
+
+- The 512 KB per-file check in the CLI and the 2 MB budget the specification states were two
+  different answers to the same question; one shared number now, so `bizview validate` and the
+  server cannot disagree about a file.
+- **`GET /api/projects/<slug>/tree` answered 500 for any project with a spec folder** since 045:
+  the route still read the `converged` flag the in-app agent used, and 045 removed its producer
+  while the frontend type had already stopped asking for it. The project editor, the e2e flows and
+  the tree the import screen reads were all affected.
 
 ### Changed
 

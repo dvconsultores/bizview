@@ -14,8 +14,8 @@ Solo el **Superusuario**.
 1. Si la tabla está en una fuente PostgreSQL, abre la fuente en
    [Abrir Fuentes de datos](app:/admin/fuentes), marca **Permitir reportes directos** y guarda
    (se pide tu contraseña). Si está en la base BI de esta instalación, usa la fuente `bi`.
-2. En [Abrir Proyectos](app:/proyectos) pulsa **Nuevo proyecto**, ponle nombre y pulsa
-   **Crear proyecto**; se abre el editor.
+2. Escribe el proyecto en tu equipo (o pídeselo a la IA que uses) e impórtalo: en
+   [Abrir Proyectos](app:/proyectos) pulsa **Importar proyecto** y elige el .zip.
 3. Escribe la spec de **Reporte** con las líneas `**Modo**: directo`, `**Fuente**:` y
    `**Tablas**:`, y añade qué quieres ver (métricas, dimensiones, período).
 4. Escribe `reports/<id>/report.yaml` con esas métricas, dimensiones y vistas.

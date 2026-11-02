@@ -2,8 +2,8 @@
 
 ## What it is for
 
-A BI project is a folder with its specs, integrations, reports and distributions. Here you create,
-import and download projects and see their status.
+A BI project is a folder with its specs, integrations, reports and distributions. It is authored
+outside Bizview with whatever tool you prefer; here you import it, download it and see its status.
 
 ## Who can use it
 
@@ -12,14 +12,16 @@ Only the **Superuser**.
 ## How to
 
 1. Open [Open Projects](app:/proyectos).
-2. Press **New project**, type the **Name** (the **Identifier** is proposed for you) and press
-   **Create project**. The project editor opens, ready for its files.
-3. To bring in a downloaded project or one made in VS Code, press **Import project** and choose
-   the .zip file (your password is asked).
+2. Press **Import project** and choose the .zip (you are asked to confirm your password). Bizview
+   reads what the zip carries before uploading it and shows both limits: artifacts (the project's
+   own files) and images (the ones in `assets/`). If one is over, it is not uploaded and the reason
+   names which.
+3. The project is created with what the zip brought and its editor opens. There is no button to
+   create an empty project: a project always enters by import.
 
 ## Options
 
-- Each project shows its specs, its conversations and its status: **Draft** (never applied),
+- Each project shows its specs and its status: **Draft** (never applied),
   **Applied**, **Unapplied changes** or **Withdrawn**.
 - **Download** gets the project as a .zip.
 - **Delete project** (only when not applied) moves it to the trash for 30 days.

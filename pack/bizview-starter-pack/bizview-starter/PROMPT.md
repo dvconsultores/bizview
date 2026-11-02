@@ -5,6 +5,20 @@
 the folder with your AI and say: *"Read PROMPT.md and build the project described in
 REQUEST.md."* Import the resulting zip in Bizview: Proyectos → Importar proyecto. If the import
 returns `problems.json`, paste it back to the AI.
+
+**Import is the only way in.** Bizview has no button that creates an empty project: everything a
+dashboard needs arrives in this zip. Before uploading, the import screen reads the zip and shows
+two budgets; over either one, it refuses and names which.
+
+| Allowance | What it pays for | Files | Per file | Total |
+|---|---|---|---|---|
+| artifacts | `project.yaml`, `specs/**`, `integrations/**`, `reports/**`, `themes/**`, `distributions/**` | 400 | 2 MB | 20 MB |
+| assets | `assets/**` (images) | 2 000 | 300 KB | 25 MB |
+
+**Zip only the project.** This pack's own files — `PROMPT.md`, `REQUEST.md`, `request/`,
+`sources/`, `.bizview/`, `README.md` — are ignored on import, so leaving them in does no harm; but a
+logo set counts, and a project with hundreds of images must fit in the `assets` allowance. A file
+that looks like a program (`.js`, `.sh`, `.exe`, …) refuses the whole import: never ship one.
 ---
 
 You are building a **Bizview project**: a folder of declarative files that Bizview validates,
