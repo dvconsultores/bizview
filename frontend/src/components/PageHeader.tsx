@@ -8,25 +8,33 @@ export interface PageHeaderProps {
   badge?: ReactNode;
 }
 
+/**
+ * One page header for every screen (feature 050, contract §3).
+ *
+ * It used to be a bordered card with a 2xl/3xl title, which on a phone took a fifth of the viewport
+ * before any content and read as a hero block. It is now the page's title line: a compact heading, an
+ * optional one-line subtitle, and the actions in one wrapping row — beside the title from `sm` up,
+ * below it on a phone, so a long Spanish label is never truncated.
+ */
 export function PageHeader({ title, subtitle, action, actions, badge }: PageHeaderProps) {
   const hasActions = action !== undefined || actions !== undefined;
   return (
-    <div className="mb-6 rounded-card border border-line-accent bg-surface p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-ink break-words sm:text-3xl">{title}</h1>
-            {badge ? badge : null}
-          </div>
-          {subtitle ? <p className="mt-1 text-sm text-ink-muted sm:text-base">{subtitle}</p> : null}
+    <header className="mb-4 flex flex-col gap-3 border-b border-line pb-4 sm:mb-5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-ink sm:text-2xl">
+            {title}
+          </h1>
+          {badge ?? null}
         </div>
-        {hasActions ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {action}
-            {actions}
-          </div>
-        ) : null}
+        {subtitle ? <p className="mt-1 text-sm text-ink-muted">{subtitle}</p> : null}
       </div>
-    </div>
+      {hasActions ? (
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+          {action}
+          {actions}
+        </div>
+      ) : null}
+    </header>
   );
 }
