@@ -10,7 +10,10 @@ Playwright writes the screenshots for feature 050 here, one per screen and viewp
 06-ayuda-tema-{phone,desktop}-{light,dark}.png      evidence 6 — the article scrolls on its own
 ```
 
-Regenerate with:
+The names without a colour suffix (`01-apariencia-desktop.png`, …) are the same six screens captured
+against the **deployed installation** (`bi.getbizview.com`) after the release, in the light theme.
+
+Regenerate the local ones with:
 
 ```bash
 cd frontend && npx playwright test tests/e2e/design-system.spec.ts
