@@ -52,6 +52,15 @@ All notable changes to this project are documented here. The format follows
 - `THEME.md` in the authoring pack and [docs/THEMES.md](./docs/THEMES.md), plus the guide topic
   *Escribir un tema* in both languages.
 
+### Removed
+
+- **The placeholder "Ventas" dashboard**: a new installation used to open on a board marked
+  *coming soon* that led nowhere, and the catalogue showed it to every user. The product ships no
+  dashboard — one appears when a project is applied or when an administrator creates it, and the
+  home screen says so — so migration `0002` no longer seeds it and `0046` removes the row from the
+  installations that already ran it. Only the seeded row is deleted (`managed_by = 'product'`, no
+  report behind it): a board a workspace or a person owns is never touched.
+
 ### Changed
 
 - `layout.theme.palette` is the deprecated alias of `layout.theme.id`, accepted for one version so
