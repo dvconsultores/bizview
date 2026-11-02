@@ -28,33 +28,26 @@ async function expectAccessible(page: Page, where: string, { waitIdle = true }: 
   expect(bad.map((v) => `${where} ${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(" | ")}`)).toEqual([]);
 }
 
-async function expectHeaderCard(page: Page, route: string) {
+/** Feature 050: the page header is a title line, not a hero card.
+ *
+ * 010 asked the `<h1>` to sit inside a card-radius, filled box. On a phone that box took a fifth of
+ * the viewport before any content, which is one of the six defects 050 corrected: the header is now
+ * one `<h1>`, an optional one-line subtitle and the actions, separated by a rule. What is asserted
+ * is the *property* — compact, top of the content, actions reachable without sideways scrolling. */
+async function expectPageHeader(page: Page, route: string) {
   const result = await page.evaluate(() => {
-    const h1s = Array.from(document.querySelectorAll("h1"));
-    const h1 = h1s.find((el) => el.getClientRects().length > 0);
-    if (!h1) return { card: false, radius: 0, foundH1: false };
-
-    const probe = document.createElement("div");
-    probe.style.borderRadius = "var(--radius-card)";
-    document.body.appendChild(probe);
-    const cardRadius = parseFloat(getComputedStyle(probe).borderTopLeftRadius);
-    probe.remove();
-    if (!(cardRadius > 0)) return { card: false, radius: cardRadius, foundH1: true };
-
-    let current: HTMLElement | null = h1.parentElement;
-    while (current && current !== document.body) {
-      const cs = getComputedStyle(current);
-      const radius = parseFloat(cs.borderTopLeftRadius);
-      const hasBackground = cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== "transparent";
-      const hasImage = cs.backgroundImage !== "none";
-      if (radius >= cardRadius - 0.5 && (hasBackground || hasImage)) {
-        return { card: true, radius, foundH1: true };
-      }
-      current = current.parentElement;
-    }
-    return { card: false, radius: cardRadius, foundH1: true };
+    const h1 = Array.from(document.querySelectorAll("h1")).find((el) => el.getClientRects().length > 0);
+    if (!h1) return { foundH1: false, sized: false, compact: false, top: false };
+    const box = h1.getBoundingClientRect();
+    const header = h1.closest("header") as HTMLElement | null;
+    const headerBox = (header ?? h1).getBoundingClientRect();
+    // It must not be an oversized intro block: a fifth of a 740 px phone viewport is the ceiling.
+    const compact = headerBox.height <= Math.max(120, window.innerHeight * 0.22);
+    // A title at the top of the content, not pushed down by a wrapper.
+    const top = headerBox.top < window.innerHeight * 0.5;
+    return { foundH1: true, sized: box.height > 0, compact, top };
   });
-  expect(result, `${route} header card`).toEqual({ card: true, radius: expect.any(Number), foundH1: true });
+  expect(result, `${route} page header`).toEqual({ foundH1: true, sized: true, compact: true, top: true });
 }
 
 async function expectActiveLink(page: Page, route: string, label: string) {
@@ -114,7 +107,7 @@ async function checkRoutes(page: Page, scheme: "dark" | "light") {
     if (route === "/") {
       await expect(page.getByRole("heading", { level: 1 })).toContainText("Bienvenido de nuevo");
     }
-    await expectHeaderCard(page, route);
+    await expectPageHeader(page, route);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: route }).toBeLessThanOrEqual(0);
     await expectAccessible(page, route);
   }

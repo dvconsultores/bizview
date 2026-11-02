@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **One design system, and the screens that had drifted from it (feature 050)**: the rules for page
+  width, gutters, card padding, page headers, split panes and mutually-exclusive choices now live in
+  `frontend/src/lib/layout.ts` and [docs/DESIGN-SYSTEM.md](./docs/DESIGN-SYSTEM.md). Four screens had
+  each answered one of them differently:
+  - **Administración → Apariencia** sat in a 56 rem column inside a 96 rem container with a fixed
+    two-column grid, so a wide screen showed a narrow library with an unexplained empty half and
+    over-tall previews. It now fills the container with one, two or three columns and equal-height
+    cards, and the selected theme is marked with a word as well as a colour.
+  - **Perfil and the account menu** stacked *Sistema / Claro / Oscuro* vertically because the theme
+    switcher emitted `grid-cols-3` without `grid`, while the language options sat in a row. Both are
+    now the same `SegmentedControl`, so they cannot answer differently again.
+  - **Ayuda** had no bounded panel: the page scrolled instead of the article, and the topic list ran
+    the full page length. Two panes now scroll on their own from `lg` up, and on a phone a topic
+    replaces the list with a Back that keeps the search.
+  - **The account menu** mixed identity, appearance, language and links without grouping; it is now
+    four labelled groups in a viewport-bounded, scrollable popup that returns focus to its trigger.
+- **The page header is a title line, not a hero block**: one compact `<h1>`, an optional subtitle and
+  the actions in one wrapping row. On a 375 px phone the old card took a fifth of the viewport before
+  any content.
+
 ### Added
 
 - **Import limits that account for project images (feature 049)**: the import is charged to two
