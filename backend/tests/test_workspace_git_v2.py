@@ -31,6 +31,10 @@ def to_v2(root):
     (base / "specs").mkdir(parents=True)
     shutil.move(root / "integrations", base / "integrations")
     shutil.move(root / "reports", base / "reports")
+    # Since 044 the logos a report reads live inside the project: leaving them at the root makes
+    # every report that names them invalid (`image_folder_missing`).
+    if (root / "assets").is_dir():
+        shutil.move(root / "assets", base / "assets")
     shutil.move(root / "specs/integrations/001-ventas-prueba", base / "specs/001-ventas-prueba")
     shutil.move(root / "specs/reports/001-ventas", base / "specs/002-ventas")
     shutil.move(root / "specs/reports/002-ventas-layout", base / "specs/003-ventas-layout")
