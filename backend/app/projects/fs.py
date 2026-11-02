@@ -19,8 +19,9 @@ from bizview_cli import layout
 from app.config import get_settings
 from app.i18n import M
 
-MAX_FILE_BYTES = 512 * 1024
-MAX_FILES = 400
+# Reading a file that is already in the project is bounded by memory, not by the import
+# allowance: what may be stored is decided on the way in (feature 049, `measure`).
+MAX_READ_BYTES = 32 * 1024 * 1024
 MAX_PATH = 240
 CONSTITUTION = ".specify/memory/constitution.md"
 TRASH = ".papelera"
@@ -183,9 +184,9 @@ def read_text(slug: str, rel: str) -> str:
         st = os.fstat(f.fileno())
         if not stat.S_ISREG(st.st_mode):
             raise _unsafe(rel)
-        if st.st_size > MAX_FILE_BYTES:
+        if st.st_size > MAX_READ_BYTES:
             raise ProjectPathError(
-                "too_large", M("projects.too_large", path=rel, max="512 KB")
+                "too_large", M("projects.too_large", path=rel, max="32 MB")
             )
         data = f.read()
     if b"\x00" in data:
@@ -238,30 +239,65 @@ def read_asset(slug: str, rel: str) -> tuple[bytes, str, str]:
         st = os.fstat(f.fileno())
         if not stat.S_ISREG(st.st_mode):
             raise _unsafe(rel)
-        if st.st_size > asset_rules.MAX_KB * 1024:
-            raise ProjectPathError("too_large", M("projects.too_large", path=rel,
-                                                 max=f"{asset_rules.MAX_KB} KB"))
+        if st.st_size > MAX_READ_BYTES:
+            raise ProjectPathError("too_large", M("projects.too_large", path=rel, max="32 MB"))
         data = f.read()
     kind = asset_rules.sniff(data, rel)
     return data, asset_rules.CONTENT_TYPES[kind], hashlib.sha256(data).hexdigest()
 
 
-def check_asset_limits(slug: str, rel: str, data: bytes,
-                       current: dict[str, tuple[int, str]]) -> None:
-    """Asset size and project limits. Separate from `check_limits`: images are binary."""
-    from app.projects import assets as asset_rules
+def _limits():
+    """The installation's two allowances. `fs` is called from request and worker contexts alike, so
+    the row is read on its own session and never cached across a change."""
+    from app.db import get_sessionmaker
+    from app.projects import budgets as project_budgets
 
-    if len(data) > asset_rules.MAX_KB * 1024:
-        raise ProjectPathError("too_large", M("projects.too_large", path=rel,
-                                             max=f"{asset_rules.MAX_KB} KB"))
-    max_mb = get_settings().project_max_mb
-    too_large = ProjectPathError(
-        "project_too_large", M("projects.project_too_large", max_mb=max_mb, max_files=MAX_FILES))
-    if rel not in current and len(current) >= MAX_FILES:
-        raise too_large
-    total = sum(size for path, (size, _) in current.items() if path != rel) + len(data)
-    if total > max_mb * 1024 * 1024:
-        raise too_large
+    with get_sessionmaker()() as db:
+        return project_budgets.effective(db)
+
+
+def measure(rel: str, data: bytes, current: dict[str, tuple[int, str]],
+            limits: dict | None = None) -> None:
+    """Refuse a write that breaks the allowance *rel* belongs to (feature 049).
+
+    Artifacts and images are counted apart: `current` holds every file of the project, and each is
+    charged to the budget the layout puts it in. A project full of logos no longer spends the
+    allowance its specs need."""
+    from bizview_cli import layout as layout_rules
+
+    name = layout_rules.budget_of(rel)
+    if name is None:
+        return
+    limits = limits if limits is not None else _limits()
+    budget = limits[name]
+    if len(data) > budget.max_file_bytes:
+        raise ProjectPathError(
+            "too_large", M("projects.too_large", path=rel, max=f"{budget.max_kb} KB"))
+    siblings = [(path, size) for path, (size, _) in current.items()
+                if path != rel and layout_rules.budget_of(path) == name]
+    total = sum(size for _, size in siblings) + len(data)
+    if rel not in current and len(siblings) >= budget.max_files:
+        raise ProjectPathError("project_too_large", _over_files(budget, len(siblings) + 1))
+    if total > budget.max_bytes:
+        raise ProjectPathError("project_too_large", _over_bytes(budget, total))
+
+
+def _over_files(budget, files: int) -> "M":
+    prefix = "artifacts" if budget.name == "artifacts" else "assets"
+    return M(f"projects.{prefix}_over_files", files=files, max_files=budget.max_files,
+             label=budget.label)
+
+
+def _over_bytes(budget, size: int) -> "M":
+    prefix = "artifacts" if budget.name == "artifacts" else "assets"
+    return M(f"projects.{prefix}_over_bytes", size_mb=max(1, round(size / 1048576)),
+             max_mb=budget.max_mb, label=budget.label)
+
+
+def check_asset_limits(slug: str, rel: str, data: bytes,
+                       current: dict[str, tuple[int, str]], limits: dict | None = None) -> None:
+    """An image: its own size and its own allowance (044, tightened by 049)."""
+    measure(rel, data, current, limits)
 
 
 def write_asset_atomic(slug: str, rel: str, data: bytes) -> tuple[bytes | None, str]:
@@ -301,7 +337,8 @@ def apply_asset(project_id: int, rel: str, data: bytes, actor: dict) -> dict:
     from app.projects import assets as asset_rules
     from app.projects import history
 
-    stored, kind, _ = asset_rules.prepare(data, rel)
+    limits = _limits()
+    stored, kind, _ = asset_rules.prepare(data, rel, limits["assets"].max_kb)
     with get_sessionmaker()() as db:
         db.execute(sql_text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
                    {"k": lock_key("project", project_id)})
@@ -311,7 +348,7 @@ def apply_asset(project_id: int, rel: str, data: bytes, actor: dict) -> dict:
         slug = project.slug
         history.sync_external(db, project)
         sizes, _ = list_files(slug)
-        check_asset_limits(slug, rel, stored, sizes)
+        check_asset_limits(slug, rel, stored, sizes, limits)
         previous, digest = write_asset_atomic(slug, rel, stored)
         rev = history.record_asset(db, project.id, rel, kind, stored, actor,
                                    group_id=uuid.uuid4())
@@ -320,24 +357,16 @@ def apply_asset(project_id: int, rel: str, data: bytes, actor: dict) -> dict:
                 "previous": previous}
 
 
-def check_limits(slug: str, rel: str, data: bytes, current: dict[str, tuple[int, str]]) -> None:
-    """Check file size, content, and project limits before writing."""
-    if len(data) > MAX_FILE_BYTES:
-        raise ProjectPathError("too_large", M("projects.too_large", path=rel, max="512 KB"))
+def check_limits(slug: str, rel: str, data: bytes, current: dict[str, tuple[int, str]],
+                 limits: dict | None = None) -> None:
+    """Check content and the artifact allowance before writing a text file."""
     if b"\x00" in data:
         raise ProjectPathError("not_text", M("projects.not_text", path=rel))
     try:
         data.decode("utf-8")
     except UnicodeDecodeError:
         raise ProjectPathError("not_text", M("projects.not_text", path=rel)) from None
-    max_mb = get_settings().project_max_mb
-    too_large = ProjectPathError(
-        "project_too_large", M("projects.project_too_large", max_mb=max_mb, max_files=MAX_FILES))
-    if rel not in current and len(current) >= MAX_FILES:
-        raise too_large
-    total = sum(size for p, (size, _) in current.items() if p != rel) + len(data)
-    if total > max_mb * 1024 * 1024:
-        raise too_large
+    measure(rel, data, current, limits)
 
 
 def _mkdirs(root: Path, parts: list[str]) -> None:

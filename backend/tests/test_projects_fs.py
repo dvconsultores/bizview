@@ -95,16 +95,18 @@ def test_spec_numbering(project, projects):
 
 
 def test_limits(project, projects, monkeypatch):
+    """Feature 049: a single file over its own limit, then the set over the artifact total."""
     monkeypatch.setattr(get_settings(), "project_max_mb", 1)
     with pytest.raises(fs.ProjectPathError) as exc:
-        fs.apply_ops(project.id, [w("specs/001-a/spec.md", "a" * (600 * 1024))], ACTOR)
+        fs.apply_ops(project.id, [w("specs/001-a/spec.md", "a" * (3 * 1024 * 1024))], ACTOR)
     assert exc.value.code == "too_large"
-    chunk = "a" * (400 * 1024)     # three of them exceed 1 MiB, each is under 512 KB
+    chunk = "a" * (400 * 1024)     # three of them exceed 1 MiB, each is under 2 MB
     fs.apply_ops(project.id, [w("specs/001-a/spec.md", chunk), w("specs/001-a/plan.md", chunk)],
                  ACTOR)
     with pytest.raises(fs.ProjectPathError) as exc:
         fs.apply_ops(project.id, [w("specs/001-a/tasks.md", chunk)], ACTOR)
     assert exc.value.code == "project_too_large"
+    assert "artefactos" in str(exc.value.message)
     assert count("specs/001-a/tasks.md") == 0
 
 

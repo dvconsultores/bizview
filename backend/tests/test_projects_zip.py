@@ -7,7 +7,7 @@ import zipfile
 import pytest
 
 from app.config import get_settings
-from tests.conftest import reauth, signed_in, sql
+from tests.conftest import make_project, reauth, signed_in, sql
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +44,7 @@ def post(client, data, **params):
 
 
 def test_round_trip(client, projects):
-    slug = client.post("/api/projects", json={"name": "Ventas"}).json()["slug"]
+    slug = make_project("Ventas")
     spec = "# A\n\n**Tipo**: reporte\n"
     assert client.put(f"/api/projects/{slug}/file",
                       json={"path": "specs/001-a/spec.md", "content": spec}).status_code == 200
@@ -86,8 +86,10 @@ def test_rejections(client, monkeypatch):
         "/api/projects/import", content=make_zip({"project.yaml": "name: x\n"}),
         headers={"Content-Type": "application/zip"})
     assert r.status_code == 403   # step-up required
+    # 049: the zip may carry both allowances, so an over-size archive is measured against their sum
     monkeypatch.setattr(get_settings(), "project_max_mb", 1)
-    r = post(client, make_zip({"specs/001-a/spec.md": os.urandom(1_500_000)},
+    monkeypatch.setattr(get_settings(), "project_asset_max_mb", 1)
+    r = post(client, make_zip({"specs/001-a/spec.md": os.urandom(3_000_000)},
                               method=zipfile.ZIP_STORED))
     assert r.status_code == 413
     assert r.json()["error"]["code"] == "too_large"
@@ -116,7 +118,7 @@ def test_spec_number_gap_is_kept_and_duplicates_leave_nothing(client, projects):
 
 def test_export_after_a_spec_delete_imports_back(client, projects):
     """020 T085, FR-018: a downloaded project with a deleted spec (001 + 003) imports again."""
-    slug = client.post("/api/projects", json={"name": "Huecos"}).json()["slug"]
+    slug = make_project("Huecos")
     for path in ("specs/001-a/spec.md", "specs/002-b/spec.md", "specs/003-c/spec.md"):
         r = client.put(f"/api/projects/{slug}/file", json={"path": path, "content": "# X\n"})
         assert r.status_code == 200, r.text

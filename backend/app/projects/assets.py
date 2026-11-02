@@ -99,8 +99,10 @@ def _looks_like_svg(data: bytes) -> bool:
     return head.startswith(b"<") and b"<svg" in data[:4096]
 
 
-def check_size(data: bytes, name: str) -> None:
-    if len(data) > MAX_KB * 1024:
+def check_size(data: bytes, name: str, max_kb: int | None = None) -> None:
+    """Refuse an image over the allowance. `max_kb` is the installation's asset budget (049); the
+    module constant is only the default for a caller that has no session at hand."""
+    if len(data) > (max_kb or MAX_KB) * 1024:
         raise AssetRefused("too_large", name)
 
 
@@ -132,13 +134,13 @@ def _clean(node: ET.Element, name: str) -> None:
             _clean(child, name)
 
 
-def prepare(data: bytes, name: str) -> tuple[bytes, str, str]:
+def prepare(data: bytes, name: str, max_kb: int | None = None) -> tuple[bytes, str, str]:
     """Validate `data` and return what to store: (bytes, kind, content type).
 
     SVG comes back sanitised; everything else comes back untouched.
     """
     kind = sniff(data, name)
-    check_size(data, name)
+    check_size(data, name, max_kb)
     stored = sanitise_svg(data, name) if kind == "svg" else data
     return stored, kind, CONTENT_TYPES[kind]
 

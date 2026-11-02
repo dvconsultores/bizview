@@ -9,11 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import Auth, client_ip, recent_reauth, require_superuser
-from app.config import get_settings
 from app.db import DB
 from app.errors import ApiError, not_found, validation
 from app.i18n import M
 from app.models import AppUser, Project
+from app.projects import budgets as project_budgets
 from app.projects import fs, history, specs
 from app.projects import service as projects
 
@@ -33,13 +33,6 @@ def path_error(e: fs.ProjectPathError) -> ApiError:
                     if e.code == "file_changed" else None)
 
 
-class ProjectCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str = Field(min_length=1, max_length=80)
-    slug: str | None = None
-    description: str = Field(default="", max_length=500)
-
-
 class ProjectPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str | None = Field(default=None, min_length=1, max_length=80)
@@ -53,18 +46,38 @@ def list_projects(actor: AppUser = Depends(require_superuser), db: Session = DB)
     return {"projects": projects.list_projects(db), "folder_writable": fs.check_dir()}
 
 
-@router.get("/slug")
-def suggest_slug(name: str = Query(min_length=1, max_length=80),
-                 actor: AppUser = Depends(require_superuser), db: Session = DB):
-    return {"slug": projects.suggest_slug(db, name)}
+#: A project is authored outside Bizview and imported (owner decision, feature 049). The route stays
+#: declared so an old client reads why instead of guessing at a 404 or a 405.
+CREATION_REMOVED = 410
 
 
-@router.post("", status_code=201)
-def create_project(body: ProjectCreate, request: Request,
-                   actor: AppUser = Depends(require_superuser), db: Session = DB):
-    project = projects.create(db, actor, body.name, body.slug, body.description,
-                              client_ip(request))
-    return projects.project_json(project)
+@router.post("", status_code=CREATION_REMOVED)
+def create_project():
+    raise ApiError(CREATION_REMOVED, "project_creation_removed",
+                   M("projects.creation_removed"))
+
+
+class LimitsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    artifact_max_files: int | None = Field(default=None, ge=1, le=100_000)
+    artifact_max_kb: int | None = Field(default=None, ge=1, le=1_048_576)
+    artifact_max_mb: int | None = Field(default=None, ge=1, le=500)
+    asset_max_files: int | None = Field(default=None, ge=1, le=100_000)
+    asset_max_kb: int | None = Field(default=None, ge=1, le=1_048_576)
+    asset_max_mb: int | None = Field(default=None, ge=1, le=2000)
+
+
+@router.get("/limits")
+def import_limits(actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """The two import allowances in force, so the browser can refuse before uploading (049)."""
+    return project_budgets.json(project_budgets.effective(db), project_budgets.stored(db))
+
+
+@router.put("/limits")
+def save_import_limits(body: LimitsIn, actor: AppUser = Depends(require_superuser),
+                       _: Auth = Depends(recent_reauth), db: Session = DB):
+    """Change the allowances. A field left null goes back to the deployment default."""
+    return project_budgets.store(db, body.model_dump(), actor)
 
 
 @router.get("/{slug}")
@@ -147,8 +160,9 @@ def project_tree(slug: str, actor: AppUser = Depends(require_superuser), db: Ses
             if layout.is_allowed_folder(parent):
                 folders.add(parent)
             parent = os.path.dirname(parent)
-    spec_info = {f"specs/{s['folder']}": {"kind": s["kind"], "stage": s["stage"],
-                                          "converged": s["converged"]}
+    # `converged` was the in-app agent's flag; 045 removed its producer and both the frontend type
+    # and this response were left asking for it, so every project with a spec folder answered 500.
+    spec_info = {f"specs/{s['folder']}": {"kind": s["kind"], "stage": s["stage"]}
                  for s in specs.list_specs(db, p)}
     return {
         "files": [{"path": path, "size": size, "sha256": digest}
@@ -399,8 +413,6 @@ def import_zip(request: Request, data: bytes = Body(..., media_type="application
     rename the project's copy so both survive (047)."""
     from app.projects import zip as project_zip
 
-    if len(data) > get_settings().project_max_mb * 1024 * 1024:
-        raise ApiError(413, "too_large", M("projects.zip_invalid", reason="size"))
     try:
         return project_zip.import_zip(db, actor, data, name=name, slug=slug,
                                       themes_on_conflict=themes, ip=client_ip(request))

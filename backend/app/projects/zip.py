@@ -6,19 +6,20 @@ import zipfile
 from importlib import resources
 
 import yaml
+from bizview_cli import budgets as shared_budgets
 from bizview_cli import layout
 
-from app.config import get_settings
 from app.errors import ApiError
 from app.i18n import M
 from app.projects import assets as asset_rules
+from app.projects import budgets as project_budgets
 from app.projects import fs
 from app.projects import service as project_service
 from app.services import audit
 
-MAX_ENTRIES = 1000
 MAX_RATIO = 100
-LAYOUT_TOPS = {"specs", "integrations", "reports", "distributions", ".specify", "project.yaml"}
+LAYOUT_TOPS = {"specs", "integrations", "reports", "distributions", "themes", "assets", ".specify",
+               "project.yaml"}
 
 README = """# {name}
 
@@ -81,10 +82,33 @@ def export(db, actor, project, ip: str | None = None) -> bytes:
 
 
 class ZipRejected(Exception):
-    def __init__(self, code: str, reason: str) -> None:
+    """An import that stops. `code` is the API's error code; `message` is already translated."""
+
+    def __init__(self, code: str, message: "M") -> None:
         self.code = code
-        self.message = M("projects.zip_invalid", reason=reason)
-        super().__init__(reason)
+        self.message = message
+        super().__init__(code)
+
+
+#: The i18n key that says why a refusal happened, and the params each one needs.
+REFUSAL_KEYS = {
+    "zip_disallowed": "projects.zip_disallowed",
+    "artifacts_over_files": "projects.artifacts_over_files",
+    "artifacts_over_bytes": "projects.artifacts_over_bytes",
+    "artifacts_file_too_large": "projects.artifacts_file_too_large",
+    "assets_over_files": "projects.assets_over_files",
+    "assets_over_bytes": "projects.assets_over_bytes",
+    "assets_file_too_large": "projects.assets_file_too_large",
+}
+
+
+def _refusal(refusal: shared_budgets.Refusal) -> ZipRejected:
+    """One budget's refusal, in the language of the request, naming only that budget."""
+    return ZipRejected(refusal.code, M(REFUSAL_KEYS[refusal.code], **refusal.params))
+
+
+def _structural(reason: str) -> ZipRejected:
+    return ZipRejected("zip_invalid", M("projects.zip_invalid", reason=reason))
 
 
 def _unsafe_name(name: str) -> bool:
@@ -94,40 +118,50 @@ def _unsafe_name(name: str) -> bool:
             or any(part in ("", ".", "..") for part in parts))
 
 
-def _entries(data: bytes) -> list[tuple[str, bytes]]:
-    """(name, content) of the regular files of the archive, after every safety check."""
-    max_bytes = get_settings().project_max_mb * 1024 * 1024
+def _max_entries(limits: dict[str, shared_budgets.Budget]) -> int:
+    """How many archive entries to walk at all: the two allowances, twice over for directories."""
+    return 2 * sum(budget.max_files for budget in limits.values())
+
+
+def _entries(data: bytes, limits: dict[str, shared_budgets.Budget]) -> list[tuple[str, bytes]]:
+    """(name, content) of the regular files of the archive, after every safety check.
+
+    Feature 049: the archive may carry both allowances, so its own size cap is their sum and the
+    entry cap follows the two file counts. What protects against a zip bomb — the ratio and the
+    declared size matching the bytes actually read — is unchanged."""
+    max_bytes = project_budgets.zip_max_mb(limits) * 1024 * 1024
     if len(data) > max_bytes:
-        raise ZipRejected("too_large", "size")
+        raise ZipRejected("too_large", M("projects.zip_too_large", max_mb=max_bytes // 1048576))
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile as e:
-        raise ZipRejected("zip_invalid", "format") from e
+        raise _structural("format") from e
     with archive:
         infos = archive.infolist()
-        if len(infos) > MAX_ENTRIES:
-            raise ZipRejected("zip_invalid", "entries")
+        if len(infos) > _max_entries(limits):
+            raise _structural("entries")
         entries: list[tuple[str, bytes]] = []
         total = 0
         for info in infos:
             if info.is_dir():
                 continue
             if (info.external_attr >> 16) & 0o170000 == 0o120000:
-                raise ZipRejected("zip_invalid", "symlink")
+                raise _structural("symlink")
             if _unsafe_name(info.filename):
-                raise ZipRejected("zip_invalid", "path")
+                raise _structural("path")
             total += info.file_size
             if total > max_bytes:
-                raise ZipRejected("too_large", "size")
+                raise ZipRejected("too_large",
+                                  M("projects.zip_too_large", max_mb=max_bytes // 1048576))
             if info.compress_size > 0 and info.file_size / info.compress_size > MAX_RATIO:
-                raise ZipRejected("zip_invalid", "ratio")
+                raise _structural("ratio")
             try:
                 with archive.open(info) as handle:
                     content = handle.read(max_bytes + 1)
             except (RuntimeError, zipfile.BadZipFile, OSError) as e:   # encrypted / corrupt
-                raise ZipRejected("zip_invalid", "format") from e
+                raise _structural("format") from e
             if len(content) != info.file_size:
-                raise ZipRejected("zip_invalid", "size")
+                raise _structural("size")
             entries.append((info.filename, content))
     return entries
 
@@ -153,20 +187,28 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
     Feature 047: `themes/*.yaml` inside the zip also enters the installation's library, with
     `origin = project`. An id that already exists is answered by `themes_on_conflict` — skip it
     (the library keeps its own), replace it, or rename the project's so both survive."""
-    entries = _entries(data)
+    limits = project_budgets.effective(db)
+    entries = _entries(data, limits)
     prefix = _strip_top([n for n, _ in entries]) or ""
+    relative = [(raw[len(prefix):], content) for raw, content in entries]
+    # 049: measured before anything is written, against the allowance each path belongs to. A
+    # project over a limit leaves no row and no folder behind because it never gets that far.
+    report = shared_budgets.tally(
+        [(rel, len(content), content) for rel, content in relative], limits)
+    if report.refusal is not None:
+        raise _refusal(report.refusal)
     files: dict[str, str] = {}
     images: dict[str, bytes] = {}
     ignored: list[str] = []
-    for raw, content in entries:
-        rel = raw[len(prefix):]
+    for rel, content in relative:
         try:
             fs.check_rel(rel)
-            if not layout.is_allowed(rel):
+            if layout.budget_of(rel) is None:
                 raise ValueError(rel)
-            if rel.startswith("assets/"):
+            if rel.startswith(layout.ASSET_PREFIX):
                 # 044: validated here so a bad image is reported in `ignored`, never half-written.
-                images[rel] = asset_rules.prepare(content, rel)[0]
+                images[rel] = asset_rules.prepare(
+                    content, rel, limits[layout.ASSETS].max_kb)[0]
                 continue
             files[rel] = content.decode("utf-8")
         except (fs.ProjectPathError, ValueError, asset_rules.AssetRefused):
@@ -214,10 +256,12 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
     result = project_service.revalidate(db, project)
     audit.record(db, "project_imported", actor_id=actor.id, ip=ip,
                  detail={"project_id": project.id, "project": project.slug,
-                         "files": len(files), "ignored": len(ignored), "source": "zip"})
+                         "files": len(files), "images": len(images),
+                         "ignored": len(ignored), "source": "zip"})
     db.flush()
     return {"project": project_service.project_json(project), "ignored": sorted(ignored),
-            "themes": themes_report, "validation": result["validation"]}
+            "themes": themes_report, "validation": result["validation"],
+            "budgets": report.as_json()}
 
 
 def _project_themes(db, project_id: int, files: dict[str, str], policy: str) -> list[dict]:
