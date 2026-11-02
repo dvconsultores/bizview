@@ -37,6 +37,21 @@ def is_allowed(path: str) -> bool:
     return any(pattern.fullmatch(path) for pattern in PROJECT_PATTERNS)
 
 
+# Feature 049: every allowed file is charged to one of two allowances. `assets/**` is binary and
+# grows with the pictures a report needs; everything else is the project itself (YAML, Markdown,
+# SQL). Charging both to one budget is what made a project with a logo set impossible to import.
+ARTIFACTS = "artifacts"
+ASSETS = "assets"
+ASSET_PREFIX = "assets/"
+
+
+def budget_of(path: str) -> str | None:
+    """The allowance *path* is charged to, or None when the path is not a project file at all."""
+    if path.startswith(ASSET_PREFIX):
+        return ASSETS if is_allowed(path) else None
+    return ARTIFACTS if is_allowed(path) else None
+
+
 FOLDER_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\.specify"),
     re.compile(r"\.specify/memory"),

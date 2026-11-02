@@ -1,4 +1,4 @@
-"""`bizview` command: init, project, validate, describe, theme, version."""
+"""`bizview` command: init, project, validate, describe, import, theme, version."""
 import argparse
 import sys
 from pathlib import Path
@@ -73,11 +73,19 @@ def _validate(args) -> int:
             summary += t("cli.summary_direct_checked", n=n_direct)
     print(summary)
     if result.layout == "v2":
+        from bizview_cli import importer
+
         for slug in sorted(result.projects):
             print(t("cli.summary_project", project=slug,
                     integrations=sum(e.project == slug for e in result.integrations.values()),
                     reports=sum(e.project == slug for e in result.reports.values()),
                     distributions=sum(e.project == slug for e in result.distributions.values())))
+            # Feature 049: the same two allowances the server applies, measured on the folder. It is
+            # a report, not a failure: a project already applied must not turn "invalid" because an
+            # installation later lowered a limit.
+            measured = importer.measure(root / "projects" / slug)
+            print(t("cli.budget_project_title", project=slug))
+            print(importer.render_budgets(measured))
     if args.write_lock:
         path = write_lock(root, result.lock)
         print(t("cli.lock_written", path=path))
@@ -100,6 +108,8 @@ def _run(args) -> int:
         from bizview_cli.init import init
         return init(Path(args.path), args.name, agent=args.agent, git=not args.no_git,
                     layout=args.layout)
+    if args.command == "import":
+        return _import(args)
     if args.command == "theme":
         return _theme(args)
     if args.command == "project":
@@ -108,6 +118,25 @@ def _run(args) -> int:
                            speckit_init=not args.no_speckit)
     from bizview_cli.describe import describe
     return describe(args.source, path=args.path, as_json=args.json)
+
+
+def _import(args) -> int:
+    """Feature 049: measure a folder or a zip against both allowances. The only mode is a dry run —
+    the app owns the upload, and nothing here writes anything."""
+    import json
+
+    from bizview_cli import importer
+
+    try:
+        result = importer.measure(Path(args.path))
+    except importer.Unreadable as e:
+        print(t("cli.read_failed", file=str(e), exc="unreadable"), file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(importer.render(result))
+    return 0 if result["importable"] else 1
 
 
 def _theme(args) -> int:
@@ -172,6 +201,10 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("source", help=t("cli.describe_source_help"))
     d.add_argument("--path", help=t("cli.describe_path_help"))
     d.add_argument("--json", action="store_true")
+    imp = sub.add_parser("import", help=t("cli.import_help"))
+    imp.add_argument("path", help=t("cli.import_help"))
+    imp.add_argument("--dry-run", action="store_true", help=t("cli.import_dry_run_help"))
+    imp.add_argument("--json", action="store_true", help=t("cli.import_json_help"))
     th = sub.add_parser("theme", help=t("cli.theme_help"))
     theme_sub = th.add_subparsers(dest="theme_command", required=True)
     tv = theme_sub.add_parser("validate", help=t("cli.theme_validate_help"))
