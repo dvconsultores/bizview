@@ -518,7 +518,7 @@ def test_admin_networks_cover_share_links_and_keep_user_reads(applied, user, mon
                         json={"frequency": "daily", "hour": 8, "period": "last_month"}
                         ).status_code == 403
     assert outside.get("/api/projects").status_code == 403
-    assert outside.post("/api/projects", json={"name": "Robado"}).status_code == 403
+    assert outside.post("/api/projects", json={"name": "Robado"}).status_code == 410   # 049
     assert outside.post("/api/assistant/sessions", json={"project": "x"}).status_code == 403
     # Reading the share controls and the dashboard catalogue is not a state change.
     assert outside.get("/api/dashboards/ventas/links").status_code == 200

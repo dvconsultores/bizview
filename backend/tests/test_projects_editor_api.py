@@ -3,7 +3,7 @@ import pytest
 
 from app.config import get_settings
 from app.projects import history
-from tests.conftest import signed_in
+from tests.conftest import make_project, signed_in
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(superuser):
     c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "Demo"}).json()["slug"]
+    slug = make_project("Demo")
     return c, slug
 
 

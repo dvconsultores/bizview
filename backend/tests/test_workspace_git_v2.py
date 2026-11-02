@@ -4,7 +4,7 @@ import shutil
 import pytest
 
 from app.config import get_settings
-from tests.conftest import reauth, signed_in, sql
+from tests.conftest import make_project, reauth, signed_in, sql
 from tests.test_runner import origin as origin  # fixture
 from tests.test_runner import pg_source as pg_source  # fixture
 from tests.test_vibe_reporting import applied as applied  # fixture
@@ -105,7 +105,7 @@ def test_git_apply_keeps_app_projects(applied, workspace, projects, monkeypatch)
                         lambda *a, **k: {"ready": True, "pending": []})
     monkeypatch.setattr("app.projects.origin_checks.recheck_draft", lambda *a, **k: [])
     c = applied
-    slug = c.post("/api/projects", json={"name": "Extra"}).json()["slug"]
+    slug = make_project("Extra")
     report = (workspace / "reports/ventas/report.yaml").read_text().replace(
         "id: ventas\n", "id: ventas-x\n").replace("spec: specs/reports/001-ventas",
                                                   "spec: specs/001-ventas-x")

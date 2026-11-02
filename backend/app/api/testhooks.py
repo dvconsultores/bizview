@@ -99,6 +99,29 @@ def telegram_reset(db: Session = DB):
 _STASHED: dict[int, str] = {}
 
 
+@router.post("/api/test/zip")
+def build_zip(body: dict):
+    """A zip built from text entries, so an e2e flow can import a project (feature 049).
+
+    A project enters the product only by import, and a browser test cannot author a file tree on
+    disk: this makes the archive the app would receive from an author."""
+    import io
+    import zipfile
+
+    from fastapi import Response
+
+    entries = body.get("entries")
+    if not isinstance(entries, dict):
+        raise HTTPException(status_code=422, detail="entries")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries.items():
+            if not isinstance(name, str) or not isinstance(content, str):
+                raise HTTPException(status_code=422, detail="entries")
+            archive.writestr(name, content)
+    return Response(content=buffer.getvalue(), media_type="application/zip")
+
+
 @router.post("/api/test/workspace/stash")
 def workspace_stash(db: Session = DB):
     """Archiva todas las versiones activas/previas y oculta los dashboards de workspace."""

@@ -17,7 +17,7 @@ from app.config import get_settings
 from app.models import AppUser
 from app.projects import fs
 from app.projects import service as project_service
-from tests.conftest import reauth, sql
+from tests.conftest import make_project, reauth, sql
 from tests.test_runner import origin as origin
 from tests.test_runner import pg_source as pg_source
 from tests.test_vibe_reporting import applied as applied
@@ -50,9 +50,7 @@ def env(tmp_path, monkeypatch):
 
 
 def _create(c, name: str) -> str:
-    r = c.post("/api/projects", json={"name": name})
-    assert r.status_code == 201, r.text
-    return r.json()["slug"]
+    return make_project(name)
 
 
 def _put(c, slug: str, files: dict[str, str], *, force: bool = False) -> None:
@@ -235,4 +233,5 @@ def test_two_projects_never_share_a_problem(applied, origin):
     beta = _validate(c, b)
     assert any(e["file"] == broken for e in beta["errors"])
     assert _validate(c, a)["errors"] == []
-    assert sql("SELECT count(*) FROM assistant_preview_request WHERE project_id IS NULL") == [(0,)]
+    # The preview request queue that 030 made carry `project_id` is gone with 045, so the last
+    # invariant of that migration (no queue row without a project) has nothing left to check.

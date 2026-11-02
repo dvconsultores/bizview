@@ -70,6 +70,30 @@ async function put(page: Page, slug: string, path: string, content: string) {
   expect(r.ok(), path).toBe(true);
 }
 
+/** 049: a project enters BizView by import. Build the zip from the files and upload it. */
+async function importProject(page: Page, name: string, files: Record<string, string>): Promise<string> {
+  const manifest = `name: "${name}"\nslug: ""\n`;
+  const zip = await page.request.post("/api/test/zip", {
+    headers: FETCH, data: { entries: { "project.yaml": manifest, ...files } },
+  });
+  expect(zip.ok(), await zip.text()).toBe(true);
+  await page.locator("#project-zip").setInputFiles({
+    name: "proyecto.zip", mimeType: "application/zip", buffer: Buffer.from(await zip.body()),
+  });
+  const stepUp = page.getByRole("region", { name: "Confirma tu contraseña" });
+  const importedText = page.getByText(/Proyecto «.+» importado/);
+  if (await stepUp.isVisible({ timeout: 2_000 }).catch(() => false)) await confirmPassword(page);
+  await expect(importedText.or(page.getByRole("heading", { level: 1 })).first())
+    .toBeVisible({ timeout: 30_000 });
+  const list = (await (await page.request.get("/api/projects")).json()) as {
+    projects: { slug: string; name: string }[];
+  };
+  const created = list.projects.find((p) => p.name === name);
+  expect(created, `project ${name} was imported`).toBeTruthy();
+  await page.goto(`/proyectos/${created!.slug}`);
+  return created!.slug;
+}
+
 async function confirmPassword(page: Page) {
   const stepUp = page.getByRole("region", { name: "Confirma tu contraseña" });
   await expect(stepUp).toBeVisible();
@@ -88,7 +112,7 @@ test.afterEach(async ({ page }) => {
   await hook(page, "/api/test/direct/reset");
 });
 
-test("new project → fuente + direct reporte → apply → dashboard; disk, history and import", async ({ page }, info) => {
+test("imported project → direct reporte → apply → dashboard; disk, history and import", async ({ page }, info) => {
   test.skip(info.project.name.endsWith("-320"), "flow checked once per engine");
   test.setTimeout(300_000);
   const scripted = await page.request.post("/api/test/assistant/script", {
@@ -108,37 +132,20 @@ test("new project → fuente + direct reporte → apply → dashboard; disk, his
   expect(scripted.ok()).toBe(true);
   await signIn(page);
 
-  // Create the project from the Proyectos page.
+  // 049: a project enters BizView only by import — there is no create button to press.
   const name = `Ventas directas ${Date.now()}`;
   await page.goto("/proyectos");
   await expect(page.getByRole("heading", { level: 1, name: "Proyectos" })).toBeVisible();
-  await page.getByRole("button", { name: "Nuevo proyecto" }).click();
-  const form = page.getByRole("form", { name: "Nuevo proyecto" });
-  await form.getByLabel("Nombre").fill(name);
-  await form.getByRole("button", { name: "Crear proyecto" }).click();
-  await expect(page).toHaveURL(/\/proyectos\/[a-z0-9-]+\?chat=\d+/);
-  const url = new URL(page.url());
-  const slug = url.pathname.split("/")[2];
-  const sid = Number(url.searchParams.get("chat"));
+  expect(await page.getByRole("button", { name: "Nuevo proyecto" }).count()).toBe(0);
+  expect(await page.getByRole("button", { name: "Crear proyecto" }).count()).toBe(0);
+  const slug = await importProject(page, name, SPECS);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
   await axe(page);
   await diskEqualsExplorer(page, slug);
 
-  // The user writes the two specs (editor saves); the agent implements the report.
-  for (const [path, content] of Object.entries(SPECS)) await put(page, slug, path, content);
-  await diskEqualsExplorer(page, slug);
-  const r = await page.request.patch(`/api/assistant/sessions/${sid}`, {
-    headers: FETCH, data: { current_spec: REPORT_SPEC },
-  });
-  expect(r.ok()).toBe(true);
-  await page.reload();
-  const chatTab = page.getByRole("tab", { name: "Chat" });
-  // Narrow layouts show tabs (Chat must be picked); wide ones show the composer at once.
-  await expect(chatTab.or(page.getByLabel("Mensaje para el asistente")).first()).toBeVisible();
-  if (await chatTab.isVisible()) await chatTab.click();
-  await page.getByLabel("Mensaje para el asistente").fill("/speckit-implement");
-  await page.getByRole("button", { name: "Enviar" }).click();
-  await expect(page.getByText(`Ejecutó /speckit-implement en ${REPORT_SPEC}`)).toBeVisible({ timeout: 120_000 });
+  // The user writes the report with the editor; the project validates and applies.
+  await put(page, slug, REPORT_PATH, REPORT_YAML);
+  await put(page, slug, `specs/${REPORT_SPEC}/tasks.md`, "- [X] T001 Listo\n");
   await diskEqualsExplorer(page, slug);
 
   // Apply (confirmation view + step-up), then the live dashboard.
@@ -160,7 +167,7 @@ test("new project → fuente + direct reporte → apply → dashboard; disk, his
   const groups = history.items.filter((i) => i.files);
   expect(groups.every((g) => g.actor && g.command)).toBe(true);
   expect(groups.some((g) => g.actor === "user" && g.command === "edit")).toBe(true);
-  expect(groups.some((g) => g.actor === "agent" && g.command === "/speckit-implement")).toBe(true);
+  expect(groups.some((g) => g.command === "import")).toBe(true);
   expect(history.items.some((i) => i.event === "project_applied")).toBe(true);
   const firstTasks = groups.flatMap((g) => g.files ?? [])
     .filter((f) => f.path === `specs/${REPORT_SPEC}/tasks.md`)

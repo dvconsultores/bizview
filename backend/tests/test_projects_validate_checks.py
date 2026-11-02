@@ -2,7 +2,7 @@
 import pytest
 
 from app.config import get_settings
-from tests.conftest import signed_in
+from tests.conftest import make_project, signed_in
 
 
 @pytest.fixture(autouse=True)
@@ -32,9 +32,7 @@ def test_validate_runs_origin_checks(env, superuser, recorder, monkeypatch):
     monkeypatch.setattr("app.projects.compose.validate_project",
                         lambda db, project: {"valid": True})
     c = signed_in("root@example.com")
-    created = c.post("/api/projects", json={"name": "Ventas Caracas"})
-    assert created.status_code in (200, 201), created.text
-    slug = created.json()["slug"]
+    slug = make_project("Ventas Caracas")
     resp = c.post(f"/api/projects/{slug}/validate")
     assert resp.status_code == 200, resp.text
     assert len(recorder) == 1
@@ -44,9 +42,7 @@ def test_save_does_not_run_origin_checks(env, superuser, recorder, monkeypatch):
     monkeypatch.setattr("app.projects.compose.validate_project",
                         lambda db, project: {"valid": True})
     c = signed_in("root@example.com")
-    created = c.post("/api/projects", json={"name": "Ventas Caracas"})
-    assert created.status_code in (200, 201), created.text
-    slug = created.json()["slug"]
+    slug = make_project("Ventas Caracas")
     saved = c.put(f"/api/projects/{slug}/file",
                   json={"path": "specs/001-demo/spec.md", "content": "# Demo\n"})
     assert saved.status_code == 200, saved.text

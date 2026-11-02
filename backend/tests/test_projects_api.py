@@ -3,7 +3,8 @@
 import pytest
 
 from app.config import get_settings
-from tests.conftest import signed_in, sql
+from app.errors import ApiError
+from tests.conftest import make_project, signed_in, sql
 
 
 @pytest.fixture(autouse=True)
@@ -16,11 +17,11 @@ def env(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
-def test_create_builds_the_folder(env, superuser):
-    c = signed_in("root@example.com")
-    r = c.post("/api/projects", json={"name": "Ventas Caracas"})
-    assert r.status_code == 201
-    assert r.json()["slug"] == "ventas-caracas"
+def test_the_service_builds_the_folder(env, superuser):
+    """049: creation is no longer an API route, but the service the importer uses still builds the
+    project the same way — the folder, the revision history and the audit entry."""
+    slug = make_project("Ventas Caracas")
+    assert slug == "ventas-caracas"
     base = env / "ventas-caracas"
     assert (base / "project.yaml").exists()
     assert (base / ".specify" / "memory" / "constitution.md").exists()
@@ -36,28 +37,33 @@ def test_create_builds_the_folder(env, superuser):
 
 
 def test_slug_suggestion_and_uniqueness(env, superuser):
-    c = signed_in("root@example.com")
-    assert c.get("/api/projects/slug", params={"name": "Ventas Caracas"}).json()["slug"] == (
-        "ventas-caracas")
-    assert c.post("/api/projects", json={"name": "Ventas Caracas"}).status_code == 201
-    assert c.get("/api/projects/slug", params={"name": "Ventas Caracas"}).json()["slug"] == (
-        "ventas-caracas-2")
-    r = c.post("/api/projects", json={"name": "Otra", "slug": "ventas-caracas"})
-    assert r.status_code == 409
-    assert r.json()["error"]["code"] == "slug_taken"
-    assert c.get("/api/projects/slug", params={"name": "Ñandú 2024"}).json()["slug"] == (
-        "nandu-2024")
+    """The suggester that fed the old create form is gone with it (049); the behaviour it gave an
+    author still holds, and the importer is what relies on it now."""
+    from sqlalchemy import select
+
+    from app.db import get_sessionmaker
+    from app.models import AppUser
+    from app.projects import service as project_service
+
+    with get_sessionmaker()() as db:
+        assert project_service.suggest_slug(db, "Ventas Caracas") == "ventas-caracas"
+        assert project_service.suggest_slug(db, "Ñandú 2024") == "nandu-2024"
+    assert make_project("Ventas Caracas") == "ventas-caracas"
+    assert make_project("Ventas Caracas") == "ventas-caracas-2"
+    with pytest.raises(ApiError) as exc:
+        make_project("Otra", "ventas-caracas")
+    assert exc.value.code == "slug_taken"
+    with get_sessionmaker()() as db:
+        assert db.scalar(select(AppUser).where(AppUser.is_superuser.is_(True))) is not None
 
 
 def test_leftover_folder_goes_to_trash(env, superuser):
     """DB and folders live on different hosts: an old tree is moved aside, never adopted."""
-    c = signed_in("root@example.com")
     stale = env / "artemisa"
     stale.mkdir(parents=True)
     (stale / "project.yaml").write_text("name: artemisa\n")
     (stale / "specs").mkdir()
-    r = c.post("/api/projects", json={"name": "artemisa"})
-    assert r.status_code == 201
+    assert make_project("artemisa") == "artemisa"
     # The previous tree is preserved in the trash, and the new project starts clean.
     trash = list((env / ".papelera").glob("artemisa--*"))
     assert len(trash) == 1 and (trash[0] / "project.yaml").read_text() == "name: artemisa\n"
@@ -68,7 +74,7 @@ def test_leftover_folder_goes_to_trash(env, superuser):
 
 def test_rename_name_vs_slug_lock(env, superuser):
     c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "Uno"}).json()["slug"]
+    slug = make_project("Uno")
     r = c.patch(f"/api/projects/{slug}", json={"name": "Uno bis"})
     assert r.status_code == 200
     assert "Uno bis" in (env / slug / "project.yaml").read_text()
@@ -91,7 +97,7 @@ def test_rename_name_vs_slug_lock(env, superuser):
 
 def test_tree_equals_disk(env, superuser):
     c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "Arbol"}).json()["slug"]
+    slug = make_project("Arbol")
     base = env / slug
     (base / "specs" / "001-a").mkdir(parents=True, exist_ok=True)
     (base / "specs" / "001-a" / "spec.md").write_text("# A\n")
@@ -116,7 +122,7 @@ def test_tree_equals_disk(env, superuser):
 def test_list_shows_artifacts_applied_and_problems(env, superuser):
     """020 T084, plan §4: folder artifacts, applied ones and the last validation's problems."""
     c = signed_in("root@example.com")
-    slug = c.post("/api/projects", json={"name": "Lista"}).json()["slug"]
+    slug = make_project("Lista")
     for path in ("integrations/carga/integration.yaml", "reports/ventas/report.yaml",
                  "distributions/semanal.yaml"):
         r = c.put(f"/api/projects/{slug}/file", json={"path": path, "content": "id: x\n"})

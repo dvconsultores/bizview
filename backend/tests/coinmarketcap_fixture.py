@@ -12,7 +12,7 @@ import yaml
 
 from app.db import get_engine
 from app.engine import datasets
-from tests.conftest import TEST_SCHEMA, sql
+from tests.conftest import TEST_SCHEMA, make_project, sql
 
 FIXTURE = Path(__file__).parent / "fixtures/projects/coinmarketcap"
 ORIGIN_TABLES = ("origin_crypto_assets", "origin_crypto_global", "origin_crypto_fear_greed",
@@ -67,9 +67,7 @@ def crypto_origin_data():
 
 
 def create_project(c, name: str = "CoinmarketCap") -> str:
-    r = c.post("/api/projects", json={"name": name})
-    assert r.status_code == 201, r.text
-    return r.json()["slug"]
+    return make_project(name)
 
 
 def put_files(c, slug: str, files: dict[str, str]) -> None:

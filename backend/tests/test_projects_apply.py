@@ -8,7 +8,7 @@ import yaml
 from app.config import get_settings
 from app.db import get_sessionmaker
 from app.projects import service as project_service
-from tests.conftest import reauth, signed_in, sql
+from tests.conftest import make_project, reauth, signed_in, sql
 from tests.test_runner import origin as origin  # fixture
 from tests.test_runner import pg_source as pg_source  # fixture
 from tests.test_vibe_reporting import applied as applied  # fixture
@@ -51,9 +51,7 @@ def spec(folder, kind):
 
 
 def create(c, name):
-    r = c.post("/api/projects", json={"name": name})
-    assert r.status_code == 201, r.text
-    return r.json()["slug"]
+    return make_project(name)
 
 
 def project_a(c, origin):

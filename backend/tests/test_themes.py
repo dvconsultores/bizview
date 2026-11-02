@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from tests.conftest import client, signed_in, sql
+from tests.conftest import client, make_project, signed_in, sql
 
 THEMES = Path(__file__).resolve().parents[2] / "frontend" / "src" / "theme" / "themes"
 
@@ -104,9 +104,7 @@ def test_a_theme_in_use_cannot_be_deleted(superuser):
     c = signed_in(superuser.email)
     assert upload(c, authored()).status_code == 201
     # A live project whose report names the theme: its next apply would break the same way.
-    project = c.post("/api/projects", json={"name": "Proyecto Tema", "slug": "proyecto-tema"})
-    assert project.status_code == 201, project.text
-    slug = project.json()["slug"]
+    slug = make_project("Proyecto Tema", "proyecto-tema")
     saved = c.put(f"/api/projects/{slug}/file",
                   json={"path": "reports/ventas/report.yaml",
                         "content": "id: ventas\nname: Ventas\ntitle: Ventas\n"
