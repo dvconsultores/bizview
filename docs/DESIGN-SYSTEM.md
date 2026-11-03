@@ -24,9 +24,14 @@ them; it does not answer a shared question locally.
 | `SPLIT_COLS` | `lg:grid lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] lg:gap-6` | navigation + reading pane |
 | `CARD_GRID_2` / `CARD_GRID_3` | 1 column → 2 → 3 | the only column progressions in the product |
 
-Colours are theme tokens (`text-ink`, `bg-surface`, `border-line`, `ring-focus`, `text-accent`, …),
-never literals: `tests/unit/no-raw-colors.test.ts` fails a screen that hard-codes one, and an
-imported theme (047) must keep working.
+Colours are theme tokens (`text-ink`, `bg-surface`, `border-line`, `ring-focus`, `text-accent`,
+`bg-chrome-gradient`, `text-on-chrome`, …), never literals: `tests/unit/no-raw-colors.test.ts` fails a
+screen that hard-codes one, and every installed theme (047, 051) must keep working.
+
+Geometry is a token too (feature 051): `rounded-card`, `rounded-btn`, `rounded-field`, `shadow-card`,
+`shadow-raised`, `card-surface` (border width) and `nav-active` come from the installation theme's
+`shape` block, so the same component answers Clásico, Impacto, Elegante and Contraste correctly with
+no per-theme branch. A new surface uses these names, never a pixel value of its own.
 
 ## The rules
 
@@ -83,6 +88,10 @@ imported theme (047) must keep working.
 - the token module exports the vocabulary and is phone-first.
 
 `tests/unit/no-raw-colors.test.ts` (006) keeps colours on tokens.
+
+Feature 051 adds the theme guards: `theme-derive.test.ts` proves Clásico's chrome still matches the
+literals `index.css` carried before it, that every one of the six themes × two modes is readable, and
+that the four official identities differ on at least four dimensions and never on colour alone.
 
 A screenshot diff would fail on a font upgrade and pass on a structural regression; a property
 check does the opposite, which is why the guards are written this way.

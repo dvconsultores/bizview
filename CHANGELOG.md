@@ -8,6 +8,30 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The installation theme now repaints the whole application (feature 051)**: applying a theme used
+  to change the charts and nothing else. The application's own chrome — header band, sidebar, page
+  background, cards, buttons, inputs, tables, dialogs, bottom navigation — was one set of literals per
+  light/dark mode in `index.css`, and the theme contract could not reach it. Two defects, one cause:
+  - a theme is now **data for the chrome too**. Seven optional tokens (`canvas`, `chrome`,
+    `chrome_text`, `field`, `line`, `accent`, `warning`) join the published contract, the six new
+    `shape` enums (`elevation`, `button`, `nav`, `divider`, `heading`, `card_border`) finally drive
+    geometry that was previously inert, and `frontend/src/theme/derive.ts` turns a theme into every
+    semantic token the screens already paint with. An uploaded theme authored before this feature
+    keeps working and is derived from its palette;
+  - **Usar en la instalación applies at once**: the page re-reads `/api/config` and the application
+    repaints, with no reload and no sign-out. The confirmation is shown only after the server stored
+    the choice, and the theme is cached on the device so a reload never flashes the previous one.
+- **Four official identities, and three of them are new**: **Clásico** keeps the appearance the
+  installation has today — its whole chrome token set is pinned in the theme file and a test compares
+  it token for token against the literals `index.css` carried, so it cannot drift. **Impacto** is the
+  modern executive identity (royal blue and cyan, pale canvas, large KPIs, strong elevation, pill
+  buttons, solid navigation), **Elegante** the premium one (warm cream canvas, graphite band, bronze
+  accent, flat elevation, hairline cards, left-bar navigation) and **Contraste** the high-contrast one
+  (white canvas, near-black band, gold accent, 2 px borders, no shadows, outlined navigation).
+  Daltónico and Monocromo remain valid and renderable and move to a **Compatibilidad** group.
+- **`elegante` is registered everywhere a theme id is**: the schema, the CLI validator, the backend
+  registry, the report/PDF renderer and the frontend, with migration `0048_official_themes` seeding
+  the six built-ins and widening the `appearance_settings` check.
 - **One design system, and the screens that had drifted from it (feature 050)**: the rules for page
   width, gutters, card padding, page headers, split panes and mutually-exclusive choices now live in
   `frontend/src/lib/layout.ts` and [docs/DESIGN-SYSTEM.md](./docs/DESIGN-SYSTEM.md). Four screens had
@@ -29,6 +53,17 @@ All notable changes to this project are documented here. The format follows
   any content.
 
 ### Added
+
+- **Two readability guarantees in the derivation**: an accent is moved along its own lightness until
+  it reads at 4.5:1 on the surface and on its own tint, and `ink-soft` is the lightest shade of the
+  theme's muted ink that reaches 4.5:1 on the surface and the canvas. Both are checked for all six
+  themes × two modes, in the unit suite and by axe in a real browser.
+- **`tests/e2e/theme-application.spec.ts`**: apply-without-reload, persistence across a reload and a
+  new session, independence from the user's light/dark preference, the four identities differing
+  without labels, no sideways scroll at 320/375/768/1440, and the reference screen captured in all
+  eight variants (`docs/assets/theme-application/`).
+- **[docs/THEMES.md](./docs/THEMES.md)** documents the widened contract, the derivation and how the
+  four identities differ.
 
 - **Import limits that account for project images (feature 049)**: the import is charged to two
   allowances counted apart — **artifacts** (`project.yaml`, `specs/`, `integrations/`, `reports/`,
