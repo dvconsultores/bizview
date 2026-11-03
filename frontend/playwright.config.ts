@@ -30,11 +30,12 @@ export default defineConfig({
       use: { ...e.use, viewport: { width: w, height: 740 }, deviceScaleFactor: 2 },
     })),
   ),
-  // The backend rebuilds a throwaway schema on every run: 20 migrations plus the workspace seed,
-  // each statement crossing ~180 ms to the external BI database, so the readiness ceiling is
-  // minutes rather than seconds (it is a maximum wait, not a fixed delay).
+  // The backend rebuilds a throwaway schema on every run: 45 migrations plus the workspace seed,
+  // each statement crossing a slow link to the external BI database, so the readiness ceiling is
+  // minutes rather than seconds (it is a maximum wait, not a fixed delay). Measured 2026-11-02:
+  // `alembic upgrade head` alone took 6m41 on that link, so the ceiling has to allow for it.
   webServer: [
-    { command: "sh tests/e2e/backend.sh", url: "http://localhost:8001/api/health", reuseExistingServer: false, timeout: 420_000 },
+    { command: "sh tests/e2e/backend.sh", url: "http://localhost:8001/api/health", reuseExistingServer: false, timeout: 900_000 },
     { command: "npm run build && API_TARGET=http://localhost:8001 npx vite preview --port 4173 --strictPort", url: "http://localhost:4173", reuseExistingServer: false, timeout: 240_000 },
   ],
 });

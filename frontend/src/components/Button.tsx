@@ -18,8 +18,8 @@ const VARIANTS: Record<Variant, string> = {
 
 /** Compact controls for a toolbar: 36 px with a mouse, 44 px under a finger (see `control-compact`). */
 const SIZES: Record<Size, string> = {
-  md: "px-4 text-base font-semibold rounded-xl",
-  sm: "control-compact rounded-lg px-3 text-sm font-medium [&_svg]:h-4 [&_svg]:w-4",
+  md: "px-4 text-base font-semibold rounded-btn",
+  sm: "control-compact rounded-btn px-3 text-sm font-medium [&_svg]:h-4 [&_svg]:w-4",
 };
 
 export function buttonClass(variant: Variant = "primary", block: boolean = false,

@@ -121,7 +121,7 @@ export function TelegramCard() {
             href={linkStart.deep_link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-tap w-full items-center justify-center rounded-xl bg-primary px-4 font-semibold text-white hover:bg-primary-hover sm:w-auto"
+            className="inline-flex min-h-tap w-full items-center justify-center rounded-xl bg-primary px-4 font-semibold text-on-primary hover:bg-primary-hover sm:w-auto"
           >
             <Send className="mr-2 h-5 w-5" aria-hidden />
             {t.telegram.openTelegram}

@@ -55,6 +55,37 @@ const SURFACE: Record<ColorRole, string> = {
   series8: "bg-chart-8",
 };
 
+/** Feature 051: the colour a letter drawn on a role must use. `ReportImage` needs the pair as
+ * custom properties rather than as two utility classes, because the ink depends on the role's own
+ * luminance in the theme in force. */
+const ROLE_VARIABLE: Record<ColorRole, string> = {
+  primary: "primary",
+  positive: "chart-positive",
+  negative: "chart-negative",
+  neutral: "chart-neutral",
+  muted: "ink-faint",
+  series1: "chart-1",
+  series2: "chart-2",
+  series3: "chart-3",
+  series4: "chart-4",
+  series5: "chart-5",
+  series6: "chart-6",
+  series7: "chart-7",
+  series8: "chart-8",
+};
+
+/** The role's background and its readable ink, as `rgb(var(--c-…))` pairs. */
+export function roleStyle(role?: ColorRole | null): { background: string; color: string } {
+  const variable = ROLE_VARIABLE[knownRole(role) ?? FALLBACK];
+  const ink = variable.startsWith("chart-") && /^chart-[1-8]$/.test(variable)
+    ? `${variable}-ink`
+    : null;
+  return {
+    background: `rgb(var(--c-${variable}))`,
+    color: ink ? `rgb(var(--c-${ink}))` : "rgb(var(--c-on-primary))",
+  };
+}
+
 const SERIES_ROLES: ColorRole[] = [
   "series1",
   "series2",

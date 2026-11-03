@@ -107,7 +107,7 @@ export function TelegramSignInPanel({ onSignedIn, onMfa, onCancel }: Props) {
         href={data.deep_link}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-tap w-full items-center justify-center rounded-xl bg-primary px-4 font-semibold text-white hover:bg-primary-hover"
+        className="inline-flex min-h-tap w-full items-center justify-center rounded-xl bg-primary px-4 font-semibold text-on-primary hover:bg-primary-hover"
       >
         <Send className="mr-2 h-5 w-5" aria-hidden />
         {t.telegram.openTelegram}

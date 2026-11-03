@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from app.models import THEME_ORIGINS, AppearanceSettings, Project, Theme
 
 BUILTIN_ORIGIN = "builtin"
-BUILTIN_IDS: tuple[str, ...] = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
+BUILTIN_IDS: tuple[str, ...] = ("impacto", "clasico", "elegante", "monocromo", "contraste",
+                                "daltonico")
 # A theme file is a few hundred bytes; the cap is the schema's, in characters so pydantic can hold
 # the body before the validator measures bytes.
 MAX_UPLOAD_CHARS = MAX_BYTES

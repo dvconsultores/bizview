@@ -35,7 +35,7 @@ export function Profile() {
 
       <Card tone="accent" className="p-5 sm:p-6">
         <div className="flex items-center">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-bold text-white" aria-hidden>
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-xl font-bold text-on-primary" aria-hidden>
             {initials(user.full_name)}
           </div>
           <div className="ml-4 min-w-0">

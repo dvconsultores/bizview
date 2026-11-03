@@ -16,9 +16,10 @@ interface PaletteSelectProps {
   compact?: boolean;
 }
 
-const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "monocromoText" | "contrasteText" | "daltonicoText"> = {
+const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "eleganteText" | "monocromoText" | "contrasteText" | "daltonicoText"> = {
   impacto: "impactoText",
   clasico: "clasicoText",
+  elegante: "eleganteText",
   monocromo: "monocromoText",
   contraste: "contrasteText",
   daltonico: "daltonicoText",

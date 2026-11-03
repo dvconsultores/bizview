@@ -105,7 +105,7 @@ SUBSCRIPTION_FREQUENCIES = ("daily", "weekly", "monthly")
 # `app.reports.palette.PRESET_IDS`, the product data both renderers read; this mirror exists
 # because the ORM and the migrations never import product modules.
 PALETTE_PRESET_IDS: tuple[str, ...] = (
-    "impacto", "clasico", "monocromo", "contraste", "daltonico",
+    "impacto", "clasico", "elegante", "monocromo", "contraste", "daltonico",
 )
 DEFAULT_PALETTE_PRESET = "impacto"
 # Feature 030 (T047): the theme a share link forces on its first load; NULL follows the viewer.

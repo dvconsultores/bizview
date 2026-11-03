@@ -22,7 +22,7 @@ export function PageHeader({ title, subtitle, action, actions, badge }: PageHead
     <header className="mb-4 flex flex-col gap-3 border-b border-line pb-4 sm:mb-5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="min-w-0 break-words text-xl font-bold tracking-tight text-ink sm:text-2xl">
+          <h1 className="page-title min-w-0 break-words text-xl text-ink sm:text-2xl">
             {title}
           </h1>
           {badge ?? null}

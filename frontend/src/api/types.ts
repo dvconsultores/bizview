@@ -621,7 +621,13 @@ export interface LayoutDocument {
 }
 
 /** Feature 030: the palette presets shipped with the product (`frontend/src/theme/palettes/`). */
-export type PaletteId = "impacto" | "clasico" | "monocromo" | "contraste" | "daltonico";
+export type PaletteId =
+  | "impacto"
+  | "clasico"
+  | "elegante"
+  | "monocromo"
+  | "contraste"
+  | "daltonico";
 
 /** Feature 048: the BI-ready declaration of a PostgreSQL source: what it exposes, and its limits. */
 export interface BiReadyDeclaration {

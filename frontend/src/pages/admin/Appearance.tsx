@@ -14,11 +14,18 @@ import { CARD_GRID_3, CARD_PAD, PAGE_STACK } from "../../lib/layout";
 import { Spinner } from "../../components/Spinner";
 import { useToast } from "../../components/Toast";
 import { View } from "../../components/View";
+import { useBrandingRefresh } from "../../config/BrandingContext";
 import { useLocale, useT } from "../../i18n";
-import { variablesForTokens } from "../../theme/palette";
-import { deriveTokens, type Theme, type ThemeMode } from "../../theme/themes";
+import { themeStyle } from "../../theme/palette";
+import { LEGACY_THEME_IDS, OFFICIAL_THEME_IDS, type Theme, type ThemeMode } from "../../theme/themes";
 
 const MODES: readonly ThemeMode[] = ["light", "dark"];
+
+/** The eight series roles, as literal class names so the stylesheet builds them (no colour here). */
+const BAR = [
+  "bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4",
+  "bg-chart-5", "bg-chart-6", "bg-chart-7", "bg-chart-8",
+] as const;
 
 interface Problem {
   path: string;
@@ -26,55 +33,52 @@ interface Problem {
   message: string;
 }
 
-/** One theme in both modes. The variables are scoped to the card, so the page keeps its own
- * palette and no colour literal appears in the source. */
-function ThemePreview({ tokens }: { tokens: Theme }) {
+/** One theme in both modes (feature 051): the *whole* derivation, chrome band included, so a
+ * preview cannot show something the application will not do. The variables are scoped to the card,
+ * so the page keeps its own theme and no colour literal appears in the source. */
+function ThemePreview({ theme }: { theme: Theme }) {
   const t = useT();
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2" data-theme="preview">
-      {MODES.map((mode) => {
-        const style = Object.fromEntries(
-          Object.entries(variablesForTokens(deriveTokens(tokens, mode))).map(([name, value]) => [
-            `--c-${name}`,
-            value,
-          ]),
-        ) as CSSProperties;
-        return (
-          <div
-            key={mode}
-            style={style}
-            className="rounded-lg border border-line bg-[var(--c-kpi-surface)] p-2"
-            data-theme-preview={mode}
-          >
-            <div className="flex items-baseline gap-2">
-              <span className="text-base font-bold tabular-nums text-[var(--c-kpi-text)]">1.284</span>
-              <span className="rounded-full bg-[var(--c-kpi-delta-bg-positive)] px-2 py-0.5 text-[10px] font-semibold text-[var(--c-chart-positive)]">
-                +12,4 %
-              </span>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))] gap-2" data-theme="preview">
+      {MODES.map((mode) => (
+        <div
+          key={mode}
+          style={themeStyle(theme, mode) as CSSProperties}
+          className="overflow-hidden rounded-[var(--radius-card)] bg-[var(--c-canvas)] ring-1 ring-[var(--c-line)]"
+          data-theme-preview={mode}
+        >
+          {/* The band the header wears, so the identity reads at a glance. */}
+          <div className="preview-band h-6 w-full" aria-hidden />
+          <div className="p-2">
+            <div className="rounded-[var(--radius-card)] border-[length:var(--card-border)] border-[var(--c-line)] bg-[var(--c-surface)] p-1.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[length:var(--kpi-numeral-lg)] font-bold tabular-nums text-[var(--c-ink)]">
+                  1.284
+                </span>
+                <span className="rounded-full bg-[var(--c-success-soft)] px-1.5 text-[10px] font-semibold text-[var(--c-success)]">
+                  +12,4 %
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1" aria-hidden>
+                <span className="rounded-[var(--radius-button)] bg-[var(--c-primary)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--c-on-primary)]">
+                  ▸
+                </span>
+                <span className="rounded-[var(--radius-button)] border border-[var(--c-line-strong)] px-1.5 py-0.5 text-[9px] text-[var(--c-ink-3)]">
+                  ▸
+                </span>
+              </div>
             </div>
             <div className="mt-1.5 flex items-end gap-1" aria-hidden>
               {[10, 16, 13, 20, 17].map((height, index) => (
-                <span
-                  key={index}
-                  className="w-2.5 rounded-sm"
-                  style={{ height, backgroundColor: `var(--c-chart-${(index % 8) + 1})` }}
-                />
+                <span key={index} className={`w-2 rounded-sm ${BAR[index % BAR.length]}`} style={{ height }} />
               ))}
             </div>
-            <svg viewBox="0 0 120 24" className="mt-1 h-4 w-full" aria-hidden>
-              <polyline
-                points="0,18 20,14 40,16 60,8 80,10 100,4 120,6"
-                fill="none"
-                stroke="var(--c-chart-2)"
-                strokeWidth="2"
-              />
-            </svg>
-            <p className="mt-1 text-[10px] text-[var(--c-chart-label)]">
+            <p className="mt-1 text-[10px] text-[var(--c-ink-muted)]">
               {mode === "light" ? t.appearance.lightPreview : t.appearance.darkPreview}
             </p>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -85,6 +89,7 @@ export function Appearance() {
   const t = useT();
   const { locale } = useLocale();
   const toast = useToast();
+  const refreshBranding = useBrandingRefresh();
   const [library, setLibrary] = useState<ThemeLibrary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -112,10 +117,12 @@ export function Appearance() {
     setBusy(row.id);
     setError(null);
     try {
+      // Persist first, then repaint: the confirmation is shown only once the server has stored the
+      // choice, and the whole application re-themes from the refreshed config with no reload.
       await api.put("/api/admin/settings/theme", { theme_id: row.id });
+      await refreshBranding();
+      await load();
       toast(t.appearance.applied.replace("{name}", nameOf(row)));
-      // The installation default changed: reload so every page applies it from /api/config.
-      window.setTimeout(() => window.location.reload(), 600);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t.common.unexpected);
     } finally {
@@ -195,10 +202,95 @@ export function Appearance() {
     setConflict(null);
   };
 
+  /** The one-line identity of a theme the product ships; an uploaded one has none. */
+  const identityOf = (row: ThemeRow): string | null => {
+    const texts = t.palette as unknown as Record<string, string | undefined>;
+    return texts[`${row.id}Text`] ?? null;
+  };
+
+  // The official order is the product's own (Clásico, Impacto, Elegante, Contraste), not the
+  // alphabetical order the library endpoint returns.
+  const rank = (id: string) => {
+    const index = (OFFICIAL_THEME_IDS as readonly string[]).indexOf(id);
+    return index === -1 ? OFFICIAL_THEME_IDS.length : index;
+  };
+  const official = (library?.themes ?? [])
+    .filter((row) => (OFFICIAL_THEME_IDS as readonly string[]).includes(row.id))
+    .sort((a, b) => rank(a.id) - rank(b.id));
+  const legacy = (library?.themes ?? []).filter((row) =>
+    !(OFFICIAL_THEME_IDS as readonly string[]).includes(row.id));
+  const legacyHint = (LEGACY_THEME_IDS as readonly string[]).length > 0;
+
   const originLabel: Record<ThemeOrigin, string> = {
     builtin: t.appearance.originBuiltin,
     upload: t.appearance.originUpload,
     project: t.appearance.originProject,
+  };
+
+  const card = (row: ThemeRow) => {
+    const installed = library?.installation === row.id;
+    const identity = identityOf(row);
+    return (
+      <Card
+        key={row.id}
+        className={`flex h-full flex-col ${CARD_PAD} ${installed ? "ring-2 ring-primary" : ""}`}
+        data-theme-card={row.id}
+        data-installed={installed ? "true" : "false"}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-ink">{nameOf(row)}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+              <Badge tone={row.origin === "builtin" ? "gray" : "blue"}>{originLabel[row.origin]}</Badge>
+              <span>{t.appearance.version.replace("{version}", String(row.version))}</span>
+              <span className="font-mono text-[11px]">{row.id}</span>
+            </p>
+          </div>
+          {installed ? (
+            <span className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
+              <Check className="h-4 w-4" aria-hidden />
+              {t.appearance.current}
+            </span>
+          ) : null}
+        </div>
+
+        {identity ? <p className="mt-2 text-xs leading-snug text-ink-muted">{identity}</p> : null}
+
+        <div className="mt-3">
+          <ThemePreview theme={row.tokens} />
+        </div>
+
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+          <Button
+            variant={installed ? "secondary" : "primary"}
+            loading={busy === row.id}
+            disabled={installed}
+            icon={<Palette className="h-4 w-4" aria-hidden />}
+            onClick={() => void apply(row)}
+          >
+            {installed ? t.appearance.inUse : t.appearance.apply}
+          </Button>
+          <IconButton
+            aria-label={`${t.appearance.download} ${nameOf(row)}`}
+            icon={<Download className="h-4 w-4" aria-hidden />}
+            onClick={() => window.open(`/api/admin/themes/${row.id}/download`, "_blank")}
+          />
+          <IconButton
+            aria-label={`${t.appearance.duplicate} ${nameOf(row)}`}
+            icon={<Copy className="h-4 w-4" aria-hidden />}
+            onClick={() => void openUpload(row)}
+          />
+          {row.origin === "builtin" ? null : (
+            <IconButton
+              aria-label={`${t.appearance.delete} ${nameOf(row)}`}
+              icon={<Trash2 className="h-4 w-4" aria-hidden />}
+              tone="danger"
+              onClick={() => void remove(row)}
+            />
+          )}
+        </div>
+      </Card>
+    );
   };
 
   return (
@@ -230,70 +322,32 @@ export function Appearance() {
             <EmptyState title={t.appearance.library}>{t.appearance.uploadHint}</EmptyState>
           ) : null}
 
-          {/* One column on a phone, two on a tablet, three when the container is wide enough to
-              keep the preview readable — the defect was a fixed two columns in a 56 rem column. */}
-          <div className={CARD_GRID_3} data-theme-grid>
-            {library.themes.map((row) => {
-              const installed = library.installation === row.id;
-              return (
-                <Card key={row.id}
-                      className={`flex h-full flex-col ${CARD_PAD} ${installed ? "ring-2 ring-primary" : ""}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-ink">{nameOf(row)}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
-                        <Badge tone={row.origin === "builtin" ? "gray" : "blue"}>
-                          {originLabel[row.origin]}
-                        </Badge>
-                        <span>{t.appearance.version.replace("{version}", String(row.version))}</span>
-                        <span className="font-mono text-[11px]">{row.id}</span>
-                      </p>
-                    </div>
-                    {installed ? (
-                      <span className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">
-                        <Check className="h-4 w-4" aria-hidden />
-                        {t.appearance.current}
-                      </span>
-                    ) : null}
-                  </div>
+          {/* Feature 051: the four identities first, then everything else the installation can
+              still use — a report may name any of them, and a legacy choice keeps working. */}
+          <section aria-labelledby="official-themes">
+            <h3 id="official-themes" className="section-title mb-2 text-sm uppercase tracking-wide text-ink-muted">
+              {t.appearance.officialGroup}
+            </h3>
+            {/* One column on a phone, two on a tablet, three when the container is wide enough to
+                keep the preview readable. */}
+            <div className={CARD_GRID_3} data-theme-grid>
+              {official.map((row) => card(row))}
+            </div>
+          </section>
 
-                  <div className="mt-3">
-                    <ThemePreview tokens={row.tokens} />
-                  </div>
-
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-                    <Button
-                      variant={installed ? "secondary" : "primary"}
-                      loading={busy === row.id}
-                      disabled={installed}
-                      icon={<Palette className="h-4 w-4" aria-hidden />}
-                      onClick={() => void apply(row)}
-                    >
-                      {t.appearance.apply}
-                    </Button>
-                    <IconButton
-                      aria-label={`${t.appearance.download} ${nameOf(row)}`}
-                      icon={<Download className="h-4 w-4" aria-hidden />}
-                      onClick={() => window.open(`/api/admin/themes/${row.id}/download`, "_blank")}
-                    />
-                    <IconButton
-                      aria-label={`${t.appearance.duplicate} ${nameOf(row)}`}
-                      icon={<Copy className="h-4 w-4" aria-hidden />}
-                      onClick={() => void openUpload(row)}
-                    />
-                    {row.origin === "builtin" ? null : (
-                      <IconButton
-                        aria-label={`${t.appearance.delete} ${nameOf(row)}`}
-                        icon={<Trash2 className="h-4 w-4" aria-hidden />}
-                        tone="danger"
-                        onClick={() => void remove(row)}
-                      />
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+          {legacy.length > 0 ? (
+            <section aria-labelledby="other-themes" className="mt-6">
+              <h3 id="other-themes" className="section-title mb-1 text-sm uppercase tracking-wide text-ink-muted">
+                {t.appearance.compatGroup}
+              </h3>
+              <p className="mb-2 text-xs text-ink-muted">
+                {legacyHint ? t.appearance.compatHint : null}
+              </p>
+              <div className={CARD_GRID_3} data-theme-grid>
+                {legacy.map((row) => card(row))}
+              </div>
+            </section>
+          ) : null}
         </>
       )}
 

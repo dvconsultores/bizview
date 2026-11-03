@@ -25,7 +25,14 @@
       "#8C6D00",
       "#1B7F79",
       "#8B4513"
-    ]
+    ],
+    "canvas": "#F4F7FA",
+    "chrome": "#0072B2",
+    "chrome_text": "#FFFFFF",
+    "field": "#E9EFF4",
+    "line": "#E2E8F0",
+    "accent": "#0072B2",
+    "warning": "#B45309"
   },
   "dark": {
     "surface": "#0F172A",
@@ -48,13 +55,26 @@
       "#F0E442",
       "#5FD3C4",
       "#F4A261"
-    ]
+    ],
+    "canvas": "#020617",
+    "chrome": "#0072B2",
+    "chrome_text": "#FFFFFF",
+    "field": "#1E293B",
+    "line": "#334155",
+    "accent": "#56B4E9",
+    "warning": "#FCD34D"
   },
   "shape": {
     "radius": "md",
     "density": "normal",
     "kpi_scale": "lg",
     "font": "sans",
-    "badge": "filled"
+    "badge": "filled",
+    "elevation": "soft",
+    "button": "rounded",
+    "nav": "gradient",
+    "divider": "soft",
+    "heading": "normal",
+    "card_border": "hairline"
   }
 }

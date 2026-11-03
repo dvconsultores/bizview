@@ -27,6 +27,28 @@ from jsonschema import Draft202012Validator
 
 COLOUR_TOKENS = ("surface", "card", "text", "muted", "grid", "primary", "positive", "negative",
                  "neutral", "delta_positive", "delta_negative")
+#: Feature 051: the tokens the application's own chrome paints with. Optional — a theme authored
+#: before 051 declares none and the web derives them from the report tokens above.
+CHROME_TOKENS = ("canvas", "chrome", "chrome_text", "field", "line", "accent", "warning")
+#: Feature 051: the semantic names `app` may override, i.e. every `--c-*` the chrome paints with.
+APP_TOKENS = (
+    "canvas", "surface", "subtle", "surface-2", "fill", "field", "field-focus", "line-soft",
+    "line", "line-strong", "line-accent", "ink", "ink-2", "ink-3", "ink-muted", "ink-soft",
+    "ink-faint", "accent-bright", "accent", "accent-strong", "accent-deep", "accent-soft",
+    "accent-soft-2", "accent-line", "accent-line-strong", "primary", "primary-hover",
+    "primary-active", "on-primary", "focus", "danger-bright", "danger", "danger-strong",
+    "danger-deep", "danger-soft", "danger-line", "danger-border", "danger-focus", "danger-solid",
+    "danger-solid-hover", "danger-solid-active", "success-bright", "success", "success-strong",
+    "success-deep", "success-soft", "success-line", "warning", "warning-strong", "warning-deep",
+    "warning-soft", "warning-line", "backdrop", "toast", "chrome", "on-chrome",
+)
+#: The pairs a declared override is held to: (ink, base, needs).
+APP_PAIRS = (
+    ("ink", "surface", 4.5), ("ink", "canvas", 4.5), ("ink", "field", 4.5),
+    ("ink-3", "surface", 4.5), ("ink-muted", "surface", 4.5),
+    ("on-primary", "primary", 4.5), ("on-chrome", "chrome", 4.5),
+    ("accent", "surface", 3.0), ("warning", "surface", 3.0),
+)
 MODES = ("light", "dark")
 SHAPE_LISTS = {
     "radius": ("sm", "md", "lg"),
@@ -34,9 +56,17 @@ SHAPE_LISTS = {
     "kpi_scale": ("md", "lg", "xl"),
     "font": ("sans", "serif", "mono"),
     "badge": ("filled", "outline"),
+    # Feature 051: the dimensions a theme differs on beyond colour.
+    "elevation": ("flat", "soft", "strong"),
+    "button": ("rounded", "pill", "square"),
+    "nav": ("gradient", "solid", "bar", "outline"),
+    "divider": ("soft", "strong"),
+    "heading": ("normal", "tight"),
+    "card_border": ("none", "hairline", "strong"),
 }
 SHAPE_DEFAULTS = {"radius": "md", "density": "normal", "kpi_scale": "lg", "font": "sans",
-                  "badge": "filled"}
+                  "badge": "filled", "elevation": "soft", "button": "rounded", "nav": "gradient",
+                  "divider": "soft", "heading": "normal", "card_border": "hairline"}
 MAX_BYTES = 20 * 1024
 
 #: The product's accessibility bar, the same one its own presets are held to (feature 030's gate:
@@ -163,6 +193,11 @@ def _shape_problems(theme: dict) -> list[Problem]:
                 f"{mode}.grid", "grid_too_strong",
                 f"{mode}.grid vs {mode}.surface: {contrast(tokens['grid'], surface):.2f}:1 "
                 f"(a grid line stays below {GRID_MAX_CONTRAST:.1f}:1)"))
+        for problem in _chrome_problems(mode, tokens):
+            # One row per token: a bad ink breaks every pair it takes part in, and the author has
+            # one fix to make.
+            if not any(existing.path == problem.path for existing in problems):
+                problems.append(problem)
         if sequential:
             steps = [abs(_lab(a)[0] - _lab(b)[0]) for a, b in pairwise(series)]
             for index, step in enumerate(steps):
@@ -179,6 +214,29 @@ def _shape_problems(theme: dict) -> list[Problem]:
                         f"{mode}.series[{index}]", "series_similar",
                         f"{mode}.series[{index}] vs {mode}.series[{index + 1}]: ΔE {distance:.1f} "
                         f"(needs {SERIES_DELTA_E:.0f})"))
+    return problems
+
+
+def _chrome_problems(mode: str, tokens: dict) -> list[Problem]:
+    """The pairs feature 051 added: a theme that declares chrome tokens must be readable with them.
+
+    Only the pairs it actually declares are checked, so a pre-051 theme (no chrome tokens) is
+    validated exactly as it was."""
+    problems: list[Problem] = []
+    pairs = (
+        ("chrome_text", "chrome", TEXT_CONTRAST),
+        ("text", "field", TEXT_CONTRAST),
+        ("text", "canvas", TEXT_CONTRAST),
+        ("accent", "surface", SERIES_CONTRAST),
+    )
+    for ink, base, needs in pairs:
+        if ink not in tokens or base not in tokens:
+            continue
+        ratio = contrast(tokens[ink], tokens[base])
+        if ratio < needs and not any(p.path == f"{mode}.{ink}" for p in problems):
+            problems.append(Problem(
+                f"{mode}.{ink}", "contrast",
+                f"{mode}.{ink} vs {mode}.{base}: {ratio:.2f}:1 (needs {needs:.1f}:1)"))
     return problems
 
 
@@ -231,6 +289,28 @@ def _missing_keys(data: Any) -> list[str]:
     return missing
 
 
+def _app_problems(theme: dict) -> list[Problem]:
+    """The precise chrome token set (feature 051): known names only, and readable pairs."""
+    problems: list[Problem] = []
+    app = theme.get("app") or {}
+    for mode in MODES:
+        declared = app.get(mode) or {}
+        for name in declared:
+            if name not in APP_TOKENS:
+                problems.append(Problem(
+                    f"app.{mode}.{name}", "unknown_key",
+                    f"app.{mode}.{name}: not a chrome token"))
+        for ink, base, needs in APP_PAIRS:
+            if ink not in declared or base not in declared:
+                continue
+            ratio = contrast(declared[ink], declared[base])
+            if ratio < needs:
+                problems.append(Problem(
+                    f"app.{mode}.{ink}", "contrast",
+                    f"app.{mode}.{ink} vs {mode}.{base}: {ratio:.2f}:1 (needs {needs:.1f}:1)"))
+    return problems
+
+
 def validate_theme(data: Any) -> list[Problem]:
     """Every reason `data` is not an acceptable theme; empty means accepted."""
     if not isinstance(data, dict):
@@ -238,7 +318,7 @@ def validate_theme(data: Any) -> list[Problem]:
     problems = _schema_problems(data)
     if problems:
         return problems
-    return _shape_problems(data)
+    return _shape_problems(data) + _app_problems(data)
 
 
 def default_shape() -> dict:

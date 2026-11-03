@@ -1,6 +1,6 @@
 """Report palette (feature 030, research R5) resolved from a theme (feature 047).
 
-The five built-ins are **themes** — one JSON file per theme under `themes/`, a byte-identical
+The six built-ins are **themes** — one JSON file per theme under `themes/`, a byte-identical
 mirror of `frontend/src/theme/themes/`, in the format `cli/bizview_cli/schemas/theme.schema.json`
 publishes — so an installation only chooses *which* one applies and no customer hue lives in code.
 The runtime roles the PDF paints with (`series1..8`, `kpi_text`, `kpi_delta_bg`, …) are derived
@@ -19,7 +19,8 @@ from typing import Any
 
 from reportlab.lib.colors import Color, HexColor
 
-PRESET_IDS: tuple[str, ...] = ("impacto", "clasico", "monocromo", "contraste", "daltonico")
+PRESET_IDS: tuple[str, ...] = ("impacto", "clasico", "elegante", "monocromo", "contraste",
+                                "daltonico")
 DEFAULT_PRESET = "impacto"
 THEME_DIR = Path(__file__).resolve().parent / "themes"
 SERIES_ROLES = tuple(f"series{i}" for i in range(1, 9))

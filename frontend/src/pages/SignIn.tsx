@@ -111,7 +111,7 @@ export function SignIn() {
       <div className="absolute right-4 top-4 z-10 text-ink">
         <LanguageSwitcher compact />
       </div>
-      <div className="relative overflow-hidden bg-brand-gradient px-6 pb-16 pt-safe text-white lg:flex lg:min-h-screen lg:w-1/2 lg:flex-col lg:justify-center lg:px-16 lg:pb-0">
+      <div className="relative overflow-hidden bg-chrome-gradient px-6 pb-16 pt-safe text-on-chrome lg:flex lg:min-h-screen lg:w-1/2 lg:flex-col lg:justify-center lg:px-16 lg:pb-0">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/15 opacity-50" />
         <div className="relative mx-auto w-full max-w-md pt-10 lg:mx-0 lg:pt-0">
           <div className="flex items-center">
@@ -121,7 +121,7 @@ export function SignIn() {
               {organization_name ? <p className="truncate text-on-primary">{organization_name}</p> : null}
             </div>
           </div>
-          <p className="mt-6 text-lg font-medium text-brand-50 lg:mt-10 lg:text-3xl lg:leading-tight">{t.signIn.heroTagline}</p>
+          <p className="mt-6 text-lg font-medium text-on-chrome lg:mt-10 lg:text-3xl lg:leading-tight">{t.signIn.heroTagline}</p>
         </div>
       </div>
 

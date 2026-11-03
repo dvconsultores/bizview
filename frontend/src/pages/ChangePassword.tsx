@@ -74,7 +74,7 @@ export function ChangePassword() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="bg-brand-gradient pt-safe text-white shadow-md">
+      <header className="bg-chrome-gradient pt-safe text-on-chrome shadow-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <div className="flex min-w-0 items-center">
             <Logo inverted className="h-8 w-8 shrink-0" />
@@ -84,13 +84,13 @@ export function ChangePassword() {
             <button
               type="button"
               onClick={() => void logout()}
-              className="inline-flex min-h-tap items-center rounded-lg px-2 font-medium text-white hover:bg-white/10"
+              className="inline-flex min-h-tap items-center rounded-lg px-2 font-medium text-on-chrome hover:bg-white/10"
             >
               <LogOut className="mr-2 h-5 w-5" aria-hidden />
               {t.nav.signOut}
             </button>
           ) : (
-            <Link to="/perfil" className="inline-flex min-h-tap items-center rounded-lg px-2 font-medium text-white hover:bg-white/10">
+            <Link to="/perfil" className="inline-flex min-h-tap items-center rounded-lg px-2 font-medium text-on-chrome hover:bg-white/10">
               <ArrowLeft className="mr-2 h-5 w-5" aria-hidden />
               {t.common.back}
             </Link>

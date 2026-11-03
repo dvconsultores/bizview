@@ -28,18 +28,18 @@ export function WelcomeBanner({ name, chip, subtitle, date = new Date(), classNa
   return (
     <section
       aria-labelledby={titleId}
-      className={`relative overflow-hidden rounded-3xl bg-brand-gradient p-6 text-on-primary sm:p-8 lg:p-10 ${className}`}
+      className={`relative overflow-hidden rounded-[var(--radius-card)] bg-chrome-gradient p-6 text-on-chrome sm:p-8 lg:p-10 ${className}`}
     >
       <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/15 opacity-60" />
       <div className="relative">
         {chip ? (
           <span className="inline-flex rounded-full px-3 py-1 text-xs font-semibold tracking-wide ring-1 ring-inset ring-white/30">{chip}</span>
         ) : null}
-        <h1 id={titleId} className="mt-3 text-2xl font-bold tracking-tight break-words lg:text-3xl">
+        <h1 id={titleId} className="page-title mt-3 text-2xl break-words lg:text-3xl">
           {title}
         </h1>
-        {subtitle ? <p className="mt-1 max-w-2xl text-sm text-on-primary">{subtitle}</p> : null}
-        <p className="mt-3 text-xs font-medium text-on-primary sm:text-sm">
+        {subtitle ? <p className="mt-1 max-w-2xl text-sm text-on-chrome/90">{subtitle}</p> : null}
+        <p className="mt-3 text-xs font-medium text-on-chrome/90 sm:text-sm">
           <time dateTime={isoDate(date)}>{formattedDateCapitalized}</time>
         </p>
       </div>

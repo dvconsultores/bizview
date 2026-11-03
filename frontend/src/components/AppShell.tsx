@@ -35,7 +35,7 @@ function ThemeToggle() {
       type="button"
       onClick={() => void setPreference(isDark ? "light" : "dark")}
       aria-label={isDark ? t.theme.toggleToLight : t.theme.toggleToDark}
-      className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-xl text-on-primary hover:bg-white/10 lg:text-ink-muted lg:hover:bg-subtle lg:hover:text-ink"
+      className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-xl text-on-chrome hover:bg-white/10 lg:text-ink-muted lg:hover:bg-subtle lg:hover:text-ink"
     >
       {isDark ? <Sun className="h-5 w-5" aria-hidden /> : <Moon className="h-5 w-5" aria-hidden />}
     </button>
@@ -101,7 +101,7 @@ function AccountMenu() {
         aria-label={t.nav.menu}
         className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-full lg:pl-1 lg:pr-3 lg:hover:bg-subtle"
       >
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-on-primary ring-1 ring-white/30 lg:hidden">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-on-chrome ring-1 ring-white/30 lg:hidden">
           {initials(user.full_name)}
         </span>
         <span className="hidden items-center lg:inline-flex">
@@ -191,12 +191,13 @@ export function AppShell() {
               navCollapsed ? "w-[5rem]" : "w-64"
             }`}
           >
-            <div className={`flex h-20 shrink-0 items-center gap-3 bg-brand-gradient ${navCollapsed ? "justify-center px-2" : "px-5"}`}>
+            <div data-app-band="sidebar"
+                className={`flex h-20 shrink-0 items-center gap-3 bg-chrome-gradient ${navCollapsed ? "justify-center px-2" : "px-5"}`}>
               <Logo inverted className="h-10 w-10 shrink-0" />
               {!navCollapsed ? (
                 <div className="min-w-0">
-                  <p className="truncate text-base font-bold leading-tight text-on-primary">{product_name}</p>
-                  {organization_name ? <p className="truncate text-xs text-on-primary">{organization_name}</p> : null}
+                  <p className="truncate text-base font-bold leading-tight text-on-chrome">{product_name}</p>
+                  {organization_name ? <p className="truncate text-xs text-on-chrome">{organization_name}</p> : null}
                 </div>
               ) : null}
             </div>
@@ -217,7 +218,7 @@ export function AppShell() {
                           `flex min-h-tap items-center rounded-xl text-base font-medium ${
                             navCollapsed ? "min-w-tap justify-center px-2" : "px-4"
                           } ${
-                            isActive ? "bg-gradient-to-r from-primary to-primary-hover text-on-primary shadow-card" : "text-ink-2 hover:bg-subtle"
+                            isActive ? "nav-active" : "text-ink-2 hover:bg-subtle"
                           }`
                         }
                       >
@@ -252,13 +253,14 @@ export function AppShell() {
         <ShellContent hidden={chromeHidden} collapsed={navCollapsed}>
             <>
             {!chromeHidden ? (
-            <header className="sticky top-0 z-30 bg-brand-gradient pt-safe text-on-primary shadow-md lg:border-b lg:border-line lg:bg-surface lg:bg-none lg:pt-0 lg:shadow-none">
+            <header data-app-band="header"
+              className="sticky top-0 z-30 bg-chrome-gradient pt-safe text-on-chrome shadow-md lg:border-b lg:border-line lg:bg-surface lg:bg-none lg:pt-0 lg:shadow-none">
               <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-5 lg:px-4">
                 <Link to="/" className="flex min-w-0 items-center lg:hidden">
                   <Logo className="h-9 w-9 shrink-0" inverted />
                   <span className="ml-3 min-w-0">
                     <span className="block truncate font-semibold leading-tight">{product_name}</span>
-                    {organization_name ? <span className="block truncate text-xs text-on-primary">{organization_name}</span> : null}
+                    {organization_name ? <span className="block truncate text-xs text-on-chrome">{organization_name}</span> : null}
                   </span>
                 </Link>
                 <div className="hidden lg:block" />

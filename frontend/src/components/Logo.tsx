@@ -17,7 +17,7 @@ export function Logo({ className = "h-9 w-9", inverted = false }: { className?: 
     <span
       aria-hidden
       className={`${className} inline-flex items-center justify-center rounded-lg text-sm font-bold ${
-        inverted ? "bg-white/15 text-white ring-1 ring-white/30" : "bg-primary text-white"
+        inverted ? "bg-white/15 text-on-chrome ring-1 ring-white/30" : "bg-primary text-on-primary"
       }`}
     >
       {initials(product_name.trim().split(/\s+/)[0] ?? product_name)}

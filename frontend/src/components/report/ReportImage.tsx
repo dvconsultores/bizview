@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReportImageSet } from "../../api/types";
-import { roleAt, surfaceClass } from "./layoutRoles";
+import { roleAt, roleStyle } from "./layoutRoles";
 
 /** The file stem the server looks up: the same rule as `app/projects/assets.normalise_key`. */
 const UNSAFE = /[^A-Za-z0-9._-]+/g;
@@ -82,8 +82,8 @@ export function ReportImage({
     <span
       role="img"
       aria-label={alt}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${surfaceClass(roleFor(key))}`}
-      style={{ ...box, fontSize: Math.round(size / 2.2) }}
+      className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold"
+      style={{ ...box, fontSize: Math.round(size / 2.2), ...roleStyle(roleFor(key)) }}
     >
       {key.slice(0, 1).toUpperCase()}
     </span>

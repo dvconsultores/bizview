@@ -92,6 +92,9 @@
   --c-warning-line: 253 230 138;
   --c-backdrop: 15 23 42;
   --c-toast: 15 23 42;
+  /* Feature 051: the band the header and the sidebar wear, and the ink on it. */
+  --c-chrome: var(--brand-600);
+  --c-on-chrome: 255 255 255;
   --c-chart-1: var(--brand-600);
   --c-chart-2: var(--brand-300);
   /* Feature 026: the remaining chart series roles the layout can name (`series3`…`series8`).
@@ -183,6 +186,8 @@
   --c-warning-line: 146 64 14;
   --c-backdrop: 2 6 23;
   --c-toast: 51 65 85;
+  --c-chrome: var(--brand-600);
+  --c-on-chrome: 255 255 255;
   --c-chart-1: var(--brand-400);
   --c-chart-2: var(--brand-600);
   --c-chart-3: 167 139 250;
@@ -209,9 +214,19 @@
   --hero-color: #172b37;
 }
 
-/* Feature 030 FR-009: `impacto` also sets the KPI typography and the card surfaces. The palette
- * colours come from the JSON preset at runtime; only the shapes live here. Other presets keep
- * today's typography. */
+/* Feature 051: the shape a theme chooses is written onto <html> as custom properties by
+ * `src/theme/derive.ts`. What is left here is the fallback Clasico paints with before the module
+ * runs, and the rules that turn an enum into styling. */
+:root {
+  --radius-button: 0.875rem;
+  --radius-field: 0.5rem;
+  --radius-nav: 0.875rem;
+  --card-border: 1px;
+  --divider: 1px;
+  --heading-weight: 700;
+  --heading-tracking: -0.01em;
+}
+
 /* 042 → WS-E bridge: semantic palette tokens for the tile components. WS-E re-defines these on
  * the report root per effective preset; until then they mirror the installation palette vars. */
 :root {
@@ -231,19 +246,46 @@
   --kpi-delta-bg-neg: rgb(var(--c-kpi-delta-bg-negative));
 }
 
-:root[data-palette="impacto"] {
-  --kpi-numeral: 1.75rem;
-  --kpi-numeral-lg: 2.5rem;
-  --kpi-numeral-tv: 3rem;
-  --kpi-numeral-tv-lg: 3.75rem;
-  --kpi-numeral-tv-xl: 4.5rem;
-  --kpi-tracking: -0.03em;
-  --radius-card: 1rem;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.08), 0 8px 24px -8px rgb(15 23 42 / 0.18);
-}
-:root[data-theme="dark"][data-palette="impacto"] {
-  --shadow-card: 0 0 0 1px rgb(71 85 105 / 0.55), 0 12px 32px -12px rgb(0 0 0 / 0.75);
-  --shadow-raised: 0 0 0 1px rgb(100 116 139 / 0.7), 0 18px 40px -12px rgb(0 0 0 / 0.85);
+
+@layer components {
+  /* Feature 051: a theme's navigation treatment. The theme declares one of four (data-nav, written
+   * by `src/theme/derive.ts`); these are the only rules that turn it into styling. */
+  .nav-active {
+    border-radius: var(--radius-nav);
+  }
+  :root[data-nav="gradient"] .nav-active {
+    background-image: linear-gradient(to right, rgb(var(--c-primary)), rgb(var(--c-primary-hover)));
+    color: rgb(var(--c-on-primary));
+    box-shadow: var(--shadow-card);
+  }
+  :root[data-nav="solid"] .nav-active {
+    background-color: rgb(var(--c-accent));
+    color: rgb(var(--c-on-primary));
+  }
+  :root[data-nav="bar"] .nav-active {
+    background-color: rgb(var(--c-accent-soft));
+    color: rgb(var(--c-accent-strong));
+    box-shadow: inset 3px 0 0 rgb(var(--c-accent));
+  }
+  :root[data-nav="outline"] .nav-active {
+    background-color: rgb(var(--c-surface));
+    color: rgb(var(--c-ink));
+    box-shadow: inset 0 0 0 2px rgb(var(--c-primary));
+  }
+  /* Typography hierarchy and the borders a theme may thicken. */
+  .page-title {
+    font-weight: var(--heading-weight);
+    letter-spacing: var(--heading-tracking);
+  }
+  .section-title {
+    font-weight: var(--heading-weight);
+  }
+  .card-surface {
+    border-width: var(--card-border);
+  }
+  .section-rule {
+    border-bottom-width: var(--divider);
+  }
 }
 
 @layer base {
@@ -337,9 +379,22 @@
     background-color: rgb(var(--grad-to));
     background-image: linear-gradient(135deg, rgb(var(--grad-from)) 0%, rgb(var(--grad-to)) 100%);
   }
+  /* Feature 051: the band the header and the sidebar wear — the theme's chrome, lit by its own
+   * darker primary. Clásico's is the brand gradient it has always had. */
+  .bg-chrome-gradient {
+    background-color: rgb(var(--c-chrome));
+    background-image: linear-gradient(135deg, rgb(var(--c-chrome)) 0%, rgb(var(--c-primary-active)) 100%);
+  }
   /* Feature 026: `chart-1`/`chart-2` are Tailwind colour tokens; the six extra series a layout can
    * name through `colors: series3…series8` need their own utilities, which is where the role map in
    * layoutRoles.ts points them at. */
+  /* Feature 051: the band a theme preview paints, identical to the one the header wears. */
+  .preview-band {
+    background-color: rgb(var(--c-chrome));
+    background-image: linear-gradient(135deg, rgb(var(--c-chrome)) 0%, rgb(var(--c-primary-active)) 100%);
+  }
+  .bg-chart-1 { background-color: rgb(var(--c-chart-1)); }
+  .bg-chart-2 { background-color: rgb(var(--c-chart-2)); }
   .bg-chart-3 { background-color: rgb(var(--c-chart-3)); }
   .bg-chart-4 { background-color: rgb(var(--c-chart-4)); }
   .bg-chart-5 { background-color: rgb(var(--c-chart-5)); }

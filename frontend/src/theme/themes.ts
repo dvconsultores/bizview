@@ -1,4 +1,4 @@
-/** Themes as data (feature 047): the five built-ins in the authored format, plus the derivation the
+/** Themes as data (feature 047): the six built-ins in the authored format, plus the derivation the
  * renderers need.
  *
  * A theme is the product's published contract — `cli/bizview_cli/schemas/theme.schema.json`, the same
@@ -10,13 +10,21 @@
 import clasicoJson from "./themes/clasico.json";
 import contrasteJson from "./themes/contraste.json";
 import daltonicoJson from "./themes/daltonico.json";
+import eleganteJson from "./themes/elegante.json";
 import impactoJson from "./themes/impacto.json";
 import monocromoJson from "./themes/monocromo.json";
 
 export type ThemeMode = "light" | "dark";
-export type ThemeId = "impacto" | "clasico" | "monocromo" | "contraste" | "daltonico";
+export type ThemeId =
+  | "impacto"
+  | "clasico"
+  | "elegante"
+  | "monocromo"
+  | "contraste"
+  | "daltonico";
 
-/** The authored tokens of one mode. */
+/** The authored tokens of one mode. The last seven are the chrome (feature 051): optional, and
+ * derived from the report tokens above when a theme does not declare them. */
 export interface ThemeTokens {
   surface: string;
   card: string;
@@ -30,6 +38,13 @@ export interface ThemeTokens {
   delta_positive: string;
   delta_negative: string;
   series: string[];
+  canvas?: string;
+  chrome?: string;
+  chrome_text?: string;
+  field?: string;
+  line?: string;
+  accent?: string;
+  warning?: string;
 }
 
 /** The shape choices, all from fixed lists so a theme cannot ask for what the renderers lack. */
@@ -39,9 +54,18 @@ export interface ThemeShape {
   kpi_scale: "md" | "lg" | "xl";
   font: "sans" | "serif" | "mono";
   badge: "filled" | "outline";
+  // Feature 051: the dimensions a theme differs on beyond colour.
+  elevation: "flat" | "soft" | "strong";
+  button: "rounded" | "pill" | "square";
+  nav: "gradient" | "solid" | "bar" | "outline";
+  divider: "soft" | "strong";
+  heading: "normal" | "tight";
+  card_border: "none" | "hairline" | "strong";
 }
 
 export interface Theme {
+  /** Feature 051: the exact chrome token set, by semantic name, per mode. Optional. */
+  app?: Partial<Record<ThemeMode, Record<string, string>>>;
   id: string;
   name: string;
   name_en: string;
@@ -77,19 +101,30 @@ export interface RuntimeTheme {
 
 export const SHAPE_DEFAULTS: ThemeShape = {
   radius: "md", density: "normal", kpi_scale: "lg", font: "sans", badge: "filled",
+  elevation: "soft", button: "rounded", nav: "gradient", divider: "soft", heading: "normal",
+  card_border: "hairline",
 };
 
 export const BUILTIN_THEMES: Record<ThemeId, Theme> = {
   impacto: impactoJson as Theme,
   clasico: clasicoJson as Theme,
+  elegante: eleganteJson as Theme,
   monocromo: monocromoJson as Theme,
   contraste: contrasteJson as Theme,
   daltonico: daltonicoJson as Theme,
 };
 
 export const THEME_IDS: readonly ThemeId[] = [
-  "impacto", "clasico", "monocromo", "contraste", "daltonico",
+  "impacto", "clasico", "elegante", "monocromo", "contraste", "daltonico",
 ];
+
+/** The four the product offers as identities (feature 051). The rest stay valid — a report or a
+ * project may name them — and appear under "compatibility" in the appearance page. */
+export const OFFICIAL_THEME_IDS: readonly ThemeId[] = [
+  "clasico", "impacto", "elegante", "contraste",
+];
+
+export const LEGACY_THEME_IDS: readonly ThemeId[] = ["daltonico", "monocromo"];
 
 export const DEFAULT_THEME: ThemeId = "impacto";
 

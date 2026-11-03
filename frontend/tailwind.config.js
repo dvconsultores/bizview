@@ -19,6 +19,8 @@ const TOKENS = [
   "chart-positive", "chart-negative", "chart-neutral", "kpi-text", "kpi-surface", "kpi-neutral",
   "kpi-delta-bg-positive", "kpi-delta-bg-negative",
   "field", "field-focus", "line-accent", "on-primary",
+  // Feature 051: the band the header and the sidebar wear, and the ink on it.
+  "chrome", "on-chrome",
 ];
 const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`;
 
@@ -45,7 +47,11 @@ export default {
       borderRadius: {
         xl: "0.875rem",
         "2xl": "1rem",
+        // Feature 051: the radii a theme chooses.
         card: "var(--radius-card)",
+        btn: "var(--radius-button)",
+        field: "var(--radius-field)",
+        nav: "var(--radius-nav)",
       },
       boxShadow: {
         card: "var(--shadow-card)",
