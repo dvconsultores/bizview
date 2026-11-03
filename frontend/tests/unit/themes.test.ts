@@ -2,7 +2,7 @@
  * Feature 047 gate: the built-in themes are themes like any other — complete in both modes, inside
  * the shape lists, and passing the accessibility rules a customer's uploaded file is held to. The
  * mathematics here mirrors `cli/bizview_cli/theme.py`; `theme-parity` in the backend suite asserts
- * the two agree on the five built-ins, so a change on one side without the other fails.
+ * the two agree on the six built-ins, so a change on one side without the other fails.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -34,6 +34,13 @@ const SHAPE_LISTS: Record<string, readonly string[]> = {
   kpi_scale: ["md", "lg", "xl"],
   font: ["sans", "serif", "mono"],
   badge: ["filled", "outline"],
+  // Feature 051: the dimensions a theme differs on beyond colour.
+  elevation: ["flat", "soft", "strong"],
+  button: ["rounded", "pill", "square"],
+  nav: ["gradient", "solid", "bar", "outline"],
+  divider: ["soft", "strong"],
+  heading: ["normal", "tight"],
+  card_border: ["none", "hairline", "strong"],
 };
 
 const srgb = (hex: string): [number, number, number] => {
@@ -69,8 +76,8 @@ const deltaE = (a: string, b: string): number =>
   Math.hypot(...(lab(a).map((v, i) => v - lab(b)[i]) as [number, number, number]));
 
 describe("themes as data (feature 047)", () => {
-  it("ships the five built-ins, each complete in both modes", () => {
-    expect(THEME_IDS).toHaveLength(5);
+  it("ships the six built-ins, each complete in both modes", () => {
+    expect(THEME_IDS).toHaveLength(6);
     expect(isThemeId(DEFAULT_THEME)).toBe(true);
     for (const id of THEME_IDS) {
       const theme = BUILTIN_THEMES[id];
@@ -183,14 +190,15 @@ describe("themes as data (feature 047)", () => {
   });
 
   it("maps the shape tokens to the custom properties components read", () => {
-    const vars = shapeVariables(BUILTIN_THEMES.impacto);
+    // Clásico is the neutral reference for each enum's default.
+    const vars = shapeVariables(BUILTIN_THEMES.clasico);
     expect(vars["t-radius"]).toBe("8px");
     expect(vars["t-density"]).toBe("1");
     expect(vars["t-kpi-scale"]).toBe("1.25");
     expect(vars["t-font"]).toContain("sans-serif");
     expect(vars["t-badge"]).toBe("filled");
     const compact = shapeVariables({
-      ...BUILTIN_THEMES.impacto,
+      ...BUILTIN_THEMES.clasico,
       shape: { radius: "lg", density: "compact", kpi_scale: "xl", font: "mono", badge: "outline" },
     });
     expect(compact["t-radius"]).toBe("14px");

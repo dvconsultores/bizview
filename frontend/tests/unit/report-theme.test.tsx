@@ -170,11 +170,12 @@ describe("a report in its own mode", () => {
     await renderShared(sharedWith({ id: "contraste", mode: "dark" }));
     expect(area()!.dataset.reportMode).toBe("dark");
     const surface = deriveTokens(BUILTIN_THEMES.contraste, "dark").surface;
-    expect(area()!.getAttribute("style")).toContain(HEX(surface));
+    expect(area()!.getAttribute("style")).toContain(`--c-surface: ${HEX(surface)}`);
     // The chrome keeps the light appearance: only the report's area turned.
     expect(document.documentElement.dataset.theme).not.toBe("dark");
     const lightSurface = deriveTokens(BUILTIN_THEMES.contraste, "light").surface;
-    expect(area()!.getAttribute("style")).not.toContain(HEX(lightSurface));
+    // On the token itself: feature 051 gives the area a `chrome_text` that is white in both modes.
+    expect(area()!.getAttribute("style")).not.toContain(`--c-surface: ${HEX(lightSurface)}`);
   });
 
   it("opens in the report's mode even when this device prefers the other", async () => {

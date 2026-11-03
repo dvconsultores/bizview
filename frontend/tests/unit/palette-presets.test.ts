@@ -70,9 +70,9 @@ const minSeriesContrast = (presetId: string): number => (presetId === "contraste
 const minAdjacentDelta = (strategy: string): number => (strategy === "sequential" ? 5 : 10);
 
 describe("palette presets (feature 030)", () => {
-  it("ships the five presets, each complete in both themes", () => {
+  it("ships the six presets, each complete in both themes", () => {
     expect([...PRESET_IDS].sort()).toEqual([...Object.keys(PALETTES)].sort());
-    expect(PRESET_IDS).toHaveLength(5);
+    expect(PRESET_IDS).toHaveLength(6);
     expect(isPaletteId(DEFAULT_PRESET)).toBe(true);
     for (const id of PRESET_IDS) {
       const preset = PALETTES[id];

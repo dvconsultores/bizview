@@ -142,24 +142,46 @@ describe("Appearance library", () => {
   it("marks the installation theme in use and offers no apply for it", async () => {
     await render();
     expect(document.body.textContent).toContain(t.appearance.current);
+    // Feature 051: the installed card's action says it is in use instead of offering the same
+    // change again — so there is one apply fewer than there are themes.
     const applies = Array.from(document.querySelectorAll("button")).filter(
       (el) => el.textContent === t.appearance.apply,
     );
-    expect(applies).toHaveLength(LIBRARY.themes.length);
-    expect((applies[0] as HTMLButtonElement).disabled).toBe(true);
-    expect((applies[1] as HTMLButtonElement).disabled).toBe(false);
+    expect(applies).toHaveLength(LIBRARY.themes.length - 1);
+    const installed = container.querySelector('[data-installed="true"]') as HTMLElement;
+    expect(installed).toBeTruthy();
+    const action = Array.from(installed.querySelectorAll("button")).find(
+      (el) => el.textContent === t.appearance.inUse,
+    ) as HTMLButtonElement;
+    expect(action.disabled).toBe(true);
+    expect(applies.every((el) => !(el as HTMLButtonElement).disabled)).toBe(true);
   });
 
-  it("applies a theme through the settings endpoint", async () => {
+  it("applies a theme through the settings endpoint, and nothing before the server agrees", async () => {
     vi.mocked(api.put).mockResolvedValue({ theme_id: "acme-azul" });
     await render();
-    const applies = Array.from(document.querySelectorAll("button")).filter(
+    const card = container.querySelector('[data-theme-card="acme-azul"]') as HTMLElement;
+    const apply = Array.from(card.querySelectorAll("button")).find(
       (el) => el.textContent === t.appearance.apply,
-    );
-    await act(async () => (applies[2] as HTMLButtonElement).click());
+    ) as HTMLButtonElement;
+    await act(async () => apply.click());
     expect(vi.mocked(api.put)).toHaveBeenCalledWith("/api/admin/settings/theme", {
       theme_id: "acme-azul",
     });
+    // Feature 051: no reload — the shared config is re-read so the whole application repaints.
+    expect(vi.mocked(api.get)).toHaveBeenCalledWith("/api/admin/themes");
+  });
+
+  it("keeps the previous theme when the server refuses the change (FR-005)", async () => {
+    vi.mocked(api.put).mockRejectedValue(new ApiError(403, "forbidden", "No puedes cambiarlo."));
+    await render();
+    const card = container.querySelector('[data-theme-card="acme-azul"]') as HTMLElement;
+    const apply = Array.from(card.querySelectorAll("button")).find(
+      (el) => el.textContent === t.appearance.apply,
+    ) as HTMLButtonElement;
+    await act(async () => apply.click());
+    expect(document.body.textContent).toContain("No puedes cambiarlo.");
+    expect(container.querySelector('[data-installed="true"]')).toBeTruthy();
   });
 
   it("refuses to delete a theme the product ships and offers the delete for the others", async () => {

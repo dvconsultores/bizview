@@ -142,7 +142,10 @@ describe("044 images", () => {
     const circle = container.querySelector('[role="img"]');
     expect(circle?.textContent).toBe("B");
     expect(circle?.getAttribute("aria-label")).toBe("BTC");
-    expect(circle?.className).toContain("bg-chart-");
+    // Feature 051: the fill and a readable ink are custom properties, because the ink depends on the
+    // role's luminance in the theme in force (Contraste's dark series are near-white).
+    expect(circle?.getAttribute("style")).toContain("--c-chart-");
+    expect(circle?.getAttribute("style")).toContain("--c-chart-");
   });
 
   it("the asset tile shows a 40 px image and keeps the name and the figure", () => {

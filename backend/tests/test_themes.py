@@ -32,11 +32,11 @@ def test_only_the_super_user_reaches_the_library(admin, user):
     assert sql("SELECT count(*) FROM theme WHERE origin = 'upload'") == [(0,)]
 
 
-def test_the_five_themes_the_product_ships_are_always_there(superuser):
+def test_the_six_themes_the_product_ships_are_always_there(superuser):
     c = signed_in(superuser.email)
     body = c.get("/api/admin/themes").json()
-    assert [t["id"] for t in body["themes"]] == ["clasico", "contraste", "daltonico", "impacto",
-                                                 "monocromo"]
+    assert [t["id"] for t in body["themes"]] == ["clasico", "contraste", "daltonico", "elegante",
+                                                 "impacto", "monocromo"]
     assert {t["origin"] for t in body["themes"]} == {"builtin"}
     assert body["installation"] == "impacto"
     row = next(t for t in body["themes"] if t["id"] == "impacto")

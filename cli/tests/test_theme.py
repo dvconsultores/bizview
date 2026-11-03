@@ -20,7 +20,8 @@ def _codes(data: dict) -> set[str]:
     return {problem.code for problem in themes.validate_theme(data)}
 
 
-@pytest.mark.parametrize("name", ["impacto", "clasico", "monocromo", "contraste", "daltonico"])
+@pytest.mark.parametrize("name", ["impacto", "clasico", "elegante", "monocromo", "contraste",
+                                  "daltonico"])
 def test_every_builtin_is_a_valid_theme(name):
     """The product's own themes obey the contract a customer's file is held to."""
     assert themes.validate_theme(_builtin(name)) == []
@@ -37,6 +38,12 @@ def test_the_schema_and_the_builtins_describe_the_same_tokens():
     assert (mode["properties"]["series"]["minItems"],
             mode["properties"]["series"]["maxItems"]) == (3, 8)
     assert set(schema["properties"]["shape"]["properties"]) == set(themes.SHAPE_LISTS)
+    # Feature 051: the chrome tokens are optional in both modes, and every one of them is a colour.
+    assert {*themes.CHROME_TOKENS} <= set(mode["properties"])
+    assert not {*themes.CHROME_TOKENS} & set(mode["required"])
+    for name in themes.CHROME_TOKENS:
+        assert mode["properties"][name]["pattern"] == "^#[0-9A-Fa-f]{6}$"
+    assert set(schema["properties"]["app"]["properties"]) == {"light", "dark"}
     # the validator's own lists are the schema's enums: one contract, not two
     for key, allowed in themes.SHAPE_LISTS.items():
         assert tuple(schema["properties"]["shape"]["properties"][key]["enum"]) == allowed
@@ -192,3 +199,57 @@ def test_the_command_exits_two_when_the_file_cannot_be_read(tmp_path):
     from bizview_cli.__main__ import main
 
     assert main(["theme", "validate", str(tmp_path / "absent.yaml")]) == 2
+
+# --- feature 051: the application's own chrome ------------------------------------------------
+
+def test_a_theme_from_before_051_is_still_accepted():
+    """The chrome tokens are additive: a file written against 047 keeps working untouched."""
+    data = copy.deepcopy(_builtin("clasico"))
+    data.pop("app", None)
+    for mode in themes.MODES:
+        for name in themes.CHROME_TOKENS:
+            data[mode].pop(name, None)
+    assert themes.validate_theme(data) == []
+
+
+def test_the_chrome_tokens_are_accepted_and_checked():
+    data = copy.deepcopy(_builtin("clasico"))
+    data["light"].update(accent="#123456", chrome="#111111", chrome_text="#FFFFFF")
+    assert themes.validate_theme(data) == []
+
+
+@pytest.mark.parametrize("mutate,code,needle", [
+    (lambda d: d["light"].update(chrome_text="#101010"), "contrast", "chrome_text"),
+    (lambda d: d["light"].update(accent="#FEFEFE"), "contrast", "accent"),
+    (lambda d: d["light"].update(canvas="#777777"), "contrast", "canvas"),
+    (lambda d: d["light"].update(field="#000000"), "contrast", "field"),
+])
+def test_a_chrome_pair_that_cannot_be_read_is_refused(mutate, code, needle):
+    data = copy.deepcopy(_builtin("clasico"))
+    mutate(data)
+    problems = themes.validate_theme(data)
+    assert code in {p.code for p in problems}
+    assert any(needle in p.path or needle in p.message for p in problems)
+
+
+def test_the_app_block_may_only_pin_known_tokens():
+    data = copy.deepcopy(_builtin("clasico"))
+    data["app"]["light"]["mystery"] = "#123456"
+    problems = themes.validate_theme(data)
+    assert [(p.path, p.code) for p in problems] == [("app.light.mystery", "unknown_key")]
+
+
+def test_the_app_block_is_held_to_the_pairs_it_declares():
+    data = copy.deepcopy(_builtin("clasico"))
+    data["app"]["dark"]["ink"] = data["app"]["dark"]["surface"]
+    problems = themes.validate_theme(data)
+    # Every declared pair the ink takes part in fails, and each is reported against the ink.
+    assert {p.code for p in problems} == {"contrast"}
+    assert {p.path for p in problems} == {"app.dark.ink"}
+
+
+def test_clasico_pins_its_whole_chrome():
+    """The appearance the installation has today is data, not a stylesheet default (FR-010)."""
+    data = _builtin("clasico")
+    for mode in themes.MODES:
+        assert set(data["app"][mode]) >= set(themes.APP_TOKENS) - {"field-focus"}, mode

@@ -2,7 +2,7 @@
 
 from tests.conftest import client, signed_in, sql
 
-PRESETS = ["impacto", "clasico", "monocromo", "contraste", "daltonico"]
+PRESETS = ["impacto", "clasico", "elegante", "monocromo", "contraste", "daltonico"]
 
 
 def test_only_the_super_user_reaches_the_settings(admin, user):

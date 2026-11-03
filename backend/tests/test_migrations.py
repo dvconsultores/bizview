@@ -52,10 +52,13 @@ def test_upgrade_is_idempotent_and_stops_downgrading_on_purpose(database):
 
 
 def test_0042_seeds_the_themes_the_product_ships():
-    """The five built-ins come from the files the app and the PDF read, not from a copy in SQL."""
+    """The built-ins come from the files the app and the PDF read, not from a copy in SQL.
+
+    Feature 051 added `elegante` and refreshed the other five from their files, so the head of the
+    chain carries the six."""
     assert sql("SELECT id, origin, version FROM theme ORDER BY id") == [
         ("clasico", "builtin", 1), ("contraste", "builtin", 1), ("daltonico", "builtin", 1),
-        ("impacto", "builtin", 1), ("monocromo", "builtin", 1)]
+        ("elegante", "builtin", 1), ("impacto", "builtin", 1), ("monocromo", "builtin", 1)]
     assert sql("SELECT tokens ->> 'id' FROM theme WHERE id = 'impacto'") == [("impacto",)]
 
 

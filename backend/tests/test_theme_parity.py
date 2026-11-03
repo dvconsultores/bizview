@@ -38,7 +38,12 @@ def test_the_shipped_files_carry_exactly_the_tokens_the_schema_names():
         data = palettes.load_theme(preset)
         assert set(schema["required"]) <= set(data) <= set(schema["properties"]), preset
         for mode in palettes.THEMES:
-            assert set(data[mode]) == set(schema["properties"][mode]["required"]), (preset, mode)
+            # Feature 051: the chrome tokens are optional in the contract, so a theme may declare
+            # them; what it must declare is exactly the report set.
+            declared = set(data[mode])
+            required = set(schema["properties"][mode]["required"])
+            optional = set(schema["properties"][mode]["properties"]) - required
+            assert required <= declared <= required | optional, (preset, mode)
 
 
 @pytest.mark.parametrize("preset", palettes.PRESET_IDS)

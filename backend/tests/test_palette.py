@@ -41,7 +41,8 @@ def _hex(color: Any) -> str:
 
 
 def test_preset_ids_are_the_contract_order():
-    assert palettes.PRESET_IDS == ("impacto", "clasico", "monocromo", "contraste", "daltonico")
+    assert palettes.PRESET_IDS == ("impacto", "clasico", "elegante", "monocromo", "contraste",
+                                   "daltonico")
     assert palettes.DEFAULT_PRESET == "impacto"
 
 

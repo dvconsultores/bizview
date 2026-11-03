@@ -61,7 +61,10 @@ async function expectOneRow(page: Page, where: string) {
 
 /** How many columns a CSS grid actually resolved to. */
 const columns = (page: Page, selector: string) =>
-  page.locator(selector).evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+  page
+    .locator(selector)
+    .first()
+    .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
 
 test.describe("design system across the screens", () => {
   for (const scheme of ["light", "dark"] as const) {
@@ -97,7 +100,9 @@ test.describe("design system across the screens", () => {
 
         // Evidence 1: the library uses the width it is given.
         await page.goto("/admin/apariencia");
-        await expect(page.locator("[data-theme-grid]")).toBeVisible();
+        // Feature 051 put the compatibility themes in a second grid below the identities: the
+        // property under test is the first one, which is the library.
+        await expect(page.locator("[data-theme-grid]").first()).toBeVisible();
         const cols = await columns(page, "[data-theme-grid]");
         expect(cols).toBe(width >= 1280 ? 3 : width >= 640 ? 2 : 1);
 

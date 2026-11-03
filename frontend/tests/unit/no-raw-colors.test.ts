@@ -23,7 +23,23 @@ const ALLOWED_BY_FILE: Record<string, string[]> = {
   "components/Logo.tsx": ["bg-white"],  // fixed light tile behind a customer logo on the gradient
 };
 // Colour literals: the browser bar colour must be known before any CSS loads (theme-init.js).
-const LITERALS_BY_FILE: Record<string, string[]> = { "theme/resolve.ts": ["#3a7393", "#172b37"] };
+const LITERALS_BY_FILE: Record<string, string[]> = {
+  // The browser bar colour must be known before any CSS loads (theme-init.js).
+  "theme/resolve.ts": ["#3a7393", "#172b37"],
+  // Feature 051: the derivation's last-resort values, used only if a theme arrives without the
+  // tokens its schema requires, plus the two contrast candidates (white and the darkest ink) every
+  // `on-primary` / `on-chrome` choice is made between. No brand colour is written here.
+  // Feature 051: converts a theme's `R G B` triplet into a CSS colour (the meta tag, and a role's
+  // background/ink pair, which cannot be a utility class because it depends on the theme's values).
+  "theme/palette.ts": ["rgb("],
+  "components/report/layoutRoles.ts": ["rgb("],
+  "theme/derive.ts": [
+    "#3A7393", "#FFFFFF", "#0F172A", "#FBBF24", "#B45309", "#0B1220", "#000000", "#020617",
+    "#047857", "#BE123C",
+    // A shadow is a colour with alpha at a chosen blur: it cannot be a plain colour token.
+    "rgb(",
+  ],
+};
 const GLOBAL_ALLOWED = new Set([...ALLOWED["text-white"].classes, ...ALLOWED.hero.classes]);
 
 function sourceFiles(dir: string): string[] {
