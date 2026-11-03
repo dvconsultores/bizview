@@ -48,14 +48,14 @@ def shared_link(token: str, request: Request, db: Session = DB) -> links.Shared:
 @router.get("/{token}")
 def get_shared(
     request: Request,
-    share_token: str,
+    token: str,
     shared: links.Shared = Depends(shared_link),
     db: Session = DB,
 ):
     links.record_visit(db, shared.link_id)
     definition = engine.definition_json(
-        shared.ctx, assets_base=f"/api/shared/{share_token}/assets",
-        images_base=f"/api/shared/{share_token}/images")
+        shared.ctx, assets_base=f"/api/shared/{token}/assets",
+        images_base=f"/api/shared/{token}/images")
     return {
         "dashboard": {"code": shared.dashboard.code, "name": shared.dashboard.name,
                       **({"name_en": definition["title_en"]}
