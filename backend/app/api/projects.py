@@ -250,8 +250,13 @@ def project_changes(slug: str, after: int = Query(0, ge=0),
 
 
 @router.post("/{slug}/validate")
-def validate(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
-    return projects.revalidate(db, projects.get(db, slug), check_origin=True)
+def validate(slug: str, check_origin: bool = True,
+             actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """Validate the project; `check_origin` runs every query against its source (the button).
+
+    The editor refreshes problems and readiness with `check_origin=false` after a file changes:
+    the source check belongs to the explicit action, not to every keystroke."""
+    return projects.revalidate(db, projects.get(db, slug), check_origin=check_origin)
 
 
 @router.post("/{slug}/apply")

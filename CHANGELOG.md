@@ -154,6 +154,17 @@ All notable changes to this project are documented here. The format follows
   "ok" while the server refused the project for a personal column, and said nothing about a report
   with no filters. Both are reported now — the personal column as an error, the missing filters as a
   warning — and the pack's agent instructions state them.
+- **«Volver a comprobar» never answered** since 045: `POST /projects/<slug>/validate` stored the
+  validation on the project row, and the origin checks store their result on that same row through
+  `WorkView._persist`, in a separate transaction — while the write also left the mapped attribute
+  dirty, so the caller's session flushed it again. The second write waited on the lock the first
+  one held, for as long as the HTTP client stayed connected: the button spun forever, every click
+  parked a database connection and the rest of the installation slowed down with it (it was already
+  holding two connections and the project row for twenty minutes on the owner's server). The
+  checks now run before anything is written, the value they store is taken in memory as committed
+  instead of dirty, and their own write waits at most 5 s. The editor also refreshes problems and
+  readiness with `check_origin=false`: re-checking every query against its source belongs to the
+  button, not to every file change the poller notices.
 
 ### Changed
 

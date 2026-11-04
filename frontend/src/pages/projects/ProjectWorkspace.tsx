@@ -150,10 +150,10 @@ export function ProjectWorkspace() {
   // 035: applying the validator's own corrections, with or without an AI.
   const [fixing, setFixing] = useState(false);
   const [fixDiff, setFixDiff] = useState<string | null>(null);
-  const revalidate = useCallback(async () => {
+  const revalidate = useCallback(async (checkOrigin = true) => {
     setChecking(true);
     try {
-      setCheck(await projectsApi.validate(slug));
+      setCheck(await projectsApi.validate(slug, { checkOrigin }));
       setCheckFailed(false);
     } catch {
       // Keep the last result but say the check did not run: a greyed-out Apply with no reason is
@@ -185,7 +185,7 @@ export function ProjectWorkspace() {
     } catch (e) {
       setResult({ tone: "error",
                   text: t.projects.fixFailed(e instanceof ApiError ? e.message : t.common.unexpected) });
-      void revalidate();
+      void revalidate(false);
     } finally {
       setFixing(false);
     }
@@ -198,7 +198,7 @@ export function ProjectWorkspace() {
     // the last validation while the new one was in flight, which is another project's problems on
     // this page.
     setCheck(null);
-    refresh().then(() => { if (!cancelled) void revalidate(); })
+    refresh().then(() => { if (!cancelled) void revalidate(false); })
       .catch((e) => !cancelled && setLoadError(errorText(e, t.common.unexpected)));
     return () => { cancelled = true; };
   }, [refresh, revalidate, t]);
@@ -334,7 +334,7 @@ export function ProjectWorkspace() {
   const { busy } = useProjectChanges(slug, {
     enabled: !!project,
     onChanges: (paths, isBusy) => {
-      if (!paths.length) { if (!isBusy) void revalidate(); return; }
+      if (!paths.length) { if (!isBusy) void revalidate(false); return; }
       void projectsApi.tree(slug).then(setTree).catch(() => undefined);
       for (const path of paths) {
         const tab = tabs.find((item) => item.path === path);
@@ -342,7 +342,7 @@ export function ProjectWorkspace() {
         if (tab.dirty) setBuffer(path, { conflict: { kind: "disk", current: null } });
         else void load(path).catch(() => closeTab(path, true));
       }
-      if (!isBusy) void revalidate();
+      if (!isBusy) void revalidate(false);
     },
   });
 
@@ -399,7 +399,7 @@ export function ProjectWorkspace() {
         navigate("/proyectos");
         return;
       }
-      void revalidate();
+      void revalidate(false);
     } catch (e) {
       setResult({ tone: "error", text: errorText(e, t.common.unexpected) });
     } finally {

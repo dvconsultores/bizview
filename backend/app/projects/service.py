@@ -249,19 +249,23 @@ def readiness_view(db: Session, project: Project):
 def revalidate(db: Session, project: Project, *, check_origin: bool = False) -> dict:
     """Validate the project (stored on it) and compute its readiness.
 
-    Origin checks run only on the explicit validate action, never on file saves."""
+    Origin checks run only on the explicit validate action, never on file saves. They come *before*
+    the validation is stored: they write `query_checks` on the project row in their own short
+    transaction (`WorkView._persist`), and a row already updated by this request would block them
+    until the client gave up — the button spun forever and each click parked a connection (owner,
+    2026-11-04: "Volver a comprobar stays spinning")."""
     from app.projects import readiness
     from app.projects.compose import validate_project
 
     validation = validate_project(db, project)
-    project.validation = validation
-    db.flush()
     view = readiness_view(db, project)
     if check_origin and validation.get("valid"):
         from app.config import get_settings
         from app.projects import origin_checks
 
         origin_checks.recheck_draft(db, view, get_settings())
+    project.validation = validation
+    db.flush()
     return {"validation": validation,
             "readiness": readiness.compute(view)}
 

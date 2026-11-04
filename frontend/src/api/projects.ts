@@ -44,7 +44,11 @@ export const projectsApi = {
     api.post<ProjectCheck & { results: unknown[] }>(`${base(slug)}/ops`, { ops }),
   changes: (slug: string, after: number) =>
     api.get<ProjectChanges>(`${base(slug)}/changes${qs({ after })}`),
-  validate: (slug: string) => api.post<ProjectCheck>(`${base(slug)}/validate`),
+  /** `checkOrigin` runs every query against its source (the «Volver a comprobar» button); the
+   * editor's refreshes pass false — a background change is not the moment to hit the source. */
+  validate: (slug: string, opts: { checkOrigin?: boolean } = {}) =>
+    api.post<ProjectCheck>(
+      `${base(slug)}/validate${qs({ check_origin: String(opts.checkOrigin ?? true) })}`),
   /** 035: apply the validator's deterministic corrections (works with the AI off). */
   applyFixes: (slug: string, fixes: (ProjectFix & { problem_id?: string | null
                                                    base_sha256?: string | null })[]) =>

@@ -71,26 +71,45 @@ class WorkView:
 
     def __setattr__(self, name, value) -> None:
         if name in PROJECT_STATE:
-            setattr(self.project, name, value)
+            # Persisted in its own short transaction, and taken in memory as *committed*: marking
+            # the mapped attribute dirty made the caller's session flush an UPDATE of this same
+            # row, whose lock then blocked the next persist — the validate button waited forever
+            # with a connection parked (owner, 2026-11-04).
             _persist(self.project.id, name, value)
+            _committed(self.project, name, value)
         elif name == "draft":
             raise AttributeError("draft is read-only: write project files with fs.apply_ops")
         else:
             raise AttributeError(name)
 
 
+def _committed(project, name: str, value) -> None:
+    """Set `name` on the project without making the session write it again."""
+    from sqlalchemy.orm import object_session
+
+    if object_session(project) is None:            # a plain object (tests, adapters)
+        setattr(project, name, value)
+        return
+    from sqlalchemy.orm.attributes import set_committed_value
+
+    set_committed_value(project, name, value)
+
+
 def _persist(project_id: int, name: str, value) -> None:
     """Write one project-level state column in its own short transaction.
 
     The request's transaction never locks the project row: `fs.apply_ops` (own session) updates
-    it on every write, and a lock held by the caller's open transaction would block it.
+    it on every write, and a lock held by the caller's open transaction would block it. The wait is
+    bounded too: an unexpected lock makes the request fail with a reason instead of parking a
+    connection until the client gives up (a validation that never answered, owner 2026-11-04).
     """
-    from sqlalchemy import update
+    from sqlalchemy import text, update
 
     from app.db import get_sessionmaker
     from app.models import Project
 
     with get_sessionmaker()() as db:
+        db.execute(text("SET LOCAL lock_timeout = '5s'"))
         db.execute(update(Project).where(Project.id == project_id).values({name: value}))
         db.commit()
 
