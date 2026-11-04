@@ -5,7 +5,6 @@ preview that used to be one of the gates, so a project is ready on evidence the 
 """
 import hashlib
 import re
-from collections.abc import Iterable
 
 import yaml
 
@@ -21,17 +20,6 @@ REQUEST_FILE = re.compile(r"^integrations/([^/]+)/requests/[^/]+\.yaml$")
 # English specs (feature 022) use "Personal data".
 _PERSONAL_LINE = re.compile(
     r"^\s*[-*]?\s*\*\*(?:Datos personales|Personal data)\*\*:\s*(.*)$", re.MULTILINE
-)
-
-_AFFIRMATIVE = (
-    "sí", "si", "confirmo", "confirmado", "incluye", "inclúyela", "inclúyelo",
-    "inclúyelas", "inclúyelos", "incluir", "de acuerdo", "ok", "vale",
-    "yes", "confirm", "confirmed", "include", "include it", "agreed",
-)
-_NEGATION = (
-    "no", "excluye", "exclúyela", "exclúyelo", "excluir", "sin", "quita",
-    "quítala", "quítalo", "omite", "omítela",
-    "exclude", "without", "remove", "omit", "drop",
 )
 
 
@@ -65,36 +53,6 @@ def _word_in(word: str, text: str | None) -> bool:
     return re.search(
         rf"(?<![A-Za-z0-9_]){re.escape(word)}(?![A-Za-z0-9_])", text, re.IGNORECASE
     ) is not None
-
-
-def confirmed_columns(
-    question: str | None, answer: str, flagged: Iterable[str] = ()
-) -> list[str]:
-    """Return columns the user explicitly confirmed in answer, given the assistant question."""
-    if not question:
-        return []
-    flagged_low = {str(c).lower() for c in flagged}
-    candidates: list[str] = []
-    seen: set[str] = set()
-    for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", question):
-        low = token.lower()
-        if low in seen:
-            continue
-        if low in flagged_low or personal_kind(token):
-            seen.add(low)
-            candidates.append(low)
-    if not candidates:
-        return []
-
-    def any_pattern(patterns: Iterable[str]) -> bool:
-        return any(
-            re.search(rf"(?<![\w]){re.escape(p)}(?![\w])", answer, re.IGNORECASE)
-            for p in patterns
-        )
-
-    if any_pattern(_NEGATION) or not any_pattern(_AFFIRMATIVE):
-        return []
-    return [c for c in candidates if _word_in(c, answer)]
 
 
 
@@ -198,6 +156,14 @@ def _report_pending(path: str, doc: dict, files: dict[str, str]) -> list[dict]:
     return pending
 
 
+def _declared(column: str, declared: str) -> bool:
+    """A personal column is allowed when the integration spec names it under **Datos personales**.
+
+    Feature 045 removed the conversation that used to hold the confirmation, so the integration
+    spec is the only record of that explicit decision (017: "recorded in the integration spec")."""
+    return _word_in(column, declared)
+
+
 def _direct_pending(
     session,
     path: str,
@@ -205,7 +171,6 @@ def _direct_pending(
     doc: dict,
     files: dict,
     personal_by_src: dict[str, dict[str, str]],
-    confirmed_set: set[str],
 ) -> list[dict]:
     pending: list[dict] = []
     direct = doc.get("direct")
@@ -269,9 +234,7 @@ def _direct_pending(
                     continue
                 seen.add(key)
                 kind = flagged.get(key) or personal_kind(col_name)
-                if not kind:
-                    continue
-                if key in confirmed_set and _word_in(col_name, declared):
+                if not kind or _declared(col_name, declared):
                     continue
                 pending.append({
                     "code": "personal_data",
@@ -305,8 +268,7 @@ def compute(session) -> dict:
         personal_by_src[str(src).strip().lower()] = {
             str(c).lower(): str(k) for c, k in (flags or {}).items()
         }
-    confirmed = (session.working_state or {}).get("personal_confirmed") or []
-    confirmed_set = {str(c).lower() for c in confirmed} if isinstance(confirmed, list) else set()
+    flagged_columns: set[tuple[str, str]] = set()
 
     for path in sorted(files):
         text = files[path]
@@ -381,14 +343,17 @@ def compute(session) -> dict:
                                             candidate_names.append(col)
                     for col in candidate_names:
                         kind = flagged.get(str(col).lower()) or personal_kind(str(col))
-                        if kind and not (
-                            str(col).lower() in confirmed_set
-                            and _word_in(str(col), declared)
-                        ):
-                            pending.append({
-                                "code": "personal_data", "file": path,
-                                "message": t("readiness.personal", column=col, kind=kind),
-                            })
+                        # The same column can arrive from two datasets or from both the column
+                        # list and the request fields: one reason per column, not five identical.
+                        dedupe_key = (path, str(col).lower())
+                        if not kind or _declared(str(col), declared) \
+                                or dedupe_key in flagged_columns:
+                            continue
+                        flagged_columns.add(dedupe_key)
+                        pending.append({
+                            "code": "personal_data", "file": path,
+                            "message": t("readiness.personal", column=col, kind=kind),
+                        })
         elif REPORT_FILE.match(path):
             doc = _load(text)
             if not doc:
@@ -402,7 +367,7 @@ def compute(session) -> dict:
             pending.extend(_report_pending(path, doc, files))
             if isinstance(doc.get("direct"), dict):
                 pending.extend(_direct_pending(
-                    session, path, text, doc, files, personal_by_src, confirmed_set
+                    session, path, text, doc, files, personal_by_src
                 ))
         elif QUERY_FILE.match(path) or REQUEST_FILE.match(path):
             chk = (session.query_checks or {}).get(path)

@@ -138,6 +138,14 @@ All notable changes to this project are documented here. The format follows
   the route still read the `converged` flag the in-app agent used, and 045 removed its producer
   while the frontend type had already stopped asking for it. The project editor, the e2e flows and
   the tree the import screen reads were all affected.
+- **A project with a flagged personal column could never be applied** since 045: readiness demanded
+  an explicit confirmation in the conversation's working state, which 045 removed, so declaring the
+  column under `**Datos personales**:` in the integration spec was not enough and "Aplicar
+  proyecto" stayed disabled with no way out. The spec declaration is the record again, and the same
+  column is no longer reported twice when two datasets share it.
+- **The project editor said nothing while it validated**, and dropped the result when the request
+  failed: Apply stayed greyed out under "Sin problemas de validación" with no visible reason. The
+  status bar now says **Comprobando el proyecto…** and, when the check cannot run, says so.
 
 ### Changed
 

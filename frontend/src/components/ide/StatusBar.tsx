@@ -19,6 +19,12 @@ export function StatusBar(props: {
   lastApplied: ProjectLastApplied | null;
   save: SaveState;
   busy?: boolean;
+  /** The project is being validated; the status bar says so instead of leaving Apply greyed out
+   * with no explanation while the origin checks run. */
+  checking?: boolean;
+  /** The validation request failed (network, timeout, server error): say it instead of showing
+   * the previous result or nothing at all. */
+  checkFailed?: boolean;
   /** Runs the action the pending reason asks for (today: the preview), so the bar is not just a
    * diagnosis: "Ejecuta la vista previa" becomes the button that runs it. */
 }) {
@@ -35,6 +41,14 @@ export function StatusBar(props: {
             ? <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-hidden />
             : <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />}
           {props.validation.valid ? t.projects.valid : t.projects.problemsCount(errors)}
+        </span>
+      )}
+      {(props.checkFailed || (!props.validation && props.checking)) && (
+        <span className="flex items-center gap-1 text-ink-2">
+          {props.checkFailed
+            ? <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />
+            : <Spinner className="h-3 w-3" />}
+          {props.checkFailed ? t.projects.checkFailed : t.projects.checking}
         </span>
       )}
       {props.readiness && (

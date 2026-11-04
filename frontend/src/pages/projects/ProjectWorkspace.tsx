@@ -145,6 +145,7 @@ export function ProjectWorkspace() {
   }, [slug]);
 
   const [checking, setChecking] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
   const [problemsOpen, setProblemsOpen] = useState(true);   // the panel can be put away
   // 035: applying the validator's own corrections, with or without an AI.
   const [fixing, setFixing] = useState(false);
@@ -153,8 +154,11 @@ export function ProjectWorkspace() {
     setChecking(true);
     try {
       setCheck(await projectsApi.validate(slug));
+      setCheckFailed(false);
     } catch {
-      /* the problems panel keeps the last result */
+      // Keep the last result but say the check did not run: a greyed-out Apply with no reason is
+      // exactly the "idk how to apply" the owner reported.
+      setCheckFailed(true);
     } finally {
       setChecking(false);
     }
@@ -617,10 +621,12 @@ export function ProjectWorkspace() {
             <Button size="sm" icon={<Upload className="h-4 w-4" aria-hidden />}
                     aria-label={t.projects.apply}
                     title={dirty ? t.projects.saveFirstToApply
-                      : !check?.readiness.ready
-                        ? [t.projects.notReady, ...(check?.readiness.pending ?? [])
-                            .map((item) => item.message)].join(": ")
-                        : undefined}
+                      : !check
+                        ? (checkFailed ? t.projects.checkFailed : t.projects.checking)
+                        : !check.readiness.ready
+                          ? [t.projects.notReady, ...check.readiness.pending
+                              .map((item) => item.message)].join(": ")
+                          : undefined}
                     disabled={!check?.readiness.ready || dirty} onClick={() => setConfirm("apply")}>
               <span className="hidden sm:inline">{t.projects.apply}</span>
             </Button>
@@ -736,7 +742,7 @@ export function ProjectWorkspace() {
         {/* Below every pane, so phones see readiness without opening the editor. */}
         <StatusBar validation={check?.validation ?? null} readiness={check?.readiness ?? null}
                    status={project.status} lastApplied={project.last_applied} save={save}
-                   busy={busy} />
+                   busy={busy} checking={checking} checkFailed={checkFailed} />
       </div>
     </div>
   );

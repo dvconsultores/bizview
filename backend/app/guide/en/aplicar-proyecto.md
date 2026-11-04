@@ -11,8 +11,8 @@ Only the **Superuser**. The agent never applies: it is always your action.
 
 ## How to
 
-1. Wait until the project's status bar says **Ready to apply** (project valid, queries checked and
-   a correct preview).
+1. Wait until the project's status bar says **Ready to apply** (project valid and queries
+   checked); while it says **Checking the project…** the check is still running.
 2. Press **Apply project** and then **Confirm**.
 3. Type your password in **Confirm your password**.
 4. You see "Project applied: version …".
@@ -31,4 +31,5 @@ Only the **Superuser**. The agent never applies: it is always your action.
 ## Common problems
 
 - If the button is not active, look at **Pending before applying** in the status bar: it says
-  what is missing.
+  what is missing (for example, a query not checked yet or a report without filters).
+  **Check again** repeats the checks.

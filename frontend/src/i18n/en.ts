@@ -1334,6 +1334,8 @@ export const en: Catalogue = {
     ready: "Ready to apply",
     notReady: "Pending before applying",
     saveFirstToApply: "Save the changes to be able to apply.",
+    checking: "Checking the project…",
+    checkFailed: "The project could not be checked; try again.",
     lastApplied: (date: string) => `Applied ${date}`,
     neverApplied: "Never applied",
     agentWorking: "Reloading the project…",

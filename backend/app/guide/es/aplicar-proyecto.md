@@ -12,8 +12,9 @@ Solo el **Superusuario**. El agente nunca aplica: siempre es una acción tuya.
 
 ## Cómo se hace
 
-1. Espera a que la barra de estado del proyecto diga **Listo para aplicar** (proyecto válido,
-   consultas comprobadas y vista previa correcta).
+1. Espera a que la barra de estado del proyecto diga **Listo para aplicar** (proyecto válido y
+   consultas comprobadas); mientras diga **Comprobando el proyecto…** la comprobación sigue en
+   curso.
 2. Pulsa **Aplicar proyecto** y luego **Confirmar**.
 3. Escribe tu contraseña en **Confirma tu contraseña**.
 4. Verás «Proyecto aplicado: versión …».
@@ -32,4 +33,5 @@ Solo el **Superusuario**. El agente nunca aplica: siempre es una acción tuya.
 ## Problemas frecuentes
 
 - Si el botón no está activo, mira **Pendiente para aplicar** en la barra de estado: dice qué
-  falta.
+  falta (por ejemplo, una consulta sin comprobar o un reporte sin filtros). **Volver a comprobar**
+  repite las comprobaciones.

@@ -1316,6 +1316,8 @@ export const es = {
     ready: "Listo para aplicar",
     notReady: "Pendiente para aplicar",
     saveFirstToApply: "Guarda los cambios para poder aplicar.",
+    checking: "Comprobando el proyecto…",
+    checkFailed: "No se pudo comprobar el proyecto; vuelve a intentarlo.",
     lastApplied: (date: string) => `Aplicado ${date}`,
     neverApplied: "Nunca aplicado",
     agentWorking: "Recargando el proyecto…",

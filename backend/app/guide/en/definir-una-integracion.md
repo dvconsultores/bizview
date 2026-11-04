@@ -26,5 +26,6 @@ Main fields:
 
 ## Options
 
-- The integration's spec lists in `**Personal data**:` the personal columns included on request.
+- The integration's spec lists in `**Personal data**:` the personal columns included on request; a
+  column flagged as personal that is not listed there blocks the apply.
 - For a full example, ask the agent for the authoring guide or download an applied project.
