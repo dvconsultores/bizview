@@ -9,6 +9,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { PageHeader } from "../../components/PageHeader";
 import { Spinner } from "../../components/Spinner";
+import { GoogleAdminCard } from "../../components/GoogleAdminCard";
 import { TelegramAdminCard } from "../../components/TelegramAdminCard";
 import { useT } from "../../i18n";
 
@@ -133,6 +134,7 @@ export function Security() {
               </ul>
             )}
           </Card>
+          <GoogleAdminCard />
           <TelegramAdminCard />
         </>
       )}

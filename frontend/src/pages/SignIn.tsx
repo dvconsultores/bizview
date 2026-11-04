@@ -15,24 +15,15 @@ import { useBranding } from "../config/BrandingContext";
 import { useT, type Catalogue } from "../i18n";
 import { SourceFooter } from "../components/SourceFooter";
 import { TelegramSignInPanel } from "../components/TelegramSignInPanel";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 type FieldErrors = { email?: string; password?: string };
 
-/** Feature 027: the callback's closed set of outcomes, mapped to plain user language. */
+/** Feature 027/054: one sentence for every refusal — an unknown identity, a domain, an inactive
+ * account and a provider failure all read the same — and the reason lives only in the audit log. A
+ * cancelled consent is the one exception: the person did it, and saying so is not a leak. */
 function googleErrorMessage(code: string, t: Catalogue): string {
-  switch (code) {
-    case "denied":
-      return t.google.errors.cancelled;
-    case "unknown_identity":
-      return t.google.errors.notRegistered;
-    case "inactive":
-      return t.google.errors.inactive;
-    case "domain":
-      return t.google.errors.domain;
-    default:
-      // disabled, state, provider, and any code we do not know: the generic failure.
-      return t.google.errors.failed;
-  }
+  return code === "denied" ? t.google.errors.cancelled : t.google.errors.failed;
 }
 
 export function SignIn() {
@@ -203,20 +194,17 @@ export function SignIn() {
               </div>
               <div className="space-y-3">
                 {google_auth ? (
-                  <Button
-                    variant="secondary"
-                    block
+                  <GoogleSignInButton
                     onClick={() => {
                       setFormError(null);
                       // A normal navigation: the endpoint sets the state cookie and 302s to Google.
                       window.location.assign("/api/auth/google/start");
                     }}
-                  >
-                    {t.google.signIn}
-                  </Button>
+                  />
                 ) : null}
                 {telegram_sign_in ? (
-                  <Button variant="secondary" block icon={<Send className="h-5 w-5" aria-hidden />}
+                  <Button variant="secondary" block className="gap-3"
+                    icon={<Send className="h-5 w-5" aria-hidden />}
                     onClick={() => { setFormError(null); setStep("telegram"); }}>
                     {t.telegram.signIn}
                   </Button>

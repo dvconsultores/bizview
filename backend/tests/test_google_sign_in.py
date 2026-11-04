@@ -265,7 +265,8 @@ def test_unknown_email_is_refused_and_creates_nothing(google_on, monkeypatch):
     before = sql("SELECT count(*) FROM app_user")[0][0]
     c = browser()
     r = callback(c, state=begin(c))
-    assert r.headers["location"] == "/ingresar?google_error=unknown_identity"
+    # Feature 054: the reason is `no_user` now (the audit keeps it; the page is generic).
+    assert r.headers["location"] == "/ingresar?google_error=no_user"
     assert sql("SELECT count(*) FROM app_user")[0][0] == before
     assert sql("SELECT count(*) FROM google_link")[0][0] == 0
     assert sessions() == 0
@@ -299,7 +300,7 @@ def test_allowed_domains(google_on, monkeypatch):
     install_token(monkeypatch, claims("user@example.com"))
     c = browser()
     r = callback(c, state=begin(c))
-    assert r.headers["location"] == "/ingresar?google_error=domain"
+    assert r.headers["location"] == "/ingresar?google_error=domain_not_allowed"
     assert sessions() == 0
 
     monkeypatch.setattr(google_on, "google_allowed_domains", "otra.com ejemplo.com")

@@ -2,10 +2,12 @@
 (set by the e2e backend script); never in images. No network: a local transport records what
 the bot would send."""
 
+import base64
 import hashlib
 import json
 import re
 import shutil
+import time
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -14,6 +16,7 @@ from pydantic import ValidationError
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.orm import Session
 
+from app.auth import google
 from app.config import get_settings
 from app.db import DB, get_sessionmaker
 from app.mail import send as mail_send
@@ -503,3 +506,58 @@ def project_disk(slug: str):
     files = sorted(p.relative_to(root).as_posix() for p in root.rglob("*")
                    if p.is_file() and not p.relative_to(root).as_posix().startswith(fs.TRASH))
     return {"files": files}
+
+# Feature 054 (T026): a Google identity without Google. The e2e suite reads the authorization URL,
+# keeps the state cookie and comes back to the callback with a fake code; the token exchange is
+# answered here with an ID token carrying the identity the test asked for. The seam is
+# `google.client()`, the same one the unit tests use — no test code reaches the production path.
+_GOOGLE_IDENTITY: dict | None = None
+_GOOGLE_CLIENT = google.client
+
+
+def _segment(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _google_transport() -> httpx.MockTransport:
+    def handle(_request: httpx.Request) -> httpx.Response:
+        claims = {
+            "iss": "https://accounts.google.com",
+            "aud": get_settings().google_client_id or "",
+            "exp": int(time.time()) + 300,
+            "email_verified": True,
+            "sub": _GOOGLE_IDENTITY["sub"],
+            "email": _GOOGLE_IDENTITY["email"],
+            "name": _GOOGLE_IDENTITY.get("name"),
+            "hd": _GOOGLE_IDENTITY.get("hd"),
+        }
+        token = f"{_segment({'alg': 'none', 'typ': 'JWT'})}.{_segment(claims)}.firma"
+        return httpx.Response(200, json={"id_token": token})
+
+    return httpx.MockTransport(handle)
+
+
+@router.post("/api/testing/google-identity")
+def google_identity(body: dict):
+    """Answer the next Google exchange with this identity (`{email, name?, sub?, hd?}`)."""
+    global _GOOGLE_IDENTITY
+    email = str(body.get("email") or "").strip().lower()
+    if "@" not in email:
+        raise HTTPException(422, "Falta el correo de la identidad.")
+    _GOOGLE_IDENTITY = {
+        "email": email,
+        "name": body.get("name") or email.split("@")[0],
+        "sub": body.get("sub") or f"google-{email}",
+        "hd": body.get("hd") or email.split("@")[1],
+    }
+    google.client = lambda: httpx.Client(transport=_google_transport())
+    return {"ok": True, "email": _GOOGLE_IDENTITY["email"]}
+
+
+@router.post("/api/testing/google-reset")
+def google_reset():
+    global _GOOGLE_IDENTITY
+    _GOOGLE_IDENTITY = None
+    google.client = _GOOGLE_CLIENT
+    return {"ok": True}

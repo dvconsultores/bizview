@@ -22,6 +22,8 @@ there is no self sign-up.
 
 ## Options
 
+- **Continue with Google**: shown when the installation has Google sign-in turned on; the
+  **Sign-in with Google** topic in Help explains how it is configured.
 - **Sign in with Telegram**: shown when the installation has Telegram sign-in turned on and your
   account is linked.
 - The language selector of the sign-in page changes the language on this device only.

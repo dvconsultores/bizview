@@ -34,7 +34,21 @@ topics:
     aliases:
       es: ["acceso", "login", "sesión", "iniciar sesión", "bloqueo"]
       en: ["access", "login", "session", "sign in", "lockout"]
-    related: [contrasena, doble-factor, telegram]
+    related: [contrasena, doble-factor, telegram, ingreso-con-google]
+  - id: ingreso-con-google
+    section: primeros-pasos
+    title: {es: "Ingreso con Google", en: "Sign in with Google"}
+    summary:
+      es: "Cómo entrar con una cuenta de Google, qué dominios se aceptan y cómo se deciden el rol y los tableros."
+      en: "How to sign in with a Google account, which domains are accepted and how the role and dashboards are decided."
+    roles: [public, user, superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["google", "ingreso con google", "dominio", "alta automática", "reglas de rol"]
+      en: ["google", "sign in with google", "domain", "automatic sign-up", "role rules"]
+    related: [ingreso, seguridad, usuarios]
   - id: contrasena
     section: primeros-pasos
     title: {es: "Cambiar la contraseña", en: "Change your password"}

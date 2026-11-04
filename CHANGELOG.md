@@ -8,6 +8,25 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Sign in with Google, branded, and a role policy the superuser can edit (feature 054)**. The
+  sign-in page showed a plain outline button next to Telegram's: it is now Google's own action — the
+  four-colour **G** inlined in the bundle (no external fetch), a light surface on the light theme and
+  a dark one on the dark theme, the same 44 px height as the Telegram button, the mark at the left —
+  and the two providers keep the order email → divider → Google → Telegram, each hidden when its
+  provider is off. The card in **Administración → Seguridad → Ingreso con Google** turns what used to
+  be env-only into policy: **Dominios permitidos** (the first save copies `GOOGLE_ALLOWED_DOMAINS`
+  into settings and the settings win from then on), **Alta automática** with a default role — never
+  **Superusuario** — and a default dashboard access (none, every public dashboard, or a chosen list),
+  **Vincular por correo** with the "apply the rules to existing users too" switch off by default, and
+  an ordered list of **Reglas de rol** that matches on `domain` or `email` (the `group` condition is
+  shipped greyed as *próximamente*), first match wins. A provisioned account is active,
+  `auth_provider=google`, carries no password and cannot sign in with one until an administrator sets
+  it. Every change and every sign-in is audited (`google_settings_updated`, `google_rule_created`,
+  `google_rule_updated`, `google_rule_deleted`, `google_user_provisioned`, `google_rule_applied`,
+  `google_sign_in_refused` with its reason), the page keeps one generic sentence for every refusal,
+  and superusers are never created or modified by a rule. Migration `0051_google_rbac` adds the two
+  tables (`google_settings`, `google_rule`) and the two columns that make a passwordless account
+  possible (`app_user.auth_provider`, `app_user.password_hash` nullable).
 - **Each source shows its structure, and one button generates the pack an author's AI reads
   (feature 052)**. The source page gains a second tab, **Estructura**: the catalogue as it is
   (schemas, tables, columns, types, keys, estimated rows, date ranges) and, for REST/Supabase, the

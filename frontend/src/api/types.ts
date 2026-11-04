@@ -1434,3 +1434,41 @@ export interface SampleRun {
   timestamp_units: string | null;
   pagination: string | null;
 }
+
+// Feature 054: the installation's Google sign-in policy (Administración → Seguridad).
+export type GoogleCondition = "domain" | "email" | "group";
+export type GoogleAccessMode = "none" | "all_public" | "list";
+
+export interface GoogleAccess {
+  mode: GoogleAccessMode;
+  codes?: string[];
+}
+
+export interface GoogleSettings {
+  /** The domains the callback accepts; the deployment's `GOOGLE_ALLOWED_DOMAINS` until saved. */
+  allowed_domains: string[];
+  /** True while the list is still the env value and the first save turns it into data. */
+  domains_from_env: boolean;
+  auto_provision: boolean;
+  default_role: Role;
+  default_access: GoogleAccess;
+  apply_rules_to_existing: boolean;
+  updated_at: string | null;
+}
+
+export interface GoogleRule {
+  id: number;
+  position: number;
+  condition: GoogleCondition;
+  /** One domain for `domain`, the addresses for `email`. */
+  value: string[];
+  role: Role;
+  access: GoogleAccess;
+  enabled: boolean;
+}
+
+export interface GoogleAdminState {
+  settings: GoogleSettings;
+  /** The access picker's catalogue: the same dashboards the administration list shows. */
+  dashboards: { code: string; name: string; status: string }[];
+}

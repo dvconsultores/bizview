@@ -99,9 +99,11 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
+    from app.api import google_admin
+
     for module in (health, auth, me, dashboards, admin, ai, sources, security, workspace,
                    reports, tokens, telegram, projects, shared, sharing, guide, oauth,
-                   appearance, themes):
+                   appearance, themes, google_admin):
         app.include_router(module.router)
     if os.environ.get("BIZVIEW_TEST_HOOKS") == "1":   # e2e only (feature 007); never in images
         from app.api import testhooks

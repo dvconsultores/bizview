@@ -22,6 +22,8 @@ Cualquier persona con una cuenta. Las cuentas las crea un **Administrador** o el
 
 ## Opciones
 
+- **Continuar con Google**: aparece cuando la instalación tiene el ingreso con Google activo; el
+  tema **Ingreso con Google** de la Ayuda cuenta cómo se configura.
 - **Ingresar con Telegram**: aparece cuando la instalación tiene el ingreso con Telegram activo
   y tu cuenta está vinculada.
 - El selector de idioma de la página de ingreso cambia el idioma solo en este dispositivo.

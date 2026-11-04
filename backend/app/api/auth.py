@@ -38,6 +38,15 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = DB)
         audit.record(db, "login_failed", target_id=user.id, ip=ip, detail={"locked": True})
         _fail(db, ip)
         raise users.locked_error(user)
+    if user.password_hash is None:
+        # Feature 054: an account provisioned from Google has no password until an admin sets one.
+        # The refusal is the wrong-password one — same message, same throttle, same timing shape.
+        passwords.verify_password(passwords.DUMMY_HASH, body.password)
+        audit.record(db, "login_failed", target_id=user.id, ip=ip, detail={"no_credential": True})
+        # No failure is registered against the account: there is no password to guess, and counting
+        # them would let anyone lock a Google-only user out of the Google path too.
+        _fail(db, ip)
+        raise INVALID
     ok = passwords.verify_password(user.password_hash, body.password)
     if not ok or not user.is_active:
         if not user.is_active:

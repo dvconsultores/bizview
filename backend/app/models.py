@@ -71,6 +71,9 @@ AUDIT_KINDS = (
     "source_structure_notes_updated", "source_structure_flag_changed", "source_sample_created",
     "source_sample_updated", "source_sample_deleted", "source_sample_run",
     "source_structure_generated",
+    # feature 054 — the Google policy: domains, provisioning and role rules
+    "google_settings_updated", "google_rule_created", "google_rule_updated",
+    "google_rule_deleted", "google_user_provisioned", "google_rule_applied",
 )
 #: Audit kinds a database may already contain that the product no longer emits (feature 045
 #: removed the in-app authoring agent). They exist so historical rows stay readable and so the
@@ -101,6 +104,11 @@ VERSION_STATES = ("active", "previous", "archived")
 SOURCE_KINDS = ("postgresql", "soap", "rest", "supabase")
 DASHBOARD_STATUSES = ("available", "coming_soon", "hidden")
 ROLES = ("admin", "user")
+#: Feature 054: how the account was created — Google provisioning writes `google` and no password.
+AUTH_PROVIDERS = ("password", "google")
+#: Feature 054: how a Google account obtains a role and dashboards.
+GOOGLE_CONDITIONS = ("domain", "email", "group")     # `group` waits for a Workspace service account
+GOOGLE_ACCESS_MODES = ("none", "all_public", "list")
 THEMES = ("system", "light", "dark")
 LOCALES = ("es", "en")
 TELEGRAM_PURPOSES = ("sign_in", "link")
@@ -151,6 +159,7 @@ class AppUser(Base):
         CheckConstraint(_in("theme", THEMES), name="theme"),
         CheckConstraint("locale IS NULL OR " + _in("locale", LOCALES), name="locale"),
         CheckConstraint("is_active OR NOT is_superuser", name="superuser_active"),
+        CheckConstraint(_in("auth_provider", AUTH_PROVIDERS), name="auth_provider"),
         Index("uq_app_user_single_superuser", text("(true)"), unique=True,
               postgresql_where=text("is_superuser")),
         Index("ix_app_user_role_active", "role", "is_active"),
@@ -162,7 +171,9 @@ class AppUser(Base):
     role: Mapped[str] = mapped_column(Text)
     is_superuser: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
-    password_hash: Mapped[str] = mapped_column(Text)
+    # Feature 054: an account provisioned from Google has no password until an admin sets one.
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    auth_provider: Mapped[str] = mapped_column(Text, server_default=text("'password'"))
     must_change_password: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     failed_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -608,6 +619,63 @@ class AppearanceSettings(Base):
     palette_preset: Mapped[str] = mapped_column(
         String(32), server_default=text(f"'{DEFAULT_PALETTE_PRESET}'"))
     theme_id: Mapped[str | None] = mapped_column(Text, ForeignKey("theme.id"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+class GoogleSettings(Base):
+    """The installation's Google sign-in policy (feature 054): who may come in and as what.
+
+    One row. With no row every answer is the deployment default: the domains of
+    `GOOGLE_ALLOWED_DOMAINS`, no provisioning, `user` and no dashboards — an installation that never
+    opened the card keeps exactly feature 027's behaviour."""
+    __tablename__ = "google_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(_in("default_role", ROLES), name="google_default_role"),
+        CheckConstraint("jsonb_typeof(allowed_domains) = 'array'", name="google_domains_array"),
+        CheckConstraint("jsonb_typeof(default_access) = 'object'", name="google_access_object"),
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    allowed_domains: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    auto_provision: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    default_role: Mapped[str] = mapped_column(Text, server_default=text("'user'"))
+    default_access: Mapped[dict] = mapped_column(
+        JSONB, server_default=text("'{\"mode\": \"none\"}'::jsonb"))
+    # Existing accounts are never rewritten unless an admin asks for it (feature 054, FR-013).
+    apply_rules_to_existing: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+class GoogleRule(Base):
+    """One ordered rule of the Google policy (feature 054): condition → role + access.
+
+    `position` is kept contiguous by the service; the first enabled rule that matches decides. A
+    rule never produces a superuser, and superusers are never modified by one."""
+    __tablename__ = "google_rule"
+    __table_args__ = (
+        CheckConstraint(_in("condition", GOOGLE_CONDITIONS), name="google_condition"),
+        CheckConstraint(_in("role", ROLES), name="google_rule_role"),
+        CheckConstraint("jsonb_typeof(value) = 'array'", name="google_rule_value_array"),
+        CheckConstraint("jsonb_typeof(access) = 'object'", name="google_rule_access_object"),
+        CheckConstraint("position >= 0", name="google_rule_position"),
+        Index("ix_google_rule_position", "position"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    condition: Mapped[str] = mapped_column(Text)
+    # A domain is a one-element list, so one column and one validator serve both conditions.
+    value: Mapped[list] = mapped_column(JSONB)
+    role: Mapped[str] = mapped_column(Text)
+    access: Mapped[dict] = mapped_column(
+        JSONB, server_default=text("'{\"mode\": \"none\"}'::jsonb"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))

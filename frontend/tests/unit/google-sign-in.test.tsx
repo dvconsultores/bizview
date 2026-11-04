@@ -57,6 +57,19 @@ vi.mock("../../src/auth/AuthContext", () => ({
 }));
 vi.mock("../../src/config/BrandingContext", () => ({ useBranding: () => branding }));
 vi.mock("../../src/components/Toast", () => ({ useToast: () => vi.fn() }));
+// Feature 054: the branded button reads the resolved theme; the page is mounted without the app
+// shell here, so the provider is replaced by the one value the button asks for.
+vi.mock("../../src/theme/ThemeContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/theme/ThemeContext")>()),
+  useTheme: () => ({
+    resolved: "light",
+    preference: "system",
+    setPreference: async () => undefined,
+    palette: "impacto",
+    tokens: {},
+    setPalette: () => undefined,
+  }),
+}));
 
 import { en } from "../../src/i18n/en";
 import { es } from "../../src/i18n/es";
@@ -241,14 +254,17 @@ describe("second factor required by the Google callback", () => {
 });
 
 describe("google_error codes", () => {
+  // Feature 054 (FR-016): every refusal but a cancelled consent reads the same — an unknown
+  // account, a foreign domain and an inactive user are indistinguishable on the page, and the real
+  // reason is written to the audit log.
   const cases: [string, string][] = [
     ["disabled", es.google.errors.failed],
     ["state", es.google.errors.failed],
     ["provider", es.google.errors.failed],
     ["denied", es.google.errors.cancelled],
-    ["unknown_identity", es.google.errors.notRegistered],
-    ["inactive", es.google.errors.inactive],
-    ["domain", es.google.errors.domain],
+    ["no_user", es.google.errors.failed],
+    ["domain_not_allowed", es.google.errors.failed],
+    ["inactive", es.google.errors.failed],
     ["not_a_code", es.google.errors.failed],
   ];
 
@@ -266,30 +282,30 @@ describe("google_error codes", () => {
 describe("both languages", () => {
   it("renders the Spanish action and error", async () => {
     branding.google_auth = true;
-    await render("/ingresar?google_error=domain");
+    await render("/ingresar?google_error=domain_not_allowed");
     expect(es.google.signIn).toBe("Continuar con Google");
     expect(byText(es.google.signIn)).toBeDefined();
-    expect(container.textContent).toContain(es.google.errors.domain);
+    expect(container.textContent).toContain(es.google.errors.failed);
   });
 
   it("renders the English action and error", async () => {
     branding.google_auth = true;
     localStorage.setItem("bizview.locale", "en");
-    await render("/ingresar?google_error=domain");
+    await render("/ingresar?google_error=domain_not_allowed");
     expect(en.google.signIn).toBe("Continue with Google");
     expect(byText(en.google.signIn)).toBeDefined();
     expect(byText(es.google.signIn)).toBeUndefined();
-    expect(container.textContent).toContain(en.google.errors.domain);
-    expect(container.textContent).not.toContain(es.google.errors.domain);
+    expect(container.textContent).toContain(en.google.errors.failed);
+    expect(container.textContent).not.toContain(es.google.errors.failed);
   });
 
   it("translates every callback code in English", async () => {
     localStorage.setItem("bizview.locale", "en");
     const codes: [string, string][] = [
       ["denied", en.google.errors.cancelled],
-      ["unknown_identity", en.google.errors.notRegistered],
-      ["inactive", en.google.errors.inactive],
-      ["domain", en.google.errors.domain],
+      ["no_user", en.google.errors.failed],
+      ["inactive", en.google.errors.failed],
+      ["domain_not_allowed", en.google.errors.failed],
       ["unknown", en.google.errors.failed],
     ];
     for (const [code, message] of codes) {

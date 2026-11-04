@@ -79,6 +79,9 @@ class Identity:
     sub: str
     email: str
     hd: str | None
+    # Feature 054: the profile name, used for an account the policy provisions. Optional in the
+    # claim set, so it is only ever a hint.
+    name: str | None = None
 
 
 def exchange(settings: Settings, code: str, verifier: str) -> Identity:
@@ -107,8 +110,9 @@ def exchange(settings: Settings, code: str, verifier: str) -> Identity:
         raise GoogleError("provider")
     claims = decode_claims(id_token)
     verify_claims(claims, settings)
+    name = claims.get("name")
     return Identity(sub=claims["sub"], email=claims["email"].strip().lower(),
-                    hd=claims.get("hd"))
+                    hd=claims.get("hd"), name=name.strip()[:120] if isinstance(name, str) else None)
 
 
 def decode_claims(id_token: str) -> dict:

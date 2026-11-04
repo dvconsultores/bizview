@@ -21,7 +21,7 @@ from app.db import get_sessionmaker
 from app.errors import ApiError, not_found
 from app.i18n import current as current_locale
 from app.models import AppUser, GoogleLink
-from app.services import audit, users
+from app.services import audit, google_policy, users
 
 router = APIRouter()
 
@@ -77,9 +77,10 @@ def google_callback(request: Request, code: str | None = None, state: str | None
     response = RedirectResponse("/", status_code=302)
     try:
         try:
-            user = _sign_in(db, settings, request, ip, code=code, state=state, error=error)
+            user, how = _sign_in(db, settings, request, ip, code=code, state=state, error=error)
             result = finish_sign_in(db, user, request, response, ip, method="google")
-            audit.record(db, "google_sign_in", actor_id=user.id, target_id=user.id, ip=ip)
+            audit.record(db, "google_sign_in", actor_id=user.id, target_id=user.id, ip=ip,
+                         detail=how)
             db.commit()
         except google.GoogleError as refusal:
             db.rollback()
@@ -99,8 +100,12 @@ def google_callback(request: Request, code: str | None = None, state: str | None
 
 
 def _sign_in(db: Session, settings: Settings, request: Request, ip: str | None, *,
-             code: str | None, state: str | None, error: str | None) -> AppUser:
-    """Prove the identity and resolve it to an existing account; never creates a user."""
+             code: str | None, state: str | None, error: str | None) -> tuple[AppUser, dict]:
+    """Prove the identity and resolve it through the installation's policy (feature 054).
+
+    Order: the linked subject, the account with that email, a provisioned account when the policy
+    allows one, and otherwise the generic refusal. The returned dict is the audit detail: how the
+    account was found and which rule decided its role."""
     if not settings.google_enabled_effective:
         raise google.GoogleError("disabled")
 
@@ -113,37 +118,51 @@ def _sign_in(db: Session, settings: Settings, request: Request, ip: str | None, 
         raise google.GoogleError("provider")
 
     identity = google.exchange(settings, code, verifier)
-    _check_domain(settings, identity.email)
+    installed = google_policy.policy(db)
+    if not google_policy.domain_allowed(installed, identity.email):
+        # Same generic answer as any other refusal; the audit keeps the reason.
+        raise google.GoogleError("domain_not_allowed")
 
     link = db.scalar(select(GoogleLink).where(GoogleLink.google_sub == identity.sub))
     if link is not None:
         user = db.get(AppUser, link.user_id)      # None: the account was deleted
         if user is None:
-            raise google.GoogleError("unknown_identity")
+            raise google.GoogleError("no_user")
         _refuse_inactive(db, user, ip)
         link.email = identity.email               # last known address, for display only
         link.last_login_at = users.now()
-        return user
+        return user, {"how": "linked", **_ruled(db, user, identity.email, installed)}
 
     user = users.by_email(db, identity.email)
-    if user is None:
-        raise google.GoogleError("unknown_identity")
-    _refuse_inactive(db, user, ip)
-    if db.scalar(select(GoogleLink).where(GoogleLink.user_id == user.id)) is not None:
-        # Already linked to a different Google identity: never repoint it silently.
-        raise google.GoogleError("unknown_identity")
-    now = users.now()
-    db.add(GoogleLink(user_id=user.id, google_sub=identity.sub, email=identity.email,
-                      created_at=now, last_login_at=now))
-    db.flush()
-    audit.record(db, "google_linked", actor_id=user.id, target_id=user.id, ip=ip)
-    return user
+    if user is not None:
+        _refuse_inactive(db, user, ip)
+        if db.scalar(select(GoogleLink).where(GoogleLink.user_id == user.id)) is not None:
+            # Already linked to a different Google identity: never repoint it silently.
+            raise google.GoogleError("no_user")
+        now = users.now()
+        db.add(GoogleLink(user_id=user.id, google_sub=identity.sub, email=identity.email,
+                          created_at=now, last_login_at=now))
+        db.flush()
+        audit.record(db, "google_linked", actor_id=user.id, target_id=user.id, ip=ip)
+        return user, {"how": "email", **_ruled(db, user, identity.email, installed)}
+
+    if installed.auto_provision:
+        user, rule = google_policy.provision(
+            db, email=identity.email, name=identity.name, google_sub=identity.sub,
+            policy_=installed)
+        _refuse_inactive(db, user, ip)            # a provisioned account is active by construction
+        return user, {"how": "provisioned", "rule": rule.id if rule is not None else None}
+
+    raise google.GoogleError("no_user")
 
 
-def _check_domain(settings: Settings, email: str) -> None:
-    allowed = settings.google_domains
-    if allowed and email.rsplit("@", 1)[-1].lower() not in allowed:
-        raise google.GoogleError("domain")
+def _ruled(db: Session, user: AppUser, email: str, installed) -> dict:
+    """Apply the first matching rule to an existing account, when the policy asks for it."""
+    rule = google_policy.matching_rule(db, email)
+    if rule is None:
+        return {}
+    changed = google_policy.apply_to_existing(db, user, rule, installed)
+    return {"rule": rule.id, "rule_applied": changed}
 
 
 def _refuse_inactive(db: Session, user: AppUser, ip: str | None) -> None:

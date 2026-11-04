@@ -24,6 +24,13 @@ const ALLOWED_BY_FILE: Record<string, string[]> = {
 };
 // Colour literals: the browser bar colour must be known before any CSS loads (theme-init.js).
 const LITERALS_BY_FILE: Record<string, string[]> = {
+  // Feature 054: Google's own mark and its two published button variants. The brand terms forbid
+  // recolouring the G, so the four brand fills and the light/dark surfaces are the one place where
+  // literal colours are the requirement, not an accident.
+  "components/GoogleSignInButton.tsx": [
+    "#EA4335", "#4285F4", "#FBBC05", "#34A853", "#747775", "#1F1F1F", "#F7F8F8", "#F1F3F4",
+    "#8E918F", "#131314", "#1F1F1F", "#2A2A2A", "#FFFFFF",
+  ],
   // The browser bar colour must be known before any CSS loads (theme-init.js).
   "theme/resolve.ts": ["#3a7393", "#172b37"],
   // Feature 051: the derivation's last-resort values, used only if a theme arrives without the
