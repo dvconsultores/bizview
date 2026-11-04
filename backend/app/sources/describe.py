@@ -17,24 +17,33 @@ from app.sources.connectors import rest, soap
 from app.sources.connectors.base import temp_pem
 
 MAX_TABLES, MAX_COLUMNS, MAX_OPERATIONS, MAX_DEPTH = 500, 200, 200, 6
+#: Feature 052: how many date columns per table get a `min`/`max` in the structure pack.
+MAX_DATE_COLUMNS = 3
+DATE_TYPES = {"date", "timestamp without time zone", "timestamp with time zone"}
 
 
 def postgresql(settings: dict, secrets: dict, app: Settings,
-               write_probe: bool = False) -> dict:
+               write_probe: bool = False, date_ranges: bool = False) -> dict:
     """Structure of a PostgreSQL source; with `write_probe`, whether the credential can write.
 
     The probe (048) attempts one harmless write inside a transaction that is always rolled back: a
     credential that can create a temporary table can write, whatever its grants look like on paper.
+
+    Feature 052: each table also carries its foreign keys and, with `date_ranges`, the `min`/`max`
+    of up to `MAX_DATE_COLUMNS` date columns — the two aggregates the structure pack prints. A
+    range that cannot be read (permission, timeout, an unaggregatable type) is skipped: a structure
+    read never fails because one column could not be summarised.
     """
     with _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30) as conn:
-        tables = conn.execute(
+        tables_query = (
             "SELECT n.nspname, c.relname, c.relkind, greatest(c.reltuples, 0)::bigint "
             "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
             "WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f') "
             "AND n.nspname NOT IN ('pg_catalog', 'information_schema') "
             "AND n.nspname NOT LIKE 'pg_toast%%' AND n.nspname NOT LIKE 'pg_temp%%' "
             "AND has_table_privilege(c.oid, 'SELECT') "
-            "ORDER BY 1, 2 LIMIT %s", (MAX_TABLES + 1,)).fetchall()
+            "ORDER BY 1, 2 LIMIT %s")
+        tables = conn.execute(tables_query, (MAX_TABLES + 1,)).fetchall()
         columns = conn.execute(
             "SELECT table_schema, table_name, column_name, data_type, is_nullable = 'YES' "
             "FROM information_schema.columns "
@@ -46,22 +55,68 @@ def postgresql(settings: dict, secrets: dict, app: Settings,
             "JOIN information_schema.key_column_usage kcu "
             "ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema "
             "WHERE tc.constraint_type = 'PRIMARY KEY' ORDER BY kcu.ordinal_position").fetchall()
-    cols: dict[tuple, list] = {}
-    for schema, table, name, dtype, nullable in columns:
-        cols.setdefault((schema, table), []).append(
-            {"name": name, "type": dtype, "nullable": nullable})
+        foreign = conn.execute(
+            "SELECT tc.table_schema, tc.table_name, kcu.column_name, "
+            "ccu.table_name, ccu.column_name "
+            "FROM information_schema.table_constraints tc "
+            "JOIN information_schema.key_column_usage kcu "
+            "ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema "
+            "JOIN information_schema.constraint_column_usage ccu "
+            "ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema "
+            "WHERE tc.constraint_type = 'FOREIGN KEY'").fetchall()
+        cols: dict[tuple, list] = {}
+        for schema, table, name, dtype, nullable in columns:
+            cols.setdefault((schema, table), []).append(
+                {"name": name, "type": dtype, "nullable": nullable})
+        ranges = _date_ranges(conn, tables[:MAX_TABLES], cols) if date_ranges else {}
     pks: dict[tuple, list] = {}
     for schema, table, name in keys:
         pks.setdefault((schema, table), []).append(name)
+    fks: dict[tuple, list] = {}
+    for schema, table, column, ref_table, ref_column in foreign:
+        fks.setdefault((schema, table), []).append(
+            {"column": column, "references": f"{ref_table}.{ref_column}"})
     kinds = {"r": "table", "p": "table", "v": "view", "m": "materialized_view",
              "f": "foreign_table"}
-    out = [{"schema": s, "name": t, "kind": kinds[k], "estimated_rows": n,
-            "primary_key": pks.get((s, t), []), "columns": cols.get((s, t), [])[:MAX_COLUMNS]}
-           for s, t, k, n in tables[:MAX_TABLES]]
+    out = []
+    for schema, table, relkind, rows in tables[:MAX_TABLES]:
+        table_columns = [dict(c) for c in cols.get((schema, table), [])[:MAX_COLUMNS]]
+        for column in table_columns:
+            span = ranges.get((schema, table), {}).get(column["name"])
+            if span:
+                column["range"] = span
+        out.append({"schema": schema, "name": table, "kind": kinds[relkind],
+                    "estimated_rows": rows, "primary_key": pks.get((schema, table), []),
+                    "foreign_keys": fks.get((schema, table), []), "columns": table_columns})
     report = {"kind": "postgresql", "tables": out, "truncated": len(tables) > MAX_TABLES}
     if write_probe:
         report["write_allowed"] = _write_probe(settings, secrets, app)
     return report
+
+
+def _ident(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def _date_ranges(conn, tables, cols: dict[tuple, list]) -> dict[tuple, dict[str, dict]]:
+    """`min`/`max` of the date columns of each table, at most `MAX_DATE_COLUMNS` of them."""
+    out: dict[tuple, dict[str, dict]] = {}
+    for schema, table, _kind, _rows in tables:
+        picks = [c for c in cols.get((schema, table), [])
+                 if str(c["type"]).lower() in DATE_TYPES][:MAX_DATE_COLUMNS]
+        for column in picks:
+            ident = _ident(column["name"])
+            try:
+                with conn.transaction():
+                    row = conn.execute(
+                        f"SELECT min({ident})::text, max({ident})::text "
+                        f"FROM {_ident(schema)}.{_ident(table)}").fetchone()
+            except Exception:
+                continue
+            if row and (row[0] or row[1]):
+                out.setdefault((schema, table), {})[column["name"]] = {"min": row[0],
+                                                                      "max": row[1]}
+    return out
 
 
 def _write_probe(settings: dict, secrets: dict, app: Settings) -> bool:
@@ -196,10 +251,12 @@ def soap_operations(settings: dict, secrets: dict, app: Settings) -> dict:
 
 
 def describe(kind: str, settings: dict, secrets: dict, app: Settings,
-             path: str | None = None, write_probe: bool = False) -> dict:
+             path: str | None = None, write_probe: bool = False,
+             date_ranges: bool = False) -> dict:
     try:
         if kind == "postgresql":
-            return postgresql(settings, secrets, app, write_probe=write_probe)
+            return postgresql(settings, secrets, app, write_probe=write_probe,
+                              date_ranges=date_ranges)
         if kind == "rest":
             return rest_shape(settings, secrets, app, path)
         if kind == "soap":

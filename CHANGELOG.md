@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Each source shows and downloads its structure, and answers questions about it (feature 052)**.
+  The source page gains a second tab, **Estructura**: schemas, tables, columns, types, keys,
+  estimated rows and date ranges for PostgreSQL; the saved **sample requests** with the shape of
+  their response for REST and Supabase; operations for SOAP. **Descargar estructura** produces the
+  authoring pack's own `structure.md` and `structure.json` — one generator
+  (`cli/bizview_cli/structure.py`) shared by the button, `GET /api/sources/{name}/structure` and
+  `bizview describe --pack`, so the three cannot drift. Nothing but metadata leaves a source: no
+  row values, hosts or credentials, and the personal-data flags are heuristics the super user can
+  override, carried in the pack.
+- **A read-only structure chat per source**: it answers from that structure only, in the user's
+  language, with the exact object names; a data or action request is refused by product code before
+  the provider is called, every object an answer mentions is checked against the structure and the
+  unknown ones are flagged, and a per-user daily token cap (`AI_CHAT_DAILY_TOKENS`, default
+  100 000) bounds the spend. With `AI_PROVIDER=none` the tab still renders and downloads; the chat
+  panel explains how to enable it. Constitution VIII is amended (3.2.1 → 3.2.2) to name the chat
+  beside the help agent.
+
 ### Changed
 
 - **The installation theme now repaints the whole application (feature 051)**: applying a theme used

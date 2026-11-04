@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     ai_model: str | None = Field(default=None, max_length=100)
     ai_base_url: str | None = None
     ai_timeout_seconds: float = Field(default=30, ge=1, le=300)
+    # Feature 052: the structure chat. A per-user, per-source, per-UTC-day budget (0 = no chat at
+    # all), and whether the question text is kept — the token counts and the audit are always kept.
+    ai_structure_chat_daily_tokens: int = Field(default=100_000, ge=0)
+    ai_structure_chat_store_questions: bool = False
     # Origin checks run inside this window (SQL/HTTP), on the explicit validate action only.
     origin_check_timeout_seconds: float = Field(default=20, ge=1, le=120)
 

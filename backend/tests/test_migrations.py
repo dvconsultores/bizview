@@ -26,7 +26,8 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "share_link", "email_send", "email_delivery", "email_subscription",
               "direct_read_log", "report_rollup", "project", "project_file_revision",
               "google_link", "ai_status", "appearance_settings", "image_cache",
-              "theme", "direct_snapshot", "project_limits"}
+              "theme", "direct_snapshot", "project_limits", "source_sample_request",
+              "source_structure_flag", "source_chat_message"}
 
 
 def schema_tables():

@@ -427,6 +427,48 @@ topics:
       es: ["fuentes", "fuente de datos", "conexión", "postgresql", "rest", "soap"]
       en: ["sources", "data source", "connection", "postgresql", "rest", "soap"]
     related: [fuente-supabase, integraciones, reportes-directos]
+  - id: estructura-de-una-fuente
+    section: datos
+    title: {es: "Estructura de una fuente", en: "A source's structure"}
+    summary:
+      es: "Ver qué contiene una conexión (tablas, columnas, tipos, claves y endpoints) y descargarla para escribir el spec."
+      en: "See what a connection holds (tables, columns, types, keys and endpoints) and download it to write the spec."
+    roles: [superuser]
+    routes: ["/admin/fuentes/:id"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["estructura", "columnas", "tablas", "tipos", "descargar estructura", "structure", "esquema"]
+      en: ["structure", "columns", "tables", "types", "download structure", "schema"]
+    related: [fuentes, chat-de-estructura, peticiones-de-muestra]
+  - id: chat-de-estructura
+    section: datos
+    title: {es: "Chat de estructura", en: "Structure chat"}
+    summary:
+      es: "Preguntar por las tablas y campos de una fuente, sin que nadie lea los datos."
+      en: "Ask about a source's tables and fields, without anybody reading the data."
+    roles: [superuser]
+    routes: ["/admin/fuentes/:id"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["chat", "preguntar", "ia", "consulta", "estructura"]
+      en: ["chat", "ask", "ai", "assistant", "structure"]
+    related: [estructura-de-una-fuente, ia, fuentes]
+  - id: peticiones-de-muestra
+    section: datos
+    title: {es: "Peticiones de muestra", en: "Sample requests"}
+    summary:
+      es: "Guardar rutas de una fuente REST o Supabase y ver la forma de su respuesta para escribir la petición del ETL."
+      en: "Save paths of a REST or Supabase source and see the shape of their response to write the ETL request."
+    roles: [superuser]
+    routes: ["/admin/fuentes/:id"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["peticiones", "muestra", "endpoint", "respuesta", "records", "campos"]
+      en: ["requests", "sample", "endpoint", "response", "records", "fields"]
+    related: [estructura-de-una-fuente, integraciones, etl-y-transformaciones]
   - id: fuente-supabase
     section: datos
     title: {es: "Fuente Supabase", en: "Supabase source"}

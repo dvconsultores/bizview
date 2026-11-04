@@ -88,6 +88,10 @@ MESSAGES: dict[str, str] = {
     "cli.describe_help": "structure of a data source (no data)",
     "cli.describe_source_help": "source name in the installation",
     "cli.describe_path_help": "REST: sample path whose shape is described (e.g. /orders)",
+    # Feature 052: the two files the authoring pack reads.
+    "cli.describe_pack_help": "write sources/<name>/structure.md and structure.json (pack format)",
+    "cli.describe_out_help": "folder to write the pack into (the current one by default)",
+    "describe.pack_written": "wrote: {path}",
     "cli.theme_help": "validate and preview themes (data: colours and shapes, never CSS)",
     "cli.import_help": "measure a project (folder or zip) against the two import limits, without uploading it",
     "cli.import_dry_run_help": "measure only: writes and uploads nothing",

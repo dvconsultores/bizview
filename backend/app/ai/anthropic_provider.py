@@ -51,7 +51,10 @@ class AnthropicProvider:
             params["output_config"] = {"effort": effort}
         response = self._create(params)
         text = "".join(b.text for b in response.content if b.type == "text").strip()
-        return AIReply(text=text, model=response.model)
+        usage = getattr(response, "usage", None)
+        return AIReply(text=text, model=response.model,
+                       tokens_in=int(getattr(usage, "input_tokens", 0) or 0),
+                       tokens_out=int(getattr(usage, "output_tokens", 0) or 0))
 
 
 

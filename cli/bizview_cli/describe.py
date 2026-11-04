@@ -1,10 +1,15 @@
 """`bizview describe "<source>"`: the STRUCTURE of a data source of the installation (tables and
 columns, REST response shape, SOAP operations) — never its data — so the author and the AI agent
 can write integration specs. Needs BIZVIEW_URL and BIZVIEW_TOKEN (a `describe` token created by
-the super user in Administración → Tokens)."""
+the super user in Administración → Tokens).
+
+`--pack` writes `sources/<name>/structure.md` + `structure.json` (feature 052) using the same
+generator the API uses, so the two cannot drift."""
 import json
 import os
+import re
 import sys
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
@@ -25,13 +30,12 @@ class DescribeError(Exception):
         return self.message
 
 
-def fetch(source: str, path: str | None = None) -> dict:
+def _get_json(path: str, params: dict | None = None) -> dict:
     url, token = os.environ.get("BIZVIEW_URL", "").rstrip("/"), os.environ.get("BIZVIEW_TOKEN")
     if not url or not token:
         raise DescribeError(t("describe.need_config"), EXIT_USAGE)
     try:
-        r = httpx.get(f"{url}/api/sources/{quote(source, safe='')}/describe",
-                      params={"path": path} if path else None,
+        r = httpx.get(f"{url}{path}", params=params,
                       headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
                       timeout=60, follow_redirects=False)
     except httpx.HTTPError as e:
@@ -48,7 +52,42 @@ def fetch(source: str, path: str | None = None) -> dict:
     return r.json()
 
 
-def describe(source: str, *, path: str | None = None, as_json: bool = False) -> int:
+def fetch(source: str, path: str | None = None) -> dict:
+    return _get_json(f"/api/sources/{quote(source, safe='')}/describe",
+                     {"path": path} if path else None)
+
+
+def fetch_pack(source: str, path: str | None = None) -> dict:
+    """The pack the installation builds (notes, personal flags and the BI-ready flag included)."""
+    return _get_json(f"/api/sources/{quote(source, safe='')}/structure",
+                     {"path": path} if path else None)
+
+
+def write_pack(pack: dict, out_dir: str | Path = ".") -> list[Path]:
+    """`sources/<name>/structure.md` + `structure.json`, the layout the authoring pack expects."""
+    from bizview_cli.structure import structure_json, structure_markdown
+
+    name = str(pack.get("pack", {}).get("source") or "source")
+    folder = Path(out_dir) / "sources" / re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip("-")
+    folder.mkdir(parents=True, exist_ok=True)
+    markdown, data = folder / "structure.md", folder / "structure.json"
+    markdown.write_text(structure_markdown(pack), encoding="utf-8")
+    data.write_text(structure_json(pack), encoding="utf-8")
+    return [markdown, data]
+
+
+def describe(source: str, *, path: str | None = None, as_json: bool = False,
+             pack: bool = False, out: str = ".") -> int:
+    if pack:
+        try:
+            data = fetch_pack(source, path=path)
+            written = write_pack(data, out)
+        except DescribeError as e:
+            print(e.message, file=sys.stderr)
+            return e.exit_code
+        for path_written in written:
+            print(t("describe.pack_written", path=str(path_written)))
+        return 0
     try:
         data = fetch(source, path=path)
     except DescribeError as e:
@@ -63,6 +102,8 @@ def describe(source: str, *, path: str | None = None, as_json: bool = False) -> 
 
 def structure_from(data: dict, tables: list[str]) -> dict:
     requested = set(tables)
+    if isinstance(data, dict) and isinstance(data.get("pack"), dict):
+        data = data.get("structure") or {}
     if not isinstance(data, dict) or data.get("kind") != "postgresql":
         return {"tables": {}, "error": "la descripción no es de una fuente PostgreSQL"}
     result: dict[str, dict] = {}

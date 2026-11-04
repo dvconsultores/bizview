@@ -6,7 +6,7 @@ what it sends: the optional help agent (feature 033) is the only caller left aft
 in-app authoring agent.
 Provider keys never leave this package: errors are redacted before they surface.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.ai.errors import CODES as ERROR_CODES
@@ -45,6 +45,10 @@ class AIError(Exception):
 class AIReply:
     text: str
     model: str
+    #: Usage the provider reported, when it did (feature 052 measures the structure chat's budget
+    #: with it). Zero means "not reported": the caller estimates.
+    tokens_in: int = field(default=0, compare=False)
+    tokens_out: int = field(default=0, compare=False)
 
 
 class Provider(Protocol):

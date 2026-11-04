@@ -36,6 +36,11 @@ export const PANEL_SCROLL = "min-h-0 overflow-y-auto";
 export const SPLIT_COLS =
   "lg:grid lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-6";
 
+/** Reading pane + an aside on the right (052: the structure, then its chat). The content keeps the
+ * wide column, because it is the part that has to be readable. */
+export const SPLIT_ASIDE =
+  "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] lg:items-start lg:gap-6";
+
 /** Card grids: one column on a phone, more only where the content is comfortable (050 FR-004). */
 export const CARD_GRID_2 = "grid grid-cols-1 gap-4 sm:grid-cols-2";
 export const CARD_GRID_3 = "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3";

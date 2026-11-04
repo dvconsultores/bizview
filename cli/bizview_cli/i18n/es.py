@@ -80,6 +80,10 @@ MESSAGES: dict[str, str] = {
     "cli.describe_help": "estructura de una fuente de datos (sin datos)",
     "cli.describe_source_help": "nombre de la fuente en la instalación",
     "cli.describe_path_help": "REST: ruta de ejemplo cuya forma se describe (p. ej. /orders)",
+    # Feature 052: the two files the authoring pack reads.
+    "cli.describe_pack_help": "escribe sources/<nombre>/structure.md y structure.json (formato del pack)",
+    "cli.describe_out_help": "carpeta donde escribir el pack (por defecto, la actual)",
+    "describe.pack_written": "escrito: {path}",
     "cli.theme_help": "valida y previsualiza temas (datos: colores y formas, nunca CSS)",
     "cli.import_help": "mide un proyecto (carpeta o zip) contra los dos límites de importación, sin subirlo",
     "cli.import_dry_run_help": "solo medir: no escribe ni sube nada",

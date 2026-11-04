@@ -11,7 +11,7 @@ in the form an agent needs.
 | # | Step | Command or screen |
 |---|---|---|
 | 1 | Add the source | **Fuentes de datos → Nueva**, then **Probar** |
-| 2 | Describe it | `bizview describe <source>` |
+| 2 | Describe it | `bizview describe <source>` or **Fuentes de datos → Estructura → Descargar** |
 | 3 | Create the workspace | `bizview init workspace --name mycompany` |
 | 4 | Write the request | edit `REQUEST.md` |
 | 5 | Build the project | `bizview project new "<name>"`, then write the files |
@@ -21,6 +21,18 @@ in the form an agent needs.
 
 `bizview describe` prints structure only — table names, column names, types, row counts. It never
 returns rows, and no credential ever appears in its output.
+
+Feature 052: the same content is on the source page — **Fuentes de datos → «source» → Estructura**
+— with **Descargar estructura (.md)** and **(.json)**, or from the terminal:
+
+```bash
+bizview describe "Origen ERP" --pack --out .   # writes sources/<name>/structure.md + structure.json
+```
+
+The two files are the pack's: `structure.md` follows the template in
+`pack/bizview-starter-pack/bizview-starter/sources/<nombre>/structure.md`, and `structure.json`
+carries the same content with a `pack` header. Your notes in **Observaciones** and the personal-data
+flags travel in both.
 
 ## 2. The folder
 

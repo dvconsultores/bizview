@@ -293,6 +293,8 @@ export function AI() {
         title={t.ai.title}
         subtitle={t.ai.subtitle}
       />
+      {/* Feature 052 (FR-006): the one feature that spends the provider, named where it is set up. */}
+      <Alert tone="info">{t.ai.usedBy}</Alert>
       {body}
     </div>
   );

@@ -63,7 +63,10 @@ class OpenAICompatibleProvider:
             raise AIError("provider_error", "unexpected response shape") from None
         if choice.get("finish_reason") == "content_filter":
             raise AIError("refused", "content_filter")
-        return AIReply(text=text.strip(), model=data.get("model") or self.model)
+        usage = data.get("usage") or {}
+        return AIReply(text=text.strip(), model=data.get("model") or self.model,
+                       tokens_in=int(usage.get("prompt_tokens") or 0),
+                       tokens_out=int(usage.get("completion_tokens") or 0))
 
 
 

@@ -117,7 +117,7 @@ def _run(args) -> int:
         return new_project(Path(args.path), args.name, slug=args.slug, agent=args.agent,
                            speckit_init=not args.no_speckit)
     from bizview_cli.describe import describe
-    return describe(args.source, path=args.path, as_json=args.json)
+    return describe(args.source, path=args.path, as_json=args.json, pack=args.pack, out=args.out)
 
 
 def _import(args) -> int:
@@ -201,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("source", help=t("cli.describe_source_help"))
     d.add_argument("--path", help=t("cli.describe_path_help"))
     d.add_argument("--json", action="store_true")
+    d.add_argument("--pack", action="store_true", help=t("cli.describe_pack_help"))
+    d.add_argument("--out", default=".", help=t("cli.describe_out_help"))
     imp = sub.add_parser("import", help=t("cli.import_help"))
     imp.add_argument("path", help=t("cli.import_help"))
     imp.add_argument("--dry-run", action="store_true", help=t("cli.import_dry_run_help"))

@@ -1270,3 +1270,113 @@ export interface GuideTopic {
   routes: string[];
   related: { id: string; title: string }[];
 }
+
+// Feature 052: the structure of a source, its sample requests and the structure chat.
+export interface StructureColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  personal?: boolean;
+  range?: { min: string | null; max: string | null };
+}
+export interface StructureTable {
+  schema?: string;
+  name: string;
+  kind?: string;
+  estimated_rows?: number;
+  primary_key?: string[];
+  foreign_keys?: { column: string; references: string }[];
+  columns: StructureColumn[];
+}
+export interface StructureSamplePayload {
+  name: string;
+  method: string;
+  path: string;
+  params: Record<string, string>;
+  notes?: string;
+  shape?: unknown;
+  records?: string | null;
+  fields?: Record<string, string>;
+  types?: Record<string, string>;
+  timestamp_units?: string | null;
+  pagination?: string | null;
+  error?: string | null;
+}
+export interface StructureSoapOperation {
+  name: string;
+  input: string | null;
+  output: string | null;
+}
+export interface StructureSoapPort {
+  name: string;
+  operations: StructureSoapOperation[];
+}
+export interface StructureSoapService {
+  name: string;
+  ports: StructureSoapPort[];
+}
+export interface StructurePack {
+  pack: {
+    version: number;
+    source: string;
+    kind: SourceKind;
+    generated_at: string;
+    timezone: string;
+    bi_ready: boolean;
+    bi_ready_scopes: string[];
+    notes: string;
+    truncated: boolean;
+  };
+  structure: {
+    kind: SourceKind;
+    truncated?: boolean;
+    path?: string;
+    shape?: unknown;
+    tables?: StructureTable[];
+    samples?: StructureSamplePayload[];
+    services?: StructureSoapService[];
+  };
+}
+export interface SampleRequest {
+  id: number;
+  name: string;
+  method: string;
+  path: string;
+  params: Record<string, string>;
+  notes: string;
+  last_shape: unknown;
+  last_suggestions: Record<string, unknown> | null;
+  last_status: number | null;
+  last_error: string | null;
+  last_run_at: string | null;
+}
+export interface SampleRun {
+  status: number;
+  shape: unknown;
+  duration_ms: number;
+  records: string | null;
+  fields: Record<string, string>;
+  types: Record<string, string>;
+  timestamp_units: string | null;
+  pagination: string | null;
+}
+export interface ChatTurn {
+  role: "question" | "answer";
+  text: string | null;
+  at: string;
+}
+export interface ChatHistory {
+  turns: ChatTurn[];
+  cap: number;
+  spent_today: number;
+}
+export interface ChatAnswer {
+  answer: string;
+  refused: boolean;
+  unknown: { name: string; kind: string }[];
+  model: string | null;
+  usage: { cap: number; spent_today: number };
+  tokens_in: number;
+  tokens_out: number;
+  created_at: string;
+}

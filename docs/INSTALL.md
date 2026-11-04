@@ -358,8 +358,8 @@ owned by the engine.
 ## 7. AI (optional)
 
 AI is off by default and everything works without it. It is used for the read-only help agent
-(033) only: authoring happens outside Bizview (043/045). The provider never receives detailed
-records, passwords, or personal data.
+(033) and for the **structure chat** of each data source (052): authoring happens outside Bizview
+(043/045). The provider never receives detailed records, passwords, or personal data.
 
 Claude (Anthropic):
 
@@ -382,6 +382,14 @@ AI_MODEL=llama3.1
 Restart, sign in as the super user → **IA** → **Probar conexión**. The page reports success and
 response time, or the reason for failure (invalid key, model not found, unreachable, …). The key
 is never shown.
+
+The **structure chat** (Fuentes de datos → a source → **Estructura**) spends the same provider.
+Two optional settings bound it:
+
+```ini
+# AI_STRUCTURE_CHAT_DAILY_TOKENS=100000    # per user, per source, per day; 0 turns the chat off
+# AI_STRUCTURE_CHAT_STORE_QUESTIONS=false  # store the question text; token counts are always stored
+```
 
 ### Projects (Proyectos)
 

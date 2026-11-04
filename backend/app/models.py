@@ -67,6 +67,10 @@ AUDIT_KINDS = (
     "theme_uploaded", "theme_replaced", "theme_deleted", "theme_applied",
     # feature 048
     "source_bi_ready_changed", "source_bi_ready_verified", "source_bi_ready_unverified",
+    # feature 052 — the structure pack, the samples and the structure chat
+    "source_structure_notes_updated", "source_structure_flag_changed", "source_sample_created",
+    "source_sample_updated", "source_sample_deleted", "source_sample_run",
+    "source_chat_asked", "source_chat_cleared",
 )
 #: Audit kinds a database may already contain that the product no longer emits (feature 045
 #: removed the in-app authoring agent). They exist so historical rows stay readable and so the
@@ -273,6 +277,9 @@ class DataSource(Base):
     # Feature 048: what reports may read from this source, and with which limits. `{}` means the
     # source is not BI-ready; `direct_reports` above is the 019 switch it overrides.
     bi_ready: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Feature 052: the "Observaciones" of the structure pack — what the source does not have, the
+    # plan or API budget notes the super user writes. The chat may draft it; only a person saves it.
+    notes: Mapped[str] = mapped_column(Text, server_default=text("''"))
     last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_test_ok: Mapped[bool | None] = mapped_column(Boolean)
     last_test: Mapped[dict | None] = mapped_column(JSONB)
@@ -281,6 +288,84 @@ class DataSource(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
     updated_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+
+
+SAMPLE_METHODS = ("GET",)
+
+
+class SourceSampleRequest(Base):
+    """A saved sample request of a REST or Supabase source (feature 052, FR-002).
+
+    Holds the path and the query parameters only — never a secret: the credential is the source's
+    own, and `last_shape` keeps keys and types, never a response value.
+    """
+
+    __tablename__ = "source_sample_request"
+    __table_args__ = (
+        Index("uq_source_sample_request_name_ci", "source_id", text("lower(name)"), unique=True),
+        CheckConstraint(_in("method", SAMPLE_METHODS), name="method"),
+        CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 80", name="name_len"),
+        CheckConstraint("path NOT LIKE '%://%' AND path NOT LIKE '/%'", name="path_relative"),
+        CheckConstraint("char_length(notes) <= 1000", name="notes_len"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("data_source.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    method: Mapped[str] = mapped_column(Text, server_default=text("'GET'"))
+    path: Mapped[str] = mapped_column(Text)
+    params: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    notes: Mapped[str] = mapped_column(Text, server_default=text("''"))
+    last_shape: Mapped[dict | None] = mapped_column(JSONB)
+    last_suggestions: Mapped[dict | None] = mapped_column(JSONB)
+    last_status: Mapped[int | None] = mapped_column(Integer)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SourceStructureFlag(Base):
+    """The super user's override of the personal-data heuristic for one column (feature 052)."""
+
+    __tablename__ = "source_structure_flag"
+
+    source_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("data_source.id", ondelete="CASCADE"), primary_key=True)
+    schema_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    table_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    column_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    personal: Mapped[bool] = mapped_column(Boolean)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SourceChatMessage(Base):
+    """One turn of the structure chat (feature 052, FR-004), and the usage the daily cap reads.
+
+    `body` is stored only when the installation sets AI_STRUCTURE_CHAT_STORE_QUESTIONS; the token
+    counts are always recorded. Never holds a credential, a host or a row value: the chat never sees
+    one.
+    """
+
+    __tablename__ = "source_chat_message"
+    __table_args__ = (
+        CheckConstraint(_in("role", ("question", "answer")), name="role"),
+        CheckConstraint("tokens_in >= 0 AND tokens_out >= 0", name="tokens"),
+        Index("ix_source_chat_message_turn", "source_id", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("data_source.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"))
+    role: Mapped[str] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text)
+    tokens_in: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    tokens_out: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class SecurityState(Base):

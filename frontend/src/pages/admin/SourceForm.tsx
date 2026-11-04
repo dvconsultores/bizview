@@ -1,6 +1,6 @@
 import { AlertTriangle, Clock, Plus, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { api, ApiError } from "../../api/client";
 import type {
@@ -14,6 +14,7 @@ import { Card } from "../../components/Card";
 import { Input } from "../../components/Input";
 import { PageHeader } from "../../components/PageHeader";
 import { PemField, SecretField } from "../../components/SecretField";
+import { SegmentedControl } from "../../components/SegmentedControl";
 import { Select } from "../../components/Select";
 import { Spinner } from "../../components/Spinner";
 import { Switch } from "../../components/Switch";
@@ -21,6 +22,7 @@ import { useToast } from "../../components/Toast";
 import { View } from "../../components/View";
 import { useT } from "../../i18n";
 import { KIND_ICONS } from "./Sources";
+import { SourceStructure } from "./SourceStructure";
 
 const LONG = new Set(["pem", "headers", "url"]);
 
@@ -76,6 +78,9 @@ export function SourceForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  // Feature 052: the source page is two tabs; a new source only has the first one.
+  const tab = params.get("tab") === "estructura" ? "estructura" : "conexion";
 
   const [types, setTypes] = useState<SourceTypes | null>(null);
   const [source, setSource] = useState<DataSource | null>(null);
@@ -370,9 +375,29 @@ export function SourceForm() {
     <div className="space-y-5 pb-28 lg:pb-0">
       <Breadcrumbs back="/admin/fuentes" items={[{ label: t.nav.admin, to: "/admin" }, { label: t.admin.sources.title, to: "/admin/fuentes" }, { label: source ? source.name : T.newTitle }]} />
       <PageHeader title={source ? source.name : T.newTitle} subtitle={source ? types[source.kind].label : undefined} />
+      {source ? (
+        <SegmentedControl
+          label={source.name}
+          value={tab}
+          onChange={(next) => {
+            const search = new URLSearchParams(params);
+            if (next === "estructura") search.set("tab", "estructura");
+            else search.delete("tab");
+            setParams(search, { replace: true });
+          }}
+          options={[
+            { value: "conexion", label: T.tabConnection },
+            { value: "estructura", label: T.tabStructure },
+          ]}
+        />
+      ) : null}
       {source?.imported ? <Alert tone="warning">{T.imported}</Alert> : null}
       {formError ? <Alert tone="error">{formError}</Alert> : null}
 
+      {tab === "estructura" && source ? <SourceStructure source={source} /> : null}
+
+      {tab === "conexion" ? (
+        <>
       <Card tone="accent" className="space-y-4 p-5 sm:p-6">
         {!source ? (
           <fieldset>
@@ -530,6 +555,9 @@ export function SourceForm() {
           <Button loading={saving} disabled={!!source && !dirty} onClick={save}>{T.save}</Button>
         </div>
       </div>
+
+        </>
+      ) : null}
 
       <View open={confirmDelete} title={T.delete} onClose={() => { setConfirmDelete(false); setDeleteError(null); }}
         footer={
