@@ -146,6 +146,14 @@ All notable changes to this project are documented here. The format follows
 - **The project editor said nothing while it validated**, and dropped the result when the request
   failed: Apply stayed greyed out under "Sin problemas de validación" with no visible reason. The
   status bar now says **Comprobando el proyecto…** and, when the check cannot run, says so.
+- **A column named `name` was treated as personal data everywhere** — a coin, product or category
+  name included — so `panorama-cripto`-style reports could not be applied and the only way out was
+  to declare a falsehood in the spec. A bare `name`/`nombre` is personal only when its dataset is
+  about people (customers, users, patients…); `customer_name`, `full_name` or `email` are unchanged.
+- **The two rules that block an apply were invisible to the author's AI**: `bizview validate` said
+  "ok" while the server refused the project for a personal column, and said nothing about a report
+  with no filters. Both are reported now — the personal column as an error, the missing filters as a
+  warning — and the pack's agent instructions state them.
 
 ### Changed
 

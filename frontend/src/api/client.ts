@@ -42,10 +42,13 @@ async function request<T>(method: string, path: string, body?: Json, retried = f
   }
   if (!res.ok) {
     const e = data?.error ?? {};
+    // A proxy or a restarting server answers HTML, not the product's JSON: say what happened
+    // instead of "Ocurrió un error inesperado", which reads as a Bizview bug and hides the retry.
+    const message = e.message ?? (res.status >= 500 ? t.errors.server : t.common.unexpected);
     const err = new ApiError(
       res.status,
       e.code ?? "error",
-      e.message ?? t.common.unexpected,
+      message,
       e.fields ?? {},
       e.retry_after_seconds,
       e,

@@ -379,6 +379,17 @@ failed, and the rest of the dashboard still renders; a report whose dataset was 
 `dataset_missing` instead of an anonymous error. See
 [tableros/errores.md](./guides/tableros/errores.md).
 
+A project is applied only when three more things hold, and each says which one is missing in the
+status bar under **Pendiente para aplicar**:
+
+- every `queries/*.sql` and `requests/*.yaml` has passed **Volver a comprobar** since its last
+  change (the check runs against the source, structure and counts only);
+- no dataset column flagged as personal data lacks the spec line `**Datos personales**: <columns>`;
+- the report declares at least one filter (`filters: [<dimension>]`).
+
+The first two are reported by `bizview validate` too — the personal column as an error, the missing
+filters as a warning — so the author's AI can fix them before the import.
+
 ## "No spec, no run"
 
 Nothing runs unless its spec folder has `spec.md`, `plan.md`, `tasks.md`; the spec's

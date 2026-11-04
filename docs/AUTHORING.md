@@ -224,7 +224,11 @@ is why a project that validates here applies there. It checks:
 - that SQL is a single read-only statement, and every column a report uses is declared by the
   dataset it reads;
 - unique ids across the workspace, spec numbers, image folders and their keys;
-- the `images:` sets exist, are not empty, and are not SVG-only when a PDF block draws them.
+- the `images:` sets exist, are not empty, and are not SVG-only when a PDF block draws them;
+- that no dataset carries a column flagged as personal data without the integration's spec listing
+  it under `**Datos personales**:` (the same gate the server applies before applying a project);
+- that every report declares at least one filter — a **warning** here, because a report already
+  running keeps validating, but the server will not apply a project whose report offers none.
 
 `--write-lock` writes `bizview.lock` with a hash per file, so an apply can prove nothing changed
 after validation. A failure is written to `problems.json`:
@@ -238,7 +242,8 @@ after validation. A failure is written to `problems.json`:
 ```
 
 `--live` also runs each query against the source (structure and counts only) when the installation
-lets the CLI reach it.
+lets the CLI reach it. The server's own gate, **Volver a comprobar**, is the same check: a query or
+request that has not passed it since its last change keeps the project from being applied.
 
 ## 7. Import and apply
 

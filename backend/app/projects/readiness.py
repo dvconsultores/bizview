@@ -96,7 +96,7 @@ def _report_pending(path: str, doc: dict, files: dict[str, str]) -> list[dict]:
                     and isinstance(meta, dict)
                     and meta.get("type") == "text"
                     and col_str not in pk
-                    and not personal_kind(col_str)
+                    and not personal_kind(col_str, context=f"{dataset} {integration}")
                 ):
                     eligible.append(col_str)
             if not eligible:
@@ -221,7 +221,7 @@ def _direct_pending(
     seen: set[str] = set()
     tables = direct.get("tables")
     if isinstance(tables, dict):
-        for table_def in tables.values():
+        for alias, table_def in tables.items():
             if not isinstance(table_def, dict):
                 continue
             columns = table_def.get("columns")
@@ -233,7 +233,7 @@ def _direct_pending(
                 if key in seen:
                     continue
                 seen.add(key)
-                kind = flagged.get(key) or personal_kind(col_name)
+                kind = flagged.get(key) or personal_kind(col_name, context=str(alias))
                 if not kind or _declared(col_name, declared):
                     continue
                 pending.append({
@@ -341,8 +341,10 @@ def compute(session) -> dict:
                                         if low not in seen:
                                             seen.add(low)
                                             candidate_names.append(col)
+                    context = f"{name} {doc.get('id') or ''}"
                     for col in candidate_names:
-                        kind = flagged.get(str(col).lower()) or personal_kind(str(col))
+                        kind = (flagged.get(str(col).lower())
+                                or personal_kind(str(col), context=context))
                         # The same column can arrive from two datasets or from both the column
                         # list and the request fields: one reason per column, not five identical.
                         dedupe_key = (path, str(col).lower())

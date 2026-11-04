@@ -1,6 +1,6 @@
-"""Readiness gate: a personal column the integration spec names under **Datos personales** is
-allowed (feature 017 records the confirmation there; feature 045 removed the conversation state
-that used to carry it separately)."""
+"""Readiness gate for the two rules that keep a project from being applied: a personal column the
+integration's spec does not declare (feature 017 records the permission there; feature 045 removed
+the conversation state that used to carry it separately) and a report without filters."""
 from types import SimpleNamespace
 
 from app.projects import readiness
@@ -50,7 +50,7 @@ def test_personal_column_named_in_the_spec_is_allowed():
 
 
 def test_personal_column_absent_from_the_spec_blocks_once():
-    files, checks = integration_files(extra_dataset="""  season:
+    files, checks = integration_files(extra_dataset="""  clientes:
     primary_key: [id]
     incremental: {mode: full}
     checks: [{type: row_count, min: 1}]
@@ -63,6 +63,13 @@ def test_personal_column_absent_from_the_spec_blocks_once():
     personal = [p for p in result["pending"] if p["code"] == "personal_data"]
     assert len(personal) == 1
     assert "name" in personal[0]["message"]
+
+
+def test_a_coin_name_is_not_personal_data():
+    """A bare `name` is a person's name only where the rows are people: a listing of coins,
+    products or categories carries data, and used to block the apply (owner, 2026-11-04)."""
+    files, checks = integration_files()
+    assert readiness.compute(session(files, checks)) == {"ready": True, "pending": []}
 
 
 def test_report_without_filters_is_pending():

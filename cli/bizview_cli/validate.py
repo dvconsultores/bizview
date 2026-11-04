@@ -28,6 +28,7 @@ from bizview_cli import (
     materialize,
     report_layout,
     sqlsafety,
+    structure,
     transform,
 )
 from bizview_cli.i18n import t
@@ -548,6 +549,36 @@ def spec_path(entry: Entry, name: str) -> str:
     return f"{folder}/{name}"
 
 
+def declared_personal(root: Path, entry: Entry) -> set[str]:
+    """Columns the artifact's spec names under **Datos personales** / **Personal data**.
+
+    That line is the only record of the decision (feature 017: "the integration spec records it"),
+    so the validator and the server's readiness gate read it the same way."""
+    rel = str(entry.artifact.get("spec", "")).strip().rstrip("/")
+    if not rel or ".." in rel.split("/") or "\\" in rel:
+        return set()
+    base = (root / entry.project_dir) if entry.project_dir is not None else root
+    spec = base / rel / "spec.md"
+    try:
+        resolved = spec.resolve()
+        if spec.is_symlink() or not resolved.is_file() or base.resolve() not in resolved.parents:
+            return set()
+        text = resolved.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    declared: set[str] = set()
+    for line in _PERSONAL_LINE.finditer(text):
+        for token in re.split(r"[\s,;`*]+", line.group(1) or ""):
+            token = token.strip().strip('"\'')
+            if not token:
+                continue
+            token = token.lower()
+            if "." in token:
+                token = token.split(".", 1)[1]
+            declared.add(token)
+    return declared
+
+
 def _check_spec(root: Path, entry: Entry, issues: list[Issue]) -> None:
     rel = str(entry.artifact.get("spec", "")).strip().rstrip("/")
     v2 = entry.project_dir is not None
@@ -791,12 +822,26 @@ def _check_integration(root: Path, entry: Entry, issues: list[Issue],
         issues.append(Issue(entry.key, "unknown_source",
                             t("validate.source_not_in_installation", source=a['source']),
                             file=iy, path="/source", fix=fix))
+    personal_declared = declared_personal(root, entry)
+    personal_reported: set[str] = set()
     for name, ds in a["datasets"].items():
         where = f"{entry.key}.{name}"
         path = _pointer(["datasets", name])
         cols = ds["columns"]
         tr = ds.get("transform")
         extracted = tr["input"] if tr else cols
+        for col in [*cols, *extracted]:
+            low = str(col).lower()
+            if low in personal_reported or low in personal_declared \
+                    or not structure.is_personal(str(col), context=f"{name} {entry.id}"):
+                continue
+            personal_reported.add(low)
+            issues.append(Issue(
+                where, "integration_personal_column",
+                t("validate.integration_column_is_personal", col=col),
+                file=iy, path=path + f"/columns/{col}",
+                expected={"personal": col},
+                fix=t("validate.fix_declare_personal_data", col=col)))
         for key in ds.get("primary_key", []):
             if key not in cols:
                 issues.append(Issue(where, "invalid_reference",
@@ -1157,9 +1202,9 @@ def _direct_aliases(entry: Entry, direct: dict | None, ctx: DirectContext | None
     return out
 
 
-def _check_direct_live(entry: Entry, ctx: DirectContext | None,
-                      aliases: dict[str, dict[str, dict]], issues: list[Issue],
-                      blocked: bool) -> None:
+def _check_direct_live(root: Path, entry: Entry, ctx: DirectContext | None,
+                       aliases: dict[str, dict[str, dict]], issues: list[Issue],
+                       blocked: bool) -> None:
     """Check live structure and personal-data columns for direct reports."""
     if ctx is None:
         return
@@ -1274,21 +1319,7 @@ def _check_direct_live(entry: Entry, ctx: DirectContext | None,
                                                 fix=fix))
 
     if ctx.personal_kind is not None:
-        declared: set[str] = set()
-        rel = entry.spec.get("folder")
-        if rel:
-            raw = entry.files.get(spec_path(entry, "spec.md"))
-            if raw is not None:
-                text = raw.decode("utf-8")
-                for line in _PERSONAL_LINE.finditer(text):
-                    for token in re.split(r"[\s,;`*]+", line.group(1) or ""):
-                        token = token.strip().strip('"\'')
-                        if not token:
-                            continue
-                        token = token.lower()
-                        if "." in token:
-                            token = token.split(".", 1)[1]
-                        declared.add(token)
+        declared = declared_personal(root, entry)
         for did, d in a.get("dimensions", {}).items():
             try:
                 cols = sqlsafety.expression_columns(d["sql"])
@@ -1605,13 +1636,22 @@ def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Iss
     _check_images(entry, a, ry, issues, root, integrations)
     _check_pdf_views(entry, ry, issues)
     _check_direct_spec(entry, issues)
+    if not a.get("filters"):
+        # The server's readiness gate refuses a project whose report offers no filters, so the
+        # author's AI has to hear it here as well — as a warning, because a report that already
+        # runs keeps validating.
+        dims = _names(list(a.get("dimensions", {})), limit=3)
+        issues.append(Issue(entry.key, "report_no_filters",
+                            t("validate.report_without_filters"), level="warning",
+                            file=ry, path="/filters",
+                            fix=t("validate.fix_declare_filters", filters=dims)))
     if "direct" in a:
         before = len(issues)
         _resolve_short_tables(entry, a["direct"], direct, issues)
         aliases = _direct_aliases(entry, a["direct"], direct, issues)
         blocked = any(i.code in ("unknown_source", "direct_not_allowed")
                       for i in issues[before:])
-        _check_direct_live(entry, direct, aliases, issues, blocked)
+        _check_direct_live(root, entry, direct, aliases, issues, blocked)
         if len(aliases) != len(a["direct"]["tables"]):
             return
     else:

@@ -17,8 +17,36 @@ def _normalise_tokens(name: str) -> list[str]:
     return [t for t in re.split(r"[^a-z0-9]+", value.lower()) if t]
 
 
-def personal_kind(name: str, data_type: str | None = None) -> str | None:
-    """Heuristic personal-data classification for a column name / type."""
+_PEOPLE = {
+    # A bare `name`/`nombre` column is only personal when the table it lives in is about people:
+    # a coin, product or category name is data, not personal data (owner, 2026-11-04: a report of
+    # crypto listings could not be applied because its `name` column was flagged).
+    "customer", "customers", "client", "clients", "cliente", "clientes",
+    "user", "users", "usuario", "usuarios", "person", "persons", "persona", "personas",
+    "patient", "patients", "paciente", "pacientes", "contact", "contacts", "contacto",
+    "contactos", "employee", "employees", "empleado", "empleados", "staff", "member",
+    "members", "miembro", "miembros", "subscriber", "subscribers", "suscriptor",
+    "suscriptores", "lead", "leads", "prospect", "prospects", "owner", "titular",
+    "beneficiary", "beneficiario", "beneficiarios", "driver", "conductor", "student",
+    "estudiante", "estudiantes", "citizen", "ciudadano", "afiliado", "afiliados",
+    "associate", "socio", "socios", "supplier", "suppliers", "proveedor", "proveedores",
+    "vendor", "vendedor", "vendedores", "agent", "agente", "agentes",
+}
+
+
+def _about_people(context: str | None) -> bool:
+    """Whether a table/dataset name says its rows are people (so a bare `name` is a person's)."""
+    if not context:
+        return False
+    return bool(set(_normalise_tokens(context)) & _PEOPLE)
+
+
+def personal_kind(name: str, data_type: str | None = None,
+                  context: str | None = None) -> str | None:
+    """Heuristic personal-data classification for a column name / type.
+
+    `context` is the table or dataset the column belongs to: it decides the ambiguous names
+    (`name`, `nombre`), which are personal only where the rows are people."""
     tokens = _normalise_tokens(name)
     if not tokens:
         return None
@@ -40,7 +68,7 @@ def personal_kind(name: str, data_type: str | None = None) -> str | None:
     if toks & {"apellido", "apellidos", "fullname", "firstname", "lastname", "surname"}:
         return "name"
     if tokens in (["name"], ["nombre"], ["nombres"]):
-        return "name"
+        return "name" if _about_people(context) else None
     if (toks & {"name", "nombre", "nombres"}) and (
         toks & {"first", "last", "full", "middle", "given", "family", "customer",
                 "client", "cliente", "user", "usuario", "contact", "contacto",

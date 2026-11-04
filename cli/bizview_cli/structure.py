@@ -35,19 +35,50 @@ _PAGINATION_KEYS = ("next", "next_page", "next_cursor", "cursor", "page", "offse
                     "total_count", "has_more", "pages", "count")
 
 
-def is_personal(column: str) -> bool:
-    """Whether a column name looks like personal data (heuristic, FR-001)."""
+#: Terms that make a table's rows people: a bare `name`/`nombre` is a person's name only there
+#: (a coin, product or category name is data, not personal data).
+_PEOPLE = {
+    "customer", "customers", "client", "clients", "cliente", "clientes",
+    "user", "users", "usuario", "usuarios", "person", "persons", "persona", "personas",
+    "patient", "patients", "paciente", "pacientes", "contact", "contacts", "contacto",
+    "contactos", "employee", "employees", "empleado", "empleados", "staff", "member",
+    "members", "miembro", "miembros", "subscriber", "subscribers", "suscriptor",
+    "suscriptores", "lead", "leads", "prospect", "prospects", "owner", "titular",
+    "beneficiary", "beneficiario", "beneficiarios", "driver", "conductor",
+    "student", "estudiante", "estudiantes", "citizen", "ciudadano", "afiliado", "afiliados",
+    "associate", "socio", "socios", "supplier", "suppliers", "proveedor", "proveedores",
+    "vendor", "vendedor", "vendedores", "agent", "agente", "agentes",
+}
+_AMBIGUOUS = {"name", "names", "nombre", "nombres"}
+
+
+def is_personal(column: str, context: str | None = None) -> bool:
+    """Whether a column name looks like personal data (heuristic, FR-001).
+
+    `context` is the table or dataset the column belongs to; it decides `name`/`nombre`, personal
+    only where the rows are people."""
     name = str(column or "").strip().lower()
     if not name:
         return False
     if re.search(r"chat[_-]?id", name) or "telegram" in name or "whatsapp" in name:
         return True
-    for token in (t for t in re.split(r"[^a-z0-9]+", name) if t):
+    tokens = [t for t in re.split(r"[^a-z0-9]+", name) if t]
+    for token in tokens:
         if token in _EXACT:
+            if token in _AMBIGUOUS and not (
+                len(tokens) > 1 or _about_people(context)
+            ):
+                continue
             return True
         if len(token) > 4 and any(token.startswith(p) for p in _PREFIXES):
             return True
     return False
+
+
+def _about_people(context: str | None) -> bool:
+    if not context:
+        return False
+    return bool({t for t in re.split(r"[^a-z0-9]+", str(context).lower()) if t} & _PEOPLE)
 
 
 def infer_timestamp_units(value) -> str | None:

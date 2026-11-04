@@ -753,6 +753,7 @@ export const es = {
   errors: {
     forbidden: "No autorizado",
     network: "No hay conexión. Revisa tu red e intenta de nuevo.",
+    server: "El servidor no respondió a tiempo; el cambio puede no haberse guardado. Vuelve a intentarlo en un momento.",
     forbiddenText: "No tienes permiso para ver esta página.",
   },
   multiSelect: {

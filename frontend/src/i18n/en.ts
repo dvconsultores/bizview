@@ -772,6 +772,7 @@ export const en: Catalogue = {
   errors: {
     forbidden: "Unauthorized",
     network: "No connection. Check your network and try again.",
+    server: "The server did not answer in time; the change may not have been saved. Try again in a moment.",
     forbiddenText: "You don't have permission to view this page.",
   },
   multiSelect: {
