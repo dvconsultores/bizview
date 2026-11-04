@@ -152,3 +152,58 @@ describe("ReportSheet", () => {
     expect(sheet()).toBeNull();
   });
 });
+
+describe("ReportSheet tabs (053)", () => {
+  const TABS = [
+    { id: "filters", label: t.reportSheet.tabs.filters },
+    { id: "params", label: t.reportSheet.tabs.params },
+  ];
+
+  async function renderTabs(tab: string, onTabChange = vi.fn()) {
+    await act(async () => {
+      root?.render(
+        <ReportSheet open title={t.reportActions.filters(0)} onClose={vi.fn()} {...{ tabs: TABS, tab, onTabChange }}>
+          <button type="button">dentro</button>
+        </ReportSheet>,
+      );
+    });
+    return onTabChange;
+  }
+
+  it("renders a tablist with the selected tab and a labelled panel", async () => {
+    await renderTabs("params");
+    const list = sheet().querySelector('[role="tablist"]') as HTMLElement;
+    expect(list).toBeTruthy();
+    const tabs = Array.from(list.querySelectorAll('[role="tab"]')) as HTMLElement[];
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      t.reportSheet.tabs.filters,
+      t.reportSheet.tabs.params,
+    ]);
+    expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+    expect(tabs[0].getAttribute("aria-selected")).toBe("false");
+    const panel = sheet().querySelector('[role="tabpanel"]') as HTMLElement;
+    expect(panel).toBeTruthy();
+    expect(panel.getAttribute("aria-labelledby")).toBe(tabs[1].id);
+    expect(tabs[1].getAttribute("aria-controls")).toBe(panel.id);
+  });
+
+  it("switches with a click and with the arrow keys, keeping one tab stop", async () => {
+    const onTabChange = await renderTabs("filters");
+    const tabs = Array.from(sheet().querySelectorAll('[role="tab"]')) as HTMLElement[];
+    await act(async () => tabs[1].click());
+    expect(onTabChange).toHaveBeenLastCalledWith("params");
+    await act(async () => {
+      tabs[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+    expect(onTabChange).toHaveBeenLastCalledWith("params");
+    expect(tabs[0].getAttribute("tabindex")).toBe("0");
+    expect(tabs[1].getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("stays a region, not a dialog", async () => {
+    await renderTabs("params");
+    expect(sheet().getAttribute("role")).toBe("region");
+    expect(sheet().hasAttribute("aria-modal")).toBe(false);
+    expect(sheet().querySelector("h2")?.textContent).toBe(t.reportActions.filters(0));
+  });
+});

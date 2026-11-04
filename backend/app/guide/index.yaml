@@ -203,6 +203,22 @@ topics:
       es: ["reporte", "kpi", "tendencia", "ranking", "narrativa", "datos en vivo"]
       en: ["report", "kpi", "trend", "ranking", "narrative", "live data"]
     related: [filtros-y-periodos, tableros, exportar-pdf-csv]
+  - id: parametros-y-filtros-del-reporte
+    section: tableros
+    title:
+      es: "Parámetros y filtros del reporte"
+      en: "Parameters and filters of the report"
+    summary:
+      es: "El panel del reporte con sus dos pestañas: período, comparación, frecuencia, paleta, tema y filtros, con fichas de lo aplicado."
+      en: "The report's panel and its two tabs: period, comparison, refresh, palette, theme and filters, with chips for what is applied."
+    roles: [user]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["parámetros", "filtros", "período", "comparar", "paleta", "tema del reporte", "limpiar", "listo", "fichas"]
+      en: ["parameters", "filters", "period", "compare", "palette", "report theme", "clear", "done", "chips"]
+    related: [ver-reporte, exportar-pdf-csv, actualizacion-y-modo-tv]
   - id: filtros-y-periodos
     section: tableros
     title: {es: "Filtros y períodos", en: "Filters and periods"}
@@ -216,7 +232,7 @@ topics:
     aliases:
       es: ["filtro", "período", "comparar", "limpiar filtros", "personalizado"]
       en: ["filter", "period", "compare", "clear filters", "custom"]
-    related: [ver-reporte, exportar-pdf-csv, actualizacion-y-modo-tv]
+    related: [parametros-y-filtros-del-reporte, ver-reporte, exportar-pdf-csv]
   - id: exportar-pdf-csv
     section: tableros
     title: {es: "Exportar a PDF o CSV", en: "Export to PDF or CSV"}

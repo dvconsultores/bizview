@@ -438,19 +438,18 @@ describe("ParamsForm", () => {
     expect(document.querySelector("details")).toBeTruthy();
   });
 
-  it('variant="bar" lays the controls out in one row without headings or the apply footer', async () => {
-    await renderForm({ section: "period", variant: "bar" } as never);
+  it("live period section: one row per control, no apply footer of its own", async () => {
+    await renderForm({ section: "period", live: true, showClear: false });
     const form = document.querySelector('[data-testid="params-form"]') as HTMLFormElement;
-    expect(form.dataset.variant).toBe("bar");
-    expect(form.querySelector("h3")).toBeNull();
+    expect(form.querySelector("h3")).toBeTruthy();
     expect(document.querySelector('[data-testid="pending-status"]')).toBeNull();
     expect(findFieldByLabel(t.reportParams.period)).toBeTruthy();
     expect(findFieldByLabel(t.reportParams.compare)).toBeTruthy();
   });
 
-  it("live bar: a period change applies once after the debounce", async () => {
+  it("live: a period change applies once after the debounce", async () => {
     vi.useFakeTimers();
-    const { onApply } = await renderForm({ section: "period", variant: "bar", live: true } as never);
+    const { onApply } = await renderForm({ section: "period", live: true });
     const periodSelect = findFieldByLabel(t.reportParams.period) as HTMLSelectElement;
     await act(async () => {
       changeSelect(periodSelect, "last_month");

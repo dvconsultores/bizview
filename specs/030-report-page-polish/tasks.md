@@ -224,3 +224,11 @@ validated (CLI schema + checker) and honoured by the web, the shared view and th
 - The PDF renderer resolves the **installation** preset too: every `pdf.render()` caller passes
   `palette.resolve(definition, palette.installation_preset(db))` (report API, shared view, previews
   and scheduled email).
+
+**Convergence note (2026-11-04, feature 053-parameters-sheet)** — T015 asked for "one sheet with
+tabs, Parámetros included", and only the filters half shipped: `ReportView` kept a second, inline
+parameters card (`ParamBar`) under the meta line with `ExportSection` inside it. Feature 053 closes
+that gap: `ReportSheet` grows the `role="tablist"` header, both openers use it, `ParamBar` and
+`ExportSection` are deleted, the downloads move to the `⋯` menu, and the palette and light/dark join
+the URL with chips. FR-003, FR-004 and FR-005 of this spec are now met as written; the tasks above
+stay ticked because their files exist, and the tab strip they assumed is the one 053 added.

@@ -30,5 +30,5 @@ Campos principales:
 - La spec de la integración lista en `**Datos personales**:` las columnas personales que se
   incluyeron a pedido; una columna marcada como personal que no esté en esa lista bloquea la
   aplicación.
-- Para ver un ejemplo completo, descarga un proyecto aplicado (**Exportar**) o mira
+- Para ver un ejemplo completo, descarga un proyecto aplicado (**Descargar**) o mira
   `examples/ventas-basico/` del esqueleto de autoría.

@@ -41,13 +41,13 @@ const kpi = (page: Page, label: string) =>
     .filter({ hasText: label });
 
 const sheet = (page: Page) => page.getByTestId("report-sheet");
-const bar = (page: Page) => page.getByTestId("param-bar");
+const paramsPanel = (page: Page) => page.getByTestId("report-params-panel");
 
-/** Feature 030: the period and the auto-refresh live in the compact inline parameter panel. */
+/** Feature 053: the period and the auto-refresh live in the sheet's Parámetros tab. */
 async function params(page: Page) {
-  if ((await bar(page).count()) === 0) await reportAction(page, "Parámetros");
-  await expect(bar(page)).toBeVisible();
-  return bar(page);
+  if ((await paramsPanel(page).count()) === 0) await reportAction(page, "Parámetros");
+  await expect(paramsPanel(page)).toBeVisible();
+  return paramsPanel(page);
 }
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -121,7 +121,7 @@ test.describe("desktop", () => {
 
     // Feature 030: the period applies live in the sheet; there is no pending state to keep.
     const panel = await params(page);
-    await panel.getByLabel("Frecuencia").selectOption("data");
+    await panel.getByLabel("Frecuencia de actualización").selectOption("data");
     await expect(page.getByTestId("autorefresh-status")).toContainText(
       "Actualización automática · última",
     );
@@ -154,7 +154,7 @@ test.describe("desktop", () => {
 
     // The setting is remembered after reload.
     await page.reload();
-    await expect((await params(page)).getByLabel("Frecuencia")).toHaveValue("data");
+    await expect((await params(page)).getByLabel("Frecuencia de actualización")).toHaveValue("data");
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -188,7 +188,7 @@ test.describe("desktop", () => {
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
 
     const panel = await params(page);
-    await panel.getByLabel("Frecuencia").selectOption("1");
+    await panel.getByLabel("Frecuencia de actualización").selectOption("1");
 
     // Ignore the initial requests.
     versionCalls = 0;
@@ -200,7 +200,7 @@ test.describe("desktop", () => {
     await advanceUntil(page, () => dataCalls, 2);
     expect(versionCalls).toBe(0);
 
-    await panel.getByLabel("Frecuencia").selectOption("off");
+    await panel.getByLabel("Frecuencia de actualización").selectOption("off");
     await page.clock.fastForward(61_000);
     await page.waitForTimeout(500);
     expect(dataCalls).toBe(2);
@@ -286,9 +286,9 @@ test("offline: status shows reconnecting and data stays on screen", async ({
   await page.clock.install();
 
   // Feature 030: the sheet is the same at every width.
-  await (await params(page)).getByLabel("Frecuencia").selectOption("data");
-  await bar(page).getByRole("button", { name: "Cerrar", exact: true }).click();
-  await expect(bar(page)).toHaveCount(0);
+  await (await params(page)).getByLabel("Frecuencia de actualización").selectOption("data");
+  await page.getByTestId("report-sheet").getByRole("button", { name: "Cerrar", exact: true }).click();
+  await expect(page.getByTestId("report-sheet")).toHaveCount(0);
 
   await page.route("**/api/reports/ventas/version", (route) =>
     route.abort("internetdisconnected"),

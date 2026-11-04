@@ -10,7 +10,7 @@ import type {
 import { ParamsForm } from "../components/report/ParamsForm";
 import { ReportActions } from "../components/report/ReportActions";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
-import { ParamBar } from "../components/report/ParamBar";
+import { ReportParamsPanel } from "../components/report/ReportParamsPanel";
 import { ReportSheet } from "../components/report/ReportSheet";
 import { ReportArea } from "../components/report/ReportArea";
 import { ReportViews } from "../components/report/ReportViews";
@@ -27,6 +27,7 @@ import { downloadPdf } from "../lib/download";
 import { formatDate } from "../lib/format";
 import { isStale, staleText } from "../lib/freshness";
 import {
+  defaultSelection,
   filterOptionsQuery,
   isIncompleteCustom,
   parseSelection,
@@ -36,6 +37,7 @@ import {
   withoutFilterValue,
 } from "../lib/reportQuery";
 import type { ReportSelection } from "../lib/reportQuery";
+import { parseViewState, togglePanel } from "../lib/reportView";
 import { errorText } from "../lib/sharing";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -67,7 +69,7 @@ export function SharedDashboard() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [dataQuery, setDataQuery] = useState<string | null>(null);
-  // Feature 030: filters in the sheet, parameters in the compact inline panel.
+  // Feature 053: one sheet with two tabs, exactly as the private report page.
   const [panel, setPanel] = useState<"filters" | "params" | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -108,6 +110,12 @@ export function SharedDashboard() {
   const viewerMode = readViewerMode(report?.id ?? "");
   const areaMode: ThemeMode = viewerMode ?? (linkMode === "auto" ? resolved : linkMode);
 
+  /** The Parámetros tab's Limpiar: the report's defaults (the share link has no palette/mode). */
+  const clearAll = () => {
+    if (!applied || !report) return;
+    setParams(serializeSelection(defaultSelection(report), report), { replace: true });
+  };
+
   const activeCount = useMemo(() => {
     if (!applied || !report) return 0;
     return report.filters.reduce((sum, id) => sum + (applied.filters[id]?.length ?? 0), 0);
@@ -118,9 +126,13 @@ export function SharedDashboard() {
       if (!report || !applied || sameSelection(s, applied)) {
         return;
       }
-      setParams(serializeSelection(s, report), { replace: true });
+      const next = serializeSelection(s, report);
+      for (const [key, value] of Object.entries(parseViewState(params))) {
+        if (value !== null) next.set(key, value);
+      }
+      setParams(next, { replace: true });
     },
-    [report, applied, setParams],
+    [report, applied, params, setParams],
   );
 
   const loadOptions = useCallback(
@@ -353,8 +365,8 @@ export function SharedDashboard() {
               <div className="w-full min-w-0 sm:w-auto sm:shrink-0">
                 <ReportActions
                   activeFilters={activeCount}
-                  onOpenFilters={() => setPanel("filters")}
-                  onOpenParams={() => setPanel((current) => (current === "params" ? null : "params"))}
+                  onOpenFilters={() => setPanel((current) => togglePanel(current, "filters"))}
+                  onOpenParams={() => setPanel((current) => togglePanel(current, "params"))}
                   alwaysVisible={1}
                   actions={[
                     {
@@ -370,16 +382,6 @@ export function SharedDashboard() {
               </div>
             ) : null}
           </div>
-
-          {applied && panel === "params" ? (
-            <ParamBar
-              def={report}
-              applied={applied}
-              onApply={apply}
-              loadOptions={loadOptions}
-              onClose={() => setPanel(null)}
-            />
-          ) : null}
 
           {pdfError && <Alert tone="error">{pdfError}</Alert>}
           {dataError && <Alert tone="error">{dataError}</Alert>}
@@ -406,9 +408,27 @@ export function SharedDashboard() {
       </PageContainer>
 
       <ReportSheet
-        open={panel === "filters"}
+        open={panel !== null}
         title={t.reportActions.filters(activeCount)}
         onClose={() => setPanel(null)}
+        tabs={[
+          { id: "filters", label: t.reportSheet.tabs.filters },
+          { id: "params", label: t.reportSheet.tabs.params },
+        ]}
+        tab={panel ?? "filters"}
+        onTabChange={(id) => setPanel(id as "filters" | "params")}
+        footer={
+          <div className="flex gap-2">
+            {panel === "params" ? (
+              <Button variant="secondary" block onClick={clearAll}>
+                {t.reportSheet.clear}
+              </Button>
+            ) : null}
+            <Button variant="primary" block onClick={() => setPanel(null)}>
+              {t.reportSheet.done}
+            </Button>
+          </div>
+        }
       >
         {applied && panel === "filters" ? (
           <ParamsForm
@@ -419,6 +439,14 @@ export function SharedDashboard() {
             live
             section="filters"
             className="space-y-5"
+          />
+        ) : null}
+        {applied && panel === "params" ? (
+          <ReportParamsPanel
+            def={report}
+            applied={applied}
+            onApply={apply}
+            loadOptions={loadOptions}
           />
         ) : null}
       </ReportSheet>

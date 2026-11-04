@@ -10,10 +10,10 @@ Anyone with access to the dashboard.
 
 ## How to
 
-1. Apply the filters and the period you want (see Filters and periods).
-2. Open **Parameters** and, in the **Export** section, choose the **Format**: **PDF** or **CSV**.
-3. Press **Generate report**. You can also use **Download PDF** at the top of the report.
-4. For a single card, open its menu and choose **Download CSV**.
+1. Apply the filters and the period you want (see Parameters and filters of the report).
+2. Open **More actions** (⋯) in the report's actions row and choose **Download PDF** or
+   **Download CSV**. The line under the menu reminds you that the applied selection is exported.
+3. For a single card, open its menu and choose **Download CSV**.
 
 ## Options
 
@@ -35,5 +35,5 @@ Anyone with access to the dashboard.
 
 ## Common problems
 
-- "Wait for the report to finish loading.": export is enabled once the report finished loading.
+- "Wait for the report to finish loading.": the downloads appear once the report finished loading.
 - "Couldn't generate the PDF.": try again in a moment.

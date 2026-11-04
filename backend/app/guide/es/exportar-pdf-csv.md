@@ -11,11 +11,10 @@ Cualquier persona con acceso al tablero.
 
 ## Cómo se hace
 
-1. Aplica los filtros y el período que quieras (ver Filtros y períodos).
-2. Abre **Parámetros** y, en la sección **Exportar**, elige el **Formato**: **PDF** o **CSV**.
-3. Pulsa **Generar reporte**. También puedes usar **Descargar PDF** en la parte superior del
-   reporte.
-4. Para una sola tarjeta, abre su menú (**Opciones de** …) y elige **Descargar CSV**.
+1. Aplica los filtros y el período que quieras (ver Parámetros y filtros del reporte).
+2. Abre **Más acciones** (⋯) en la fila de acciones del reporte y elige **Descargar PDF** o
+   **Descargar CSV**. La línea bajo el menú recuerda que se exporta la selección aplicada.
+3. Para una sola tarjeta, abre su menú (**Opciones de** …) y elige **Descargar CSV**.
 
 ## Opciones
 
@@ -37,6 +36,6 @@ Cualquier persona con acceso al tablero.
 
 ## Problemas frecuentes
 
-- «Espera a que el reporte termine de cargar.»: la exportación se habilita cuando el reporte
+- «Espera a que el reporte termine de cargar.»: la exportación aparece cuando el reporte
   terminó de cargar.
 - «No se pudo generar el PDF.»: inténtalo de nuevo en un momento.

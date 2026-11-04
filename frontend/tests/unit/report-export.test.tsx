@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportView } from "../../src/api/types";
 import { CardMenu } from "../../src/components/report/CardMenu";
 import { DataTable } from "../../src/components/report/DataTable";
-import { ExportSection } from "../../src/components/report/ExportSection";
 import { RankingTable } from "../../src/components/report/RankingTable";
+import { ReportActions } from "../../src/components/report/ReportActions";
+import { FileDown } from "lucide-react";
+import { t } from "../../src/i18n/es";
 
 type TableView = Extract<ReportView, { type: "table" }>;
 type RankingView = Extract<ReportView, { type: "ranking" }>;
@@ -236,89 +238,51 @@ describe("RankingTable menu availability", () => {
   });
 });
 
-describe("ExportSection", () => {
-  it("defaults to PDF, can switch to CSV, and triggers the matching callback", () => {
+describe("ReportActions menu (053)", () => {
+  it("offers both downloads in the ⋯ menu with the applied-selection caption", () => {
     const onPdf = vi.fn();
     const onCsv = vi.fn();
     render(
-      <ExportSection
-        pdfAvailable
-        csvAvailable
-        ready
-        pdfBusy={false}
-        onPdf={onPdf}
-        onCsv={onCsv}
+      <ReportActions
+        activeFilters={0}
+        onOpenFilters={vi.fn()}
+        onOpenParams={vi.fn()}
+        caption={t.reportParams.exportCaptionApplied}
+        actions={[
+          { id: "pdf", label: t.reportActions.pdf, icon: FileDown, onClick: onPdf, show: true },
+          { id: "csv", label: t.reportActions.csv, icon: FileDown, onClick: onCsv, show: true },
+        ]}
       />,
     );
-
-    const radios = Array.from(container.querySelectorAll<HTMLInputElement>("input[type='radio']"));
-    expect(radios).toHaveLength(2);
-    expect(radios.find((r) => r.value === "pdf")?.checked).toBe(true);
-
     act(() => {
-      findButtonByText("Generar reporte")!.click();
+      container.querySelector<HTMLButtonElement>(`[aria-label="${t.reportActions.more}"]`)!.click();
     });
-    expect(onPdf).toHaveBeenCalledTimes(1);
-    expect(onCsv).not.toHaveBeenCalled();
-
-    act(() => {
-      radios.find((r) => r.value === "csv")!.click();
-    });
-    expect(radios.find((r) => r.value === "pdf")?.checked).toBe(false);
-    expect(radios.find((r) => r.value === "csv")?.checked).toBe(true);
-
-    act(() => {
-      findButtonByText("Generar reporte")!.click();
-    });
+    expect(container.querySelector('[data-testid="menu-caption"]')?.textContent).toBe(
+      t.reportParams.exportCaptionApplied,
+    );
+    act(() => findButtonByText(t.reportActions.csv)!.click());
     expect(onCsv).toHaveBeenCalledTimes(1);
-    expect(onPdf).toHaveBeenCalledTimes(1);
   });
 
-  it("disables generate and shows the not-ready hint when not ready", () => {
+  it("hides the CSV item while the report is loading and says so", () => {
     render(
-      <ExportSection
-        pdfAvailable
-        csvAvailable
-        ready={false}
-        pdfBusy={false}
-        onPdf={vi.fn()}
-        onCsv={vi.fn()}
+      <ReportActions
+        activeFilters={0}
+        onOpenFilters={vi.fn()}
+        onOpenParams={vi.fn()}
+        caption={t.reportParams.exportCaptionLoading}
+        actions={[
+          { id: "pdf", label: t.reportActions.pdf, icon: FileDown, onClick: vi.fn(), show: true },
+          { id: "csv", label: t.reportActions.csv, icon: FileDown, onClick: vi.fn(), show: false },
+        ]}
       />,
     );
-    expect(findButtonByText("Generar reporte")!.disabled).toBe(true);
-    expect(container.textContent).toContain(
-      "Espera a que el reporte termine de cargar.",
+    act(() => {
+      container.querySelector<HTMLButtonElement>(`[aria-label="${t.reportActions.more}"]`)!.click();
+    });
+    expect(container.querySelector('[data-testid="menu-caption"]')?.textContent).toBe(
+      t.reportParams.exportCaptionLoading,
     );
-  });
-
-  it("renders nothing when neither format is available", () => {
-    render(
-      <ExportSection
-        pdfAvailable={false}
-        csvAvailable={false}
-        ready
-        pdfBusy={false}
-        onPdf={vi.fn()}
-        onCsv={vi.fn()}
-      />,
-    );
-    expect(container.children).toHaveLength(0);
-  });
-
-  it("shows only CSV and checks it when PDF is unavailable", () => {
-    render(
-      <ExportSection
-        pdfAvailable={false}
-        csvAvailable
-        ready
-        pdfBusy={false}
-        onPdf={vi.fn()}
-        onCsv={vi.fn()}
-      />,
-    );
-    const radios = Array.from(container.querySelectorAll<HTMLInputElement>("input[type='radio']"));
-    expect(radios).toHaveLength(1);
-    expect(radios[0].value).toBe("csv");
-    expect(radios[0].checked).toBe(true);
+    expect(findButtonByText(t.reportActions.csv)).toBeNull();
   });
 });

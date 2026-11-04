@@ -4,7 +4,9 @@ import { useT } from "../../i18n";
 import { freshnessText } from "../../lib/freshness";
 import { formatRange } from "../../lib/numbers";
 import type { ReportSelection } from "../../lib/reportQuery";
+import type { ThemeMode } from "../../theme/themes";
 import { FilterChips } from "./FilterChips";
+import { ParameterChips, type ParameterChip } from "./ParameterChips";
 
 interface ReportMetaLineProps {
   def: ReportDefinition;
@@ -12,6 +14,13 @@ interface ReportMetaLineProps {
   data: ReportData | null;
   onRemoveFilter: (filterId: string, value: string) => void;
   onOpenFilters: () => void;
+  /** Feature 053: the reader's palette preview and light/dark, shown as removable chips. */
+  view?: {
+    theme: string | null;
+    mode: ThemeMode | null;
+    declaredTheme: string | null;
+    onRemove: (chip: ParameterChip) => void;
+  };
 }
 
 /**
@@ -20,7 +29,14 @@ interface ReportMetaLineProps {
  * the period keeps the first line and the rest wraps to a second. "Consultado por" is no longer
  * shown here (it lives in the PDF footer and the audit).
  */
-export function ReportMetaLine({ def, applied, data, onRemoveFilter, onOpenFilters }: ReportMetaLineProps) {
+export function ReportMetaLine({
+  def,
+  applied,
+  data,
+  onRemoveFilter,
+  onOpenFilters,
+  view,
+}: ReportMetaLineProps) {
   const t = useT();
   const periodText = t.reportParams.periodLabels[applied.period] ?? applied.period;
   const rangeText = data ? formatRange(data.selection.current) : null;
@@ -58,7 +74,19 @@ export function ReportMetaLine({ def, applied, data, onRemoveFilter, onOpenFilte
           </span>
         ))}
       </p>
-      <FilterChips def={def} applied={applied} onRemove={onRemoveFilter} onMore={onOpenFilters} />
+      <div className="flex flex-wrap items-center gap-2">
+        {view ? (
+          <ParameterChips
+            def={def}
+            applied={applied}
+            theme={view.theme}
+            mode={view.mode}
+            declaredTheme={view.declaredTheme}
+            onRemove={view.onRemove}
+          />
+        ) : null}
+        <FilterChips def={def} applied={applied} onRemove={onRemoveFilter} onMore={onOpenFilters} />
+      </div>
     </div>
   );
 }

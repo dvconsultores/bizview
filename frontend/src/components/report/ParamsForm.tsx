@@ -43,8 +43,8 @@ export interface ParamsFormProps {
   live?: boolean;
   /** Feature 030: render only the period block or only the filter block (the filters sheet). */
   section?: "all" | "period" | "filters";
-  /** `bar` lays the controls out in one compact row (the report page's parameter panel). */
-  variant?: "stacked" | "bar";
+  /** The panel owns Limpiar when it also resets the viewer's view (feature 053). */
+  showClear?: boolean;
 }
 
 export function ParamsForm({
@@ -56,7 +56,7 @@ export function ParamsForm({
   className,
   live = false,
   section = "all",
-  variant = "stacked",
+  showClear = true,
 }: ParamsFormProps) {
   const t = useT();
   const [draft, setDraft] = useState<ReportSelection>(applied);
@@ -93,6 +93,16 @@ export function ParamsForm({
     const id = window.setTimeout(() => onApply(draft), 250);
     return () => window.clearTimeout(id);
   }, [live, draft, pending, onApply]);
+
+  // Feature 053: closing the sheet must not swallow the change made in the last 250 ms — the timer
+  // dies with the panel, so a pending valid draft is applied instead of being lost. `onApply` is a
+  // no-op when the draft already equals the applied selection.
+  const flush = useRef<() => void>(() => undefined);
+  flush.current = () => {
+    if (live && pending > 0 && Object.keys(validateSelection(draft)).length === 0
+        && !isIncompleteCustom(draft)) onApply(draft);
+  };
+  useEffect(() => () => flush.current(), []);
 
   const optionsBase = useMemo(() => {
     const baseIsComplete =
@@ -192,13 +202,9 @@ export function ParamsForm({
   const grouped = def.filters.length >= 10;
   const shownFilters = grouped ? def.filters.slice(0, 6) : def.filters;
 
-  const bar = variant === "bar";
-  const row = bar ? "flex flex-wrap items-end gap-3" : undefined;
-  const heading = (text: string) =>
-    bar ? null : (
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{text}</h3>
-    );
-  const field = bar ? "min-w-[8.5rem] flex-1" : undefined;
+  const heading = (text: string) => (
+    <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{text}</h3>
+  );
 
   return (
     <form
@@ -206,14 +212,13 @@ export function ParamsForm({
       onSubmit={handleSubmit}
       className={className}
       data-testid="params-form"
-      data-variant={variant}
     >
-      <div className={row}>
+      <div className="space-y-4">
         {section !== "filters" && (
-          <div className={bar ? "contents" : "space-y-4"}>
+          <div className="space-y-4">
             {heading(t.reportParams.periodSection)}
 
-            <div className={field}>
+            <div>
               <Select
                 label={t.reportParams.period}
                 value={draft.period}
@@ -228,7 +233,7 @@ export function ParamsForm({
             </div>
 
             {draft.period === "custom" && (
-              <div className={bar ? "flex min-w-[15rem] flex-1 gap-3" : "grid grid-cols-1 gap-4 min-[360px]:grid-cols-2"}>
+              <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2">
                 <Input
                   ref={fromInputRef}
                   label={t.reportParams.from}
@@ -255,10 +260,10 @@ export function ParamsForm({
         )}
 
         {section !== "filters" && (
-          <div className={bar ? "contents" : "mt-5 space-y-4 border-t border-line pt-5"}>
+          <div className="mt-5 space-y-4 border-t border-line pt-5">
             {heading(t.reportParams.compareSection)}
 
-            <div className={field}>
+            <div>
               {compareOptions.length > 1 ? (
                 <Select
                   label={t.reportParams.compare}
@@ -285,7 +290,7 @@ export function ParamsForm({
         {section !== "period" && def.filters.length > 0 && (
           <section
             aria-labelledby={filtersSectionId}
-            className={bar ? "contents" : "mt-5 space-y-4 border-t border-line pt-5"}
+            className="mt-5 space-y-4 border-t border-line pt-5"
           >
             {heading(t.reportParams.filtersSection)}
 
@@ -304,18 +309,23 @@ export function ParamsForm({
         {children}
       </div>
 
-      {bar ? null : (
+      {live ? (
+        showClear ? (
+          <footer className="mt-5 border-t border-line pt-5">
+            <Button type="button" variant="secondary" block onClick={handleClear}>
+              {t.reportParams.clear}
+            </Button>
+          </footer>
+        ) : null
+      ) : (
+        // A layout's `filters` component applies on submit (feature 026), never live.
         <footer className="mt-5 flex flex-col gap-3 border-t border-line pt-5">
-          {live ? null : (
-            <>
-              <p role="status" className="text-sm text-ink-muted" data-testid="pending-status">
-                {pending === 0 ? t.reportParams.noPending : t.reportParams.pending(pending)}
-              </p>
-              <Button type="submit" variant="primary" block disabled={pending === 0}>
-                {t.reportParams.apply}
-              </Button>
-            </>
-          )}
+          <p role="status" className="text-sm text-ink-muted" data-testid="pending-status">
+            {pending === 0 ? t.reportParams.noPending : t.reportParams.pending(pending)}
+          </p>
+          <Button type="submit" variant="primary" block disabled={pending === 0}>
+            {t.reportParams.apply}
+          </Button>
           <Button type="button" variant="secondary" block onClick={handleClear}>
             {t.reportParams.clear}
           </Button>

@@ -18,12 +18,15 @@ Anyone with access to the dashboard.
 3. In **Compare with** choose **No comparison**, **Previous period** or **Previous year**.
 4. In **Filters** choose one or more values; the list shows up to 200 matches and you can type
    to narrow it down.
-5. Press **Apply filters**. Changes are not applied until then.
+5. Changes apply by themselves, after a quarter-second pause; press **Done** to close the panel.
 
 ## Options
 
-- **Active filters** shows what is applied; **Clear all** goes back to the start.
-- Filters stay in the page address: sharing or reloading it keeps them.
+- Each applied value appears as a chip under the title; its ✕ removes it. **Clear all** goes back
+  to the start.
+- Filters and the period stay in the page address: sharing or reloading it keeps them.
+- Period, comparison, frequency, palette and theme have their own tab in the same panel (see
+  Parameters and filters of the report).
 
 ## Common problems
 

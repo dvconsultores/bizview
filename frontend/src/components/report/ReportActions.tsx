@@ -22,6 +22,9 @@ interface ReportActionsProps {
   actions: ReportAction[];
   /** How many leading actions never collapse (the shared view has a single one: the PDF). */
   alwaysVisible?: number;
+  /** Feature 053: one line under the menu items (what the downloads export, or that the report is
+   * still loading). The old parameters card carried it; the menu is where the downloads live now. */
+  caption?: string;
 }
 
 /**
@@ -37,6 +40,7 @@ export function ReportActions({
   onOpenParams,
   actions,
   alwaysVisible = 0,
+  caption,
 }: ReportActionsProps) {
   const t = useT();
   const visible = actions.filter((action) => action.show);
@@ -147,6 +151,11 @@ export function ReportActions({
                 </button>
               );
             })}
+            {caption ? (
+              <p className="px-3 pb-1 pt-2 text-xs text-ink-muted" data-testid="menu-caption">
+                {caption}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

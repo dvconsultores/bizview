@@ -127,6 +127,23 @@ describe("ReportActions", () => {
     expect(labels.some((label) => label.includes(t.reportActions.params))).toBe(true);
   });
 
+  it("opens the sheet from both openers (053: same sheet, two tabs)", async () => {
+    const onOpenFilters = vi.fn();
+    const onOpenParams = vi.fn();
+    await act(async () => {
+      root?.render(
+        <ReportActions {...base} onOpenFilters={onOpenFilters} onOpenParams={onOpenParams} />,
+      );
+    });
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+    const filters = buttons.find((b) => b.textContent?.includes(t.reportActions.filters(2)))!;
+    const params = buttons.find((b) => b.textContent?.trim() === t.reportActions.params)!;
+    await act(async () => filters.click());
+    expect(onOpenFilters).toHaveBeenCalledTimes(1);
+    await act(async () => params.click());
+    expect(onOpenParams).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the rest of the actions in the ⋯ menu, at every width", async () => {
     await act(async () => {
       root?.render(<ReportActions {...base} />);

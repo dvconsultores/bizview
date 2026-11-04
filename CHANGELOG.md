@@ -29,6 +29,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Parámetros lives in the same sheet as Filtros (feature 053)**: the report page still opened a
+  second, inline parameters card under the meta line — a large empty area, **EXPORTAR** with its
+  format radio on one side and four selects along the bottom — although feature 030 had decided on
+  one sheet with two tabs. **Filtros** and **Parámetros** now open the same right sheet (bottom sheet
+  on phones) on their own tab, and the open tab's opener closes it. The Parámetros tab is a column of
+  five labelled rows — Período, Comparar con, Frecuencia de actualización, Paleta (with a swatch row
+  of the chosen theme), Tema del reporte — each applying live, with **Limpiar** and **Listo** in the
+  footer. The palette and the light/dark choice join the URL (`theme`, `mode`) and appear as
+  removable chips next to the filter chips, so a reload or a shared tab shows the same view; the
+  report definition is never written from there. The shared report page gets the same two tabs.
+- **Downloads moved to the ⋯ menu**: **Descargar PDF** and **Descargar CSV** export the applied
+  selection from the actions row's menu, with the one line that used to explain it inside the card.
 - **The installation theme now repaints the whole application (feature 051)**: applying a theme used
   to change the charts and nothing else. The application's own chrome — header band, sidebar, page
   background, cards, buttons, inputs, tables, dialogs, bottom navigation — was one set of literals per
@@ -123,6 +135,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Removed
 
+- **The inline parameters card (feature 053)**: `ParamBar` and `ExportSection` are gone, with
+  **Generar reporte**, the PDF/CSV radio and the strings that named them. A reader used to reach
+  export through the parameters card; the card also cost a screen of height above the numbers.
 - **Manual project creation (feature 049)**: the "Nuevo proyecto" button, its form and
   `GET /api/projects/slug` are gone, and `POST /api/projects` answers `410`
   (`project_creation_removed`) instead of creating anything. Projects are authored outside Bizview

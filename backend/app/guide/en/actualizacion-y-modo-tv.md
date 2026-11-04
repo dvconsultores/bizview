@@ -11,7 +11,7 @@ Anyone with access to the dashboard.
 ## How to
 
 1. In the report open **Auto refresh**.
-2. Choose the **Frequency**: **Disabled**, **When new data arrives**, **Every 1 min**,
+2. Choose the **Refresh frequency**: **Disabled**, **When new data arrives**, **Every 1 min**,
    **Every 5 min**, **Every 15 min** or **Every 60 min**.
 3. For a TV or a monitor, press **TV mode** and then **Fullscreen**.
 4. To go back, press **Exit TV mode** or the Esc key.

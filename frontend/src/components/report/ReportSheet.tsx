@@ -1,9 +1,21 @@
 import { X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useT } from "../../i18n";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export interface ReportSheetTab {
+  id: string;
+  label: string;
+}
 
 interface ReportSheetProps {
   open: boolean;
@@ -13,6 +25,12 @@ interface ReportSheetProps {
   children: ReactNode;
   /** Rendered under the content ("Listo"). */
   footer?: ReactNode;
+  /** Feature 053: the header's tabs ("Filtros | Parámetros"). Without them the sheet has one panel
+   * and no tab strip, as before. */
+  tabs?: readonly ReportSheetTab[];
+  /** The selected tab when `tabs` is given. */
+  tab?: string;
+  onTabChange?: (id: string) => void;
 }
 
 /**
@@ -22,12 +40,41 @@ interface ReportSheetProps {
  * a dialog, per the app's no-modals rule (`tests/unit/no-modals.test.ts`): focus moves in and cycles
  * while it is open, Esc closes it and returns focus to the opener, and the page behind stays usable.
  */
-export function ReportSheet({ open, title, onClose, children, footer }: ReportSheetProps) {
+export function ReportSheet({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  tabs,
+  tab,
+  onTabChange,
+}: ReportSheetProps) {
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<number | null>(null);
   const titleId = useId();
+  const baseId = useId();
+  const selected = tabs && tabs.length > 0 ? (tab ?? tabs[0].id) : null;
+  const tabId = (id: string) => `${baseId}-tab-${id}`;
+  const panelId = `${baseId}-panel`;
+
+  /** ArrowLeft/ArrowRight/Home/End move between the tabs (automatic activation: two tabs, no async). */
+  const onTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!tabs || !selected || !onTabChange) return;
+    const index = tabs.findIndex((item) => item.id === selected);
+    if (index < 0) return;
+    let next: number | null = null;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    if (next === null) return;
+    event.preventDefault();
+    onTabChange(tabs[next].id);
+    document.getElementById(tabId(tabs[next].id))?.focus();
+  };
 
   const close = useCallback(() => {
     onClose();
@@ -110,9 +157,46 @@ export function ReportSheet({ open, title, onClose, children, footer }: ReportSh
     >
       <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-line-strong lg:hidden" />
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-          {title}
-        </h2>
+        {selected === null ? (
+          <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+            {title}
+          </h2>
+        ) : (
+          <h2 id={titleId} className="sr-only">
+            {title}
+          </h2>
+        )}
+        {selected !== null ? (
+          <div
+            role="tablist"
+            aria-label={t.reportSheet.tabsLabel}
+            className="-mx-1 flex min-w-0 flex-1 items-center gap-1"
+          >
+            {tabs!.map((item) => {
+              const isSelected = item.id === selected;
+              return (
+                <button
+                  key={item.id}
+                  id={tabId(item.id)}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-controls={panelId}
+                  tabIndex={isSelected ? 0 : -1}
+                  onClick={() => onTabChange?.(item.id)}
+                  onKeyDown={onTabKeyDown}
+                  className={`min-h-tap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 ${
+                    isSelected
+                      ? "bg-accent-soft text-accent-deep"
+                      : "text-ink-2 hover:bg-subtle hover:text-ink"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={close}
@@ -122,7 +206,15 @@ export function ReportSheet({ open, title, onClose, children, footer }: ReportSh
           <X className="mx-auto h-5 w-5" aria-hidden />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+      <div
+        id={selected !== null ? panelId : undefined}
+        role={selected !== null ? "tabpanel" : undefined}
+        aria-labelledby={selected !== null ? tabId(selected) : undefined}
+        tabIndex={selected !== null ? 0 : undefined}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-4 outline-none"
+      >
+        {children}
+      </div>
       <div className="shrink-0 border-t border-line px-4 py-3 pb-safe">
         {footer ?? (
           <button

@@ -20,16 +20,17 @@ const theme = (page: Page) => page.evaluate(() => document.documentElement.datas
 const kpi = (page: Page, label: string) =>
   page.getByRole("region", { name: "Indicadores" }).getByRole("listitem").filter({ hasText: label });
 
-/** Filtros opens the sheet; Parámetros opens the compact inline panel (never over the numbers). */
+// Feature 053: Filtros and Parámetros open the same sheet on their own tab; the inline card is gone.
 const sheet = (page: Page) => page.getByTestId("report-sheet");
-const bar = (page: Page) => page.getByTestId("param-bar");
+const paramsPanel = (page: Page) => page.getByTestId("report-params-panel");
 const filtersSheet = async (page: Page) => {
   await expect(sheet(page)).toBeVisible();
   return sheet(page);
 };
-const paramsBar = async (page: Page) => {
-  await expect(bar(page)).toBeVisible();
-  return bar(page);
+const paramsTab = async (page: Page) => {
+  await expect(sheet(page)).toBeVisible();
+  await expect(paramsPanel(page)).toBeVisible();
+  return paramsPanel(page);
 };
 
 function countDataRequests(page: Page) {
@@ -78,30 +79,65 @@ async function expectAccessible(
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 900 }, colorScheme: "light" });
 
-  test("Parámetros applies live with the dashboard still visible", async ({ page }, testInfo) => {
+  test("Parámetros opens the same sheet on its tab and applies live", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
     await signIn(page);
     await page.goto(`/r/ventas?${SELECTION}`);
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
-    await expect(sheet(page)).toHaveCount(0); // no parameters card, nothing covering the numbers
+    await expect(sheet(page)).toHaveCount(0); // nothing covering the numbers on first paint
 
     const counter = countDataRequests(page);
     counter.reset();
 
     await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-    const params = await paramsBar(page);
-    await expect(kpi(page, "Ventas netas")).toBeVisible(); // inline: the numbers stay on screen
+    const params = await paramsTab(page);
+    await expect(sheet(page).getByRole("tab", { name: "Parámetros" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(kpi(page, "Ventas netas")).toBeVisible(); // the numbers stay on screen
     await params.getByLabel("Comparar con").selectOption("previous_year");
 
     await expect.poll(() => counter.count).toBe(1); // debounced to one request
     await expect(page).toHaveURL(/compare=previous_year/);
-    await expect(bar(page)).toBeVisible();
+    await expect(paramsPanel(page)).toBeVisible();
     await expect(kpi(page, "Ventas netas")).toBeVisible();
 
-    // Not a sheet: it closes with its own button, and pressing the action again toggles it.
-    await bar(page).getByRole("button", { name: "Cerrar", exact: true }).click();
-    await expect(bar(page)).toHaveCount(0);
+    // Filtros switches the same sheet, and the open tab's opener closes it.
+    await page.getByRole("button", { name: "Filtros", exact: true }).click();
+    await expect(sheet(page).getByRole("tab", { name: "Filtros" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(paramsPanel(page)).toHaveCount(0);
+    await page.getByRole("button", { name: "Filtros", exact: true }).click();
+    await expect(sheet(page)).toHaveCount(0);
     counter.dispose();
+  });
+
+  test("Parámetros → change the period → Listo → the chip is there and a reload keeps it", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
+    await signIn(page);
+    await page.goto(`/r/ventas?${SELECTION}`);
+    await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
+
+    await page.getByRole("button", { name: "Parámetros", exact: true }).click();
+    const params = await paramsTab(page);
+    await params.getByLabel("Período").selectOption("last_month");
+    await expect(page).toHaveURL(/period=last_month/);
+
+    await page.getByRole("button", { name: "Listo" }).click();
+    await expect(sheet(page)).toHaveCount(0);
+    const chip = page.getByRole("button", { name: "Quitar Período: Mes anterior" });
+    await expect(chip).toBeVisible();
+
+    await page.reload();
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(chip).toHaveCount(0);
+    await expect(page).not.toHaveURL(/period=last_month/);
   });
 
   test("Filtros: one request per change, chips appear and are removable, Limpiar todo clears", async ({
@@ -144,7 +180,7 @@ test.describe("desktop", () => {
     counter.dispose();
   });
 
-  test("CSV from the card menu and from the sheet's Parámetros tab", async ({ page }, testInfo) => {
+  test("CSV from the card menu and from the ⋯ menu", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
     await signIn(page);
     await page.goto(`/r/ventas?${SELECTION}`);
@@ -159,16 +195,17 @@ test.describe("desktop", () => {
     ]);
     expect(cardDownload.suggestedFilename()).toMatch(/\.csv$/);
 
-    await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-    const params = await paramsBar(page);
-    const [sheetDownload] = await Promise.all([
+    const [menuDownload] = await Promise.all([
       page.waitForEvent("download"),
       (async () => {
-        await params.getByRole("radio", { name: "CSV" }).check();
-        await params.getByRole("button", { name: "Generar reporte" }).click();
+        await page.getByRole("button", { name: "Más acciones" }).click();
+        await expect(page.getByTestId("menu-caption")).toHaveText(
+          "Se exporta la selección aplicada.",
+        );
+        await page.getByRole("menuitem", { name: "Descargar CSV" }).click();
       })(),
     ]);
-    expect(sheetDownload.suggestedFilename()).toMatch(/\.csv$/);
+    expect(menuDownload.suggestedFilename()).toMatch(/\.csv$/);
   });
 });
 
@@ -226,9 +263,38 @@ test.describe("accessibility", () => {
         await expect(sheet(page)).toHaveCount(0);
         await expect(page.getByRole("button", { name: "Parámetros", exact: true })).toBeVisible();
         await page.getByRole("button", { name: "Parámetros", exact: true }).click();
-        await paramsBar(page);
+        await paramsTab(page);
         await expectAccessible(page, "parameters panel");
       });
     });
   }
 });
+
+// Feature 053 (SC-003): the sheet fits its viewport at every width in both themes. The brief asked
+// for snapshots; this repository has no visual-snapshot baseline, so the same claim is asserted with
+// the checks it already uses: the panel inside the viewport, the dashboard visible behind it and no
+// horizontal scroll.
+for (const width of [375, 768, 1280, 1920]) {
+  for (const scheme of ["light", "dark"] as const) {
+    test(`the Parámetros tab fits at ${width}px, ${scheme}`, async ({ page }, testInfo) => {
+      test.skip(!testInfo.project.name.startsWith("chromium"), "one engine per width");
+      test.setTimeout(60_000);
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await signIn(page);
+      await page.goto(`/r/ventas?${SELECTION}`);
+      await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
+
+      await page.getByRole("button", { name: "Parámetros", exact: true }).click();
+      const panel = await paramsTab(page);
+      const box = await sheet(page).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+      expect(box!.height).toBeLessThanOrEqual(900 * 0.72 + 1);
+      await expect(panel.getByLabel("Período")).toBeVisible();
+      await expectNoHorizontalScroll(page);
+      expect(await theme(page)).toBe(scheme);
+    });
+  }
+}

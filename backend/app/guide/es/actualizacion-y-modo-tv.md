@@ -11,7 +11,7 @@ Cualquier persona con acceso al tablero.
 ## Cómo se hace
 
 1. En el reporte abre **Actualización automática**.
-2. Elige la **Frecuencia**: **Desactivada**, **Al llegar datos nuevos**, **Cada 1 min**,
+2. Elige la **Frecuencia de actualización**: **Desactivada**, **Al llegar datos nuevos**, **Cada 1 min**,
    **Cada 5 min**, **Cada 15 min** o **Cada 60 min**.
 3. Para una TV o un monitor, pulsa **Modo TV** y luego **Pantalla completa**.
 4. Para volver, pulsa **Salir del modo TV** o la tecla Esc.

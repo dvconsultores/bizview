@@ -17,12 +17,17 @@ Cualquier persona con acceso al tablero.
 3. En **Comparar con** elige **Sin comparación**, **Período anterior** o **Año anterior**.
 4. En **Filtros** elige uno o varios valores; la lista muestra hasta 200 coincidencias y puedes
    escribir para acotar.
-5. Pulsa **Aplicar filtros**. Los cambios no se aplican hasta entonces.
+5. Los cambios se aplican solos, con una pausa de un cuarto de segundo; pulsa **Listo** para
+   cerrar el panel.
 
 ## Opciones
 
-- **Filtros activos** muestra lo aplicado; **Limpiar todo** vuelve al estado inicial.
-- Los filtros quedan en la dirección de la página: al compartirla o recargarla se conservan.
+- Cada valor aplicado aparece como ficha bajo el título; su ✕ lo quita. **Limpiar todo** vuelve al
+  estado inicial.
+- Los filtros y el período quedan en la dirección de la página: al compartirla o recargarla se
+  conservan.
+- El período, la comparación, la frecuencia, la paleta y el tema tienen su propia pestaña en el
+  mismo panel (ver Parámetros y filtros del reporte).
 
 ## Problemas frecuentes
 

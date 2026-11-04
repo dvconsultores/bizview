@@ -2,9 +2,9 @@ import { Copy } from "lucide-react";
 import { useState } from "react";
 import type { PaletteId } from "../../api/types";
 import { useT } from "../../i18n";
-import { isPaletteId, PRESET_IDS } from "../../theme/palette";
+import { isPaletteId, PRESET_IDS, themeStyle } from "../../theme/palette";
+import { BUILTIN_THEMES, type ThemeMode } from "../../theme/themes";
 import { Button } from "../Button";
-import { iconButtonClass } from "../IconButton";
 import { Select } from "../Select";
 
 interface PaletteSelectProps {
@@ -12,9 +12,15 @@ interface PaletteSelectProps {
   value: string | null;
   /** Applies a preview for this view. `null` restores the declared/installation preset. */
   onChange: (preset: string | null) => void;
-  /** Feature 030: just the field, for the parameter panel's row. */
-  compact?: boolean;
+  /** The mode the swatches paint in: the report area's own (feature 053). */
+  mode?: ThemeMode;
 }
+
+/** The eight series roles, as literal class names so the stylesheet builds them (no colour here). */
+const SWATCHES = [
+  "bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4",
+  "bg-chart-5", "bg-chart-6", "bg-chart-7", "bg-chart-8",
+] as const;
 
 const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "eleganteText" | "monocromoText" | "contrasteText" | "daltonicoText"> = {
   impacto: "impactoText",
@@ -32,43 +38,12 @@ const DESCRIPTIONS: Record<PaletteId, "impactoText" | "clasicoText" | "eleganteT
  * definition itself changes through the project editor + a validated workspace version (IX), never
  * from a reader's screen.
  */
-export function PaletteSelect({ value, onChange, compact = false }: PaletteSelectProps) {
+export function PaletteSelect({ value, onChange, mode = "light" }: PaletteSelectProps) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const declared = isPaletteId(value) ? value : null;
   const shown: PaletteId = declared ?? "impacto";
   const snippet = `layout:\n  theme:\n    palette: ${declared ?? "impacto"}`;
-
-  if (compact) {
-    return (
-      <div className="flex min-w-[9rem] flex-1 items-end gap-1">
-        <div className="min-w-0 flex-1" title={t.palette[DESCRIPTIONS[shown]]}>
-          <Select label={t.palette.label} value={declared ?? ""} onChange={(event) => onChange(event.target.value || null)}>
-            <option value="">{t.palette.installation}</option>
-            {PRESET_IDS.map((id) => (
-              <option key={id} value={id}>
-                {t.palette[id]}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <button
-          type="button"
-          aria-label={t.palette.declare}
-          title={copied ? t.palette.copied : t.palette.declare}
-          onClick={() => {
-            void navigator.clipboard?.writeText(snippet).then(
-              () => setCopied(true),
-              () => setCopied(false),
-            );
-          }}
-          className={iconButtonClass()}
-        >
-          <Copy className="h-5 w-5" aria-hidden />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <section className="space-y-3 border-t border-line pt-5">
@@ -85,6 +60,18 @@ export function PaletteSelect({ value, onChange, compact = false }: PaletteSelec
           </option>
         ))}
       </Select>
+      {/* The selected theme's colours, painted with the same derivation the dashboard uses. */}
+      <div
+        data-testid="palette-swatches"
+        data-theme="preview"
+        style={themeStyle(BUILTIN_THEMES[shown], mode)}
+        className="flex flex-wrap items-center gap-1"
+        aria-hidden
+      >
+        {SWATCHES.map((role) => (
+          <span key={role} className={`h-3 w-6 rounded-full ${role}`} />
+        ))}
+      </div>
       <p className="text-sm text-ink-muted">{t.palette[DESCRIPTIONS[shown]]}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Button

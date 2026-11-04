@@ -18,9 +18,10 @@ import { ParamsForm } from "../components/report/ParamsForm";
 import { ReportActions } from "../components/report/ReportActions";
 import { ReportArea } from "../components/report/ReportArea";
 import { ReportMetaLine } from "../components/report/ReportMetaLine";
-import { ParamBar } from "../components/report/ParamBar";
 import { ReportSheet } from "../components/report/ReportSheet";
-import { ExportSection } from "../components/report/ExportSection";
+import { ReportParamsPanel } from "../components/report/ReportParamsPanel";
+import type { ParameterChip } from "../components/report/ParameterChips";
+import { Button } from "../components/Button";
 import { View } from "../components/View";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { useAuth } from "../auth/AuthContext";
@@ -38,6 +39,13 @@ import {
   type CsvTable,
 } from "../lib/csv";
 import {
+  parseViewState,
+  togglePanel,
+  withViewState,
+  type ReportViewState,
+} from "../lib/reportView";
+import {
+  defaultSelection,
   filterOptionsQuery,
   isIncompleteCustom,
   unknownFilterIds,
@@ -133,11 +141,10 @@ export function ReportView() {
 
   const tv = params.get("tv") === "1";
 
-  const openFilters = useCallback(() => setPanel("filters"), []);
-  const toggleParams = useCallback(
-    () => setPanel((current) => (current === "params" ? null : "params")),
-    [],
-  );
+  // Feature 053: one sheet, two tabs. Both actions open it on their tab; pressing the tab that is
+  // already shown closes it (the toggle the report page always had).
+  const openFilters = useCallback(() => setPanel((current) => togglePanel(current, "filters")), []);
+  const toggleParams = useCallback(() => setPanel((current) => togglePanel(current, "params")), []);
   const closePanel = useCallback(() => setPanel(null), []);
 
   /** The report's own theme (`layout.theme.id`, or its deprecated alias `palette`) wins over the
@@ -146,19 +153,28 @@ export function ReportView() {
   const declaredTheme = def?.layout?.theme;
   const declaredPalette = declaredTheme?.id ?? declaredTheme?.palette ?? null;
   const declaredMode: ReportMode = reportMode(declaredTheme);
-  const [palettePreview, setPalettePreview] = useState<string | null>(null);
-  /** The viewer's own light/dark for this report, for the session only (047 FR-019). */
-  const [viewerMode, setViewerMode] = useState<ThemeMode | null>(() => readViewerMode(id));
+  /** The reader's own palette and light/dark for this view (053): URL first, then the stored choice
+   * for this report, then what the report declares. */
+  const viewState = useMemo<ReportViewState>(() => {
+    const fromUrl = parseViewState(params);
+    return { theme: fromUrl.theme, mode: fromUrl.mode ?? readViewerMode(id) };
+  }, [params, id]);
+  const setView = useCallback(
+    (change: Partial<ReportViewState>) => {
+      if (change.mode !== undefined) writeViewerMode(id, change.mode);
+      setParams(withViewState(params, change), { replace: true });
+    },
+    [id, params, setParams],
+  );
   useEffect(() => {
-    setPalette(palettePreview ?? declaredPalette);
-  }, [palettePreview, declaredPalette, setPalette]);
+    setPalette(viewState.theme ?? declaredPalette);
+  }, [viewState.theme, declaredPalette, setPalette]);
   useEffect(() => () => setPalette(null), [setPalette]);
   const areaMode: ThemeMode =
-    viewerMode ?? (declaredMode === "auto" ? resolved : declaredMode);
+    viewState.mode ?? (declaredMode === "auto" ? resolved : declaredMode);
   const toggleMode = () => {
     const next: ThemeMode = areaMode === "dark" ? "light" : "dark";
-    setViewerMode(next);
-    writeViewerMode(id, next);
+    setView({ mode: next });
   };
 
   // TV mode is meant to be looked at, not worked in: the chrome steps aside with it.
@@ -304,10 +320,40 @@ export function ReportView() {
   const apply = useCallback(
     (s: ReportSelection) => {
       if (!def || !applied || sameSelection(s, applied)) return;
-      setParams(serializeSelection(s, def), { replace: true });
+      // The selection is rewritten from scratch; the reader's own view keys must survive it.
+      const next = serializeSelection(s, def);
+      for (const [key, value] of Object.entries(parseViewState(params))) {
+        if (value !== null) next.set(key, value);
+      }
+      setParams(next, { replace: true });
     },
-    [def, applied, setParams],
+    [def, applied, params, setParams],
   );
+
+  /** Feature 053: a parameter chip restores that parameter's default (and its URL key). */
+  const removeParameterChip = useCallback(
+    (chip: ParameterChip) => {
+      if (!def || !applied) return;
+      if (chip.key === "period") {
+        apply({ ...applied, period: def.periods.default, from: "", to: "" });
+      } else if (chip.key === "compare") {
+        apply({ ...applied, compare: def.compare.default });
+      } else if (chip.key === "theme") {
+        setView({ theme: null });
+      } else {
+        setView({ mode: null });
+      }
+    },
+    [applied, apply, def, setView],
+  );
+
+  /** The Parámetros tab's Limpiar: the report's defaults and the reader's own view, in one write so
+   * the two updates cannot overwrite each other. */
+  const clearAll = useCallback(() => {
+    if (!def || !applied) return;
+    writeViewerMode(id, null);
+    setParams(serializeSelection(defaultSelection(def), def), { replace: true });
+  }, [applied, def, id, setParams]);
 
   const refreshData = useCallback(async (): Promise<boolean> => {
     const q = queryRef.current;
@@ -402,20 +448,8 @@ export function ReportView() {
     : undefined;
 
   const ready = fresh && !loading;
-  const pdfAvailable = !!def?.pdf;
   const csvAvailable = fresh && !!data?.views.some(
     (v) => !v.error && !v.empty && (v.type === "table" || v.type === "ranking"),
-  );
-
-  const exportSection = (
-    <ExportSection
-      pdfAvailable={pdfAvailable}
-      csvAvailable={csvAvailable}
-      ready={ready}
-      pdfBusy={pdfBusy}
-      onPdf={exportPdf}
-      onCsv={exportCsv}
-    />
   );
 
   const activeCount = useMemo(() => {
@@ -521,6 +555,7 @@ export function ReportView() {
               activeFilters={activeCount}
               onOpenFilters={openFilters}
               onOpenParams={toggleParams}
+              caption={ready ? t.reportParams.exportCaptionApplied : t.reportParams.exportCaptionLoading}
               actions={[
                 {
                   id: "pdf",
@@ -529,6 +564,13 @@ export function ReportView() {
                   onClick: exportPdf,
                   show: def.pdf && query !== null,
                   loading: pdfBusy,
+                },
+                {
+                  id: "csv",
+                  label: t.reportActions.csv,
+                  icon: FileDown,
+                  onClick: exportCsv,
+                  show: csvAvailable,
                 },
                 {
                   id: "share",
@@ -579,25 +621,14 @@ export function ReportView() {
             data={fresh ? data : null}
             onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
             onOpenFilters={openFilters}
+            view={{
+              theme: viewState.theme,
+              mode: viewState.mode,
+              declaredTheme: declaredPalette,
+              onRemove: removeParameterChip,
+            }}
           />
         </div>
-      ) : null}
-
-      {applied && panel === "params" ? (
-        <ParamBar
-          def={def}
-          applied={applied}
-          onApply={apply}
-          loadOptions={loadOptions}
-          onClose={closePanel}
-          refresh={{
-            mode: storedMode,
-            onChange: setStoredMode,
-            cacheSeconds: def.direct?.cache_seconds,
-          }}
-          palette={{ value: palettePreview ?? declaredPalette, onChange: setPalettePreview }}
-          extra={exportSection}
-        />
       ) : null}
 
       {/* The report's own area paints from its theme and its mode: with `mode: dark` inside a
@@ -635,9 +666,27 @@ export function ReportView() {
       </ReportArea>
 
       <ReportSheet
-        open={panel === "filters"}
+        open={panel !== null}
         title={t.reportActions.filters(activeCount)}
         onClose={closePanel}
+        tabs={[
+          { id: "filters", label: t.reportSheet.tabs.filters },
+          { id: "params", label: t.reportSheet.tabs.params },
+        ]}
+        tab={panel ?? "filters"}
+        onTabChange={(id) => setPanel(id as "filters" | "params")}
+        footer={
+          <div className="flex gap-2">
+            {panel === "params" ? (
+              <Button variant="secondary" block onClick={clearAll}>
+                {t.reportSheet.clear}
+              </Button>
+            ) : null}
+            <Button variant="primary" block onClick={closePanel}>
+              {t.reportSheet.done}
+            </Button>
+          </div>
+        }
       >
         {applied && panel === "filters" ? (
           <ParamsForm
@@ -653,6 +702,29 @@ export function ReportView() {
               <Alert tone="info">{t.reportSheet.unknownFilter}</Alert>
             ) : null}
           </ParamsForm>
+        ) : null}
+        {applied && panel === "params" ? (
+          <ReportParamsPanel
+            def={def}
+            applied={applied}
+            onApply={apply}
+            loadOptions={loadOptions}
+            refresh={{
+              mode: storedMode,
+              onChange: setStoredMode,
+              cacheSeconds: def.direct?.cache_seconds,
+            }}
+            palette={{
+              value: viewState.theme,
+              onChange: (preset) => setView({ theme: preset }),
+            }}
+            themeMode={
+              declaredTheme
+                ? { value: viewState.mode, onChange: (mode) => setView({ mode }) }
+                : undefined
+            }
+            mode={areaMode}
+          />
         ) : null}
       </ReportSheet>
 
