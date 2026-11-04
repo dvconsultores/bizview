@@ -1,17 +1,22 @@
 """Data-source catalogue (feature 004): super user only; changes and tests need step-up.
 
 Feature 052 adds the structure pack (`structure.md`/`.json`), the sample requests of a REST source
-and the read-only structure chat. All of them are metadata: no route here returns a row value."""
+and the AI-assisted generation of that pack. All of them are metadata: no route here returns a row
+value."""
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from bizview_cli.structure import structure_json, structure_markdown
+from bizview_cli.structure import (
+    enriched_json,
+    enriched_markdown,
+    structure_json,
+    structure_markdown,
+)
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.ai import chat as chat_service
 from app.api.tokens import token_or_session
 from app.auth.deps import Auth, client_ip, recent_reauth, require_superuser
 from app.config import get_settings
@@ -25,7 +30,7 @@ from app.models import ApiToken, AppUser, SourceSampleRequest
 from app.services import audit
 from app.sources import describe as describer
 from app.sources import samples as sample_service
-from app.sources import schemas, service
+from app.sources import schemas, service, structure_ai
 from app.sources import structure as structure_service
 
 router = APIRouter(prefix="/api/sources")
@@ -176,7 +181,7 @@ def describe_source(name: str, request: Request, path: str | None = None,
         raise ApiError(502, "source_error", _safe_message(e, secrets)) from None
 
 
-# --- feature 052: the structure pack, the sample requests and the structure chat ---------------
+# --- feature 052: the structure pack, its generation, the sample requests ----------------------
 
 class NotesIn(BaseModel):
     notes: str = Field(default="", max_length=4000)
@@ -203,10 +208,6 @@ class SamplePatch(BaseModel):
     notes: str | None = Field(default=None, max_length=1000)
 
 
-class ChatIn(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
-
-
 def _source_by_name(db: Session, name: str):
     src = service.by_name(db, name)
     if src is None:
@@ -228,25 +229,88 @@ def _pack(db: Session, src, path: str | None = None) -> dict:
 
 @router.get("/{name}/structure")
 def source_structure(name: str, request: Request, format: str = "json",
-                     path: str | None = None,
+                     path: str | None = None, mode: str = "pack",
                      who: tuple[AppUser, ApiToken | None] = Depends(
                          token_or_session("describe")),
                      db: Session = DB):
     """The pack this source produces: `structure.json` (default) or `structure.md`, as a download.
 
-    Structure only, never a row value; audited the same way a describe is (FR-003)."""
+    Since the convergence of 052 the generated pack is what both files carry; `mode=scan` forces the
+    plain describe when a super user wants to see the raw catalogue. Structure only, never a row
+    value; audited the same way a describe is (FR-003)."""
     user, token = who
     src = _source_by_name(db, name)
-    pack = _pack(db, src, path)
+    generated = (src.structure_pack or {}) if mode != "scan" else {}
     audit.record(db, "source_described", actor_id=user.id, ip=client_ip(request),
-                 detail={"source": src.name, "format": format,
+                 detail={"source": src.name, "format": format, "mode": mode,
                          "key_id": token.id if token else None})
+    if generated:
+        if format == "md":
+            return Response(content=enriched_markdown(generated),
+                            media_type="text/markdown; charset=utf-8",
+                            headers={"Content-Disposition":
+                                     'attachment; filename="structure.md"'})
+        return Response(content=enriched_json(generated), media_type="application/json",
+                        headers={"Content-Disposition":
+                                 'attachment; filename="structure.json"'})
+    pack = _pack(db, src, path)
     if format == "md":
         return Response(content=structure_markdown(pack),
                         media_type="text/markdown; charset=utf-8",
                         headers={"Content-Disposition": 'attachment; filename="structure.md"'})
     return Response(content=structure_json(pack), media_type="application/json",
                     headers={"Content-Disposition": 'attachment; filename="structure.json"'})
+
+
+def _pack_document(db: Session, src, path: str | None = None) -> dict:
+    """What the tab renders: whether a generated pack exists and what the scan says right now."""
+    generated = dict(src.structure_pack or {})
+    previous = dict(src.structure_pack_prev or {})
+    secrets = service.secrets_of(src)
+    try:
+        scan_pack = structure_service.build(db, src, get_settings(), path=path)
+    except Exception as e:
+        scan_pack = None
+        error = _safe_message(e, secrets)
+    else:
+        error = None
+    return {"generated": generated or None, "previous": previous or None,
+            "scan": scan_pack, "scan_error": error,
+            "ai": {"enabled": get_settings().ai_enabled,
+                   "model": get_settings().ai_model_effective,
+                   "ceiling": get_settings().ai_structure_tokens}}
+
+
+@router.get("/{name}/structure/pack")
+def source_structure_pack(name: str, _: AppUser = Depends(require_superuser), db: Session = DB):
+    """The tab's own read: the generated pack, the previous one and the live scan."""
+    return _pack_document(db, _source_by_name(db, name))
+
+
+@router.post("/{name}/structure/generate")
+def generate_structure(name: str, request: Request,
+                       actor: AppUser = Depends(require_superuser),
+                       _: Auth = Depends(recent_reauth), db: Session = DB):
+    """One internal pass: scan, AI, verify, save. The super user types nothing (052, FR-004)."""
+    src = _source_by_name(db, name)
+    if not get_settings().ai_enabled:
+        raise ApiError(409, "ai_not_configured", M("sourceStructure.ai_off"),
+                       extra={"ai": {"action": "admin_ai"}})
+    try:
+        result = structure_ai.generate(db, src, get_settings())
+    except ApiError:
+        raise
+    except Exception as e:                 # an unreachable source, a refused credential, ...
+        raise _source_error(e, service.secrets_of(src)) from None
+    pack = result["pack"]
+    audit.record(db, "source_structure_generated", actor_id=actor.id, ip=client_ip(request),
+                 # counts only: `tokens` is in the guard's secret vocabulary, so it nests under
+                 # `usage` — the audit records what a run cost, never what it read.
+                 detail={"source": src.name, "model": pack["generator"].get("model"),
+                         "tables": len(pack.get("tables") or []),
+                         "dropped": len(pack.get("dropped") or []),
+                         "usage": {"total": pack["generator"].get("tokens", 0)}})
+    return {**result, "previous": dict(src.structure_pack_prev or {}) or None}
 
 
 @router.put("/{name}/structure/notes")
@@ -407,36 +471,3 @@ def run_sample(name: str, sample_id: int, request: Request,
     audit.record(db, "source_sample_run", actor_id=actor.id, ip=client_ip(request),
                  detail={"source": src.name, "name": sample.name, "status": result["status"]})
     return result
-
-
-@router.get("/{name}/chat")
-def chat_history(name: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
-    src = _source_by_name(db, name)
-    return {"turns": chat_service.turns(db, src, actor),
-            "cap": get_settings().ai_structure_chat_daily_tokens,
-            "spent_today": chat_service.spent_today(db, src, actor)}
-
-
-@router.post("/{name}/chat")
-def chat_ask(name: str, body: ChatIn, request: Request,
-             actor: AppUser = Depends(require_superuser), db: Session = DB):
-    src = _source_by_name(db, name)
-    result = chat_service.ask(db, source=src, user=actor, question=body.question,
-                              pack_factory=lambda: _pack(db, src), settings=get_settings())
-    if not result["refused"]:
-        audit.record(db, "source_chat_asked", actor_id=actor.id, ip=client_ip(request),
-                     # counts only: the question text is never in the audit trail
-                     detail={"source": src.name, "model": result["model"],
-                             "usage": {"in": result["tokens_in"],
-                                       "out": result["tokens_out"]}})
-    return result
-
-
-@router.delete("/{name}/chat", status_code=204)
-def chat_clear(name: str, request: Request, actor: AppUser = Depends(require_superuser),
-               db: Session = DB):
-    src = _source_by_name(db, name)
-    removed = chat_service.clear(db, src, actor)
-    audit.record(db, "source_chat_cleared", actor_id=actor.id, ip=client_ip(request),
-                 detail={"source": src.name, "turns": removed})
-    return Response(status_code=204)

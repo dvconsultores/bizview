@@ -55,17 +55,16 @@ class Settings(BaseSettings):
     # address (build arg BIZVIEW_SOURCE_URL → SOURCE_URL); an installation may override it.
     source_url: str | None = None
 
-    # Optional AI provider (constitution VIII): off unless configured. Since 045 the only caller
-    # is the read-only help agent (feature 033); authoring lives outside BizView.
+    # Optional AI provider (constitution VIII): off unless configured. Since 045 the callers are the
+    # read-only help agent (033) and the structure generator (052); authoring lives outside BizView.
     ai_provider: AIProvider = "none"
     ai_api_key: SecretStr | None = None
     ai_model: str | None = Field(default=None, max_length=100)
     ai_base_url: str | None = None
     ai_timeout_seconds: float = Field(default=30, ge=1, le=300)
-    # Feature 052: the structure chat. A per-user, per-source, per-UTC-day budget (0 = no chat at
-    # all), and whether the question text is kept — the token counts and the audit are always kept.
-    ai_structure_chat_daily_tokens: int = Field(default=100_000, ge=0)
-    ai_structure_chat_store_questions: bool = False
+    # Feature 052: one structure generation is a super user's deliberate action, so the ceiling is
+    # per run (not per day): past it the run stops chunking and says what it did not examine.
+    ai_structure_tokens: int = Field(default=150_000, ge=0)
     # Origin checks run inside this window (SQL/HTTP), on the explicit validate action only.
     origin_check_timeout_seconds: float = Field(default=20, ge=1, le=120)
 

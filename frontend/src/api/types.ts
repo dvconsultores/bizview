@@ -1271,7 +1271,7 @@ export interface GuideTopic {
   related: { id: string; title: string }[];
 }
 
-// Feature 052: the structure of a source, its sample requests and the structure chat.
+// Feature 052: the structure of a source, its sample requests and the generated pack.
 export interface StructureColumn {
   name: string;
   type: string;
@@ -1315,6 +1315,7 @@ export interface StructureSoapService {
   name: string;
   ports: StructureSoapPort[];
 }
+/** The plain scan: what the describe answers, without any AI pass. */
 export interface StructurePack {
   pack: {
     version: number;
@@ -1336,6 +1337,79 @@ export interface StructurePack {
     samples?: StructureSamplePayload[];
     services?: StructureSoapService[];
   };
+}
+/** One field of a generated table (`structure.schema.json`). */
+export interface StructureField {
+  name: string;
+  path?: string;
+  type: string;
+  semantic?: string;
+  unit?: string | null;
+  units?: "iso8601" | "epoch_s" | "epoch_ms" | null;
+  nullable?: boolean | null;
+  personal?: boolean;
+  note?: string;
+}
+/** One table or endpoint of the generated pack. */
+export interface GeneratedTable {
+  id: string;
+  schema?: string;
+  path?: string;
+  params?: Record<string, string>;
+  records?: string | null;
+  pagination?: { type: string; param?: string | null };
+  row_is?: string;
+  key?: string[];
+  date_field?: string | null;
+  row_count?: number | null;
+  fields: StructureField[];
+  personal?: string[];
+  notes?: string[];
+}
+export interface GeneratedRelation {
+  from: string;
+  to: string;
+  kind: string;
+  confidence?: string;
+  note?: string;
+}
+export interface SuggestedMetric {
+  id: string;
+  from: string;
+  formula_words: string;
+  note?: string;
+}
+/** The generated structure pack: what the external AI reads. */
+export interface GeneratedPack {
+  source: string;
+  kind: SourceKind;
+  generated_at: string;
+  generator: {
+    mode: "scan" | "ai";
+    model?: string | null;
+    version: number;
+    tokens?: number;
+    incomplete?: string[];
+  };
+  notes?: string;
+  bi_ready?: boolean;
+  tables: GeneratedTable[];
+  relations?: GeneratedRelation[];
+  suggested_metrics?: SuggestedMetric[];
+  dropped?: string[];
+}
+export interface StructureState {
+  generated: GeneratedPack | null;
+  previous: GeneratedPack | null;
+  scan: StructurePack | null;
+  scan_error: string | null;
+  ai: { enabled: boolean; model: string | null; ceiling: number };
+}
+export interface GenerateResult {
+  pack: GeneratedPack;
+  usage: { tokens: number; chunks: number; incomplete: string[] };
+  markdown: string;
+  previous: GeneratedPack | null;
 }
 export interface SampleRequest {
   id: number;
@@ -1359,24 +1433,4 @@ export interface SampleRun {
   types: Record<string, string>;
   timestamp_units: string | null;
   pagination: string | null;
-}
-export interface ChatTurn {
-  role: "question" | "answer";
-  text: string | null;
-  at: string;
-}
-export interface ChatHistory {
-  turns: ChatTurn[];
-  cap: number;
-  spent_today: number;
-}
-export interface ChatAnswer {
-  answer: string;
-  refused: boolean;
-  unknown: { name: string; kind: string }[];
-  model: string | null;
-  usage: { cap: number; spent_today: number };
-  tokens_in: number;
-  tokens_out: number;
-  created_at: string;
 }

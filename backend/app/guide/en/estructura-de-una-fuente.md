@@ -17,7 +17,9 @@ Only the **Superuser**.
 2. Press the **Structure** tab: BizView reads the source (structure only) and shows it.
 3. Use **Search table or column** to find an object in a large catalogue.
 4. Press **Download structure (.md)** or **Download structure (.json)** to take it to the authoring
-   pack: they are the `sources/<name>/structure.md` and `structure.json` files.
+   pack: they are the `sources/<name>/structure.md` and `structure.json` files. When you have
+   generated the pack with AI (see Generate structure with AI), that is what downloads; otherwise it
+   is the scan.
 5. Write what is missing in **Notes** and press **Save notes**: that text travels in the
    "Observaciones" section of the download.
 6. For a source that changed, press **Refresh** to read it again.
@@ -28,6 +30,8 @@ Only the **Superuser**.
   document, chat identifiers). Press it to change the flag: the choice is stored and kept in the
   download.
 - The **Dates** range comes from the minimum and maximum of up to three date columns per table.
+- The **Generate structure with AI** button completes this reading with logical tables, relations and
+  notes; the result is what downloads.
 - When the catalogue is very large the structure is truncated and the download says so in its notes.
 
 ## Common problems

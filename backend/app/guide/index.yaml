@@ -440,21 +440,21 @@ topics:
     aliases:
       es: ["estructura", "columnas", "tablas", "tipos", "descargar estructura", "structure", "esquema"]
       en: ["structure", "columns", "tables", "types", "download structure", "schema"]
-    related: [fuentes, chat-de-estructura, peticiones-de-muestra]
-  - id: chat-de-estructura
+    related: [fuentes, generar-estructura-con-ia, peticiones-de-muestra]
+  - id: generar-estructura-con-ia
     section: datos
-    title: {es: "Chat de estructura", en: "Structure chat"}
+    title: {es: "Generar estructura con IA", en: "Generate structure with AI"}
     summary:
-      es: "Preguntar por las tablas y campos de una fuente, sin que nadie lea los datos."
-      en: "Ask about a source's tables and fields, without anybody reading the data."
+      es: "Un botón que lee la fuente, identifica sus tablas, campos y relaciones y guarda el paquete que usa la IA de fuera."
+      en: "One button that reads the source, identifies its tables, fields and relations and saves the pack the external AI uses."
     roles: [superuser]
     routes: ["/admin/fuentes/:id"]
     tiles: []
     commands: []
     aliases:
-      es: ["chat", "preguntar", "ia", "consulta", "estructura"]
-      en: ["chat", "ask", "ai", "assistant", "structure"]
-    related: [estructura-de-una-fuente, ia, fuentes]
+      es: ["generar estructura", "ia", "tablas", "relaciones", "paquete", "estructura"]
+      en: ["generate structure", "ai", "tables", "relations", "pack", "structure"]
+    related: [estructura-de-una-fuente, ia, peticiones-de-muestra]
   - id: peticiones-de-muestra
     section: datos
     title: {es: "Peticiones de muestra", en: "Sample requests"}

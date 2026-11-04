@@ -470,7 +470,7 @@ MESSAGES: dict[str, str] = {
     "sources.bi_unreadable": "Could not read the BI database",
     "sources.not_found": "Source not found.",
 
-    # feature 052: the structure tab, its sample requests and the structure chat
+    # feature 052: the structure tab, its sample requests and the generated pack
     "sourceStructure.samples_unsupported": "Only REST and Supabase sources keep sample requests.",
     "sourceStructure.sample_not_found": "That sample request does not exist.",
     "sourceStructure.sample_duplicate": "A sample request with that name already exists.",
@@ -478,10 +478,11 @@ MESSAGES: dict[str, str] = {
     "sourceStructure.sample_method": "This version runs GET requests only: a source credential must not be able to write.",
     "sourceStructure.column_not_found": "That column is not in the source's current structure.",
     "sourceStructure.not_packable": "This source does not produce a structure pack yet.",
-    "sourceChat.refused": "The structure chat does not read data: it describes tables, columns, types, keys and endpoints. Ask me about the source's structure.",
-    "sourceChat.not_configured": "The structure chat needs an AI provider: Administration → AI.",
-    "sourceChat.cap": "You reached this chat's daily limit ({cap} tokens). Come back tomorrow, or ask the super user to raise it in Administration → AI.",
-    "sourceChat.cap_off": "The structure chat is turned off in this installation.",
+    "sourceStructure.ai_off": "Generating the structure with AI needs an AI provider: Administration → AI.",
+    "sourceStructure.ai_unsupported": "A SOAP source has no tables or fields to infer: the pack is the scan of its WSDL.",
+    "sourceStructure.ai_invalid": "The model's answer did not form a valid pack. The scan is still available; try again.",
+    "sourceStructure.ai_ceiling": "The run reached its token ceiling: the pack says what was not examined.",
+    "sourceStructure.ai_empty": "The model returned no table the source actually has. Nothing was saved: you still see the previous pack or the scan.",
     "users.only_superuser_creates_admins": "Only the superuser can create administrators.",
     "telegram.not_configured": "Set the bot name and its credential.",
     "workspace.report_not_found": "Report not found.",

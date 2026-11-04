@@ -16,6 +16,7 @@ import httpx
 import yaml
 
 from bizview_cli.i18n import t
+from bizview_cli.structure import is_enriched
 
 EXIT_USAGE, EXIT_NETWORK = 2, 3
 
@@ -101,9 +102,15 @@ def describe(source: str, *, path: str | None = None, as_json: bool = False,
 
 
 def structure_from(data: dict, tables: list[str]) -> dict:
+    """Columns of the requested tables, from a plain describe, a pack wrapper or a generated pack.
+
+    `bizview validate --describe NAME=FILE` reads this, so the file an author has — any of the three
+    `structure.json` shapes this product wrote — must answer the same question."""
     requested = set(tables)
     if isinstance(data, dict) and isinstance(data.get("pack"), dict):
         data = data.get("structure") or {}
+    if isinstance(data, dict) and is_enriched(data):
+        return _structure_from_generated(data, requested)
     if not isinstance(data, dict) or data.get("kind") != "postgresql":
         return {"tables": {}, "error": "la descripción no es de una fuente PostgreSQL"}
     result: dict[str, dict] = {}
@@ -121,4 +128,24 @@ def structure_from(data: dict, tables: list[str]) -> dict:
     if truncated and len(result) != len(requested):
         return {"tables": {}, "error": "la descripción está truncada y no incluye todas las "
                                       "tablas"}
+    return {"tables": result, "error": None}
+
+def _structure_from_generated(data: dict, requested: set[str]) -> dict:
+    """The generated pack: `id` is `schema.table` for a database and the endpoint for an API."""
+    if data.get("kind") not in ("postgresql", "rest", "supabase"):
+        return {"tables": {}, "error": "el paquete no es de una fuente con tablas o endpoints"}
+    index: dict[str, dict] = {}
+    for table in data.get("tables") or []:
+        if not isinstance(table, dict) or "id" not in table:
+            continue
+        columns = {str(f["name"]).lower(): str(f.get("type", "")).lower()
+                   for f in table.get("fields") or []
+                   if isinstance(f, dict) and "name" in f}
+        entry = {"columns": columns, "product_dependency": False}
+        index[str(table["id"]).lower()] = entry
+        if table.get("schema"):
+            index[f"{table['schema']}.{table['id']}".lower()] = entry
+    result = {name: index[name] for name in requested if name in index}
+    if not result:
+        return {"tables": {}, "error": "el paquete no incluye las tablas pedidas"}
     return {"tables": result, "error": None}

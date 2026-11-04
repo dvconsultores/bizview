@@ -8,18 +8,21 @@
 #   run_contract   the Auto-mode contract
 #   token_budget   the retired conversation budget
 #   AI Powered     the name the product dropped in 0.2.0 (046)
+#   source_chat    the structure chat 052 shipped and then removed (one generator button instead)
 #
 # Excluded on purpose: cli/bizview_cli/workspace_template/ (the external authoring contract),
 # specs/ (historical feature documents, and specs/_deprecated/ is where the removed features live),
 # CHANGELOG.md (it records what was removed) and alembic/versions/ (a migration has to name the
-# tables it drops).
+# tables it drops). A line that must name a retired term anyway — the audit history it left behind,
+# a label for that history — says so with `vocab-allow` and is skipped.
 set -eu
 cd "$(dirname "$0")/.."
 
 PATHS=${*:-"backend/app frontend/src docs README.md README.es.md SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md"}
 
-hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget|AI Powered' $PATHS \
-         --exclude-dir=workspace_template --exclude-dir=node_modules 2>/dev/null || true)
+hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget|AI Powered|source_chat' $PATHS \
+         --exclude-dir=workspace_template --exclude-dir=node_modules 2>/dev/null \
+         | grep -v 'vocab-allow' || true)
 
 if [ -n "$hits" ]; then
   printf '%s\n' "$hits"

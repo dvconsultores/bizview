@@ -27,7 +27,7 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "direct_read_log", "report_rollup", "project", "project_file_revision",
               "google_link", "ai_status", "appearance_settings", "image_cache",
               "theme", "direct_snapshot", "project_limits", "source_sample_request",
-              "source_structure_flag", "source_chat_message"}
+              "source_structure_flag"}
 
 
 def schema_tables():
@@ -249,6 +249,10 @@ HISTORICAL = (
     "assistant_run_started", "assistant_run_stopped", "assistant_session_archived",
     "assistant_session_deleted",
 )
+#: Kinds a later feature retired, which the constraint had already accepted by then: 052 shipped a
+#: structure chat and replaced it with one generator button (convergence). Only the migrations from
+#: 0049 on must accept these — the ones before it could not have written them.
+LATE_HISTORY = ("source_chat_asked", "source_chat_cleared")
 
 
 def _migration(name: str):
@@ -265,7 +269,7 @@ def _migration(name: str):
 def test_the_model_keeps_the_two_catalogues_apart():
     from app.models import AUDIT_KINDS, AUDIT_KINDS_ALLOWED, HISTORICAL_AUDIT_KINDS
 
-    assert set(HISTORICAL_AUDIT_KINDS) == set(HISTORICAL)
+    assert set(HISTORICAL_AUDIT_KINDS) == set(HISTORICAL) | set(LATE_HISTORY)
     assert not set(AUDIT_KINDS) & set(HISTORICAL_AUDIT_KINDS)
     assert set(AUDIT_KINDS_ALLOWED) == set(AUDIT_KINDS) | set(HISTORICAL_AUDIT_KINDS)
 
@@ -277,6 +281,11 @@ def test_every_migration_that_recreates_the_constraint_accepts_history():
     bi_ready = _migration("0044_bi_ready_sources").KINDS_0044
     for name, kinds in (("0041", forties), ("0042", themes), ("0044", bi_ready)):
         missing = [kind for kind in HISTORICAL if kind not in kinds]
+        assert not missing, f"{name} would reject historical rows: {missing}"
+    # 0050 replaced 052's chat with the generator: it must accept everything written before it.
+    pack = _migration("0050_structure_pack")
+    for name, kinds in (("0049", pack.KINDS_0049), ("0050", pack.KINDS_0050)):
+        missing = [kind for kind in (*HISTORICAL, *LATE_HISTORY) if kind not in kinds]
         assert not missing, f"{name} would reject historical rows: {missing}"
     # And they agree on what may be written: the later one is a superset of the earlier one.
     assert set(forties) <= set(themes) <= set(bi_ready)

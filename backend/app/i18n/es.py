@@ -460,7 +460,7 @@ MESSAGES: dict[str, str] = {
     "sources.bi_unreadable": "No se pudo leer la base de datos BI",
     "sources.not_found": "Fuente no encontrada.",
 
-    # feature 052: the structure tab, its sample requests and the structure chat
+    # feature 052: the structure tab, its sample requests and the generated pack
     "sourceStructure.samples_unsupported": "Solo las fuentes REST y Supabase guardan peticiones de muestra.",
     "sourceStructure.sample_not_found": "Esa petición de muestra no existe.",
     "sourceStructure.sample_duplicate": "Ya existe una petición de muestra con ese nombre.",
@@ -468,10 +468,11 @@ MESSAGES: dict[str, str] = {
     "sourceStructure.sample_method": "Esta versión ejecuta solo peticiones GET: la credencial de una fuente no debe poder escribir.",
     "sourceStructure.column_not_found": "Esa columna no está en la estructura actual de la fuente.",
     "sourceStructure.not_packable": "Esta fuente no produce un pack de estructura todavía.",
-    "sourceChat.refused": "El chat de estructura no lee datos: describe tablas, columnas, tipos, claves y endpoints. Pregúntame por la estructura de la fuente.",
-    "sourceChat.not_configured": "El chat de estructura necesita un proveedor de IA: Administración → IA.",
-    "sourceChat.cap": "Alcanzaste el límite diario de este chat ({cap} tokens). Vuelve mañana o pide al superusuario que lo suba en Administración → IA.",
-    "sourceChat.cap_off": "El chat de estructura está desactivado en esta instalación.",
+    "sourceStructure.ai_off": "Generar la estructura con IA necesita un proveedor de IA: Administración → IA.",
+    "sourceStructure.ai_unsupported": "Una fuente SOAP no tiene tablas ni campos que inferir: el paquete es el escaneo del WSDL.",
+    "sourceStructure.ai_invalid": "La respuesta del modelo no formó un paquete válido. El escaneo sigue disponible; vuelve a intentarlo.",
+    "sourceStructure.ai_ceiling": "La corrida llegó al tope de tokens: el paquete dice qué no se examinó.",
+    "sourceStructure.ai_empty": "El modelo no devolvió ninguna tabla que la fuente tenga. No se guardó nada: sigues viendo el paquete anterior o el escaneo.",
     "users.only_superuser_creates_admins": "Solo el superusuario puede crear administradores.",
     "telegram.not_configured": "Configura el nombre del bot y su credencial.",
     "workspace.report_not_found": "Reporte no encontrado.",

@@ -1,4 +1,21 @@
 <!--
+Sync Impact Report (amendment 2026-11-03, feature 052 convergence)
+- Version change: 3.2.2 → 3.2.3 (PATCH: the name of one AI surface inside a principle's list. No
+  principle added, removed or redefined.)
+- Modified principles:
+  - VIII. AI Is Optional and Private: the second read-only surface is now **AI-assisted structure
+    generation** — internal, non-interactive, metadata only — instead of the structure chat that
+    052's first pass added and the owner replaced after reading it on production. The chat was a
+    conversation about a structure; the generator is one pass that produces the pack, verified
+    against the scan. Neither authors a project: the pack is still what a person hands to the
+    external AI.
+- Added constraints: none.
+- Removed constraints: none.
+- Trigger: owner review of feature 052 on production, 2026-11-03 ("no chat; one button, the simpler
+  the better").
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-11-03, feature 052)
 - Version change: 3.2.1 → 3.2.2 (PATCH: one clause made complete and one sentence added to a
   principle's list of surfaces. No principle added, removed or redefined.)
@@ -441,9 +458,9 @@ Rationale: one codebase serves every customer and every customer receives every 
 - Provider keys MUST never be returned by the API, shown in the interface, or logged.
 - Customers MUST be able to choose a local model so no data leaves their infrastructure.
 - Bizview does not author artifacts with AI. AI inside the product is limited to read-only help,
-  to the **structure chat** of a data source — which answers from the structure pack only, with no
-  tools, no file writes, no commands and no row values — and to connectors that consume approved
-  reports.
+  to **AI-assisted structure generation** — one internal pass per data source that turns a scan of
+  the source into the structure pack, with no tools, no file writes, no commands and no row values,
+  verified by product code before it is saved — and to connectors that consume approved reports.
 - A **structure pack** — what a customer hands to an external AI — contains structure, counts and
   shapes only: table and column names, types, cardinalities and value distributions. It MUST NOT
   contain credentials, hosts, connection strings or row values. The CLI and the product build it
@@ -549,4 +566,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.2.2 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-03
+**Version**: 3.2.3 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-03

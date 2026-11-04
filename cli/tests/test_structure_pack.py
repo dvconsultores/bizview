@@ -9,12 +9,17 @@ from pathlib import Path
 from bizview_cli.describe import structure_from
 from bizview_cli.structure import (
     build_pack,
+    enriched_json,
+    enriched_markdown,
+    enriched_schema,
     infer_timestamp_units,
+    is_enriched,
     is_personal,
     pagination_hint,
     structure_json,
     structure_markdown,
     suggest,
+    validate_enriched,
 )
 
 SECRET_VALUE = "ACME-SECRET-CUSTOMER-9931"
@@ -200,3 +205,92 @@ def test_cli_writes_both_files_where_the_pack_expects(tmp_path, monkeypatch):
     assert (folder / "structure.md").read_text("utf-8").startswith("# Fuente «erp-ventas»")
     assert json.loads((folder / "structure.json").read_text("utf-8"))["pack"]["source"] == \
         "erp-ventas"
+
+
+# --- the generated pack (052, converged 2026-11-03) ---------------------------------------
+
+GENERATED = {
+    "source": "coinmarketcap", "kind": "rest", "generated_at": "2026-11-03T21:00:00Z",
+    "generator": {"mode": "ai", "model": "deepseek-chat", "version": 1, "tokens": 4200},
+    "notes": "Plan free: 333 llamadas al día.",
+    "tables": [
+        {"id": "v1/listings", "path": "v1/cryptocurrency/listings/latest",
+         "params": {"limit": "100"}, "records": "$.data", "pagination": {"type": "none"},
+         "row_is": "una moneda del top N en la última toma", "key": ["id"],
+         "date_field": "last_updated", "row_count": 100,
+         "fields": [
+             {"name": "id", "path": "$.id", "type": "integer", "semantic": "identifier"},
+             {"name": "price_usd", "path": "$.quote.USD.price", "type": "numeric",
+              "semantic": "amount", "unit": "USD"},
+             {"name": "last_updated", "path": "$.last_updated", "type": "timestamptz",
+              "semantic": "timestamp", "units": "iso8601"},
+             {"name": "owner_email", "path": "$.owner_email", "type": "text",
+              "semantic": "text", "personal": True}],
+         "personal": ["owner_email"], "notes": ["sin open interest en este plan"]},
+    ],
+    "relations": [{"from": "v1/listings.id", "to": "v1/quotes.coin_id",
+                   "kind": "one_to_many", "confidence": "high"}],
+    "suggested_metrics": [{"id": "altcoin_season_index", "from": "v1/listings",
+                           "formula_words": "porcentaje del top 100 que supera a BTC"}],
+    "dropped": ["ventas_fantasma (tabla que la fuente no tiene)"],
+}
+
+
+def test_the_generated_document_is_valid_against_the_shipped_schema():
+    assert validate_enriched(GENERATED) == []
+    assert enriched_schema()["title"] == "Bizview source structure pack"
+
+
+def test_an_enriched_document_is_told_apart_from_the_scan():
+    assert is_enriched(GENERATED)
+    assert not is_enriched({"pack": {"source": "x"}, "structure": {"kind": "rest"}})
+
+
+def test_invalid_documents_name_the_field():
+    broken = json.loads(json.dumps(GENERATED))
+    broken["tables"][0]["fields"][0]["semantic"] = "inventado"
+    problems = validate_enriched(broken)
+    assert problems and "semantic" in problems[0]
+
+    no_generator = json.loads(json.dumps(GENERATED))
+    del no_generator["generator"]
+    assert any("generator" in problem for problem in validate_enriched(no_generator))
+
+
+def test_enriched_markdown_follows_the_pack_template():
+    text = enriched_markdown(GENERATED)
+    lines = text.splitlines()
+    assert lines[0] == "# Fuente «coinmarketcap» — estructura"
+    assert "Tipo: rest" in lines[2]
+    assert "Plan free: 333 llamadas al día." in lines[2]
+    assert "## REST" in lines
+    assert ("#### Tabla `v1/listings` — GET `v1/cryptocurrency/listings/latest` — ~100 filas"
+            " · fecha: `last_updated`") in lines
+    assert "Una fila es una moneda del top N en la última toma." in lines
+    assert "| Campo | Tipo | Clave | Personal | Nota |" in lines
+    assert "| id | integer | PK |  | identificador |" in lines
+    assert "| price_usd | numeric |  |  | importe · unidad USD |" in lines
+    assert "| owner_email | text |  | **sí** | texto |" in lines
+    assert "## Relaciones" in lines
+    assert "- `v1/listings.id` → `v1/quotes.coin_id`: one_to_many (high)" in lines
+    assert "## Métricas sugeridas" in lines
+    assert "## Observaciones" in lines
+    assert any("ventas_fantasma" in line for line in lines)
+
+
+def test_the_generated_pack_never_carries_a_value_or_a_host():
+    text = enriched_markdown(GENERATED) + enriched_json(GENERATED)
+    for secret in (SECRET_VALUE, HOST, PASSWORD):
+        assert secret not in text
+
+
+def test_structure_from_reads_a_generated_pack_with_tables_and_schemas():
+    generated = json.loads(json.dumps(GENERATED))
+    generated["kind"] = "postgresql"
+    generated["tables"] = [
+        {"id": "orders", "schema": "ventas", "row_is": "un pedido",
+         "fields": [{"name": "id", "type": "integer"}, {"name": "total", "type": "numeric"}]}]
+    result = structure_from(generated, ["ventas.orders"])
+    assert result["error"] is None
+    assert result["tables"]["ventas.orders"]["columns"] == {"id": "integer", "total": "numeric"}
+    assert structure_from(generated, ["otra"])["error"]

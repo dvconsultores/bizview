@@ -1,7 +1,8 @@
 #!/bin/sh
 # Gate 6/6 (045): the removed agent's switches are gone from code, settings and documentation.
 #
-# `AI_CHAT_*` (rounds, timeouts, previews, budgets), `AI_AGENT_*` (concurrency, discovery),
+# `AI_CHAT_*` (rounds, timeouts, previews, budgets; and 052's retired chat switches),
+# `AI_AGENT_*` (concurrency, discovery),
 # `AI_AUTO_*` (run contracts), `AI_COMMAND_TOKEN_CEILING`, `AI_CONTEXT_COMPACT_CHARS`,
 # `AI_STAGE_TOKEN_BUDGET`, `AI_VISION`, `ATTACHMENTS_*` and the `fake` provider switch.
 #
@@ -10,7 +11,7 @@ set -eu
 cd "$(dirname "$0")/../.."
 
 PATHS=${1:-"backend/app backend/alembic frontend/src deploy .env.example docs README.md README.es.md"}
-PATTERN='AI_CHAT_|AI_AGENT_|AI_AUTO_|AI_COMMAND_TOKEN_CEILING|AI_CONTEXT_COMPACT_CHARS|AI_STAGE_TOKEN_BUDGET|AI_VISION|ATTACHMENTS_DIR|ATTACHMENTS_MAX|AI_TOOL_TIMEOUT_SECONDS|ai_provider=[\"'"'"']fake'
+PATTERN='AI_CHAT_|AI_STRUCTURE_CHAT_|AI_AGENT_|AI_AUTO_|AI_COMMAND_TOKEN_CEILING|AI_CONTEXT_COMPACT_CHARS|AI_STAGE_TOKEN_BUDGET|AI_VISION|ATTACHMENTS_DIR|ATTACHMENTS_MAX|AI_TOOL_TIMEOUT_SECONDS|ai_provider=[\"'"'"']fake'
 
 hits=$(grep -rInE "$PATTERN" $PATHS \
          --exclude-dir=node_modules --exclude-dir=workspace_template 2>/dev/null || true)

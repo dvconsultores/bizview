@@ -110,3 +110,58 @@ a task is ticked only when it is implemented and its file exists.
       tests/test_guide.py -q`
 - [x] T031 CLI: `cd cli && uv run pytest tests/ -q`
 - [x] T032 Frontend: `npx vitest run tests/unit/source-structure.test.tsx` and `npm run build`
+
+---
+
+## Phase 11 — convergence 2026-11-03: the chat becomes one generator button
+
+Owner decision after reading the feature on production: no chat; one button that produces the pack
+with AI, internally and without input.
+
+- [x] T033 Converge the spec: US2 replaced, FR/SC/entities rewritten, constitution PATCH 3.2.3
+- [x] T034 `cli/bizview_cli/schemas/structure.schema.json`: the pack document (generator, tables,
+      fields, relations, suggested metrics, dropped) — and its byte-identical copy in
+      `pack/bizview-starter-pack/bizview-starter/.bizview/schemas/`
+- [x] T035 `cli/bizview_cli/structure.py`: `enriched_schema()`, `validate_enriched(doc)`,
+      `enriched_json(doc)`, `enriched_markdown(doc)` — `structure.md` rendered from the JSON
+- [x] T036 `cli/bizview_cli/describe.py`: `structure_from()` also reads a generated pack (tables →
+      fields), so `bizview validate --describe FILE` works with it
+- [x] T037 `backend/app/ai/prompts/structure_enrich.md`: the internal prompt (JSON only, names from
+      the scan, no invention, metrics as suggestions, Spanish notes)
+- [x] T038 `backend/app/sources/structure_scan.py`: the scan — describe, every sample, the OpenAPI
+      document and the base listing when the source serves one, scrubbed formats only, chunked
+- [x] T039 `backend/app/sources/structure_ai.py`: enrich (one `complete()` per chunk, ≤ 6, token
+      ceiling, one repair round), verify (drop unknown names/relations/paths), save with the
+      previous pack beside it
+- [x] T040 `backend/app/models.py` + `alembic/versions/0050_structure_pack.py`:
+      `data_source.structure_pack`/`structure_pack_prev`, drop `source_chat_message`, audit kind
+      `source_structure_generated`, chat kinds moved to historical
+- [x] T041 `backend/app/api/sources.py`: `POST .../structure/generate`, `GET .../structure` serves the
+      generated pack (`?mode=scan` forces the scan), chat routes and `ChatIn` removed
+- [x] T042 `backend/app/config.py`, `.env.example`, `docs/INSTALL.md`: `AI_STRUCTURE_TOKENS`
+      (default 150 000) replaces the two chat settings
+- [x] T043 Remove the chat: `backend/app/ai/chat.py`, `prompts/source_structure.md`, worker purge,
+      `frontend/src/components/StructureChat.tsx`, its i18n block, its tests
+- [x] T044 `frontend/src/pages/admin/SourceStructure.tsx`: full-width card, the generator button with
+      progress and Cancelar, `dropped` list, "Ver cambios" diff, the generated tables view
+- [x] T045 `frontend/src/api/sources.ts` + `types.ts`: the pack, the generate call (with abort), the
+      diff shapes; `api/admin/AI.tsx` names the generator and shows the internal prompt read-only
+- [x] T046 `frontend/src/i18n/{es,en}.ts`: strings for the generator; the chat block removed
+- [x] T047 Guide: `generar-estructura-con-ia` (es/en) replaces `chat-de-estructura`; index, aliases,
+      counts in `test_guide.py`/`test_guide_api.py`
+- [x] T048 `backend/app/i18n/{es,en}.py`: generator messages (AI off, unsupported kind, run failed,
+      ceiling reached); chat messages removed
+- [x] T049 Gates: `source_chat` and `AI_STRUCTURE_CHAT_` added to `scripts/check_vocabulary.sh` and
+      `scripts/gates/06-settings.sh` so the removed surface cannot come back
+- [x] T050 `backend/tests/test_source_structure_ai.py`: scan + enrich + verify with the fake provider
+      over recorded CoinMarketCap shapes — schema-valid, relations only between existing fields,
+      `dropped` names the planted table, markdown matches the template, repair round, failure keeps
+      the scan, payload audit, AI off, token ceiling; and the chat routes are gone (404)
+- [x] T051 `cli/tests/test_structure_pack.py`: the enriched document validates against the schema,
+      `enriched_markdown` renders it, a generated `structure.json` feeds `structure_from`
+- [x] T052 `frontend/tests/unit/source-structure.test.tsx`: rewritten for the button — disabled with
+      the hint when AI is off, progress, `dropped`, diff, generated table rows
+- [x] T053 Docs: `docs/AUTHORING.md`, `docs/VIBE-REPORTING.md`, `pack/.../PROMPT.md` (the pack's two
+      files are the generated ones), `CHANGELOG.md`
+- [x] T054 Verify: pytest (structure, AI, guide, migrations), `npx vitest run`, `tsc`, `npm run
+      build`, the eight gates

@@ -40,32 +40,45 @@ def clean_params(params: dict | None) -> dict[str, str]:
     return out
 
 
-def run(source, secrets: dict, app: Settings, path: str, params: dict | None,
-        timeout: float = 20) -> dict:
-    """One GET; returns the shape and the suggestions. No value is returned or kept."""
-    rel = clean_path(path)
+def rest_of(source, secrets: dict) -> tuple[dict, dict]:
+    """The base URL settings and secrets a REST-shaped read uses (Supabase borrows its own)."""
     if source.kind == "rest":
-        settings, sample_secrets = source.settings, secrets
-    else:
-        settings = supabase_connector.rest_settings(source.settings)
-        sample_secrets = supabase_connector.rest_secrets(secrets)
+        return source.settings, secrets
+    return (supabase_connector.rest_settings(source.settings),
+            supabase_connector.rest_secrets(secrets))
+
+
+def get_json(settings: dict, secrets: dict, app: Settings, path: str,
+             params: dict | None = None, timeout: float = 20) -> tuple[int, object]:
+    """One guarded GET against the source's own base URL; the parsed JSON and its status.
+
+    Shared by a saved sample and by the structure scan (feature 052): same host checks, same
+    credential, same relative-path rule. Nothing here decides what is kept."""
+    rel = clean_path(path)
     if profile.url_problem(settings["base_url"], app):
         raise ExtractError(t("sources.https_required"))
     base = settings["base_url"].rstrip("/") + "/"
     url = same_origin(base, urljoin(base, rel))
-    started = time.monotonic()
     with guarded_client(policy=policy_from_settings(app), timeout=timeout,
                         verify=rest._verify(settings)) as client:
-        headers, extra, auth = rest.build_request(settings, sample_secrets, client)
+        headers, extra, auth = rest.build_request(settings, secrets, client)
         with client.stream("GET", url, headers=headers,
                            params={**extra, **clean_params(params)}, auth=auth) as r:
             body, status = rest._read_limited(r), r.status_code
     if status >= 300:
         raise ExtractError(t("sources.http_status", status=status))
     try:
-        data = json.loads(body)
+        return status, json.loads(body)
     except ValueError:
         raise ExtractError(t("sources.response_not_json")) from None
+
+
+def run(source, secrets: dict, app: Settings, path: str, params: dict | None,
+        timeout: float = 20) -> dict:
+    """One GET; returns the shape and the suggestions. No value is returned or kept."""
+    settings, sample_secrets = rest_of(source, secrets)
+    started = time.monotonic()
+    status, data = get_json(settings, sample_secrets, app, path, params, timeout)
     shape = describer.shape(data)
     found = structure_service.suggestions_for(shape, _record(data))
     elapsed_ms = int((time.monotonic() - started) * 1000)

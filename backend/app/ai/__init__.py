@@ -1,9 +1,10 @@
 """Optional AI provider layer (constitution VIII).
 
 Only strings composed by product code reach a provider: aggregates and metadata, never raw source
-records, credentials, or users' personal data. Every feature that calls `complete()` documents
-what it sends: the optional help agent (feature 033) is the only caller left after 045 removed the
-in-app authoring agent.
+records, credentials, or users' personal data. Two features call `complete()`: the read-only help
+agent (feature 033), and the structure generator of 052, which sends the scan of a source — describe
+output, response shapes and formats — never a row value. The in-app authoring agent that 045 removed
+does not come back through either of them.
 Provider keys never leave this package: errors are redacted before they surface.
 """
 from dataclasses import dataclass, field
@@ -45,8 +46,8 @@ class AIError(Exception):
 class AIReply:
     text: str
     model: str
-    #: Usage the provider reported, when it did (feature 052 measures the structure chat's budget
-    #: with it). Zero means "not reported": the caller estimates.
+    #: Usage the provider reported, when it did (feature 052 sums it for the run's ceiling). Zero
+    #: means "not reported": the caller estimates.
     tokens_in: int = field(default=0, compare=False)
     tokens_out: int = field(default=0, compare=False)
 

@@ -1,10 +1,11 @@
 # PROMPT.md — Build a Bizview project with any AI
 
 **How to use this pack**: fill `REQUEST.md`, drop images/Excel/PDFs in `request/`, make sure
-`sources/<name>/structure.md` exists (Bizview produces it; see the template there), then open
-the folder with your AI and say: *"Read PROMPT.md and build the project described in
-REQUEST.md."* Import the resulting zip in Bizview: Proyectos → Importar proyecto. If the import
-returns `problems.json`, paste it back to the AI.
+`sources/<name>/structure.md` exists — in Bizview: **Fuentes de datos → «source» → Estructura →
+Generar estructura con IA**, then **Descargar estructura** — then open the folder with your AI and
+say: *"Read PROMPT.md and build the project described in REQUEST.md."* Import the resulting zip in
+Bizview: Proyectos → Importar proyecto. If the import returns `problems.json`, paste it back to the
+AI.
 
 **Import is the only way in.** Bizview has no button that creates an empty project: everything a
 dashboard needs arrives in this zip. Before uploading, the import screen reads the zip and shows
@@ -23,9 +24,15 @@ that looks like a program (`.js`, `.sh`, `.exe`, …) refuses the whole import: 
 
 You are building a **Bizview project**: a folder of declarative files that Bizview validates,
 imports and runs. You never connect to any data source. Everything you need to know about the
-data is in `sources/<name>/structure.md` and `structure.json` (tables, columns, types, keys,
-response shapes). Credentials, hosts and row values are not here and must never appear in the
-output.
+data is in `sources/<name>/structure.json` and `structure.md` (tables, fields, types, keys,
+relations, dates and the notes that say what one row is). Credentials, hosts and row values are not
+here and must never appear in the output.
+
+`structure.json` follows `.bizview/schemas/structure.schema.json`. When `generator.mode` is `ai` the
+document was produced by Bizview's internal pass and checked against the source: use its `tables`,
+`relations`, `key`/`date_field` and `suggested_metrics` as the starting point. `suggested_metrics`
+are suggestions, not a contract — build one only when the fields it names are there. Anything listed
+under `dropped` does not exist in the source: never use it.
 
 ## What to produce
 

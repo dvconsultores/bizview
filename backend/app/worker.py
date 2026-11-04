@@ -22,7 +22,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select, text, update
 
-from app.ai import chat
 from app.config import get_settings
 from app.db import get_sessionmaker
 from app.engine import direct, rollup, runner, schedule, snapshot, transform
@@ -202,13 +201,12 @@ class Worker:
             log.exception("manual run of %s failed", integration_id)
 
     def housekeeping(self) -> None:
-        """Prune the direct-read log and the structure chat at most once an hour."""
+        """Prune the direct-read log at most once an hour."""
         now = time.monotonic()
         if self.last_housekeeping is None or now - self.last_housekeeping >= 3600:
             try:
                 with get_sessionmaker().begin() as db:
                     direct.prune_log(db)
-                    chat.prune_older_than(db)
             except Exception:
                 log.exception("housekeeping pruning failed")
             self.last_housekeeping = now

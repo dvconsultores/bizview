@@ -70,9 +70,12 @@ bizview describe "API pedidos" --path /orders   # REST: JSON shape (keys and typ
 Descriptions never contain row values. Give them to the agent as context for the spec.
 
 Since feature 052 a super user can also do this from the interface — **Fuentes de datos →
-«source» → Estructura** — and press **Descargar estructura** to get the pack's own
-`sources/<name>/structure.md` and `structure.json`. In the workspace, `bizview describe "<name>"
---pack` writes the same two files.
+«source» → Estructura** — press **Generar estructura con IA** (one internal pass: scan, AI,
+verification) and then **Descargar estructura** to get the pack's own
+`sources/<name>/structure.md` and `structure.json`. The generated pack is richer than the raw
+catalogue: logical tables, field semantics, keys, date fields, relations, personal-data flags and
+the notes that say what one row is. In the workspace, `bizview describe "<name>" --pack` writes the
+same two files; `?mode=scan` gives the raw reading.
 
 ## 3. Write an integration spec
 

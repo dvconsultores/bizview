@@ -8,22 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Each source shows and downloads its structure, and answers questions about it (feature 052)**.
-  The source page gains a second tab, **Estructura**: schemas, tables, columns, types, keys,
-  estimated rows and date ranges for PostgreSQL; the saved **sample requests** with the shape of
-  their response for REST and Supabase; operations for SOAP. **Descargar estructura** produces the
-  authoring pack's own `structure.md` and `structure.json` — one generator
-  (`cli/bizview_cli/structure.py`) shared by the button, `GET /api/sources/{name}/structure` and
-  `bizview describe --pack`, so the three cannot drift. Nothing but metadata leaves a source: no
-  row values, hosts or credentials, and the personal-data flags are heuristics the super user can
-  override, carried in the pack.
-- **A read-only structure chat per source**: it answers from that structure only, in the user's
-  language, with the exact object names; a data or action request is refused by product code before
-  the provider is called, every object an answer mentions is checked against the structure and the
-  unknown ones are flagged, and a per-user daily token cap (`AI_CHAT_DAILY_TOKENS`, default
-  100 000) bounds the spend. With `AI_PROVIDER=none` the tab still renders and downloads; the chat
-  panel explains how to enable it. Constitution VIII is amended (3.2.1 → 3.2.2) to name the chat
-  beside the help agent.
+- **Each source shows its structure, and one button generates the pack an author's AI reads
+  (feature 052)**. The source page gains a second tab, **Estructura**: the catalogue as it is
+  (schemas, tables, columns, types, keys, estimated rows, date ranges) and, for REST/Supabase, the
+  saved **sample requests** with the shape of their responses. On top of that, **Generar estructura
+  con IA** runs one internal pass with no input from anybody — Bizview scans the source (describe,
+  the samples, the OpenAPI document when the source publishes one), the provider identifies the
+  logical tables, fields and semantics, keys, dates, relations, personal data, pagination and the
+  notes that say what one row is, and product code verifies every name against the scan before it
+  saves the pack. What the model invents is dropped and listed, so a hallucinated table cannot reach
+  a spec. **Descargar estructura** produces `structure.md` + `structure.json` from that pack (or from
+  the plain scan when no run exists), through one generator shared by the button, the API and
+  `bizview describe --pack`; `structure.json` validates against `structure.schema.json`, which also
+  ships in the authoring pack.
+  A structure *chat* was the first design of this feature and the owner replaced it on production:
+  one button, no conversation, nothing typed. Nothing but metadata ever leaves a source — no row
+  values, hosts or credentials — and the personal-data flags are heuristics a super user can
+  override, carried in the pack. Constitution VIII is amended (3.2.2 → 3.2.3) to name AI-assisted
+  structure generation as the second read-only AI surface.
 
 ### Changed
 

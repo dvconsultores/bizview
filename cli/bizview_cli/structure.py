@@ -14,6 +14,7 @@ import copy
 import json
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 PACK_VERSION = 1
 
@@ -313,4 +314,178 @@ def structure_markdown(pack: dict) -> str:
     elif kind == "soap":
         _soap_lines(body, out)
     _observations(pack, out)
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+# --- the generated pack (feature 052, convergence 2026-11-03) ---------------------------------
+#
+# `structure.json` may be the *generated* document of `schemas/structure.schema.json`: the scan of
+# the source, optionally enriched by an internal AI pass and always verified against that scan. One
+# schema (shipped with this package and copied into the authoring pack) and one renderer, so the
+# product, the CLI and the author's AI read the same contract.
+
+ENRICHED_VERSION = 1
+SCHEMA_PATH = Path(__file__).resolve().parent / "schemas" / "structure.schema.json"
+
+
+def enriched_schema() -> dict:
+    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+def validate_enriched(doc) -> list[str]:
+    """Problems of a generated pack, empty when it is valid (`file: message`)."""
+    from jsonschema import Draft202012Validator
+
+    problems: list[str] = []
+    validator = Draft202012Validator(enriched_schema())
+    for error in sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path)):
+        where = "/".join(str(p) for p in error.absolute_path) or "structure"
+        problems.append(f"{where}: {error.message}")
+    return problems
+
+
+def is_enriched(doc) -> bool:
+    """Whether a `structure.json` is a generated pack (rather than the plain describe wrapper)."""
+    return isinstance(doc, dict) and "generator" in doc and "tables" in doc \
+        and not isinstance(doc.get("pack"), dict)
+
+
+def enriched_json(doc: dict) -> str:
+    return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+
+
+_SEMANTIC_ES = {
+    "identifier": "identificador", "reference": "referencia", "name": "nombre",
+    "amount": "importe", "quantity": "cantidad", "percentage": "porcentaje",
+    "timestamp": "fecha y hora", "date": "fecha", "category": "categoría", "flag": "indicador",
+    "url": "URL", "image_url": "URL de imagen", "text": "texto", "unknown": "",
+}
+
+
+def enriched_markdown(doc: dict) -> str:
+    """`structure.md` rendered from a generated pack — never written by the AI itself.
+
+    Same sections and order as the pack template (`sources/<nombre>/structure.md`): the header line,
+    then one block per table with its field table, then the relations, the suggested metrics and the
+    observations. Sections that do not apply are omitted, as the template instructs.
+    """
+    notes = " ".join(str(doc.get("notes") or "").split()) or "—"
+    generator = doc.get("generator") or {}
+    how = "escaneo" if generator.get("mode") != "ai" else f"IA ({generator.get('model') or '—'})"
+    out = [f"# Fuente «{doc.get('source')}» — estructura", "",
+           f"Tipo: {doc.get('kind')} · Zona horaria de los datos: UTC · Notas: {notes}", "",
+           f"Generado: {doc.get('generated_at')} · {how} · formato {generator.get('version', 1)}",
+           ""]
+    kind = doc.get("kind")
+    tables = doc.get("tables") or []
+    if kind == "soap":
+        out.append("## SOAP")
+        out.append("")
+    elif kind == "postgresql":
+        out.append("## PostgreSQL")
+        out.append("")
+    else:
+        out.append("## REST")
+        out.append("")
+        out.append("Base: configurada en Bizview (no se incluye) · Autenticación: gestionada por "
+                   "Bizview")
+        out.append("")
+
+    schemas: dict[str, list] = {}
+    for table in tables:
+        schemas.setdefault(str(table.get("schema") or ("public" if kind == "postgresql" else "")),
+                           []).append(table)
+    for schema in sorted(schemas):
+        if schema:
+            out.append(f"### Esquema `{schema}`")
+            out.append("")
+        for table in schemas[schema]:
+            heading = f"#### Tabla `{table.get('id')}`"
+            if table.get("path"):
+                heading += f" — GET `{table.get('path')}`"
+            if table.get("row_count") is not None:
+                heading += f" — ~{int(table['row_count'])} filas"
+            if table.get("date_field"):
+                heading += f" · fecha: `{table['date_field']}`"
+            out.append(heading)
+            out.append("")
+            if table.get("row_is"):
+                out.append(f"Una fila es {table['row_is']}.")
+                out.append("")
+            if table.get("params") or table.get("records") or table.get("pagination"):
+                details = []
+                if table.get("params"):
+                    details.append("Params: " + ", ".join(
+                        f"`{_cell(k)}={_cell(v)}`" for k, v in table["params"].items()))
+                if table.get("records"):
+                    details.append(f"`records: \"{_cell(table['records'])}\"`")
+                pager = (table.get("pagination") or {}).get("type")
+                if pager:
+                    details.append(f"Paginación: {_cell(pager)}")
+                out.append(" · ".join(details))
+                out.append("")
+            out.append("| Campo | Tipo | Clave | Personal | Nota |")
+            out.append("|---|---|---|---|---|")
+            keys = {str(k) for k in table.get("key") or []}
+            personal = {str(p) for p in table.get("personal") or []
+                        if isinstance(table.get("personal"), list)}
+            for field in table.get("fields") or []:
+                note = " · ".join(p for p in (
+                    _SEMANTIC_ES.get(str(field.get("semantic") or ""), ""),
+                    f"unidad {field['unit']}" if field.get("unit") else "",
+                    str(field["units"]) if field.get("units") else "",
+                    str(field.get("note") or "")) if p)
+                is_personal = bool(field.get("personal")) or str(field.get("name")) in personal
+                out.append("| " + " | ".join([
+                    _cell(field.get("name")), _cell(field.get("type")),
+                    "PK" if str(field.get("name")) in keys else "",
+                    "**sí**" if is_personal else "", _cell(note)]) + " |")
+            out.append("")
+            for note in table.get("notes") or []:
+                out.append(f"- {_cell(note)}")
+            if table.get("notes"):
+                out.append("")
+
+    relations = doc.get("relations") or []
+    if relations:
+        out.append("## Relaciones")
+        out.append("")
+        for relation in relations:
+            extra = f" ({relation['confidence']})" if relation.get("confidence") else ""
+            out.append(f"- `{_cell(relation.get('from'))}` → `{_cell(relation.get('to'))}`: "
+                       f"{_cell(relation.get('kind'))}{extra}")
+        out.append("")
+
+    metrics = doc.get("suggested_metrics") or []
+    if metrics:
+        out.append("## Métricas sugeridas")
+        out.append("")
+        out.append("Calculables con lo que esta estructura trae; son sugerencias, no un contrato.")
+        out.append("")
+        for metric in metrics:
+            out.append(f"- `{_cell(metric.get('id'))}` (desde `{_cell(metric.get('from'))}`): "
+                       f"{_cell(metric.get('formula_words'))}")
+        out.append("")
+
+    observations = [line.strip(" -") for line in str(doc.get("notes") or "").splitlines()
+                   if line.strip()]
+    generated = []
+    if doc.get("bi_ready"):
+        generated.append("Fuente declarada BI-ready: los reportes pueden leerla en vivo.")
+    dropped = doc.get("dropped") or []
+    if dropped:
+        generated.append(f"La verificación descartó {len(dropped)} elemento(s) del resultado del "
+                         "modelo: " + "; ".join(_cell(d) for d in dropped[:20]) +
+                         ("" if len(dropped) <= 20 else "…"))
+    incomplete = (generator.get("incomplete") or [])
+    if incomplete:
+        generated.append("No se examinaron por el tope de la corrida: " +
+                         ", ".join(_cell(i) for i in incomplete[:20]) + ".")
+    if not (observations or generated):
+        generated.append("Sin observaciones.")
+    out.append("## Observaciones")
+    out.append("")
+    for line in observations + generated:
+        out.append(f"- {line}")
+    out.append("")
     return "\n".join(out).rstrip("\n") + "\n"

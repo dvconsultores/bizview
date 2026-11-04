@@ -23,7 +23,9 @@ in the form an agent needs.
 returns rows, and no credential ever appears in its output.
 
 Feature 052: the same content is on the source page — **Fuentes de datos → «source» → Estructura**
-— with **Descargar estructura (.md)** and **(.json)**, or from the terminal:
+— with **Descargar estructura (.md)** and **(.json)**, or from the terminal. Press **Generar
+estructura con IA** first and the pack carries the logical tables, fields, relations and notes an
+author's AI needs (see VIBE-REPORTING.md).
 
 ```bash
 bizview describe "Origen ERP" --pack --out .   # writes sources/<name>/structure.md + structure.json

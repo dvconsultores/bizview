@@ -1,7 +1,8 @@
-# Feature Specification: Per-source structure — "Descargar estructura" and a read-only structure chat for each connection
+# Feature Specification: Per-source structure — "Descargar estructura" and "Generar estructura con IA"
 
 **Product**: Bizview · **Feature Branch**: `052-source-structure-chat` (worked on `main`) ·
-**Created**: 2026-11-03 · **Status**: Draft
+**Created**: 2026-11-03 · **Status**: Approved — converged 2026-11-03: the structure chat is
+replaced by one button that generates the pack with AI (owner decision, `## Clarifications`)
 
 **Input**: Owner, 2026-11-03: "I have the connection to CoinMarketCap connected. In the scope we
 need the AI chat to indicate the database structure (tables, types, etc.), and it was removed.
@@ -18,11 +19,14 @@ only), and a way to ask questions about a source. 045 removed the authoring chat
 replace the one thing of it that the owner still needs: knowing what a source contains.
 
 **Decision**: each source gets an **Estructura** tab with (1) the structure rendered and
-downloadable as the authoring pack expects, and (2) an optional **read-only chat scoped to that
-source's structure** — it answers questions about tables, columns, types, keys, endpoints and
-shapes, suggests which objects fit a request, and can draft the `sources/<name>/structure.md`
-notes; it never reads rows, never writes files, never runs commands. AI stays optional (VIII):
-without a provider the tab still shows and downloads the structure.
+downloadable as the authoring pack expects, and (2) **one button — "Generar estructura con IA"** —
+that runs an internal, non-interactive pass: Bizview scans the source, the AI identifies what can be
+extracted (tables or endpoints, fields, types, keys, relations, date fields, pagination, personal
+data), product code verifies every name against the scan, and the result *is* the structure pack
+handed to the other AI, the one that builds the dashboard outside Bizview. The user types nothing.
+AI stays optional (VIII): without a provider the tab still shows and downloads the plain scan.
+*(Replaces the read-only structure chat this spec first delivered; the owner reviewed it on
+production and asked for the button instead: "the simpler the better".)*
 
 **Builds on**: 004 (sources), 043 WS-B (authoring pack), 048 (BI-ready flag in the pack), 033
 (guide/help boundary), 003 (provider layer), 019/048 (direct reads remain the only data path).
@@ -51,6 +55,15 @@ without a provider the tab still shows and downloads the structure.
   source per UTC day; a refusal says how much is left tomorrow and points to Administración → IA.
 - Q: Are question texts stored? → A: only when the installation sets `AI_STRUCTURE_CHAT_STORE_QUESTIONS`
   (default off); token counts and audit entries are always recorded.
+- Q: A chat, or something else? → A: **no chat.** The owner reviewed the implementation on
+  production (`/admin/fuentes/2`, source `coinmarketcap`) on 2026-11-03 and replaced it with **one
+  button, "Generar estructura con IA"**, that produces the pack in one internal pass. The chat, its
+  endpoint, its history table and its prompt are removed; the tab, the downloads, the sample
+  requests, the observations, the describe endpoint, the audit and SC-002's data boundary stay.
+- Q: Who writes `structure.md` once the AI has enriched the pack? → A: product code. The AI returns
+  the JSON document only; `structure.md` is rendered from it, so the two files cannot disagree.
+- Q: What happens when the AI pass fails or the provider is off? → A: the plain scan stays the pack.
+  A failed run changes nothing (`structure_pack` keeps its previous value) and the tab says why.
 
 ---
 
@@ -93,41 +106,45 @@ template), and a seeded distinctive row value never appears anywhere (014 SC-002
 
 ---
 
-### User Story 2 — Ask the connection about itself (Priority: P1)
+### User Story 2 — Generate the structure pack with AI, in one pass (Priority: P1)
 
-With AI configured, the Estructura tab has a chat panel on the right (side sheet, non-modal).
-The super user asks "¿qué tablas tienen las facturas y cómo se relacionan con clientes?" or
-"¿qué campos trae el endpoint de listados y cuál es la fecha?"; the assistant answers from the
-structure only, names objects exactly as they appear, and can propose a draft of
-`structure.md` notes or a `REQUEST.md` paragraph to paste into the authoring pack.
+With AI configured, the Estructura tab has one button: **Generar estructura con IA**. The super user
+presses it and types nothing. Bizview scans the source (describe plus, for REST/Supabase, the saved
+sample requests, the OpenAPI document when the source exposes one, and the base path listing), sends
+that scan to the provider in chunks, and asks for one strict JSON document: the logical tables, their
+fields with types and semantics, the row key, the date field, relations between tables, pagination
+and incremental strategy, the personal-data columns, the suggested `records`/`fields` JSONPaths and
+the notes that say what one row is — plus metrics the structure makes computable, marked as
+suggestions. Product code verifies every name against the scan, drops what does not exist, and saves
+the result as the pack. "Descargar estructura" then serves that pack, and `structure.md` is rendered
+from it.
 
-**Why this priority**: the owner asked for it by name ("each connection can have its own chat to
-indicate structure"); it is the second half of the same tab, and it degrades to US1 when no
-provider exists.
+**Why this priority**: it is the whole point of the owner's request — the pack is what the external
+AI reads — and it degrades to the plain scan when there is no provider.
 
-**Independent Test**: with a fake provider, questions about the CoinMarketCap structure get
-answers that cite only objects present in the describe output; a question asking for data
-("¿cuánto vendimos ayer?", "dame 5 filas") is refused with the standard line.
+**Independent Test**: with a fake provider over recorded CoinMarketCap responses, the button
+produces a schema-valid `structure.json` whose relations reference fields that exist, whose
+`dropped` lists the planted fake table, and whose `structure.md` renders with the pack template's
+sections.
 
 **Acceptance Scenarios**:
 
-1. **Given** a question, **Then** the context sent to the provider is: the system prompt, the
-   source's structure (as `structure.json`, truncated per schema with a note when over the
-   token limit), the user's question and the last 10 turns — never credentials, hosts, row
-   values; verified by a payload audit test.
-2. **Given** an answer, **Then** every table/column/endpoint it mentions is validated against the
-   structure; unknown names are flagged in the UI ("no existe en la fuente") so hallucinated
-   objects never reach a spec.
-3. **Given** "Resume esta fuente para el REQUEST.md" or "Redacta las observaciones de
-   structure.md", **Then** the assistant returns text the user can copy or insert into the
-   downloadable `structure.md` "Observaciones" section (saved on the source as notes; audited).
-4. **Given** a request for data, writes or actions ("ejecuta", "borra", "muéstrame filas"),
-   **Then** the chat refuses with one line and offers the structure instead; it has no tools
-   except reading the already-fetched structure.
-5. **Given** a provider error, **Then** the 035-style typed message (code, provider text,
-   action link to Administración → IA) is shown; nothing else breaks.
-6. **Given** usage, **Then** a per-user daily token cap for this chat (setting, default 100 k)
-   and audit of counts only (question text stored only if the installation enables it).
+1. **Given** a REST source with saved samples, **When** "Generar estructura con IA" runs, **Then**
+   the scan (describe + every sample's shape + the discoverable endpoints) is what reaches the
+   provider — never a credential, a host or a row value (payload audit) — and the answer becomes the
+   saved pack with `generator.mode: ai`, the model and the token usage.
+2. **Given** an answer that names a table the scan does not have, **Then** it is dropped and listed
+   under `dropped`; relations that reference a field absent on either side are dropped the same way;
+   the tab shows the list.
+3. **Given** a malformed answer, **Then** one repair round is attempted; if it fails again, the run
+   fails with a typed error (035 vocabulary) and the previous pack — or the plain scan — is still
+   what the tab and the download serve.
+4. **Given** `AI_PROVIDER=none`, **Then** the button is disabled with the line that explains how a
+   super user enables AI, and everything else (tab, samples, notes, downloads) works.
+5. **Given** a PostgreSQL source, **Then** relations that the catalogue already knows (foreign keys)
+   are part of the pack even with no AI pass, and an AI pass adds semantics and notes on top.
+6. **Given** a second run, **Then** the previous pack is kept beside the new one and the tab offers
+   "Ver cambios" (tables and fields added, removed, changed).
 
 ---
 
@@ -138,10 +155,13 @@ answers that cite only objects present in the describe output; a question asking
   with checkboxes is deferred (see Out of scope).
 - Personal-data flags are heuristics: the super user can toggle a column's flag; the choice is
   saved and travels in the pack.
-- The chat's structure context exceeds the model's window: send a per-schema index first and
-  fetch the schema the question names (one internal round, no tools exposed to the model).
-- Prompt injection in column names/comments: structure is data; the system prompt says so;
-  object-name validation (US2/AC2) catches fabricated objects.
+- The scan does not fit one model call: it is chunked per schema or endpoint, at most 6 chunks per
+  run, and a per-run token ceiling (setting, default 150 k) stops a run that would cost more; the
+  pack then says what was not examined.
+- Prompt injection in column names/comments: the scan is data; the internal prompt says so, and the
+  name check (US2/AC2) drops anything fabricated.
+- A source that exposes an OpenAPI document with hundreds of paths: it is read as names and types
+  only and never in full; over the chunk budget the run says so instead of pretending.
 - REST sample with pagination: the shape shows the first page; `pagination` suggestion based on
   known keys (`next`, `cursor`, `page`, `total`).
 - SSRF/limits: describe and samples use the source's stored base URL only; `path` must be
@@ -156,62 +176,68 @@ answers that cite only objects present in the describe output; a question asking
 
 ### Functional
 
-- **FR-001**: Source detail gets tabs `Conexión | Estructura`; Estructura renders the describe
-  output per kind with search, personal flags (toggleable, persisted), row counts and date
-  ranges (PostgreSQL), sample requests (REST/Supabase), operations (SOAP).
+- **FR-001**: Source detail gets tabs `Conexión | Estructura`; Estructura renders the structure per
+  kind with search, personal flags (toggleable, persisted), row counts and date ranges
+  (PostgreSQL), the generated tables with their fields, keys, relations and notes
+  (REST/Supabase/PostgreSQL after a run), and operations (SOAP).
 - **FR-002**: Sample requests stored per REST/Supabase source (`method`, `path`, `params`,
   `name`, `notes`); executed on demand through the stored credential; shape, `records`/`fields`
-  suggestions and `timestamp_units` inferred by product code.
-- **FR-003**: "Descargar estructura" → `structure.md` + `structure.json` in the pack format
-  (single generator used by the UI, the API `GET /api/sources/{name}/structure?format=md|json`,
-  and the CLI `bizview describe --pack`). The pack template in `pack/` is the format both must
-  produce. The starter pack + structure zip ("Descargar paquete de autoría") is deferred (see
-  Clarifications and Out of scope).
-- **FR-004**: Structure chat: `POST /api/sources/{name}/chat` (super user; session-scoped history
-  stored per user/source, 30 days); context = system prompt + structure + question + last 10
-  turns; provider `complete()`; object-name validation of answers; refusal rules; typed errors;
-  daily cap; audit of counts. No tools, no file writes, no commands, no data.
-- **FR-005**: System prompt (data, versioned in `backend/app/ai/prompts/source_structure.md`):
-  answer in the user's language; only objects in the structure; exact names in backticks; say
-  "no está en la estructura" rather than guess; never request or produce row values; when asked,
-  draft `structure.md` observations or a `REQUEST.md` paragraph in the pack's format.
-- **FR-006**: Everything works with `AI_PROVIDER=none` except the chat panel (replaced by the
-  enable hint); the Administración home has no AI card (043-G stays), the AI settings page
-  remains under Administración → IA for provider/key/model and now lists "Chat de estructura"
-  as the feature using it.
-- **FR-007**: i18n ES/EN; feature-010 look; side sheet non-modal; mobile: tabs + bottom sheet.
-- **FR-008**: Guide topics (033 format): "Estructura de una fuente", "Chat de estructura" and
-  "Peticiones de muestra", with the routes/tiles the drift tests read.
+  suggestions and `timestamp_units` inferred by product code. They are also an input of the scan.
+- **FR-003**: "Descargar estructura" → `structure.md` + `structure.json`. When a generated pack
+  exists it is what both files carry (`structure.md` rendered from the JSON by product code);
+  otherwise the plain scan is. One generator, used by the UI, by
+  `GET /api/sources/{name}/structure?format=md|json&mode=pack|scan` and by
+  `bizview describe --pack`.
+- **FR-004**: `POST /api/sources/{name}/structure/generate` (super user, recent re-authentication):
+  scan (no AI) → enrich (AI, `complete()`, one call per chunk, at most 6) → verify (no AI) → save
+  (`data_source.structure_pack`, with the previous one beside it). Audit `source_structure_generated`
+  with counts only. No tools, no file writes, no commands, and no row values anywhere.
+- **FR-005**: The internal prompt is data, versioned in
+  `backend/app/ai/prompts/structure_enrich.md`: return only JSON matching
+  `cli/bizview_cli/schemas/structure.schema.json`; use only names present in the scan; never invent a
+  table, field or path; mark metrics that are computable from the structure as suggestions; write
+  the notes in Spanish, as the pack template does.
+- **FR-006**: Everything works with `AI_PROVIDER=none` except the button (disabled, with the line
+  that explains how to enable AI); the AI settings page names "Generar estructura con IA" as the
+  feature that spends the provider and shows its internal prompt read-only.
+- **FR-007**: i18n ES/EN; feature-010 look; the structure card takes the full width; mobile-first
+  (the tab and its buttons stack, the tables scroll inside a bounded card).
+- **FR-008**: Guide topics (033 format): "Estructura de una fuente", "Generar estructura con IA" and
+  "Peticiones de muestra", with the routes the drift tests read.
 
 ### Key entities
 
+- **Structure pack** (`data_source.structure_pack`, plus `structure_pack_prev`): the generated
+  document of `structure.schema.json` — generator (mode, model, version), tables with fields, keys,
+  date field, relations, `suggested_metrics`, `dropped` — or `{}` when no run has succeeded. Its
+  previous value is kept so the tab can show what changed.
+- **Scan** (not stored): describe output + sample shapes + discoverable endpoints, plus the
+  scrubbed formats (an enum's values, a date's shape). What the AI may see, and what every name in
+  the answer is checked against.
 - **Sample request** (`source_sample_request`): belongs to a source; `name`, `method`, `path`,
-  `params` (query, no secrets), free `notes`; stores the last measured `shape` summary so the tab
-  and the pack do not need to re-call the endpoint for a download.
-- **Column personal flag** (`source_column_flag`): source, `schema`, `table`, `column`, `personal`
-  (bool) — only the columns the super user overrode; a heuristic default covers the rest.
-- **Structure notes** (`data_source.notes`): the free text the super user (or the chat, on
-  request) writes into "Observaciones"; travels in `structure.md`.
-- **Chat message** (`source_chat_message`): source, user, `role` (question/answer), `text` when
-  the installation stores it, token counts always, `created_at`; purged after 30 days.
-- **Chat usage** (`source_chat_usage`): per user, per source, per UTC day: questions and tokens
-  spent, which is what the daily cap reads.
+  `params` (query, no secrets), free `notes`; stores the last measured shape summary so the scan and
+  the download need not re-call the endpoint.
+- **Column personal flag** (`source_structure_flag`): source, `schema`, `table`, `column`, `personal`
+  — only the overrides; the heuristic covers the rest, and the AI's `personal` list is initial data.
+- **Structure notes** (`data_source.notes`): the free text the super user writes into
+  "Observaciones"; travels in `structure.md` and is merged into the pack's notes.
 
 ## Success criteria *(mandatory)*
 
 ### Measurable outcomes
 
-- **SC-001**: For the demo PostgreSQL source and CoinMarketCap, Estructura renders in < 10 s and
-  the downloaded `structure.md`/`.json` has every section the pack template asks for, with no
+- **SC-001**: For the demo PostgreSQL source and CoinMarketCap, Estructura renders in < 10 s and the
+  downloaded `structure.md`/`.json` has every section the pack template asks for, with no
   placeholder left and no value from the source's rows.
-- **SC-002**: 0 row values, credentials or hosts in the tab, the downloads, the chat context or
-  the chat answers (payload audit with seeded values).
-- **SC-003**: 100 % of answers that mention objects absent from the structure are flagged in the
-  UI (adversarial fake-provider fixture).
-- **SC-004**: Data requests to the chat are refused in 100 % of the fixture cases; the chat has
-  no tool surface (asserted in the provider payload).
-- **SC-005**: A super user who has never seen the feature can go from "Fuentes de datos" to a
-  downloaded `structure.md` in three interactions (open the source, open Estructura, download).
+- **SC-002**: 0 row values, credentials or hosts in the tab, the downloads, the scan sent to the
+  provider or the saved pack (payload audit with seeded values).
+- **SC-003**: 100 % of the tables, fields and relations the AI invents are absent from the saved pack
+  and listed under `dropped` (adversarial fake-provider fixture).
+- **SC-004**: With `AI_PROVIDER=none`, or after a failed run, the tab still renders and the download
+  still produces a pack — the plain scan.
+- **SC-005**: A super user who has never seen the feature goes from "Fuentes de datos" to a
+  downloaded `structure.md` in three interactions (open the source, open Estructura, download), and
+  to a generated pack in four (press "Generar estructura con IA").
 
 ## Assumptions
 
@@ -237,25 +263,31 @@ answers that cite only objects present in the describe output; a question asking
 - **Per-schema describe and schema checkboxes** for catalogues over the 300-table cap: the single
   describe truncates and says so, which the tab and the download need; picking schemas one at a
   time is a follow-up.
-- `bizview check-request --sample` (043 WS-C): not present in the CLI today and not needed by
-  this delivery.
+- `bizview check-request --sample` (043 WS-C): not present in the CLI today; `bizview validate
+  --describe`/`--live` is what reads a pack, and it now also reads the generated one.
+- **The structure chat** (delivered by the first pass of this feature, removed by the convergence):
+  conversational questions about a source's structure. The generator covers the need with one
+  action and no interaction.
 
 ## Constitution check
 
-- **III** (source of truth is external): describe and samples are read-only through the
+- **III** (source of truth is external): the scan and the samples are read-only through the
   catalogue's credentials; `path` relative only; SSRF rules of `security/netguard` unchanged.
-- **VIII** (AI optional and private): only structure and metadata are sent; no authoring by AI —
-  the chat explains and drafts notes the *user* saves, it never writes artifacts. The principle
-  lists the read-only help agent as the only AI surface; this chat joins it. **PATCH: 3.2.1 →
-  3.2.2** (the brief says 2.0.1 because it was written against an older copy of the file, exactly
-  as recorded for 046 and 048).
-- **IX** (spec-driven reporting): unchanged — projects still enter only through import; nothing
-  here authors a project.
-- **V** (fixed stack): no new component; the existing provider layer and `httpx`/`psycopg`
+- **VIII** (AI optional and private): only structure and metadata are sent — the scan is describe
+  output, response shapes and scrubbed formats; no row values, no credentials, no hosts. The AI
+  writes a *description of the structure*, not an artifact of a project: nothing here authors a
+  dashboard, and the pack is still what a human hands to the external AI. **PATCH: 3.2.2 → 3.2.3**
+  (the sentence naming the structure chat now names AI-assisted structure generation — internal,
+  non-interactive, metadata only).
+- **IX** (spec-driven reporting): unchanged — projects still enter only through import; the pack is
+  an input to that authoring, not a shortcut around it.
+- **V** (fixed stack): no new component; the existing provider layer, `jsonschema` and the
   connectors do the work.
-- **Constraints**: every user-visible text in ES and EN; no credentials returned or logged.
+- **Constraints**: every user-visible text in ES and EN; no credentials returned or logged; the
+  schemas in `cli/` stay the single source of the contract — `structure.schema.json` joins them and
+  the pack ships the same file.
 
-→ PASS with the VIII PATCH 3.2.2.
+→ PASS with the VIII PATCH 3.2.3.
 
 ## Decisiones tomadas (modo autónomo)
 
@@ -265,11 +297,14 @@ answers that cite only objects present in the describe output; a question asking
   connection's structure visible at all, and 043 WS-B lists them inside the structure pack.
 - [specify] decision — the brief's `GET/POST /api/ai` is written as the real routes
   `GET /api/admin/ai` and `POST /api/admin/ai/test` (verified in `backend/app/api/ai.py`); the
-  chat route is added under the source, `/api/sources/{name}/chat`.
+  source's own route lives under it, `/api/sources/{name}/structure/generate` (was `.../chat`
+  before the convergence).
 - [analyze] decision — the edge case that asked for a per-schema, on-demand describe with schema
   checkboxes is out of scope: this delivery caps the single describe at 300 tables and states the
   truncation in the pack, which is what the tab and the download need. Recorded under Out of scope.
 - [analyze] decision — the sample body cap is the connector's existing 1 MB, not the brief's 2 MB.
+  *Superseded in part (2026-11-03): kept for the plain scan; the AI scan adds the OpenAPI document
+  and the base listing, both capped at 1 MB each.*
 - [specify] decision — the "fake provider" the brief asks for in tests is a test-level stand-in
   for `app.ai.get_provider` (the pattern `backend/tests/test_ai.py` already uses); the product
   gains no `fake` provider, so no test-only branch ships in the request path.
@@ -289,9 +324,33 @@ answers that cite only objects present in the describe output; a question asking
 - [implement] decision — the two settings are `AI_STRUCTURE_CHAT_DAILY_TOKENS` and
   `AI_STRUCTURE_CHAT_STORE_QUESTIONS`, not the brief's `AI_CHAT_*`: that prefix is the removed
   authoring agent's, and `scripts/gates/06-settings.sh` fails the build when it reappears (045).
-- [implement] decision — the chat history is read as the last 20 rows (ten question/answer turns)
-  ordered by `created_at, id`: several turns can share a timestamp, and a shuffled history is worse
-  than a short one.
+- [converge] decision — the chat is **removed**, not kept beside the button: endpoint, history
+  table, prompt, i18n, tests and its two settings. The owner read the chat on production and asked
+  for one button; two AI surfaces on the same page would answer the same question twice.
+- [converge] decision — the AI returns the JSON document only and **product code renders
+  `structure.md`** from it, so the two files cannot disagree (the alternative — the AI writing the
+  markdown — makes the pair drift by construction).
+- [converge] decision — the previous pack is kept in `structure_pack_prev` so "Ver cambios" works
+  on a later visit, not only right after a run.
+- [converge] decision — the token ceiling is per run (`AI_STRUCTURE_TOKENS`, default 150 000), not
+  per user per day: a generation is a deliberate action by a super user, and a run is bounded by its
+  six chunks. A run that would exceed it stops chunking and says which schemas were not examined.
+- [converge] decision — SOAP sources keep the plain scan: an operation's signature has no rows,
+  fields, keys or relations to infer, so `POST .../structure/generate` answers 422 there and the tab
+  says why.
+- [converge] decision — "Descargar paquete de autoría" stays deferred (see Out of scope): the
+  backend image does not ship `pack/`, and turning the starter pack into CLI package data is a
+  change to the authoring pack (043/049), not to this tab.
+- [converge] decision — the run is synchronous with a progress line and a Cancelar that stops
+  waiting; the pipeline is bounded (one describe, samples already measured, at most six AI calls), so
+  a job queue would be a component this feature does not need.
+- [converge] decision — the OpenAPI probe tries three well-known paths with an 8-second timeout each
+  and stops at the first that answers: a source that publishes nothing must not make the button wait.
+- [converge] decision — the audit records the run's token count under `usage`, not as a top-level
+  `tokens`: `app/services/audit.py` refuses a key that looks like a secret, and the count belongs
+  with the other numbers anyway.
+- [converge] decision — the search box stays (FR-001): it filters the generated tables by id, row
+  description and field name, and the scan by table or column name.
 - [clarify] decision — the structure is read lazily on first open of the tab and re-read on
   **Actualizar**; nothing polls, and the last rendered structure stays visible while a re-read is
   in flight or when it fails (the error is shown above it).

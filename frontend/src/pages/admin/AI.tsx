@@ -31,6 +31,46 @@ function StatusBadge({ status }: { status: AIStatus }) {
   return <Badge tone="amber" icon={<AlertTriangle className="h-4 w-4" aria-hidden />}>{t.ai.incomplete}</Badge>;
 }
 
+/** The prompt the structure generator sends: data that ships with the release, shown read-only. */
+function InternalPrompt() {
+  const t = useT();
+  const T = t.ai.prompt;
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open || text !== null) return;
+    let cancelled = false;
+    api
+      .get<{ name: string; text: string }>("/api/admin/ai/prompt")
+      .then((r) => !cancelled && setText(r.text))
+      .catch(() => !cancelled && setError(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, text]);
+  return (
+    <Card className="space-y-2 p-5 sm:p-6">
+      <h2 className="text-lg font-semibold text-ink">{T.title}</h2>
+      <p className="text-sm text-ink-soft">{T.help}</p>
+      <Button variant="secondary" onClick={() => setOpen((v) => !v)}>
+        {open ? T.hide : T.show}
+      </Button>
+      {open ? (
+        error ? (
+          <Alert tone="error">{t.common.unexpected}</Alert>
+        ) : text === null ? (
+          <p className="text-sm text-ink-muted">{t.common.loading}</p>
+        ) : (
+          <pre className="max-h-96 overflow-auto rounded-card bg-surface-2 p-3 text-xs whitespace-pre-wrap text-ink-2">
+            {text}
+          </pre>
+        )
+      ) : null}
+    </Card>
+  );
+}
+
 function HowTo({ enabled }: { enabled: boolean }) {
   const t = useT();
   return (
@@ -295,6 +335,7 @@ export function AI() {
       />
       {/* Feature 052 (FR-006): the one feature that spends the provider, named where it is set up. */}
       <Alert tone="info">{t.ai.usedBy}</Alert>
+      <InternalPrompt />
       {body}
     </div>
   );

@@ -358,8 +358,8 @@ owned by the engine.
 ## 7. AI (optional)
 
 AI is off by default and everything works without it. It is used for the read-only help agent
-(033) and for the **structure chat** of each data source (052): authoring happens outside Bizview
-(043/045). The provider never receives detailed records, passwords, or personal data.
+(033) and for **Generar estructura con IA**, the structure generator of each data source (052):
+authoring happens outside Bizview (043/045). The provider never receives detailed records, passwords, or personal data.
 
 Claude (Anthropic):
 
@@ -383,13 +383,16 @@ Restart, sign in as the super user → **IA** → **Probar conexión**. The page
 response time, or the reason for failure (invalid key, model not found, unreachable, …). The key
 is never shown.
 
-The **structure chat** (Fuentes de datos → a source → **Estructura**) spends the same provider.
-Two optional settings bound it:
+**Generar estructura con IA** (Fuentes de datos → a source → **Estructura**) spends the same
+provider: one press runs a scan, at most six model calls and a verification, and saves the structure
+pack the external AI reads. One optional setting bounds a run:
 
 ```ini
-# AI_STRUCTURE_CHAT_DAILY_TOKENS=100000    # per user, per source, per day; 0 turns the chat off
-# AI_STRUCTURE_CHAT_STORE_QUESTIONS=false  # store the question text; token counts are always stored
+# AI_STRUCTURE_TOKENS=150000    # tokens one generation may spend; 0 turns the button off
 ```
+
+The internal prompt is data (`backend/app/ai/prompts/structure_enrich.md`) and Administración → IA
+shows it read-only, so an installation can see exactly what is asked of the provider.
 
 ### Projects (Proyectos)
 
