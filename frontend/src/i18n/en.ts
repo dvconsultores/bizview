@@ -396,6 +396,7 @@ export const en: Catalogue = {
       enableAi: "Go to Administration → AI",
       generateSoap: "A SOAP source has no tables or fields to infer: its structure is the scan of its WSDL.",
       stageScan: "Reading the source (scan)…",
+      ceilingOff: "Generation is paused: the per-run token ceiling is 0 (Administration → AI).",
       stageAi: "The AI identifies tables, fields and relations…",
       stageVerify: "Verifying against the scan…",
       cancel: "Cancel",

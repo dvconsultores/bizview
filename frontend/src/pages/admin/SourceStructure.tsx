@@ -555,7 +555,8 @@ export function SourceStructure({ source }: { source: DataSource }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button icon={<Sparkles className="h-4 w-4" aria-hidden />} loading={!!generating}
-                  disabled={!state?.ai.enabled || source.kind === "soap"}
+                  disabled={!state?.ai.enabled || state.ai.ceiling <= 0
+                            || source.kind === "soap"}
                   onClick={() => void generate()}>
             {generating ? T.generating : T.generate}
           </Button>
@@ -583,6 +584,9 @@ export function SourceStructure({ source }: { source: DataSource }) {
                  </a>}>
             {T.generateOff}
           </Alert>
+        ) : null}
+        {state && state.ai.enabled && state.ai.ceiling <= 0 ? (
+          <Alert tone="info">{T.ceilingOff}</Alert>
         ) : null}
         {source.kind === "soap" ? <Alert tone="info">{T.generateSoap}</Alert> : null}
         {generating ? (

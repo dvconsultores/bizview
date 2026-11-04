@@ -376,6 +376,7 @@ export const es = {
       enableAi: "Ir a Administración → IA",
       generateSoap: "Una fuente SOAP no tiene tablas ni campos que inferir: su estructura es el escaneo del WSDL.",
       stageScan: "Leyendo la fuente (escaneo)…",
+      ceilingOff: "La generación está en pausa: el tope de tokens por corrida es 0 (Administración → IA).",
       stageAi: "La IA identifica tablas, campos y relaciones…",
       stageVerify: "Verificando contra el escaneo…",
       cancel: "Cancelar",
