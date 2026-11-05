@@ -512,7 +512,6 @@ def project_disk(slug: str):
 # answered here with an ID token carrying the identity the test asked for. The seam is
 # `google.client()`, the same one the unit tests use — no test code reaches the production path.
 _GOOGLE_IDENTITY: dict | None = None
-_GOOGLE_CLIENT = google.client
 
 
 def _segment(payload: dict) -> str:
@@ -555,9 +554,3 @@ def google_identity(body: dict):
     return {"ok": True, "email": _GOOGLE_IDENTITY["email"]}
 
 
-@router.post("/api/testing/google-reset")
-def google_reset():
-    global _GOOGLE_IDENTITY
-    _GOOGLE_IDENTITY = None
-    google.client = _GOOGLE_CLIENT
-    return {"ok": True}

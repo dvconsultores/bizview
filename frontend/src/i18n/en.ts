@@ -84,11 +84,15 @@ export const en: Catalogue = {
         empty: "No domains: any Google account may try to sign in.",
         invalid: "Write a valid domain, for example company.com.",
         duplicate: "That domain is already on the list.",
+        // A typo in the env value used to look like a working policy: say it out loud.
+        rejected: (values: string) => `GOOGLE_ALLOWED_DOMAINS carries ${values}, which is not a domain: it is not used, and until you save a list nobody can sign in with Google.`,
       },
       provisioning: {
         title: "Automatic sign-up",
         help: "An account with no Bizview user is created on first sign-in with the role and access below.",
         access: "Default dashboard access",
+        accessForUsers:
+          "Applies to accounts with the User role: an administrator sees the whole catalogue.",
       },
       accessModes: {
         none: "None",
@@ -128,6 +132,7 @@ export const en: Catalogue = {
         role: "Role",
         access: "Dashboard access",
         apply: "Apply rule",
+        shadowed: (position: number) => `Shadowed by rule ${position}`,
         superuserNote: "Rules never create or modify superusers.",
       },
     },

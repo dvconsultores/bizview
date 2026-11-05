@@ -7,7 +7,7 @@ import type { GoogleAdminState, GoogleRule } from "../../src/api/types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const state: GoogleAdminState = {
+const initialState = (): GoogleAdminState => ({
   settings: {
     allowed_domains: ["empresa.com"],
     domains_from_env: true,
@@ -21,7 +21,9 @@ const state: GoogleAdminState = {
     { code: "cripto", name: "Cripto impacto", status: "published" },
     { code: "salud", name: "Salud", status: "published" },
   ],
-};
+});
+
+let state: GoogleAdminState = initialState();
 
 let rules: GoogleRule[] = [
   {
@@ -65,6 +67,7 @@ let container: HTMLDivElement;
 let root: Root | null = null;
 
 beforeEach(() => {
+  state = initialState();
   rules = [
     { id: 1, position: 0, condition: "domain", value: ["empresa.com"], role: "admin",
       access: { mode: "all_public" }, enabled: true },
@@ -149,6 +152,45 @@ describe("GoogleAdminCard", () => {
       )!.click();
     });
     expect(picker()).not.toBeNull();
+  });
+
+  it("reports an env domain it cannot use instead of showing it as policy", async () => {
+    await render();
+    // Fresh fixture: no rejects, so nothing is said.
+    expect(container.textContent).not.toContain("GOOGLE_ALLOWED_DOMAINS trae");
+
+    state = {
+      ...state,
+      settings: { ...state.settings, allowed_domains: [], domains_rejected: ["https://acme.io;"] },
+    };
+    await render();
+    expect(container.textContent).toContain("GOOGLE_ALLOWED_DOMAINS trae https://acme.io;");
+    expect(container.textContent).toContain(t.google.admin.domains.empty);
+  });
+
+  it("says the default access is for Usuario accounts", async () => {
+    await render();
+    await act(async () => {
+      container.querySelector<HTMLElement>(
+        `[role="switch"][aria-label="${t.google.admin.provisioning.title}"]`,
+      )!.click();
+    });
+    expect(container.textContent).toContain(t.google.admin.provisioning.accessForUsers);
+  });
+
+  it("marks a rule an earlier enabled rule already covers", async () => {
+    rules = [
+      { id: 1, position: 0, condition: "domain", value: ["empresa.com"], role: "admin",
+        access: { mode: "none" }, enabled: true },
+      { id: 2, position: 1, condition: "domain", value: ["empresa.com"], role: "user",
+        access: { mode: "none" }, enabled: true },
+      { id: 3, position: 2, condition: "domain", value: ["acme.io"], role: "user",
+        access: { mode: "none" }, enabled: true },
+    ];
+    await render();
+    // Only the covered rule carries the hint, named by the position that covers it.
+    expect(container.textContent).toContain(t.google.admin.rules.shadowed(1));
+    expect(container.textContent).not.toContain(t.google.admin.rules.shadowed(3));
   });
 
   it("says the provider is off when the installation has no Google client", async () => {

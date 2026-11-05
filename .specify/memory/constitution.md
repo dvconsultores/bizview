@@ -1,4 +1,28 @@
 <!--
+Sync Impact Report (amendment 2026-11-04, feature 054)
+- Version change: 3.2.3 → 3.3.0 (MINOR: principle V materially expanded — no principle removed or
+  redefined incompatibly, so not MAJOR. 054's brief assumed "no constitution change"; the amendment
+  is what makes that false assumption true.)
+- Modified principles:
+  - V. Fixed Technology Stack, **Auth**: Google sign-in stops being bounded as invite-only. The
+    bound added by the 2.1.0 amendment ("it never creates or promotes a user") is replaced by two
+    installation-owned, audited decisions — opt-in automatic sign-up for accounts on the allowed
+    domains (never superuser, no password), and an ordered rule list that may decide role and
+    dashboard access, never for superusers and never for existing accounts unless the installation
+    asks for it. Everything else the 027 amendment established still holds: off by default, the
+    installation's own OAuth client, opt-in per attempt, the `internet` profile's second factor, and
+    password sign-in unchanged.
+- Added constraints:
+  - the allowed-domain list is configuration of the installation and is audited on every change;
+  - a provisioned account is `auth_provider=google` with no password hash, and gains password
+    sign-in only through an administrator's reset.
+- Removed constraints:
+  - the invite-only clause of principle V, superseded by the opt-in automatic sign-up above.
+- Trigger: owner brief of 2026-11-04 (feature 054) — sign-in with Google must be able to bring a
+  customer's Workspace in without an admin creating every person by hand.
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-11-03, feature 052 convergence)
 - Version change: 3.2.2 → 3.2.3 (PATCH: the name of one AI surface inside a principle's list. No
   principle added, removed or redefined.)
@@ -405,12 +429,20 @@ API route quickly (see Success Criteria).
   container.
 - **Auth:** email + password, Argon2id password hashes, server-side sessions stored in
   PostgreSQL and carried by an HttpOnly cookie. An installation MAY also enable sign-in with
-  Google as an **additional** identity for users who already exist (feature 027): it is off by
-  default, configured per installation with that installation's own OAuth client, invite-only
-  (it never creates or promotes a user), opt-in per attempt by the person signing in, and it never
-  substitutes for the second factor that the `internet` profile requires of administrators.
-  Password sign-in MUST remain available whenever it is today, so an installation can never be
-  locked out through its identity provider.
+  Google as an **additional** identity (features 027 and 054): it is off by default, configured per
+  installation with that installation's own OAuth client, opt-in per attempt by the person signing
+  in, and it never substitutes for the second factor that the `internet` profile requires of
+  administrators. Password sign-in MUST remain available whenever it is today, so an installation
+  can never be locked out through its identity provider. Two things bound what a Google identity may
+  become, and both are decisions an installation makes in its own settings, audited per change:
+  - **It is invite-only unless the installation says otherwise.** By default an unknown account is
+    refused. A superuser MAY turn on automatic sign-up, and even then only for accounts on the
+    domains the installation lists: such an account is created as `user` or `admin`, never
+    superuser, has no password, and gains a password only when an administrator gives it one.
+  - **An ordered rule list MAY decide the role and the dashboard access.** The first enabled rule
+    that matches an account's domain or address wins; a rule never produces a superuser, never
+    modifies one, and never touches an existing account's role unless the installation explicitly
+    asks for that, in which case every resulting change is audited with the rule that caused it.
 
 - **AI:** optional provider layer in the backend — Claude through the official `anthropic` SDK,
   or any OpenAI-compatible endpoint (including local models) over `httpx` — used only by the
@@ -566,4 +598,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.2.3 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-03
+**Version**: 3.3.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-04

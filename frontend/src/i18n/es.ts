@@ -73,11 +73,15 @@ export const es = {
         empty: "Sin dominios: cualquier cuenta de Google puede intentar entrar.",
         invalid: "Escribe un dominio válido, por ejemplo empresa.com.",
         duplicate: "Ese dominio ya está en la lista.",
+        // A typo in the env value used to look like a working policy: say it out loud.
+        rejected: (values: string) => `GOOGLE_ALLOWED_DOMAINS trae ${values}, que no es un dominio: no se usa, y mientras no guardes una lista nadie puede entrar con Google.`,
       },
       provisioning: {
         title: "Alta automática",
         help: "Si la cuenta no tiene usuario en Bizview, se crea al ingresar con el rol y el acceso de aquí.",
         access: "Acceso por defecto a los tableros",
+        accessForUsers:
+          "Se aplica a las cuentas con rol Usuario: un administrador ve todo el catálogo.",
       },
       accessModes: {
         none: "Ninguno",
@@ -117,6 +121,7 @@ export const es = {
         role: "Rol",
         access: "Acceso a los tableros",
         apply: "Aplicar regla",
+        shadowed: (position: number) => `Tapada por la regla ${position}`,
         superuserNote: "Las reglas nunca crean ni modifican superusuarios.",
       },
     },

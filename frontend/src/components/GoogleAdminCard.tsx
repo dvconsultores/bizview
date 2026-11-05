@@ -35,6 +35,22 @@ const draftOf = (settings: GoogleSettings): SettingsDraft => ({
   apply_rules_to_existing: settings.apply_rules_to_existing,
 });
 
+/**
+ * A rule an earlier *enabled* rule already covers: it can never decide anything, because the first
+ * match wins. Shown as a hint rather than refused — two rules may legitimately share a condition
+ * while one of them is disabled (spec, Edge Cases).
+ */
+function shadowedBy(rules: GoogleRule[], index: number): GoogleRule | null {
+  const rule = rules[index];
+  if (!rule.enabled) return null;
+  const values = new Set(rule.value.map((v) => v.trim().toLowerCase()));
+  for (const earlier of rules.slice(0, index)) {
+    if (!earlier.enabled || earlier.condition !== rule.condition) continue;
+    if (earlier.value.some((v) => values.has(v.trim().toLowerCase()))) return earlier;
+  }
+  return null;
+}
+
 const sameAccess = (a: GoogleAccess, b: GoogleAccess) =>
   a.mode === b.mode && (a.mode !== "list" || [...(a.codes ?? [])].sort().join() === [...(b.codes ?? [])].sort().join());
 
@@ -116,10 +132,13 @@ function AccessPicker({
 function DomainsField({
   domains,
   fromEnv,
+  rejected,
   onChange,
 }: {
   domains: string[];
   fromEnv: boolean;
+  /** `GOOGLE_ALLOWED_DOMAINS` entries that are not domains: shown, never silently obeyed. */
+  rejected: string[];
   onChange: (domains: string[]) => void;
 }) {
   const t = useT();
@@ -168,6 +187,11 @@ function DomainsField({
           {t.google.admin.domains.add}
         </Button>
       </div>
+      {rejected.length ? (
+        <div className="mt-3">
+          <Alert tone="warning">{t.google.admin.domains.rejected(rejected.join(", "))}</Alert>
+        </div>
+      ) : null}
       {domains.length ? (
         <ul className="mt-3 flex flex-wrap gap-2">
           {domains.map((domain) => (
@@ -189,6 +213,18 @@ function DomainsField({
         <p className="mt-3 text-sm text-ink-muted">{t.google.admin.domains.empty}</p>
       )}
     </div>
+  );
+}
+
+function ShadowHint({ rules, index }: { rules: GoogleRule[]; index: number }) {
+  const t = useT();
+  const earlier = shadowedBy(rules, index);
+  if (!earlier) return null;
+  const position = rules.indexOf(earlier) + 1;
+  return (
+    <span className="inline-flex">
+      <Badge tone="amber">{t.google.admin.rules.shadowed(position)}</Badge>
+    </span>
   );
 }
 
@@ -441,6 +477,7 @@ export function GoogleAdminCard() {
         <DomainsField
           domains={draft.allowed_domains}
           fromEnv={state.settings.domains_from_env}
+          rejected={state.settings.domains_rejected ?? []}
           onChange={(allowed_domains) => set({ allowed_domains })}
         />
 
@@ -470,6 +507,7 @@ export function GoogleAdminCard() {
                 dashboards={state.dashboards}
                 onChange={(default_access) => set({ default_access })}
               />
+              <p className="text-sm text-ink-muted">{t.google.admin.provisioning.accessForUsers}</p>
             </div>
           ) : null}
         </div>
@@ -529,6 +567,7 @@ export function GoogleAdminCard() {
                           {rule.enabled ? null : (
                             <Badge tone="amber">{t.google.admin.rules.disabled}</Badge>
                           )}
+                          <ShadowHint rules={rules} index={index} />
                         </p>
                         <p className="mt-1 text-sm text-ink-muted">
                           {t.roles[rule.role]} · {t.google.admin.accessModes[rule.access.mode]}

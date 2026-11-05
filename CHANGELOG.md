@@ -26,7 +26,13 @@ All notable changes to this project are documented here. The format follows
   `google_sign_in_refused` with its reason), the page keeps one generic sentence for every refusal,
   and superusers are never created or modified by a rule. Migration `0051_google_rbac` adds the two
   tables (`google_settings`, `google_rule`) and the two columns that make a passwordless account
-  possible (`app_user.auth_provider`, `app_user.password_hash` nullable).
+  possible (`app_user.auth_provider`, `app_user.password_hash` nullable). Principle **V (Auth)** of the
+  constitution is amended (3.2.3 → 3.3.0): Google sign-in was bounded as *invite-only — it never
+  creates or promotes a user*, which is precisely what this feature needed to lift. The replacement
+  keeps every bound that still holds and adds the two installation-owned, audited ones — opt-in
+  automatic sign-up on the allowed domains (never a superuser, no password) and an ordered rule list
+  that may decide role and access, never for superusers and never for existing accounts unless the
+  installation asks for it.
 - **Each source shows its structure, and one button generates the pack an author's AI reads
   (feature 052)**. The source page gains a second tab, **Estructura**: the catalogue as it is
   (schemas, tables, columns, types, keys, estimated rows, date ranges) and, for REST/Supabase, the

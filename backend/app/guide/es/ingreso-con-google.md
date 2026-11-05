@@ -21,10 +21,13 @@ con el rol **Superusuario**, en Administración → Seguridad → **Ingreso con 
 ## Opciones
 
 - **Dominios permitidos**: los dominios que pueden entrar. Mientras no guardes la lista, es la que
-  trae la instalación (GOOGLE_ALLOWED_DOMAINS); el primer guardado la convierte en configuración.
+  trae la instalación (GOOGLE_ALLOWED_DOMAINS); el primer guardado la convierte en configuración. Si
+  esa variable trae algo que no es un dominio, la tarjeta lo avisa y, hasta que guardes la lista,
+  nadie puede entrar con Google.
 - **Alta automática**: con el interruptor activo, una cuenta desconocida de un dominio permitido se
   crea al ingresar. Elige el rol por defecto —nunca **Superusuario**— y el acceso por defecto:
-  ninguno, todos los tableros públicos o una lista de tableros.
+  ninguno, todos los tableros públicos o una lista de tableros. El acceso se aplica a las cuentas con
+  rol **Usuario**; un administrador ve todo el catálogo por su rol.
 - **Reglas de rol**: se evalúan de arriba abajo y gana la primera que coincida. Cada regla mira el
   dominio o una lista de correos, y decide el rol y el acceso. La condición por grupo llegará cuando
   la instalación tenga una cuenta de servicio de Workspace.

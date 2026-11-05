@@ -48,12 +48,18 @@ no schema change that invalidates an installation's audit history
 | II. Backend as ETL | untouched | no data path change |
 | III. Source of Truth Is External | untouched | no source or artifact change |
 | IV. Separated Concerns | `app/api` routes, `app/services` policy, `frontend/src` UI | the rule engine lives in a service, not in the route |
-| V. Fixed Technology Stack | no auth library, no icon package | inline SVG, the existing exchange |
+| V. Fixed Technology Stack | no auth library, no icon package; the Auth contract | inline SVG, the existing exchange. The Auth bullet bounded Google sign-in as *invite-only* (amendment 2.1.0, feature 027); provisioning and rules expand it, so principle V is **amended** to 3.3.0 by this feature (Sync Impact Report in the constitution) — see T029 |
 | VII. One Product, Many Installations | everything is data in the installation | domains, defaults and rules are rows; the env value is only the seed |
 | VIII. AI Is Optional and Private | untouched | no AI involved |
 | IX. Spec-Driven Reporting | untouched | no report or project change |
 
-No violation; nothing to justify in Complexity Tracking.
+No violation, and one amendment: principle V's **Auth** bullet stopped bounding Google sign-in as
+invite-only, because the second half of this specification is exactly what that clause forbade. The
+amendment keeps every bound that still holds (off by default, per-installation OAuth client, opt-in per
+attempt, the `internet` profile's second factor, password sign-in unchanged) and adds the two the
+product needed: opt-in automatic sign-up on the allowed domains — never a superuser, no password — and
+an ordered rule list that may decide role and access, never for superusers and never for existing
+accounts unless the installation asks for it. Nothing to justify in Complexity Tracking.
 
 ## Project Structure
 

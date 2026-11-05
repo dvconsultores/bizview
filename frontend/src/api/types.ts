@@ -1449,6 +1449,8 @@ export interface GoogleSettings {
   allowed_domains: string[];
   /** True while the list is still the env value and the first save turns it into data. */
   domains_from_env: boolean;
+  /** Entries of `GOOGLE_ALLOWED_DOMAINS` that are not domains: shown, never silently obeyed. */
+  domains_rejected?: string[];
   auto_provision: boolean;
   default_role: Role;
   default_access: GoogleAccess;

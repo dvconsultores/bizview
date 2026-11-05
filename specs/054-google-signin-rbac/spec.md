@@ -317,3 +317,23 @@ real reason (`domain_not_allowed`, `no_user`, `provisioned`, `rule:<id>`).
   were deleted from both catalogues when FR-016 landed, and feature 027's error-code test was updated
   to assert the generic sentence for every code but `denied`: keeping unused strings would let a
   later edit reintroduce the leak the feature removes.
+- [converge] decision — principle **V (Auth)** of the constitution is amended (3.2.3 → 3.3.0, MINOR)
+  instead of leaving the brief's "no constitution change" standing: the clause it added in 2.1.0 said
+  Google sign-in "never creates or promotes a user", which is exactly what this feature needed to
+  lift. The amendment keeps every bound that still holds and turns the two new ones into
+  installation-owned, audited decisions.
+- [implement] decision — the environment seed is *validated* with the same rule as a save, not just
+  normalised: `GOOGLE_ALLOWED_DOMAINS=https://www.getbizview.com;` used to appear on the card as a
+  domain while refusing every sign-in. Entries that are not domains are dropped and reported
+  (`domains_rejected`) so the card can say so; a seed that is set but yields nothing admits **nobody**
+  instead of falling back to "any domain", because opening an installation to every Google domain is
+  not a repair for a typo.
+- [implement] decision — the provisioning access is granted to `user` accounts only, in provisioning
+  and in rule application alike: an admin sees the whole catalogue by role, so a grant row would be
+  access nobody reads, and the card now says which accounts the value is for.
+- [implement] decision — a rule covered by an earlier enabled rule is **marked**, not refused: two
+  rules may share a condition while one is disabled, and the first-match rule makes the later one a
+  no-op the reader has to see (`rules.shadowed(position)`).
+- [implement] decision — the second test hook (`POST /api/testing/google-reset`) was removed rather
+  than wired: the throwaway e2e backend dies with its process, nothing needed to restore the exchange
+  seam, and the plan counts one hook.

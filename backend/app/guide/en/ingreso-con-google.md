@@ -21,10 +21,13 @@ Anyone whose Google address belongs to an allowed domain. The policy is configur
 ## Options
 
 - **Allowed domains**: the domains that may come in. Until you save the list it is the one the
-  installation ships (GOOGLE_ALLOWED_DOMAINS); the first save turns it into configuration.
+  installation ships (GOOGLE_ALLOWED_DOMAINS); the first save turns it into configuration. If that
+  variable carries something that is not a domain, the card says so and, until you save a list,
+  nobody can sign in with Google.
 - **Automatic sign-up**: with the switch on, an unknown account on an allowed domain is created on
   first sign-in. Pick the default role — never **Superuser** — and the default access: none, every
-  public dashboard or a list of dashboards.
+  public dashboard or a list of dashboards. The access applies to accounts with the **User** role; an
+  administrator sees the whole catalogue through their role.
 - **Role rules**: evaluated top to bottom, and the first match wins. Each rule looks at the domain
   or a list of addresses and decides the role and the access. The group condition arrives when the
   installation has a Workspace service account.

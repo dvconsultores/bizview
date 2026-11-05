@@ -96,6 +96,25 @@ def test_domains_come_from_env_until_the_card_saves(superuser, google_on, monkey
     assert body["settings"]["default_access"] == {"mode": "none"}
 
 
+def test_a_mis_typed_env_value_is_reported_and_never_opens_the_door(superuser, google_on,
+                                                                  monkeypatch):
+    """T030: `GOOGLE_ALLOWED_DOMAINS` is a seed, not a licence. A URL in it used to show up as a
+    domain, refuse everybody (`domain_not_allowed`) and look like a working policy."""
+    monkeypatch.setattr(get_settings(), "google_allowed_domains",
+                        "https://www.getbizview.com; getbizview.com")
+    c = reauth(signed_in("root@example.com"))
+    body = c.get("/api/admin/google").json()["settings"]
+    assert body["allowed_domains"] == ["getbizview.com"]           # the usable half survives
+    assert body["domains_rejected"] == ["https://www.getbizview.com;"]
+
+    # Only rejects: the list is not "empty means any" — it admits nobody until it is saved.
+    monkeypatch.setattr(get_settings(), "google_allowed_domains", "https://www.getbizview.com;")
+    body = c.get("/api/admin/google").json()["settings"]
+    assert body["allowed_domains"] == [] and body["domains_rejected"]
+    monkeypatch.setattr(get_settings(), "google_allowed_domains", "")
+    assert c.get("/api/admin/google").json()["settings"]["domains_rejected"] == []
+
+
 def test_saving_domains_overrides_env_and_is_audited(superuser, google_on, monkeypatch):
     monkeypatch.setattr(get_settings(), "google_allowed_domains", "example.com")
     c = reauth(signed_in("root@example.com"))
@@ -223,6 +242,22 @@ def test_auto_provision_creates_one_user_with_the_defaults(superuser, google_on,
     assert len(sql("select id from app_user where email = 'persona@example.org'")) == 1
 
 
+def test_an_admin_is_provisioned_without_explicit_grants(superuser, google_on, monkeypatch):
+    """T031: the access value is for `user` accounts; an admin sees the whole catalogue by role."""
+    c = reauth(signed_in("root@example.com"))
+    codes = [row[0] for row in sql("select code from dashboard where status = 'available' limit 1")]
+    c.put("/api/admin/google", json={
+        "allowed_domains": ["example.org"], "auto_provision": True, "default_role": "admin",
+        "default_access": {"mode": "list", "codes": codes}})
+
+    assert sign_in_with_google(monkeypatch, identity()).status_code in (302, 307)
+    row = sql("select id, role from app_user where email = 'persona@example.org'")[0]
+    assert row[1] == "admin"
+    assert sql("select dashboard_id from dashboard_access where user_id = :u", u=row[0]) == []
+    detail = sql("select detail from audit_event where kind = 'google_user_provisioned'")[0][0]
+    assert detail["dashboards"] == []
+
+
 def test_a_foreign_domain_is_refused_generically_and_audited(superuser, google_on, monkeypatch):
     c = reauth(signed_in("root@example.com"))
     c.put("/api/admin/google", json={"allowed_domains": ["example.org"], "auto_provision": True})
@@ -251,6 +286,32 @@ def test_a_provisioned_account_cannot_use_the_password_form(superuser, google_on
     detail = sql("select detail from audit_event where kind = 'login_failed' "
                  "and detail ? 'no_credential'")
     assert detail
+
+
+def test_an_admin_gives_a_provisioned_account_its_password(superuser, google_on, monkeypatch):
+    """FR-012: the existing reset is the only way in — hash written, change forced, link kept."""
+    c = reauth(signed_in("root@example.com"))
+    c.put("/api/admin/google", json={"allowed_domains": ["example.org"], "auto_provision": True})
+    sign_in_with_google(monkeypatch, identity())
+    user_id = sql("select id from app_user where email = 'persona@example.org'")[0][0]
+
+    reset = c.post(f"/api/admin/users/{user_id}/password",
+                   json={"temporary_password": "Temporal-pass-91"})
+    assert reset.status_code == 204, reset.text
+    assert sql("select password_hash is not null from app_user where id = :u", u=user_id)[0][0]
+
+    pw = browser()
+    first = pw.post("/api/auth/login", json={
+        "email": "persona@example.org", "password": "Temporal-pass-91"})
+    assert first.status_code == 200, first.text
+    assert first.json()["user"]["must_change_password"] is True
+    # The reset forces the change: the session may reach nothing else until it happens.
+    blocked = pw.get("/api/dashboards")
+    assert blocked.json()["error"]["code"] == "password_change_required"
+    # The Google link is untouched: the same account signs in with Google again.
+    again = sign_in_with_google(monkeypatch, identity())
+    assert again.status_code in (302, 307)
+    assert len(sql("select id from app_user where email = 'persona@example.org'")) == 1
 
 
 def test_rules_apply_to_new_accounts_and_never_to_superusers(superuser, google_on, monkeypatch):

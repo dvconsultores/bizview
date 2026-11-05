@@ -84,3 +84,35 @@ task is ticked only when it is implemented and its file exists.
 - [x] T027 `frontend/tests/e2e/google-rbac.spec.ts`: provisioned user → default dashboards → admin
       changes the role → next sign-in keeps the admin's role
 - [x] T028 Gates: `pytest` (the four suites), `tsc -b`, `vitest run`, `npm run build`
+
+## Phase 9: Convergence
+
+- [x] T029 **CRITICAL** Amend `.specify/memory/constitution.md` principle **V. Fixed Technology
+      Stack, Auth** so it stops bounding Google sign-in as invite-only: number the provisioning
+      (opt-in, allowed domain only, default role `usuario`/`admin`, never superuser) and the ordered
+      rules that may change a role, keep every existing bound that still holds (off by default,
+      per-installation OAuth client, the `internet` profile's second factor, password sign-in
+      unchanged), add the Sync Impact Report (MINOR, trigger: owner brief 2026-11-04) and bump the
+      version; then correct the "Constitution: no change" line in `spec.md`, `plan.md`, the CHANGELOG
+      entry and `run-report.md` per Constitution V (contradicts)
+- [x] T030 Validate the environment seed in `app/services/google_policy.py`: pass
+      `Settings.google_domains` through the same domain validator `validate_settings` uses and keep
+      only what it accepts (or report the rejects on the card) so `public_settings` can never display
+      a domain the API would refuse to save — `https://www.getbizview.com;` currently makes every
+      Google sign-in fail with `domain_not_allowed` while the card looks healthy; add a backend test
+      for a rejected seed per FR-004 and US2/AC1 (partial)
+- [x] T031 Grant the provisioning access only to `user` accounts and say so on the card: skip
+      `grant()` in `provision()` when the resolved role is `admin` (admins see the whole catalogue by
+      role, and the edge case says the new admin has no dashboards of their own), and add the
+      one-line label under **Acceso por defecto** stating it applies to `usuario` accounts per the
+      spec's Edge Cases and the [clarify] decision (contradicts)
+- [x] T032 Warn about a shadowed rule in `frontend/src/components/GoogleAdminCard.tsx`: a rule whose
+      condition and value repeat an earlier enabled rule never decides anything, so mark it on the row
+      with a hint (i18n es/en) instead of letting it look active per the spec's Edge Cases (missing)
+- [x] T033 Assert FR-012's second clause in `backend/tests/test_google_rbac.py`: an admin resets the
+      password of a provisioned account through `POST /api/admin/users/{id}/password`, the account
+      then signs in with it, `must_change_password` forces the change, and the Google link is untouched
+      per FR-012 and the [analyze] decision that claims this flow is already asserted (missing)
+- [x] T034 Justify or drop `POST /api/testing/google-reset` in `backend/app/api/testhooks.py`: either
+      restore the `google.client` seam from it after the e2e suite (so the hook is the one the plan
+      counts) or delete it, since nothing references it per the plan's test-hook scope (unrequested)

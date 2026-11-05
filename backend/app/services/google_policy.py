@@ -74,6 +74,22 @@ def normalise_access(value: dict | None) -> dict:
     return {"mode": mode, "codes": codes} if mode == "list" else {"mode": mode}
 
 
+def valid_domain(value: str) -> bool:
+    """The one rule `validate_settings` and the environment seed both obey."""
+    return len(value) <= MAX_DOMAIN_LEN and bool(_DOMAIN.match(value))
+
+
+def seed_domains() -> tuple[list[str], list[str]]:
+    """The deployment's `GOOGLE_ALLOWED_DOMAINS`, split into what may be used and what may not.
+
+    A value that is not a bare domain — a URL, a leftover separator — would never match an account,
+    and showing it on the card would suggest a working policy. The valid entries are kept; the
+    rejects are reported so the card can say so instead of failing quietly (convergence T030)."""
+    entries = normalise_domains(get_settings().google_domains)
+    valid = [d for d in entries if valid_domain(d)]
+    return valid, [d for d in entries if d not in valid]
+
+
 # --- settings -------------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -85,6 +101,8 @@ class Policy:
     default_role: str
     default_access: dict
     apply_rules_to_existing: bool
+    #: `GOOGLE_ALLOWED_DOMAINS` was set but yielded no usable domain: fail closed, never "any".
+    seed_refused: bool = False
 
 
 def row(db: Session) -> GoogleSettings | None:
@@ -94,9 +112,11 @@ def row(db: Session) -> GoogleSettings | None:
 def policy(db: Session) -> Policy:
     stored = row(db)
     if stored is None:
-        return Policy(allowed_domains=normalise_domains(get_settings().google_domains),
+        domains, rejected = seed_domains()
+        return Policy(allowed_domains=domains,
                       auto_provision=False, default_role="user",
-                      default_access={"mode": "none"}, apply_rules_to_existing=False)
+                      default_access={"mode": "none"}, apply_rules_to_existing=False,
+                      seed_refused=bool(rejected) and not domains)
     return Policy(allowed_domains=normalise_domains(stored.allowed_domains),
                   auto_provision=stored.auto_provision, default_role=stored.default_role,
                   default_access=normalise_access(stored.default_access),
@@ -106,10 +126,13 @@ def policy(db: Session) -> Policy:
 def public_settings(db: Session) -> dict:
     current = policy(db)
     stored = row(db)
+    _, rejected = seed_domains()
     return {
         "allowed_domains": current.allowed_domains,
         # True when the list on screen is the deployment's and the first save turns it into data.
         "domains_from_env": stored is None,
+        # Entries of GOOGLE_ALLOWED_DOMAINS that are not domains: shown, never silently obeyed.
+        "domains_rejected": rejected if stored is None else [],
         "auto_provision": current.auto_provision,
         "default_role": current.default_role,
         "default_access": current.default_access,
@@ -124,7 +147,7 @@ def validate_settings(body: dict) -> dict:
         raise validation({"allowed_domains": "too_many"},
                          M("google.too_many_domains", max=MAX_DOMAINS))
     for domain in domains:
-        if len(domain) > MAX_DOMAIN_LEN or not _DOMAIN.match(domain):
+        if not valid_domain(domain):
             raise validation({"allowed_domains": "invalid"},
                              M("google.invalid_domain", domain=domain))
     role = str(body.get("default_role") or "user")
@@ -296,7 +319,12 @@ def matching_rule(db: Session, email: str) -> GoogleRule | None:
 
 
 def domain_allowed(policy_: Policy, email: str) -> bool:
-    """An empty list admits any verified domain — the meaning `GOOGLE_ALLOWED_DOMAINS` has today."""
+    """An empty list admits any verified domain — the meaning `GOOGLE_ALLOWED_DOMAINS` has today.
+
+    A seed that was set but unusable is not an empty list: it admits nobody, because opening the
+    installation to every Google domain is not a fix for a typo."""
+    if policy_.seed_refused:
+        return False
     if not policy_.allowed_domains:
         return True
     return email.rsplit("@", 1)[-1].lower() in policy_.allowed_domains
@@ -349,7 +377,9 @@ def provision(db: Session, *, email: str, name: str | None, google_sub: str,
     db.add(GoogleLink(user_id=user.id, google_sub=google_sub, email=address,
                       created_at=now_, last_login_at=now_))
     db.flush()
-    granted = grant(db, user, access, actor_id=actor_id)
+    # The access value is for `user` accounts only: an admin sees the whole catalogue by role, and a
+    # grant row would be an access nobody reads (spec, Edge Cases; clarify decision).
+    granted = grant(db, user, access, actor_id=actor_id) if role == "user" else []
     audit.record(db, "google_user_provisioned", target_id=user.id,
                  detail={"email": address, "role": role,
                          "rule": rule.id if rule is not None else None,
@@ -368,7 +398,9 @@ def apply_to_existing(db: Session, user: AppUser, rule: GoogleRule,
     if user.role != rule.role:
         changed["role"] = {"from": user.role, "to": rule.role}
         user.role = rule.role
-    granted = grant(db, user, normalise_access(rule.access), actor_id=user.id)
+    # Same rule as provisioning: only a `user` account carries explicit dashboard grants.
+    granted = (grant(db, user, normalise_access(rule.access), actor_id=user.id)
+               if user.role == "user" else [])
     if granted:
         changed["dashboards"] = granted
     if not changed:
