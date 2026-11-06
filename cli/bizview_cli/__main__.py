@@ -105,8 +105,21 @@ def _run(args) -> int:
     if args.command == "validate":
         return _validate(args)
     if args.command == "init":
-        from bizview_cli.init import init
-        return init(Path(args.path), args.name, agent=args.agent, git=not args.no_git,
+        from bizview_cli.init import init, init_project
+
+        if args.what == "project":
+            if not args.project_name:
+                print(t("cli.init_project_name_help"), file=sys.stderr)
+                return 2
+            return init_project(args.project_name, source=args.source, lang=args.lang,
+                                kind=args.kind, directory=args.dir)
+        # `init` and `init workspace` keep the shape they had; the path is either the first
+        # argument or `--path`.
+        where = args.path or (args.what if args.what and args.what != "workspace" else None)
+        if not where or not args.name:
+            print(t("cli.init_usage"), file=sys.stderr)
+            return 2
+        return init(Path(where), args.name, agent=args.agent, git=not args.no_git,
                     layout=args.layout)
     if args.command == "import":
         return _import(args)
@@ -183,13 +196,21 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--live", action="store_true",
                    help=t("cli.validate_live_help"))
     i = sub.add_parser("init", help=t("cli.init_help"))
-    i.add_argument("path")
-    i.add_argument("--name", required=True, help=t("cli.init_name_help"))
+    i.add_argument("what", nargs="?", default=None,
+                   help=t("cli.init_what_help"))
+    i.add_argument("project_name", nargs="?")
+    i.add_argument("--path", default=None, help=t("cli.init_path_help"))
+    i.add_argument("--name", help=t("cli.init_name_help"))
     i.add_argument("--agent", default="claude",
                    help=t("cli.init_agent_help"))
     i.add_argument("--no-git", action="store_true")
     i.add_argument("--layout", choices=["v2", "legacy"], default="v2",
                    help=t("cli.init_layout_help"))
+    i.add_argument("--source", default=None, help=t("cli.init_source_help"))
+    i.add_argument("--lang", choices=["es", "en"], default="es", help=t("cli.init_lang_help"))
+    i.add_argument("--kind", choices=["integration", "direct"], default="integration",
+                   help=t("cli.init_kind_help"))
+    i.add_argument("--dir", default=None, help=t("cli.init_dir_help"))
     p = sub.add_parser("project", help=t("cli.project_help"))
     project_sub = p.add_subparsers(dest="project_command", required=True)
     n = project_sub.add_parser("new", help=t("cli.project_new_help"))

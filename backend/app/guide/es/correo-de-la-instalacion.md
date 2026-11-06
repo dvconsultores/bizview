@@ -24,3 +24,9 @@ de ajustes de la instalación, no en pantallas.
 
 - Sin correo configurado, **Enviar por correo** y **Envíos programados** muestran que el envío
   por correo no está disponible; el resto de la aplicación funciona igual.
+
+## Relacionados
+
+- Instalación y ajustes
+- Enviar por correo
+- Envíos programados

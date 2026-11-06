@@ -1,7 +1,7 @@
 ## How work is done in BizView
 
-Every source, integration, report and distribution is a numbered spec of the project. The agent
-writes files only inside a command and you decide when to apply.
+Every source, integration, report and distribution is a numbered spec of the project. The files
+are written outside with the AI you prefer and enter through import; you decide when to apply.
 
 Flow: specify → clarify → plan → tasks → analyze/checklist → implement → converge → **Apply project**
 

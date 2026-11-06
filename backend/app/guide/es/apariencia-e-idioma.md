@@ -25,3 +25,8 @@ acompaña en otros dispositivos.
   puede traer etiquetas en inglés opcionales).
 - Si ves «Tema aplicado en este dispositivo, pero no se pudo guardar en tu cuenta.», vuelve a
   elegirlo cuando tengas conexión.
+
+## Relacionados
+
+- Tu perfil
+- Moverse por la aplicación

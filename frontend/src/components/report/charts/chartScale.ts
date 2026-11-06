@@ -113,3 +113,23 @@ export function axisLabelIndexes(count: number, most = 12): number[] {
   if (out[out.length - 1] !== count - 1 && count - 1 - out[out.length - 1] >= step / 2) out.push(count - 1);
   return out;
 }
+
+/** Feature 056: the drawing area's height, so a chart can grow into the card it was given. */
+export function useChartHeight(ref: RefObject<HTMLDivElement | null>, fallback = CHART_HEIGHT): number {
+  const [height, setHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const h = Math.floor(el.clientHeight);
+      setHeight(h > 0 ? h : fallback);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, fallback]);
+
+  return height;
+}

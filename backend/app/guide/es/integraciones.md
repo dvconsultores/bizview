@@ -34,3 +34,9 @@ Solo el **Superusuario**.
   **Habilitada**.
 - «No hay integraciones activas»: aplica un proyecto o un espacio de trabajo con specs de
   integración.
+
+## Relacionados
+
+- Fuentes de datos
+- ETL y transformaciones
+- Reportes directos

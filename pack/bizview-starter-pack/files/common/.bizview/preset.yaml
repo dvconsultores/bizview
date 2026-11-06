@@ -1,0 +1,32 @@
+# The published contract this pack implements. Informational: Bizview reads the JSON Schemas in
+# `.bizview/schemas/`, not this file. El contrato publicado que implementa este paquete. Informativo:
+# Bizview lee los esquemas JSON de `.bizview/schemas/`, no este archivo.
+schema_version: "1.0"
+pack: bizview-starter
+project: {{slug}}
+
+files:
+  - "project.yaml: schemas/project.schema.json"
+  - "specs/NNN-*/spec.md: the kind line and the Status line"
+  - "integrations/<id>/integration.yaml: schemas/integration.schema.json"
+  - "integrations/<id>/requests/*.yaml: schemas/request.schema.json"
+  - "reports/<id>/report.yaml: schemas/report.schema.json"
+  - "distributions/<id>.yaml: schemas/distribution.schema.json"
+  - "themes/<id>.yaml: schemas/theme.schema.json"
+  - "sources/<name>/structure.json: schemas/structure.schema.json"
+
+rules:
+  - "Specs live in specs/NNN-<slug>/, three digits, consecutive, never reused."
+  - "Every spec.md states its kind (**Tipo**: integracion | reporte) and **Status**: Approved."
+  - "An artifact's spec: is specs/NNN-<slug> inside its own project."
+  - "The artifact id equals its folder name, kebab-case, unique in the installation."
+  - "One read-only SELECT or WITH per SQL file; no DDL, no DML, no ; chains."
+  - "Dates in transforms: CAST(strftime(col, '%Y-%m-%d') AS DATE)."
+  - "A windowed dataset filters with :window_start and :window_end and declares both."
+  - "A ranking view uses singular dimension and metric; a bar component uses x and series."
+  - "Columns with personal data are listed in the spec under **Datos personales**."
+  - "Business names, not engine names: comprobante_id, never document_id."
+
+budgets:
+  artifacts: {files: 400, max_kb: 2048, max_mb: 20}
+  assets: {files: 2000, max_kb: 300, max_mb: 25}

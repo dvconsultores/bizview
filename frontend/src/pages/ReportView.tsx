@@ -11,7 +11,10 @@ import type {
 import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
-import { ReportViews } from "../components/report/ReportViews";
+import { ReportViews, SingleView, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import { CardDialog } from "../components/report/CardDialog";
+import { LayoutRenderer } from "../components/report/LayoutRenderer";
+import { downloadCardPng } from "../lib/cardPng";
 import type { LayoutParamsWiring } from "../components/report/LayoutBlocks";
 import { Spinner } from "../components/Spinner";
 import { ParamsForm } from "../components/report/ParamsForm";
@@ -140,6 +143,20 @@ export function ReportView() {
   const loadingRef = useRef(false);
 
   const tv = params.get("tv") === "1";
+
+  // Feature 056: one card full screen, shareable as `?ampliar=<component id>`; TV mode ignores it.
+  const maximizedId = tv ? null : params.get("ampliar");
+  const maximize = useCallback((id: string) => {
+    const next = new URLSearchParams(params);
+    next.set("ampliar", id);
+    setParams(next, { replace: false });
+  }, [params, setParams]);
+  const closeMaximized = useCallback(() => {
+    const next = new URLSearchParams(params);
+    next.delete("ampliar");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
 
   // Feature 053: one sheet, two tabs. Both actions open it on their tab; pressing the tab that is
   // already shown closes it (the toggle the report page always had).
@@ -473,10 +490,11 @@ export function ReportView() {
       return (
         <ReportViews data={data} def={def!} kpiSize={kpiSize}
           csvBase={kpiSize === "normal" ? csvBase : undefined}
-          params={layoutParams} />
+          params={layoutParams}
+          onMaximize={maximize} />
       );
     },
-    [data, def, csvBase, layoutParams],
+    [data, def, csvBase, layoutParams, maximize],
   );
 
   if (!def) {
@@ -665,6 +683,19 @@ export function ReportView() {
           ) : null}
       </ReportArea>
 
+      {/* Feature 056: the maximised card, rendered from the same tree so it cannot drift. */}
+      {maximizedId && data && def ? (
+        <MaximizedCard
+          id={maximizedId}
+          data={data}
+          def={def}
+          csvBase={csvBase}
+          params={layoutParams}
+          onMaximize={maximize}
+          onClose={closeMaximized}
+        />
+      ) : null}
+
       <ReportSheet
         open={panel !== null}
         title={t.reportActions.filters(activeCount)}
@@ -763,5 +794,91 @@ export function ReportView() {
         ) : null}
       </View>
     </div>
+  );
+}
+
+/** Feature 056: what the full-screen header says — a layout component's title, or a view's. */
+function maximizedTitle(def: ReportDefinition, id: string, t: ReturnType<typeof useT>): string {
+  const component = (def.layout?.web?.components ?? []).find((entry) => entry.id === id);
+  return (component ? localized(component, "title") : undefined) ?? t.layout.maximize(id);
+}
+
+/** The view a maximised card draws, whichever kind of card it is. */
+function maximizedView(id: string, data: ReportData, def: ReportDefinition) {
+  if (id.startsWith(VIEW_CARD_PREFIX)) return data.views[Number(id.slice(VIEW_CARD_PREFIX.length))];
+  const component = (def.layout?.web?.components ?? []).find((entry) => entry.id === id);
+  return component?.view ? data.views.find((view) => view.id === component.view) : undefined;
+}
+
+/**
+ * Feature 056: one card at the viewport's size.
+ *
+ * The same tree is rendered again (a layout component through `LayoutRenderer`, a default view
+ * through `SingleView`), so a maximised card cannot show something the dashboard does not. The
+ * arrows walk the dashboard's cards; the CSV is the view's own export; the PNG is the drawing.
+ */
+function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: {
+  id: string;
+  data: ReportData;
+  def: ReportDefinition;
+  csvBase?: string;
+  params?: LayoutParamsWiring;
+  onMaximize: (id: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const frame = useRef<HTMLDivElement>(null);
+  const byView = id.startsWith(VIEW_CARD_PREFIX);
+  const index = byView ? Number(id.slice(VIEW_CARD_PREFIX.length)) : -1;
+  const component = byView
+    ? undefined
+    : (def.layout?.web?.components ?? []).find((entry) => entry.id === id);
+  const cards = byView
+    ? data.views.map((_, position) => `${VIEW_CARD_PREFIX}${position}`)
+    : (def.layout?.web?.components ?? [])
+        .filter((entry) => entry.type !== "text" && entry.type !== "filters"
+          && entry.type !== "spacer")
+        .map((entry) => entry.id);
+  const position = cards.indexOf(id);
+  const view = maximizedView(id, data, def);
+  const table = view ? viewCsvTable(view) : null;
+  const title = byView
+    ? (view && "title" in view ? localized(view as { title?: string }, "title") : undefined)
+      ?? t.reportParams.detailTitle
+    : maximizedTitle(def, id, t);
+
+  const go = (step: -1 | 1) => {
+    const target = cards[position + step];
+    if (target) onMaximize(target);
+  };
+
+  return (
+    <CardDialog
+      open
+      title={title}
+      onClose={onClose}
+      onPrevious={position > 0 ? () => go(-1) : undefined}
+      onNext={position >= 0 && position < cards.length - 1 ? () => go(1) : undefined}
+      onDownloadPng={() => downloadCardPng(frame.current, title)}
+      onDownloadCsv={table
+        ? () => downloadCsv(
+            csvBase ? csvFileName(`${csvBase}-${table.title}`) : csvFileName(table.title),
+            toCsv(table.columns, table.rows))
+        : undefined}
+    >
+      <div ref={frame} className="min-h-0">
+        {byView ? (
+          <SingleView index={index} data={data} def={def} csvBase={csvBase} params={params} />
+        ) : def.layout?.web && component ? (
+          <LayoutRenderer
+            layout={{ ...def.layout.web, gutter: "md", components: [component] }}
+            data={data}
+            def={def}
+            csvBase={csvBase}
+            params={params}
+          />
+        ) : null}
+      </div>
+    </CardDialog>
   );
 }

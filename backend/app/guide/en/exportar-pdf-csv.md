@@ -37,3 +37,9 @@ Anyone with access to the dashboard.
 
 - "Wait for the report to finish loading.": the downloads appear once the report finished loading.
 - "Couldn't generate the PDF.": try again in a moment.
+
+## Related
+
+- View a report
+- Filters and periods
+- Send by email

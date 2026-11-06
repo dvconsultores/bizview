@@ -33,3 +33,9 @@ Solo el **Superusuario**.
 - «La fuente respondió HTTP 403»: la credencial no tiene acceso a esa ruta.
 - «La respuesta no es JSON»: la ruta devuelve otro formato; documenta la estructura a mano en las
   observaciones.
+
+## Relacionados
+
+- Estructura de una fuente
+- Integraciones
+- ETL y transformaciones

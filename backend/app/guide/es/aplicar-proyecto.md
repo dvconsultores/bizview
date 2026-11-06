@@ -8,7 +8,7 @@ tableros.
 
 ## Quién puede usarlo
 
-Solo el **Superusuario**. El agente nunca aplica: siempre es una acción tuya.
+Solo el **Superusuario**. Aplicar siempre es una acción tuya: nada entra en marcha solo.
 
 ## Cómo se hace
 
@@ -35,3 +35,9 @@ Solo el **Superusuario**. El agente nunca aplica: siempre es una acción tuya.
 - Si el botón no está activo, mira **Pendiente para aplicar** en la barra de estado: dice qué
   falta (por ejemplo, una consulta sin comprobar o un reporte sin filtros). **Volver a comprobar**
   repite las comprobaciones.
+
+## Relacionados
+
+- Espacio de trabajo
+- Proyectos
+- Historial del proyecto

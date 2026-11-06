@@ -61,6 +61,8 @@ AUDIT_KINDS = (
     "project_fix_applied",
     # feature 049
     "project_limits_changed",
+    # feature 057
+    "starter_downloaded",
     # feature 027
     "google_sign_in", "google_sign_in_refused", "google_linked",
     # feature 030

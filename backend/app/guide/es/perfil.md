@@ -19,3 +19,10 @@ Cualquier persona con una cuenta.
 6. **Apariencia** e **Idioma** cambian el tema y el idioma de la aplicación.
 
 Para salir, abre el **Menú de cuenta** y elige **Cerrar sesión**.
+
+## Relacionados
+
+- Cambiar la contraseña
+- Verificación en dos pasos
+- Telegram
+- Apariencia e idioma

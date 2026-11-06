@@ -25,3 +25,9 @@ Solo el **Superusuario**.
 
 - La conciliación (comparar totales con el origen) no está disponible para Supabase; solo para
   PostgreSQL.
+
+## Relacionados
+
+- Fuentes de datos
+- ETL y transformaciones
+- Integraciones

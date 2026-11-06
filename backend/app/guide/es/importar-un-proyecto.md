@@ -43,3 +43,10 @@ sus números.
   lectura se hace con los límites vigentes.
 - Los comandos `bizview validate` y `bizview import --dry-run proyecto.zip` dicen los mismos números
   desde tu equipo, sin subir nada.
+
+## Relacionados
+
+- Proyectos
+- Proyectos en VS Code y Git
+- Aplicar un proyecto
+- Estructura de un proyecto

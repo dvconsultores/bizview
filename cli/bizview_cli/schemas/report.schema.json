@@ -973,6 +973,21 @@
           "description": "Apilar las series de las barras; requiere dos o más series.",
           "type": "boolean"
         },
+        "labels": {
+          "description": "Etiquetas de valor siempre visibles: true en bar, line y area imprime el valor al final de cada marca; en pie y donut, values, percent o both elige qué se imprime en cada porción. Por defecto false.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "enum": [
+                "values",
+                "percent",
+                "both"
+              ]
+            }
+          ]
+        },
         "category": {
           "description": "Dimensión de las categorías (pie, donut).",
           "type": "string"

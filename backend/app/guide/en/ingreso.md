@@ -35,3 +35,10 @@ there is no self sign-up.
 - "Forgot your password? Ask your administrator to reset it.": BizView sends no recovery emails;
   an **Administrator** resets the password.
 - "Your session ended. Sign in again.": a session ends after 7 days without use or after 30 days.
+
+## Related
+
+- Change your password
+- Two-step verification
+- Telegram
+- Sign in with Google

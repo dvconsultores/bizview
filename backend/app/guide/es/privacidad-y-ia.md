@@ -22,3 +22,7 @@ todo lo demás funciona igual.
 
 - Si la ayuda no responde con IA, la instalación no tiene proveedor configurado: la página de
   ayuda y su buscador funcionan igual.
+
+## Relacionados
+
+- Inteligencia artificial

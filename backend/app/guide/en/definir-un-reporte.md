@@ -111,7 +111,12 @@ Fields per type:
   `series1` to `series8`; the installation's theme and branding resolve them.
 - Fonts are named (`sans`, `sans_bold`, `serif` and `mono`), and `font_name` is only accepted on a
   `text` component or block.
-- The English versions of texts are `text_en`, `other_label_en` and `legal_en`.
 - A layout carries no addresses and no paths: the logo uses the `logo_role`.
-- `bizview validate` checks the layout with the same schema the agent uses.
+- `bizview validate` checks the layout with the same schema the server uses.
 - The complete example is `reports/facturas-dia/report.yaml`.
+
+## Related
+
+- Spec kinds
+- Direct reports
+- A direct report step by step

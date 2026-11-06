@@ -38,3 +38,9 @@ Solo el **Superusuario**.
   vienen siempre del tema.
 - Un reporte puede declarar su propio tema en su definición (`layout.theme.id`); ese valor gana
   sobre el de la instalación.
+
+## Relacionados
+
+- Administración
+- Definir un reporte
+- Escribir un tema

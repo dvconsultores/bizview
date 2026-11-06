@@ -20,3 +20,7 @@ Cualquier persona con una cuenta ve la **Ayuda** con los temas de su rol.
 - La búsqueda encuentra por título, texto y palabras clave, en el idioma de la interfaz.
 - Si la instalación tiene la IA configurada, puedes preguntar con tus palabras, por ejemplo
   «¿cómo comparto un tablero?»; sin IA, la búsqueda y los temas funcionan igual.
+
+## Relacionados
+
+- Moverse por la aplicación

@@ -28,4 +28,10 @@ Main fields:
 
 - The integration's spec lists in `**Personal data**:` the personal columns included on request; a
   column flagged as personal that is not listed there blocks the apply.
-- For a full example, ask the agent for the authoring guide or download an applied project.
+- A full example is in the authoring guide; an applied project can be downloaded from its page.
+
+## Related
+
+- Spec kinds
+- ETL and transformations
+- From source to distribution

@@ -32,3 +32,9 @@ Campos principales:
   aplicación.
 - Para ver un ejemplo completo, descarga un proyecto aplicado (**Descargar**) o mira
   `examples/ventas-basico/` del esqueleto de autoría.
+
+## Relacionados
+
+- Tipos de spec
+- ETL y transformaciones
+- De la fuente a la distribución

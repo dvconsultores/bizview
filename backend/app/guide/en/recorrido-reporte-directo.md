@@ -28,3 +28,9 @@ Only the **Superuser**.
 
 - If the query fails because a column does not exist, the table's structure changed: update the
   spec and the report with the new columns and validate again.
+
+## Related
+
+- Direct reports
+- Define a report
+- Apply a project

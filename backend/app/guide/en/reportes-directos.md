@@ -39,3 +39,9 @@ Also:
 - "Data from …; the source didn't respond": the last saved data is shown.
 - "The source is busy": too many queries are running; try again.
 - If the table's structure changed, the report shows the error and the spec must be updated.
+
+## Related
+
+- Define a report
+- A direct report step by step
+- Integrations

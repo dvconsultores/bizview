@@ -37,3 +37,9 @@ Only the **Superuser**.
 - The brand primary still drives buttons and links; chart series always come from the theme.
 - A report may declare its own theme in its definition (`layout.theme.id`); that value wins over the
   installation's.
+
+## Related
+
+- Administration
+- Define a report
+- Writing a theme

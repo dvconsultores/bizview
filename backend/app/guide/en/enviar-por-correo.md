@@ -29,3 +29,9 @@ Anyone with access to the dashboard, when the installation has email set up.
 ## Common problems
 
 - "Email sending is not available in this installation.": the **Superuser** must set up email.
+
+## Related
+
+- Share with a link
+- Export to PDF or CSV
+- Scheduled sends

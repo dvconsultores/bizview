@@ -1,0 +1,6 @@
+# Workspace manifest: what the validator reads to accept the folder as a workspace.
+# Manifiesto del espacio de trabajo: lo que el validador lee para aceptar la carpeta.
+name: {{slug}}
+product: bizview
+timezone: UTC          # zona horaria de los datos / the data's time zone
+currency: USD          # moneda de las cifras / the currency of the figures

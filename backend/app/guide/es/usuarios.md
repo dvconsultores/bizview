@@ -33,3 +33,9 @@ los administradores.
 - «No puedes modificar a este usuario.»: es un **Administrador** o el **Superusuario**; solo el
   **Superusuario** los cambia.
 - Tus propios datos se cambian desde tu perfil, no aquí.
+
+## Relacionados
+
+- Roles y permisos
+- Administración
+- Auditoría

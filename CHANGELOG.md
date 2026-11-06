@@ -8,6 +8,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The product writes the starter pack, so an author without a terminal can start (feature 057)**.
+  Authoring moved outside Bizview in 043/045, but the only way to obtain the folder it needs was
+  `bizview init workspace` on a machine with the CLI. **Proyectos → Nuevo proyecto → Descargar paquete
+  inicial** now builds `bizview-starter-<slug>.zip` on the server from one source,
+  `pack/bizview-starter-pack/`: the prompt, `REQUEST.md`, `project.yaml`, the spec, plan and tasks
+  skeletons, the integration and report skeletons, the schemas the validator reads, both
+  explanatory documents and — when a source is chosen — its structure pack, generated on the fly and
+  never carrying a credential or a row. The dialog collects the name, the optional source, the
+  language and the kind of the first spec; the result is measured against the two import allowances
+  before a byte is served. The same pack is `bizview init project "<name>" [--source <s>]`, what
+  `bizview init workspace` seeds, and the published
+  [`bizview-starter-template.zip`](bizview-starter-template.zip) built by `make starter-template` and
+  served at `GET /api/projects/starter-template`. The rendered project validates with zero errors;
+  what is left to write is marked `REEMPLAZA` / `REPLACE`. Every text ships in Spanish and English,
+  including `CONTENIDO.md`/`CONTENTS.md` (what each file is for) and
+  `QUE-HACE-BIZVIEW.md`/`WHAT-BIZVIEW-DOES.md` (what import and apply do).
+
 - **Importing a project again is a new revision of it, not a second project (feature 055)**. Every
   correction to a project arrived as another zip, and **Importar** treated a taken slug as a
   collision: it appended `-2`, created a different project, and the installation ended up with
@@ -74,7 +91,46 @@ All notable changes to this project are documented here. The format follows
   override, carried in the pack. Constitution VIII is amended (3.2.2 → 3.2.3) to name AI-assisted
   structure generation as the second read-only AI surface.
 
+- **Values on demand and full screen, per card (feature 056)**. Hovering or tapping a bar or a slice
+  shows a chip with the full name, the formatted value and its share, and dims the other marks
+  (`prefers-reduced-motion` keeps the colour and drops the scaling). `labels: true` on a
+  `bar`/`line`/`area`, or `labels: values|percent|both` on a `pie`/`donut`, prints the figure
+  permanently and hides the labels that do not fit; the key is in `report.schema.json`, the CLI
+  validator and `docs/AUTHORING.md`. Every data card offers **Ampliar**, opening it full screen at
+  `?ampliar=<component id>` with ← → between the dashboard's cards, a PNG of the view and Esc
+  closing back to the card that opened it.
+
+### Fixed
+
+- **A KPI fills the width its author gave it, and cards in a row share a height (feature 056)**. A
+  `layout.web` `kpi` component rendered through `KpiGrid`, whose `<ul>` kept its `grid-cols-2
+  lg:grid-cols-4` even for a single metric: a `span: 6` card drew a ~200 px card at the left of its
+  column and left the rest empty, so a dashboard looked broken and could not be fixed from YAML. The
+  component now renders one card, `w-full h-full`, with the anatomy the design system asks for:
+  icon and label, the value at a fluid size, then a delta row with its own top margin and a reserved
+  height — the "antes" line no longer collides with the badge on a two-line value. Every cell and
+  every card is `h-full`, a chart's drawing area is `flex-1`, and minimum heights (KPI 150 px,
+  chart 320 px) keep four cards in a row on one rhythm.
+- **A long category name is shortened, never cut (feature 056)**. `HorizontalBars` capped its label
+  column at `min(112, max(64, width * 0.28))` and drew the text right-aligned, so `BIOLOGICOS
+  PROVIACOL FORTE` appeared as `OLOGICOS PROVI…`: the reader lost the beginning, the part that
+  identifies it. The column is measured from the real font now (at most 220 px and 40 % of the
+  chart, at least 96 px), the text is shortened with a trailing ellipsis, `<title>` keeps the whole
+  name, and below 480 px the label moves above its bar so nothing is truncated at all.
+
 ### Changed
+
+- **Help, README and docs describe the product that exists (feature 057)**. The guide's *Agente y
+  Spec Kit* section is gone; **Crear con tu IA** holds the starter pack, the request, handing it to
+  any AI, validating, fixing problems, re-importing and a complete worked example, plus a topic that
+  is the same text shipped inside every zip. Every topic now ends with **Relacionados**.
+  *Primeros pasos* is the five-step path, and the topics that still described a chat now describe
+  import, apply and the optional CLI. `README.md`/`README.es.md` present the five steps with the
+  starter download as step three, list what exists after 047–055 and say plainly that no AI key is
+  needed in Bizview. `docs/VIBE-REPORTING.md` became `docs/REPORTS.md` (a stub keeps the old path),
+  `docs/AUTHORING.md` starts with the starter pack and names the nine checks, and `docs/IMPORT.md`
+  links the pack and tells the reader, in plain language, what import and apply do. Spanish mirrors
+  live in `docs/es/` for authoring, import and reports.
 
 - **Parámetros lives in the same sheet as Filtros (feature 053)**: the report page still opened a
   second, inline parameters card under the meta line — a large empty area, **EXPORTAR** with its

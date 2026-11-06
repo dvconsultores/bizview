@@ -45,3 +45,9 @@ Cualquier persona con acceso al tablero.
   cargar.
 - Una ficha con un filtro que ya no existe en el reporte: el panel de **Filtros** lo avisa y lo
   ignora.
+
+## Relacionados
+
+- Ver un reporte
+- Exportar a PDF o CSV
+- Actualización y modo TV

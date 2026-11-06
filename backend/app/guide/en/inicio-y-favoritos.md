@@ -22,3 +22,9 @@ To add a favorite, tap the star of a dashboard in the **Dashboards** list.
 
 - "You have no dashboards assigned yet. Contact your administrator.": an **Administrator** must
   give you access to a dashboard.
+
+## Related
+
+- Dashboards
+- Find your way around
+- View a report

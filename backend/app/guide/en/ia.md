@@ -76,3 +76,7 @@ If the problem is in the project and not in the provider (a missing `joins`, a m
 unknown view type), the **Problems** panel offers **Apply fix** on that warning, and the header
 button applies every fix at once. It works in any mode, even with the AI down: it does not call the
 provider, it edits the draft, validates again and leaves the change in the audit log.
+
+## Related
+
+- Privacy and AI

@@ -25,3 +25,9 @@ applying the workspace, **Apply project** and **Delete project**.
 ## Common problems
 
 - If the password is wrong, the action is not done; try again.
+
+## Related
+
+- Change your password
+- Security
+- Administration

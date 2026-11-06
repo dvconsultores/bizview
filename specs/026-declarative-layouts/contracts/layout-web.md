@@ -82,3 +82,22 @@ layout:
   `views[].summary`; tables keep their real header cells; `text` blocks render semantic headings.
 - **Small screens**: KPI items wrap two per row; `spacer` collapses to the `sm` step; charts keep a
   minimum height of 160 px.
+
+### Rendering notes added by feature 056
+
+- **Fill the span**: a `kpi` component renders one card that fills its cell (`w-full h-full`, no
+  inner grid). The 2/4-column grid belongs to the `kpis` view rendered without a layout, which is
+  the only case with no cell to fill.
+- **Equal heights**: every cell is `h-full` and every card stretches to it; a chart's drawing area
+  is `flex-1`. Minimum heights: `kpi` 150 px, chart kinds 320 px, `table`/`asset` none. Charts in one
+  row therefore share the row height.
+- **KPI anatomy**: icon and label, the value (fluid size, tabular, full value in `title`), then a
+  delta row with its own top margin and a reserved height, then the optional sparkline.
+- **Category labels**: the horizontal bar's column is measured from the real font — at most 220 px
+  and 40 % of the chart, at least 96 px — and a longer name is shortened with a trailing ellipsis.
+  The full name stays in `<title>`. Below 480 px of chart width the label is drawn above its bar.
+- **Values**: hovering or tapping a bar or a slice shows a chip with the full name, the formatted
+  value and its share, and dims the other marks. `labels` makes the figure permanent: `true` on
+  `bar`/`line`/`area`, `values`/`percent`/`both` on `pie`/`donut`.
+- **Full screen**: every data card offers **Ampliar**, which opens it at the viewport's size under
+  `?ampliar=<component id>`. TV mode ignores the parameter.

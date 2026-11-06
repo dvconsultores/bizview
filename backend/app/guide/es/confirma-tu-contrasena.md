@@ -25,3 +25,9 @@ el espacio de trabajo, **Aplicar proyecto** y **Eliminar proyecto**.
 ## Problemas frecuentes
 
 - Si la contraseña es incorrecta, la acción no se hace; vuelve a intentarlo.
+
+## Relacionados
+
+- Cambiar la contraseña
+- Seguridad
+- Administración

@@ -29,3 +29,9 @@ turned on. Anyone with the link can open it while it is valid.
 
 - "This link expired or was revoked": ask for a new link.
 - "Too many visits": the link got many visits in a row; try again in a few minutes.
+
+## Related
+
+- Dashboards
+- Send by email
+- Scheduled sends

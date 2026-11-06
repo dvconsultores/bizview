@@ -118,7 +118,63 @@ def init(path: Path, name: str, *, agent: str = "claude", git: bool = True,
     for d in folders:
         (path / d).mkdir(parents=True, exist_ok=True)
         (path / d / ".gitkeep").touch()
+    if layout != "legacy":
+        # Feature 057: what `bizview init workspace` writes is the starter pack, so the folder on
+        # disk, the server's download and the published template share one source.
+        _starter(path / "projects", name, lang="es", kind="integration", source=None)
     if git:
         _git(path)
     print(t("init.done" if layout == "legacy" else "init.done_v2", name=name, path=path))
+    return 0
+
+
+def _write_pack(target: Path, files: dict[str, str], *, manifest: bool) -> None:
+    for rel, text in files.items():
+        if rel == "bizview.yaml" and not manifest:
+            continue
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+
+def _starter(parent: Path, name: str, *, lang: str, kind: str, source: str | None) -> Path:
+    from bizview_cli import starter
+
+    files = starter.render(name=name, lang=lang, kind=kind, source=source)
+    target = parent / starter.plain_slug(name)
+    target.mkdir(parents=True, exist_ok=True)
+    _write_pack(target, files, manifest=False)
+    return target
+
+
+def init_project(name: str, *, source: str | None = None, lang: str = "es",
+                 kind: str = "integration", directory: str | None = None) -> int:
+    """`bizview init project <name>`: the starter pack as a project folder (feature 057).
+
+    Inside a workspace (a folder with `bizview.yaml`) it goes to `projects/<slug>/`; anywhere else
+    it goes to `./<slug>/` and carries its own `bizview.yaml`, so `bizview validate .` works from
+    inside it. `--source` only fills the source's name in the skeletons — the structure document of
+    a registered source is downloaded from the product, the only side that can read it."""
+    from bizview_cli import starter
+
+    name = name.strip()
+    if not name:
+        print(t("init.bad_name"), file=sys.stderr)
+        return 2
+    cwd = Path.cwd()
+    inside = (cwd / "bizview.yaml").is_file()
+    base = Path(directory).expanduser() if directory else (cwd / "projects" if inside else cwd)
+    target = base / starter.plain_slug(name)
+    if target.exists() and any(target.iterdir()):
+        print(t("init.not_empty", path=target), file=sys.stderr)
+        return 2
+    try:
+        files = starter.render(name=name, lang=lang, kind=kind, source=source)
+    except starter.PackError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    target.mkdir(parents=True, exist_ok=True)
+    _write_pack(target, files, manifest=not inside and directory is None)
+    print(t("init.project_done", name=name, path=target))
+    print(t("init.project_next", path=target))
     return 0

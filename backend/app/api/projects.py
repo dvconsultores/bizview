@@ -80,6 +80,51 @@ def save_import_limits(body: LimitsIn, actor: AppUser = Depends(require_superuse
     return project_budgets.store(db, body.model_dump(), actor)
 
 
+# --- feature 057: the starter pack ---------------------------------------------------------
+# Declared before `/{slug}`: two literal segments would otherwise be read as a project's slug.
+
+
+@router.get("/starter")
+def starter_pack(request: Request,
+                 name: str = Query(min_length=1, max_length=80),
+                 source: str | None = Query(default=None, max_length=80),
+                 lang: str = Query(default="es", pattern="^(es|en)$"),
+                 kind: str = Query(default="integration", pattern="^(integration|direct)$"),
+                 actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """One project's starter zip, built from the pack (feature 057).
+
+    `source` adds that source's structure document — structure only, never a credential or a row.
+    The rendered project is measured against both import allowances before it is served."""
+    from app.projects import starter
+    from app.projects import zip as project_zip
+    from app.services import audit
+
+    try:
+        result = starter.build(db, name=name, source=source, lang=lang, kind=kind)
+    except project_zip.ZipRejected as e:
+        raise ApiError(413, e.code, e.message) from e
+    audit.record(db, "starter_downloaded", actor_id=actor.id, ip=client_ip(request),
+                 detail={"name": name, "slug": layout.plain_slug(name), "source": source,
+                         "lang": lang, "kind": kind, "structure": result["structure"],
+                         "files": result["files"]})
+    headers = {"Content-Disposition": f'attachment; filename="{result["filename"]}"',
+               "Cache-Control": "no-store"}
+    if result["structure"]:
+        headers["X-Bizview-Structure"] = result["structure"]
+    return Response(result["data"], media_type="application/zip", headers=headers)
+
+
+@router.get("/starter-template")
+def starter_template(actor: AppUser = Depends(require_superuser)):
+    """The generic template with placeholders (feature 057): committed, or rendered if missing."""
+    from app.projects import starter
+
+    result = starter.template()
+    return Response(result["data"], media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"',
+                             "Cache-Control": "no-store"})
+
+
 @router.get("/{slug}")
 def get_project(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
     from app.projects import revisions

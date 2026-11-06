@@ -2,8 +2,8 @@
 
 ## What it is for
 
-It keeps every change of every project file: who made it (a person, the agent with its command,
-an import or an external change) and lets you go back.
+It keeps every change of every project file: who made it (a person, the editor, an import
+or an external change) and lets you go back.
 
 ## Who can use it
 
@@ -22,3 +22,9 @@ Only the **Superuser**.
 - A spec's **Timeline** shows its way through the stages and the commands that changed it.
 - **External change**: the file changed on disk outside BizView.
 - The project's applies also appear in the history.
+
+## Related
+
+- Project editor
+- Projects
+- Apply a project

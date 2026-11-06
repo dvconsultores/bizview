@@ -1,0 +1,140 @@
+# {{name}} — report. / Reporte.
+# `uses` maps an alias to <integration-id>.<dataset>; metrics and dimensions read the alias.
+# `uses` enlaza un alias con <id-integración>.<dataset>; métricas y dimensiones leen el alias.
+id: {{slug}}
+spec: specs/002-{{slug}}-reporte
+title: "{{name}}"
+description: "REEMPLAZA: qué responde este tablero. / REPLACE: what this dashboard answers."
+icon: chart           # any icon name of the app / cualquier icono de la app
+
+uses:
+  d: {{slug}}.{{dataset}}
+
+date: d.fecha
+
+metrics:              # sql (sum, count, avg, min, max, coalesce, round, date_trunc) or formula
+  total:
+    label: "Total / Total"
+    sql: "sum(d.monto_total)"
+    format: currency  # currency | integer | percent | decimal
+    better: higher    # higher | lower | none
+  comprobantes:
+    label: "Comprobantes / Vouchers"
+    sql: "count(distinct d.comprobante_id)"
+    format: integer
+  promedio:
+    label: "Promedio / Average"
+    formula: total / comprobantes    # a formula over metrics that have `sql` / sobre métricas con `sql`
+    format: currency
+
+dimensions:
+  estado:
+    label: "Estado / Status"
+    sql: d.estado
+  sucursal:
+    label: "Sucursal / Branch"
+    sql: d.sucursal
+
+periods:              # default and the ones the reader may pick / el período por defecto y los posibles
+  default: last_7_days
+  allowed: [today, yesterday, last_7_days, mtd, qtd, ytd]
+
+compare:
+  default: previous_period
+  allowed: [none, previous_period, previous_year]
+
+filters: [estado, sucursal]    # at least one filter or the report is not applied / al menos un filtro
+
+access:
+  roles: [admin, user]
+  grants: true
+
+views:                # kpis, trend, ranking, table, gauge, index, share, asset
+  - id: resumen
+    type: kpis
+    metrics: [total, comprobantes, promedio]
+  - id: diaria
+    type: trend
+    metric: total
+    grain: day
+  - id: por_estado
+    type: ranking          # a ranking uses SINGULAR dimension and metric / usa dimension y metric
+    dimension: estado
+    metric: total
+    limit: 10
+    title: "Por estado / By status"
+  - id: detalle
+    type: table
+    dimensions: [estado, sucursal]
+    metrics: [comprobantes, total]
+    limit: 100
+    title: "Detalle / Detail"
+
+pdf:
+  enabled: true
+
+layout:
+  web:
+    gutter: md
+    components:
+      - id: kpis_principales
+        type: kpi
+        view: resumen
+        metric: total
+        delta: previous_period
+        span: 12
+      - id: tendencia
+        type: line
+        view: diaria
+        x: day                 # the grain the trend view declares / el grano que declara la vista
+        series: [total]
+        span: 8
+      - id: por_estado_barra
+        type: bar              # a bar component uses x and series / usa x y series
+        view: por_estado
+        x: estado
+        series: [total]
+        orientation: horizontal
+        span: 4
+      - id: detalle_tabla
+        type: table
+        view: detalle
+        columns: [estado, sucursal, comprobantes, total]
+        totals: true
+        page_size: 25
+        sort: {by: total, dir: desc}
+        span: 12
+  pdf:
+    page:
+      size: a4
+      orientation: portrait
+      margins: {top: 12, right: 10, bottom: 12, left: 10}
+    overflow: continue
+    blocks:
+      - id: cabecera
+        type: header
+        title: true
+        period: true
+        logo: true
+      - id: fila_kpis
+        type: kpi_row
+        view: resumen
+        items: [total, comprobantes, promedio]
+        delta: true
+      - id: grafico
+        type: chart
+        view: diaria
+        kind: line
+        x: day
+        series: [total]
+        height_mm: 60
+      - id: tabla
+        type: table
+        view: detalle
+        columns: [estado, sucursal, comprobantes, total]
+        totals: true
+        overflow: truncate
+      - id: pie
+        type: footer
+        generated_at: true
+        page_numbers: true

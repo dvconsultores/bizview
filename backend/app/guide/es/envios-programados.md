@@ -23,3 +23,9 @@ Un **Administrador** o el **Superusuario**, cuando la instalación tiene el corr
 - Las horas son las de la zona horaria de la instalación.
 - Un envío que dice **Gestionado por el proyecto** … viene de una spec de distribución: se
   cambia en los archivos del proyecto; aquí solo puedes pausarlo o reanudarlo.
+
+## Relacionados
+
+- Enviar por correo
+- Compartir con un enlace
+- Distribuciones

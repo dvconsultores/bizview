@@ -1,0 +1,146 @@
+# {{name}} — direct report. / Reporte directo.
+# No integration: the tables are read in place. Choose this only when another process already
+# prepares them. / Sin integración: las tablas se leen en su sitio. Elige esto solo si otro proceso
+# ya las prepara.
+id: {{slug}}
+spec: specs/001-{{slug}}
+title: "{{name}}"
+description: "REEMPLAZA: qué responde este tablero. / REPLACE: what this dashboard answers."
+icon: chart
+
+direct:
+  source: {{source}}
+  tables:
+    v:
+      table: reporting.v_comprobantes_dia    # REEMPLAZA: esquema.objeto / schema.object
+      columns:                               # the columns this report may read / las columnas
+        comprobante_id: {type: text}
+        fecha: {type: date}
+        estado: {type: text}
+        sucursal: {type: text}
+        monto_total: {type: numeric}
+date: v.fecha
+materialize: none                      # none | daily / none | diaria
+
+metrics:
+  total:
+    label: "Total / Total"
+    sql: "sum(v.monto_total)"
+    format: currency
+    better: higher
+  comprobantes:
+    label: "Comprobantes / Vouchers"
+    sql: "count(distinct v.comprobante_id)"
+    format: integer
+
+dimensions:
+  estado:
+    label: "Estado / Status"
+    sql: v.estado
+  sucursal:
+    label: "Sucursal / Branch"
+    sql: v.sucursal
+
+periods:
+  default: last_7_days
+  allowed: [today, yesterday, last_7_days, mtd, qtd, ytd]
+
+compare:
+  default: previous_period
+  allowed: [none, previous_period, previous_year]
+
+filters: [estado, sucursal]
+
+access:
+  roles: [admin, user]
+  grants: true
+
+views:
+  - id: resumen
+    type: kpis
+    metrics: [total, comprobantes]
+  - id: diaria
+    type: trend
+    metric: total
+    grain: day
+  - id: por_estado
+    type: ranking
+    dimension: estado
+    metric: total
+    limit: 10
+    title: "Por estado / By status"
+  - id: detalle
+    type: table
+    dimensions: [estado, sucursal]
+    metrics: [comprobantes, total]
+    limit: 100
+    title: "Detalle / Detail"
+
+pdf:
+  enabled: true
+
+layout:
+  web:
+    gutter: md
+    components:
+      - id: kpis_principales
+        type: kpi
+        view: resumen
+        metric: total
+        delta: previous_period
+        span: 12
+      - id: tendencia
+        type: line
+        view: diaria
+        x: day
+        series: [total]
+        span: 8
+      - id: por_estado_barra
+        type: bar
+        view: por_estado
+        x: estado
+        series: [total]
+        orientation: horizontal
+        span: 4
+      - id: detalle_tabla
+        type: table
+        view: detalle
+        columns: [estado, sucursal, comprobantes, total]
+        totals: true
+        page_size: 25
+        sort: {by: total, dir: desc}
+        span: 12
+  pdf:
+    page:
+      size: a4
+      orientation: portrait
+      margins: {top: 12, right: 10, bottom: 12, left: 10}
+    overflow: continue
+    blocks:
+      - id: cabecera
+        type: header
+        title: true
+        period: true
+        logo: true
+      - id: fila_kpis
+        type: kpi_row
+        view: resumen
+        items: [total, comprobantes]
+        delta: true
+      - id: grafico
+        type: chart
+        view: diaria
+        kind: line
+        x: day
+        series: [total]
+        height_mm: 60
+      - id: tabla
+        type: table
+        view: detalle
+        columns: [estado, sucursal, comprobantes, total]
+        totals: true
+        overflow: truncate
+      - id: pie
+        type: footer
+        generated_at: true
+        page_numbers: true

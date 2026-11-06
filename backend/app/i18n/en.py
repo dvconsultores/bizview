@@ -534,6 +534,7 @@ MESSAGES: dict[str, str] = {
     "projects.assets_over_files": "The project is over the image limit: {files} files in {label} (maximum {max_files})",
     "projects.assets_over_bytes": "The project is over the image limit: {size_mb} MB in {label} (maximum {max_mb} MB)",
     "projects.assets_file_too_large": "{path} is over the per-image limit ({max_kb} KB)",
+    "projects.starter_name_required": "Type a project name: the name decides the identifier.",
     "projects.zip_disallowed": "The zip contains a file BizView does not import: {path}",
     "projects.creation_removed": "Projects are authored outside BizView and imported: Projects → Import project.",
     "projects.limits_changed": "Import limits updated.",

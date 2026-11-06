@@ -28,3 +28,9 @@ Cualquier persona con acceso al tablero.
 
 - **Sin conexión — reintentando**: se perdió la conexión; el tablero sigue intentando y se
   actualiza solo al volver.
+
+## Relacionados
+
+- Ver un reporte
+- Tableros
+- Filtros y períodos

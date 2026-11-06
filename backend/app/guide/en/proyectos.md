@@ -29,3 +29,10 @@ Only the **Superuser**.
 - The **Identifier** cannot change after the project is applied.
 - Type in **Search projects** to filter the list by name, identifier or description (case and
   accents are ignored); the counter says how many match.
+
+## Related
+
+- Import a project
+- Project editor
+- Apply a project
+- Project structure

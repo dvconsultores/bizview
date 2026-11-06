@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { ColorRole, MetricFormat } from "../../../api/types";
 import { formatValue } from "../../../lib/numbers";
+import { useReducedMotion } from "../../../lib/useReducedMotion";
 import { ChartCard } from "./ChartCard";
 import { fillClass, roleAt, surfaceClass } from "../layoutRoles";
 import { chartSummary, type ChartCategory, type ChartFrame } from "./series";
@@ -15,6 +17,8 @@ export interface PieChartProps {
   donut: boolean;
   format: MetricFormat;
   emptyText: string;
+  /** Feature 056: `true`/`values`/`percent`/`both` prints the figure on each slice. */
+  labels?: boolean | "values" | "percent" | "both";
 }
 
 interface Slice {
@@ -42,6 +46,27 @@ function arcPath(cx: number, cy: number, radius: number, inner: number, from: nu
   const [i1, j1] = point(cx, cy, inner, to);
   const [i0, j0] = point(cx, cy, inner, from);
   return `M${x0.toFixed(1)},${y0.toFixed(1)} A${radius.toFixed(1)},${radius.toFixed(1)} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} L${i1.toFixed(1)},${j1.toFixed(1)} A${inner.toFixed(1)},${inner.toFixed(1)} 0 ${large} 0 ${i0.toFixed(1)},${j0.toFixed(1)} Z`;
+}
+
+/** Feature 056: the figure printed on a slice, chosen by `labels`; nothing when it is off. */
+function SliceLabel({ labels, x, y, slice, total, format, currency }: {
+  labels?: boolean | "values" | "percent" | "both";
+  x: number;
+  y: number;
+  slice: Slice;
+  total: number;
+  format: MetricFormat;
+  currency: string;
+}) {
+  if (!labels) return null;
+  const percent = formatValue((slice.value / total) * 100, "percent");
+  const value = formatValue(slice.value, format, currency);
+  const text = labels === "percent" ? percent : labels === "both" ? `${value} · ${percent}` : value;
+  return (
+    <text x={x} y={y} textAnchor="middle" fontSize="10" className="fill-chart-label tabular-nums">
+      {text}
+    </text>
+  );
 }
 
 /** Top-N slices: the remainder is grouped under the localised label with its summed value. */
@@ -80,8 +105,11 @@ export function PieChart({
   donut,
   format,
   emptyText,
+  labels,
 }: PieChartProps) {
   const label = chartSummary(frame);
+  const reduced = useReducedMotion();
+  const [hover, setHover] = useState<string | null>(null);
   const slices = topSlices(categories, values, topN, otherLabel, roles);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
@@ -114,18 +142,38 @@ export function PieChart({
                 const from = angle;
                 const to = Math.max(angle + GAP_DEG, angle + sweep);
                 angle += sweep;
+                const dim = hover !== null && hover !== slice.key;
+                const mid = from + sweep / 2;
+                const [lx, ly] = point(SIZE / 2, SIZE / 2, radius * (inner > 0 ? 0.78 : 0.68), mid);
                 return (
-                  <path
-                    key={slice.key}
-                    d={arcPath(SIZE / 2, SIZE / 2, radius, inner, from, to)}
-                    className={fillClass(slice.role)}
-                  />
+                  <g key={slice.key}
+                     onPointerEnter={() => setHover(slice.key)}
+                     onPointerLeave={() => setHover((current) => (current === slice.key ? null : current))}
+                     onClick={() => setHover(slice.key)}>
+                    <title>{`${slice.label}: ${formatValue(slice.value, format, frame.currency)} · ${formatValue((slice.value / total) * 100, "percent")}`}</title>
+                    <path
+                      d={arcPath(SIZE / 2, SIZE / 2, radius, inner, from, to)}
+                      className={fillClass(slice.role)}
+                      opacity={dim ? 0.7 : 1}
+                      style={{
+                        transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
+                        transformBox: "fill-box",
+                        transformOrigin: "center",
+                        transform: hover === slice.key && !reduced ? "scale(1.03)" : undefined,
+                      }}
+                    />
+                    {sweep > 20 ? <SliceLabel labels={labels} x={lx} y={ly} slice={slice} total={total}
+                                              format={format} currency={frame.currency} /> : null}
+                  </g>
                 );
               })}
             </svg>
             <ul className="w-full min-w-0 space-y-1.5 text-sm">
               {slices.map((slice) => (
-                <li key={slice.key} className="flex items-center gap-2">
+                <li key={slice.key}
+                    className={`flex items-center gap-2 ${hover === slice.key ? "text-ink" : ""}`}
+                    onPointerEnter={() => setHover(slice.key)}
+                    onPointerLeave={() => setHover((current) => (current === slice.key ? null : current))}>
                   <span className={`${surfaceClass(slice.role)} h-2.5 w-2.5 shrink-0 rounded-sm`} aria-hidden />
                   <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-ink-2">{slice.label}</span>
                   <span className="shrink-0 tabular-nums text-ink-muted">

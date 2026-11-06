@@ -30,3 +30,10 @@ Only the **Superuser**.
 
 - A control in **Needs attention** explains what is missing; fix it in the installation. BizView
   offers no way to turn off password confirmation or required two-factor.
+
+## Related
+
+- Administration
+- Audit
+- Two-step verification
+- Telegram

@@ -32,3 +32,9 @@ Cualquier persona con acceso al tablero.
 ## Problemas frecuentes
 
 - «La fecha final no puede ser anterior a la inicial.»: corrige **Desde** y **Hasta**.
+
+## Relacionados
+
+- Parámetros y filtros del reporte
+- Ver un reporte
+- Exportar a PDF o CSV

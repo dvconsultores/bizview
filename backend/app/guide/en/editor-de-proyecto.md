@@ -2,8 +2,8 @@
 
 ## What it is for
 
-It is a project's workplace: its files, its validation problems and the agent's chat, like a code
-editor in the cloud.
+It is a project's workplace: its files and its validation problems, like a code editor in the
+cloud. What your AI writes enters through import.
 
 ## Who can use it
 
@@ -33,3 +33,9 @@ Only the **Superuser**.
 
 - If someone changed a file while you were editing it, the editor lets you reload, overwrite or
   discard your changes.
+
+## Related
+
+- Projects
+- Project history
+- Apply a project

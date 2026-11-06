@@ -25,6 +25,11 @@ artifacts = ["bizview_cli/workspace_template/**", "bizview_cli/schemas/*.json",
              "bizview_cli/golden/**", "bizview_cli/golden-supabase/**",
              "bizview_cli/golden-direct/**", "bizview_cli/golden-large/**"]
 
+# Feature 057: the starter pack has one source at the repository root and travels inside the wheel,
+# so an installed `bizview` renders the same bytes the server does.
+[tool.hatch.build.targets.wheel.force-include]
+"../pack/bizview-starter-pack" = "bizview_cli/starter_pack"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

@@ -25,3 +25,9 @@ Only the **Superuser**.
   exists.
 - For a new dashboard with data from an operational system, the usual order is source,
   integration, report and, if needed, distribution.
+
+## Related
+
+- Define an integration
+- Define a report
+- Distributions

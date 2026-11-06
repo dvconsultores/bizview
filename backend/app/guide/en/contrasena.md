@@ -33,3 +33,9 @@ the app until you change it.
 - Changing it signs out your other sessions on other devices; sign in there again with the new
   password.
 - "Passwords do not match.": type the same password in both fields.
+
+## Related
+
+- Sign in to BizView
+- Your profile
+- Two-step verification

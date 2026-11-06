@@ -1,0 +1,51 @@
+# {{name}} — integration. / Integración.
+# Every key below is commented: replace the values, keep the shape.
+# Cada clave está comentada: reemplaza los valores, conserva la forma.
+id: {{slug}}                    # = the folder name / = el nombre de la carpeta
+spec: specs/001-{{slug}}        # the spec that owns this file / la spec que lo posee
+source: {{source}}              # the source's name in Bizview / el nombre de la fuente en Bizview
+schedule: "0 * * * *"          # cron, in the installation's time zone
+timezone: UTC                   # the zone of the business dates / la zona de las fechas de negocio
+time_limit_minutes: 15          # a run is abandoned after this / una ejecución se abandona tras esto
+
+datasets:
+  {{dataset}}:
+    description: "REEMPLAZA: qué es una fila. / REPLACE: what one row is."
+    primary_key: [comprobante_id]   # unique per row / única por fila
+    date_column: fecha              # date or timestamptz / date o timestamptz
+    columns:
+      comprobante_id:
+        type: text
+        nullable: false
+        description: "Identificador del comprobante / voucher id"
+      fecha:
+        type: date
+        nullable: false
+        description: "Fecha contable / business date"
+      estado:
+        type: text
+        nullable: false
+        enum: [emitido, pagado, anulado]   # the values the column may hold / los valores posibles
+        description: "Estado del comprobante / voucher status"
+      sucursal:
+        type: text
+        description: "Sucursal que lo emitió / issuing branch"
+      monto_total:
+        type: numeric
+        nullable: false
+        description: "Monto total / total amount"
+
+    extract:
+      query: queries/example.sql          # one read-only SELECT per file / un SELECT de solo lectura
+      params: [window_start, window_end]  # the incremental window / la ventana incremental
+
+    incremental:
+      window_days: 7                      # how far back each run reads / cuántos días relee
+      full_rebuild_cron: "0 3 * * 0"      # a full reload every Sunday 03:00 / recarga completa
+      slice: month                        # month | day | none / corte de la recarga
+
+    checks:
+      - type: row_count                   # never empty by accident / nunca vacío por accidente
+        min: 0
+      - type: not_null
+        columns: [comprobante_id, fecha, estado, monto_total]

@@ -31,3 +31,9 @@ Only the **Superuser**.
 
 - **Source disabled**: the integration does not run until its source is **Enabled** again.
 - "No active integrations": apply a project or a workspace with integration specs.
+
+## Related
+
+- Data sources
+- ETL and transformations
+- Direct reports

@@ -16,11 +16,25 @@ sections:
     title: {es: "Datos e integraciones", en: "Data and integrations"}
   - id: proyectos
     title: {es: "Proyectos", en: "Projects"}
-  - id: agente
-    title: {es: "Agente y Spec Kit", en: "Agent and Spec Kit"}
+  - id: crear-con-ia
+    title: {es: "Crear con tu IA", en: "Create with your AI"}
   - id: instalacion
     title: {es: "Instalación", en: "Installation"}
 topics:
+  - id: primeros-pasos
+    section: primeros-pasos
+    title: {es: "Los cinco pasos", en: "The five steps"}
+    summary:
+      es: "El camino completo, de la fuente al tablero compartido, en cinco pasos."
+      en: "The whole path, from the source to the shared dashboard, in five steps."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["primeros pasos", "empezar", "camino", "cinco pasos", "flujo de trabajo"]
+      en: ["getting started", "start", "path", "five steps", "workflow"]
+    related: [paquete-inicial, pasarlo-a-tu-ia, importar-un-proyecto]
   - id: ingreso
     section: primeros-pasos
     title: {es: "Ingresar a BizView", en: "Sign in to BizView"}
@@ -681,8 +695,120 @@ topics:
       es: ["estructura", "carpetas", "project.yaml", "rutas permitidas"]
       en: ["structure", "folders", "project.yaml", "allowed paths"]
     related: [proyectos, editor-de-proyecto, tipos-de-spec]
+  - id: paquete-inicial
+    section: crear-con-ia
+    title: {es: "Descargar el paquete inicial", en: "Download the starter pack"}
+    summary:
+      es: "Qué trae el zip que se descarga desde Proyectos, cómo pedirlo y qué hacer con él."
+      en: "What the zip downloaded from Projects brings, how to ask for it and what to do with it."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["paquete inicial", "starter", "zip del proyecto", "plantilla general", "descargar paquete"]
+      en: ["starter pack", "zip", "project template", "general template", "download pack"]
+    related: [primeros-pasos, escribir-la-peticion, pasarlo-a-tu-ia]
+  - id: escribir-la-peticion
+    section: crear-con-ia
+    title: {es: "Escribir la petición", en: "Write the request"}
+    summary:
+      es: "Qué escribir en REQUEST.md para que tu IA acierte: la pregunta, el lector, las cifras y el estilo."
+      en: "What to write in REQUEST.md so your AI gets it right: the question, the reader, the figures and the style."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["peticion", "request.md", "encargo", "qué pedir", "alcance"]
+      en: ["request", "brief", "what to ask", "scope"]
+    related: [paquete-inicial, pasarlo-a-tu-ia, tipos-de-spec]
+  - id: pasarlo-a-tu-ia
+    section: crear-con-ia
+    title: {es: "Pasarlo a tu IA", en: "Hand it to your AI"}
+    summary:
+      es: "Cómo usar el paquete con ChatGPT, Claude, Gemini, DeepSeek, Copilot o a mano, y qué pedir de vuelta."
+      en: "How to use the pack with ChatGPT, Claude, Gemini, DeepSeek, Copilot or by hand, and what to ask back."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["chatgpt", "claude", "gemini", "deepseek", "copilot", "pegar prompt", "sin clave"]
+      en: ["chatgpt", "claude", "gemini", "deepseek", "copilot", "paste prompt", "no api key"]
+    related: [escribir-la-peticion, paquete-inicial, validar-antes-de-importar]
+  - id: validar-antes-de-importar
+    section: crear-con-ia
+    title: {es: "Validar antes de importar", en: "Validate before importing"}
+    summary:
+      es: "Cómo comprobar el proyecto con la CLI antes de subirlo, y qué revisa exactamente."
+      en: "How to check the project with the CLI before uploading it, and what exactly it checks."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["bizview validate", "cli", "validar", "write-lock", "dry run"]
+      en: ["bizview validate", "cli", "validate", "write lock", "dry run"]
+    related: [corregir-problemas, importar-un-proyecto, estructura-de-proyecto]
+  - id: corregir-problemas
+    section: crear-con-ia
+    title: {es: "Corregir los problemas", en: "Fix the problems"}
+    summary:
+      es: "Cómo leer un problema del validador, corregirlo y volver a comprobar sin empezar de nuevo."
+      en: "How to read a validator problem, fix it and check again without starting over."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["problemas", "errores", "no valida", "corregir", "revisar"]
+      en: ["problems", "errors", "does not validate", "fix", "recheck"]
+    related: [validar-antes-de-importar, editor-de-proyecto, aplicar-proyecto]
+  - id: importar-y-aplicar
+    section: crear-con-ia
+    title: {es: "Qué pasa al importar y aplicar", en: "What happens on import and apply"}
+    summary:
+      es: "El relato paso a paso de la importación y de la aplicación, para saber qué esperar."
+      en: "The step-by-step account of import and apply, so the author knows what to expect."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["importar", "aplicar", "qué pasa", "borrador", "worker", "versión"]
+      en: ["import", "apply", "what happens", "draft", "worker", "version"]
+    related: [importar-un-proyecto, aplicar-proyecto, reimportar-cambios]
+  - id: reimportar-cambios
+    section: crear-con-ia
+    title: {es: "Reimportar cambios", en: "Re-import changes"}
+    summary:
+      es: "Cómo traer una segunda versión del mismo proyecto sin duplicarlo."
+      en: "How to bring a second version of the same project without duplicating it."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["reimportar", "segunda version", "revision", "cambios", "actualizar proyecto"]
+      en: ["re-import", "second version", "revision", "changes", "update project"]
+    related: [reimportar-un-proyecto, historial-de-proyecto, corregir-problemas]
+  - id: ejemplo-completo
+    section: crear-con-ia
+    title: {es: "Ejemplo completo: ventas por marca", en: "A complete example: sales by brand"}
+    summary:
+      es: "El recorrido entero con un caso pequeño: fuente, estructura, paquete, tu IA, importar y compartir."
+      en: "The whole path with a small case: source, structure, pack, your AI, import and share."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["ejemplo", "ventas por marca", "recorrido completo", "paso a paso", "walkthrough"]
+      en: ["example", "sales by brand", "end to end", "step by step", "walkthrough"]
+    related: [primeros-pasos, importar-un-proyecto, importar-y-aplicar]
   - id: tipos-de-spec
-    section: agente
+    section: crear-con-ia
     title: {es: "Tipos de spec", en: "Spec kinds"}
     summary:
       es: "Qué produce una spec de fuente, integración, reporte o distribución, y cuándo conviene cada una."
@@ -696,7 +822,7 @@ topics:
       en: ["spec kind", "source", "integration", "report", "distribution"]
     related: [definir-una-integracion, definir-un-reporte, distribuciones]
   - id: definir-una-integracion
-    section: agente
+    section: crear-con-ia
     title: {es: "Definir una integración", en: "Define an integration"}
     summary:
       es: "Qué lleva integration.yaml: fuente, consultas, columnas, clave, carga incremental y chequeos."
@@ -710,7 +836,7 @@ topics:
       en: ["integration.yaml", "sql query", "primary_key", "incremental", "checks"]
     related: [tipos-de-spec, etl-y-transformaciones, recorrido-integracion-a-distribucion]
   - id: definir-un-reporte
-    section: agente
+    section: crear-con-ia
     title: {es: "Definir un reporte", en: "Define a report"}
     summary:
       es: "Qué lleva report.yaml: datos que usa, métricas, dimensiones, períodos, vistas, filtros, acceso, layout y PDF."
@@ -724,7 +850,7 @@ topics:
       en: ["report.yaml", "metrics", "dimensions", "views", "filters", "layout"]
     related: [tipos-de-spec, reportes-directos, recorrido-reporte-directo]
   - id: distribuciones
-    section: agente
+    section: crear-con-ia
     title: {es: "Distribuciones", en: "Distributions"}
     summary:
       es: "Envíos programados por rol y política de enlaces de un reporte, definidos en una spec."
@@ -738,7 +864,7 @@ topics:
       en: ["distribution", "project sends", "recipients by role", "link policy"]
     related: [tipos-de-spec, envios-programados, recorrido-integracion-a-distribucion]
   - id: recorrido-integracion-a-distribucion
-    section: agente
+    section: crear-con-ia
     title: {es: "De la fuente a la distribución", en: "From source to distribution"}
     summary:
       es: "El recorrido completo: fuente, integración, reporte y distribución, aplicar, dar acceso y compartir."
@@ -752,7 +878,7 @@ topics:
       en: ["full path", "end to end", "step by step", "new dashboard"]
     related: [definir-una-integracion, definir-un-reporte, distribuciones]
   - id: recorrido-reporte-directo
-    section: agente
+    section: crear-con-ia
     title: {es: "Un reporte directo paso a paso", en: "A direct report step by step"}
     summary:
       es: "Los pasos para un reporte directo sobre una tabla existente, de permitirlo a dar acceso."

@@ -20,3 +20,7 @@ Anyone with an account sees **Help** with the topics of their role.
 - The search matches titles, body text and keywords, in the interface's language.
 - If the installation has AI configured you can also ask in your own words, for example "how do I
   share a dashboard?"; without AI, the search and the topics work the same.
+
+## Related
+
+- Find your way around

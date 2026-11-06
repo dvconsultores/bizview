@@ -28,3 +28,9 @@ installation. By area:
   credentials cannot be read.
 - Server commands: `rotate-secret-key` (rotates the encryption key) and `reset-superuser-mfa`
   (resets the **Superuser**'s two-factor).
+
+## Related
+
+- Installation email
+- Security
+- Artificial intelligence

@@ -23,3 +23,9 @@ settings file, not on screens.
 
 - Without email set up, **Send by email** and **Scheduled sends** say email sending is not
   available; the rest of the app works the same.
+
+## Related
+
+- Installation and settings
+- Send by email
+- Scheduled sends

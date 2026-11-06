@@ -24,3 +24,9 @@ Only the **Superuser**.
 9. Give access to the dashboard in each user's **Dashboard access**
    ([Open Users](app:/admin/usuarios)).
 10. Share it with **Share** or **Send by email** if needed.
+
+## Related
+
+- Define an integration
+- Define a report
+- Distributions

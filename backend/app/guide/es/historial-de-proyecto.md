@@ -23,3 +23,9 @@ Solo el **Superusuario**.
   cambiaron.
 - **Cambio externo**: el archivo cambió en el disco fuera de BizView.
 - Las aplicaciones del proyecto también aparecen en el historial.
+
+## Relacionados
+
+- Editor de proyecto
+- Proyectos
+- Aplicar un proyecto

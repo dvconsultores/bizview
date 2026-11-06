@@ -64,24 +64,35 @@ Cloudflare, copias de seguridad y marca: [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Cómo funciona
 
-1. **Agrega una fuente** — **Fuentes de datos → Nueva**, con las credenciales y **Probar**.
-2. **Descríbela** — `bizview describe <fuente>` imprime tablas, columnas y tipos (estructura y
-   conteos, nunca filas).
-3. **Descarga el paquete de autoría** — `bizview init workspace --name miempresa` escribe los
-   presets, las reglas, los esquemas y un proyecto de ejemplo.
-4. **Escribe la petición** — `REQUEST.md`: qué responde el tablero, para quién, con qué filtros.
-5. **Constrúyelo con cualquier IA (o a mano)** — el `PROMPT.md` del paquete le dice al agente las
-   reglas; la salida es `specs/NNN-nombre/spec.md`, `integrations/<id>/integration.yaml|queries/*.sql`
-   y `reports/<id>/report.yaml`.
-6. **Valida** — `bizview validate .` corre el mismo validador que el servidor y escribe
-   `problems.json` con archivo, ruta JSON, mensaje y, cuando puede, el arreglo.
-7. **Importa** — **Proyectos → Importar** recibe el zip, mapea las carpetas, informa colisiones,
-   valida otra vez y muestra el árbol antes de aplicar nada.
-8. **Aplica y comparte** — **Aplicar** crea una versión; **Compartir** genera un enlace de solo
-   lectura, **Enviar por correo** programa el PDF.
+1. **Agrega una fuente** — **Fuentes de datos → Nueva**, con las credenciales, y **Probar**.
+2. **Descríbela** — **Estructura** genera la estructura de la fuente: tablas, columnas, tipos,
+   conteos y formas. Nunca filas, nunca una credencial.
+3. **Descarga el paquete inicial** — **Proyectos → Nuevo proyecto → Descargar paquete inicial**
+   escribe `bizview-starter-<identificador>.zip`: las reglas, `REQUEST.md`, los esqueletos de spec y
+   artefactos, los esquemas y, si eliges una, la estructura de la fuente. Desde la terminal:
+   `bizview init project "Ventas" --source "Origen ventas"`. Sin instalación, toma
+   [bizview-starter-template.zip](bizview-starter-template.zip).
+4. **Escribe la petición** — `REQUEST.md`: qué responde el tablero, para quién, con qué filtros y
+   período, en qué estilo.
+5. **Constrúyelo con cualquier IA (o a mano)** — pega `PROMPT.md` + `REQUEST.md` (+ `structure.md`)
+   en ChatGPT, Claude, Gemini, DeepSeek o Copilot, o abre la carpeta con una herramienta de código, y
+   pide el proyecto. La respuesta es un zip con `specs/NNN-nombre/`, `integrations/<id>/` y
+   `reports/<id>/` en su raíz.
+6. **Importa** — **Proyectos → Importar proyecto** lee el zip, mapea las carpetas, lista lo que
+   ignora, mide los dos presupuestos y valida con el mismo validador que la CLI. El proyecto queda
+   como borrador: nada corre todavía.
+7. **Aplica y comparte** — **Aplicar** compone una versión nueva de la instalación y registra las
+   programaciones; **Compartir** genera un enlace de solo lectura y **Enviar por correo** programa el
+   PDF.
 
 El contrato, cada archivo y un ejemplo completo resuelto: [docs/AUTHORING.md](docs/AUTHORING.md). El
-camino de importación: [docs/IMPORT.md](docs/IMPORT.md).
+camino de importación y qué pasa al aplicar: [docs/IMPORT.md](docs/IMPORT.md).
+
+**Crea con tu propia IA:** el paquete trae `PROMPT.md` (las reglas y las nueve comprobaciones),
+`REQUEST.md` (tu encargo), los esquemas JSON que usa el validador, `CONTENIDO.md`/`CONTENTS.md` (qué es
+cada archivo) y `QUE-HACE-BIZVIEW.md`/`WHAT-BIZVIEW-DOES.md` (qué hacen importar y aplicar). Bizview
+no necesita ninguna clave de IA: tu IA trabaja fuera y Bizview valida, ejecuta y comparte el
+resultado.
 
 ## Qué hace
 
@@ -91,10 +102,15 @@ camino de importación: [docs/IMPORT.md](docs/IMPORT.md).
 | Reportes con métricas, dimensiones, vistas, filtros y períodos; reportes directos sobre una tabla existente | [005](specs/005-vibe-reporting/spec.md), [019](specs/019-direct-source-reports/spec.md) |
 | Diseños declarativos para tableros y PDF, dibujados por la app en pantalla y por ReportLab en el servidor | [026](specs/026-declarative-layouts/spec.md) |
 | Proyectos BI: una carpeta por proyecto con specs numeradas, historial y editor en el navegador; exportación en zip | [020](specs/020-bi-projects/spec.md) |
-| Importación y exportación como puerta de entrada: subir → mapear → colisiones → validar → vista previa → aplicar | [020](specs/020-bi-projects/spec.md), [046](specs/046-release-docs-governance/spec.md) |
-| El paquete de autoría: presets, reglas, esquemas, `PROMPT.md`, `REQUEST.md` y un ejemplo de oro | [043](specs/043-bizview-refactor-external-authoring/spec.md) |
-| Paquetes de estructura: la estructura y los conteos de una fuente como documento que una IA externa puede leer | [043](specs/043-bizview-refactor-external-authoring/spec.md) |
+| Importación como puerta de entrada: subir → mapear → presupuestos → validar → vista previa → borrador, y reimportar como revisión con su propio historial | [046](specs/046-release-docs-governance/spec.md), [055](specs/055-project-reimport/spec.md) |
+| El paquete inicial: un zip descargable con el prompt, la petición, los esquemas y los esqueletos, servido por la app y publicado como plantilla | [043](specs/043-bizview-refactor-external-authoring/spec.md), [057](specs/057-docs-help-starter-zip/spec.md) |
+| Paquetes de estructura: la estructura y los conteos de una fuente como documento que una IA externa lee en lugar de conectarse | [048](specs/048-bi-ready-sources/spec.md), [052](specs/052-source-structure-chat/spec.md) |
 | Componentes visuales: bloques gauge, index, share y asset, imágenes del proyecto y caché de imágenes por URL | [044](specs/044-visual-components-and-assets/spec.md) |
+| Dos presupuestos de importación (artefactos e imágenes) que la instalación puede subir, medidos antes de escribir nada | [049](specs/049-import-limits-assets/spec.md) |
+| Un sistema de diseño compartido por pantallas, PDF y correos | [050](specs/050-ui-design-system/spec.md) |
+| Temas como datos: una biblioteca de tokens que un autor puede traer dentro de un proyecto y aplicar a un reporte | [047](specs/047-themes-as-data/spec.md), [051](specs/051-theme-application/spec.md) |
+| Parámetros y filtros como una sola hoja en la página del reporte | [053](specs/053-parameters-sheet/spec.md) |
+| Ingreso con Google, con reglas de dominio y asignación de rol | [054](specs/054-google-signin-rbac/spec.md) |
 | Compartir: enlaces de solo lectura que expiran, envío por correo, envíos programados | [018](specs/018-dashboard-sharing/spec.md) |
 | Español e inglés, modo oscuro, exportación a PDF y CSV | [022](specs/022-i18n-en-es/spec.md), [006](specs/006-dark-mode/spec.md) |
 | Administración: usuarios, roles, acceso, auditoría, perfil `internet`, ingreso con Google o Telegram | [002](specs/002-auth-admin-home/spec.md), [004](specs/004-data-sources-security/spec.md), [027](specs/027-google-sign-in/spec.md), [007](specs/007-telegram-sign-in/spec.md) |

@@ -9,8 +9,9 @@ from app import guide
 
 HEADINGS = {
     "es": ["Para qué sirve", "Quién puede usarlo", "Cómo se hace", "Opciones",
-           "Problemas frecuentes"],
-    "en": ["What it is for", "Who can use it", "How to", "Options", "Common problems"],
+           "Problemas frecuentes", "Relacionados"],
+    "en": ["What it is for", "Who can use it", "How to", "Options", "Common problems",
+           "Related"],
 }
 ENV_ASSIGNMENT = re.compile(r"\b[A-Z][A-Z_]{3,}=")
 SECRET_LITERAL = re.compile(r"(password|token|api_key|secret)\s*=\s*\S", re.I)
@@ -32,7 +33,7 @@ def test_index_loads_with_valid_ids_sections_and_related(loaded):
     # 045 removed the nine topics of the in-app assistant (2026-10-31); 047 added `temas`;
     # 049 added `importar-un-proyecto`; 052 added the three structure topics; 053 added
     # `parametros-y-filtros-del-reporte`; 054 added `ingreso-con-google`.
-    assert len(ids) == len(set(ids)) == 55
+    assert len(ids) == len(set(ids)) == 64
     sections = {section.id for section in loaded.sections}
     for topic in loaded.topics:
         assert guide.TOPIC_ID.match(topic.id), topic.id

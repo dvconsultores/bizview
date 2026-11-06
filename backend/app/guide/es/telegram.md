@@ -29,3 +29,9 @@ Para quitarlo, pulsa **Desvincular** en la misma tarjeta.
 - Telegram no es un segundo factor: si tu cuenta usa verificación en dos pasos, ingresa con
   correo, contraseña y código.
 - «Telegram no está disponible; ingresa con tu correo.»: el bot no responde; usa tu correo.
+
+## Relacionados
+
+- Ingresar a BizView
+- Tu perfil
+- Seguridad

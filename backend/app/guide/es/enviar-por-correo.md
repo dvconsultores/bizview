@@ -31,3 +31,9 @@ Cualquier persona con acceso al tablero, cuando la instalación tiene el correo 
 
 - «El envío por correo no está disponible en esta instalación.»: el **Superusuario** debe
   configurar el correo.
+
+## Relacionados
+
+- Compartir con un enlace
+- Exportar a PDF o CSV
+- Envíos programados

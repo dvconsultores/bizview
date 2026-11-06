@@ -28,3 +28,9 @@ Anyone with access to the dashboard.
 
 - **No connection — retrying**: the connection was lost; the dashboard keeps trying and updates
   by itself when it is back.
+
+## Related
+
+- View a report
+- Dashboards
+- Filters and periods

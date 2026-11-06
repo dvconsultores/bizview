@@ -23,3 +23,9 @@ Para marcar un favorito, toca la estrella de un tablero en la lista de **Tablero
 
 - «Aún no tienes tableros asignados. Contacta a tu administrador.»: un **Administrador** debe
   darte acceso a algún tablero.
+
+## Relacionados
+
+- Tableros
+- Moverse por la aplicación
+- Ver un reporte

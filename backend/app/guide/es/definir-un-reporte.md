@@ -111,7 +111,11 @@ Campos por tipo:
   `series1` a `series8`; los resuelven el tema y la marca de la instalación.
 - Las tipografías van por nombre (`sans`, `sans_bold`, `serif`, `mono`); `font_name` solo en un
   componente o bloque de texto.
-- Los textos con versión en inglés son `text_en`, `other_label_en` y `legal_en`.
 - Un layout no lleva direcciones ni rutas: el logo usa el rol `logo_role`.
 - `bizview validate` comprueba el layout con el mismo esquema del servidor.
-- Ejemplo completo: `reports/facturas-dia/report.yaml`.
+
+## Relacionados
+
+- Tipos de spec
+- Reportes directos
+- Un reporte directo paso a paso

@@ -35,3 +35,9 @@ Solo el **Superusuario**.
 - «Dirección no permitida (local, interna o de metadatos)»: BizView no se conecta a direcciones
   internas del propio servidor.
 - Con el perfil internet solo se permiten conexiones cifradas (HTTPS/TLS).
+
+## Relacionados
+
+- Fuente Supabase
+- Integraciones
+- Reportes directos

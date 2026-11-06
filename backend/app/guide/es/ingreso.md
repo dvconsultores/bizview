@@ -36,3 +36,10 @@ Cualquier persona con una cuenta. Las cuentas las crea un **Administrador** o el
 - «¿Olvidaste tu contraseña? Pide a tu administrador que la restablezca.»: BizView no envía
   correos de recuperación; un **Administrador** restablece la contraseña.
 - «Tu sesión terminó. Ingresa de nuevo.»: la sesión vence tras 7 días sin uso o a los 30 días.
+
+## Relacionados
+
+- Cambiar la contraseña
+- Verificación en dos pasos
+- Telegram
+- Ingreso con Google

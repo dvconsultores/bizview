@@ -27,3 +27,9 @@ la ficha de tu usuario.
 - Si una pantalla dice **No autorizado**, tu rol no la incluye.
 - Un **Administrador** no puede cambiar a otros administradores; eso lo hace el
   **Superusuario**.
+
+## Relacionados
+
+- Administración
+- Usuarios
+- Tableros

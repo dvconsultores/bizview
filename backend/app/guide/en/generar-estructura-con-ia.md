@@ -38,3 +38,9 @@ Only the **Superuser**, and it needs an AI provider configured in Administration
 - "The model's answer did not form a valid pack": try again; the scan is still available and the
   previous pack was not lost.
 - A SOAP source does not generate: its structure is the WSDL operation, there are no fields to infer.
+
+## Related
+
+- A source's structure
+- Artificial intelligence
+- Sample requests

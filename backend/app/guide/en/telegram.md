@@ -29,3 +29,9 @@ To remove it, press **Unlink** in the same card.
 - Telegram is not a second factor: if your account uses two-step verification, sign in with
   email, password and code.
 - "Telegram is unavailable; sign in with your email.": the bot does not answer; use your email.
+
+## Related
+
+- Sign in to BizView
+- Your profile
+- Security

@@ -26,3 +26,9 @@ your user page.
 
 - If a screen says **Unauthorized**, your role does not include it.
 - An **Administrator** cannot change other administrators; the **Superuser** does that.
+
+## Related
+
+- Administration
+- Users
+- Dashboards

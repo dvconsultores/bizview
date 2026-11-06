@@ -39,3 +39,9 @@ Only the **Superuser**.
 - "The source responded with HTTP…" or a network error: check the connection in the **Connection**
   tab and press **Test connection**.
 - A table you expected is missing: the credential may not have read permission on it.
+
+## Related
+
+- Data sources
+- Generate structure with AI
+- Sample requests

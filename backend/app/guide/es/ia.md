@@ -80,3 +80,7 @@ Si el problema es del proyecto y no del proveedor (falta un `joins`, falta `date
 desconocido), el panel **Problemas** ofrece **Aplicar arreglo** en ese aviso, y en la cabecera el
 botón para aplicar todos los arreglos de una vez. Funciona en cualquier modo, incluso con la IA
 caída: no llama al proveedor, edita el borrador, vuelve a validar y deja el cambio en la auditoría.
+
+## Relacionados
+
+- Privacidad e IA

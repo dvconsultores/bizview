@@ -25,3 +25,9 @@ Solo el **Superusuario**.
 9. Da acceso al tablero en **Acceso a tableros** de cada usuario
    ([Abrir Usuarios](app:/admin/usuarios)).
 10. Compártelo con **Compartir** o **Enviar por correo** si hace falta.
+
+## Relacionados
+
+- Definir una integración
+- Definir un reporte
+- Distribuciones

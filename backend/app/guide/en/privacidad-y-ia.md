@@ -24,3 +24,7 @@ everything else works the same.
 
 - If you see neither **AI summary** nor the assistant, AI is not configured in this
   installation.
+
+## Related
+
+- Artificial intelligence

@@ -24,3 +24,9 @@ Cualquier persona con una cuenta. Cada uno ve solo los tableros que le asignaron
 
 - **No autorizado**: el tablero existe pero no tienes acceso; pídelo a tu administrador.
 - **Tablero no encontrado**: el enlace es incorrecto o el tablero ya no existe.
+
+## Relacionados
+
+- Inicio y favoritos
+- Ver un reporte
+- Compartir con un enlace

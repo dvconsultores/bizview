@@ -42,7 +42,9 @@ change; the drift tests fail until you do.
   2. "Quién puede usarlo" / "Who can use it";
   3. "Cómo se hace" / "How to";
   4. optional "Opciones" / "Options";
-  5. optional "Problemas frecuentes" / "Common problems".
+  5. optional "Problemas frecuentes" / "Common problems";
+  6. "Relacionados" / "Related" last, naming the topics above (feature 057: every topic closes with
+     it, and a topic that documents a screen also carries its `app:` link).
 
   The es and en bodies have the same sections in the same order.
 - ≤ 6,000 characters.

@@ -39,3 +39,9 @@ Solo el **Superusuario**.
 - «La fuente respondió HTTP…» o un error de red: revisa la conexión en la pestaña **Conexión** y
   pulsa **Probar conexión**.
 - Una tabla que esperabas no aparece: la credencial quizá no tiene permiso de lectura sobre ella.
+
+## Relacionados
+
+- Fuentes de datos
+- Generar estructura con IA
+- Peticiones de muestra

@@ -16,3 +16,10 @@ An **Administrator** sees **Users**. The **Superuser** also sees the other cards
    **Security**, **Audit**, **Projects** or **Artificial intelligence**.
 
 The counters of failing sources and integrations are on the home page.
+
+## Related
+
+- Users
+- Security
+- Audit
+- Artificial intelligence

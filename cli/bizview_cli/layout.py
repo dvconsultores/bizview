@@ -1,6 +1,7 @@
 """Project layout of feature 020 (shared by the CLI validator, the zip importer and the backend)."""
 
 import re
+import unicodedata
 
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,49}$")
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
@@ -35,6 +36,18 @@ PROJECT_PATTERNS: tuple[re.Pattern[str], ...] = (
 def is_allowed(path: str) -> bool:
     """Return True when *path* exactly matches one of the allowed project files."""
     return any(pattern.fullmatch(path) for pattern in PROJECT_PATTERNS)
+
+
+def plain_slug(name: str) -> str:
+    """The slug a project name derives to. One implementation: the CLI, the server and the starter
+    pack all answer the same, so a name decides one identity and not two (features 055, 057)."""
+    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    base = s if s and s[0].isalpha() else ("p-" + s if s else "proyecto")
+    base = base[:50].rstrip("-")
+    if not ID_RE.match(base):
+        base = "proyecto"
+    return base
 
 
 # Feature 049: every allowed file is charged to one of two allowances. `assets/**` is binary and

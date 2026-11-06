@@ -30,3 +30,9 @@ Cualquier persona con una cuenta. Cada uno ve solo las secciones de su rol.
   **Administrador**.
 - **Página no encontrada**: la dirección no existe o fue movida. Vuelve al
   [Abrir Inicio](app:/).
+
+## Relacionados
+
+- Inicio y favoritos
+- Tu perfil
+- Obtener ayuda

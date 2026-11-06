@@ -32,3 +32,10 @@ administradores y el **Superusuario**.
 
 - «El código no es válido. Revisa la hora de tu teléfono e inténtalo de nuevo.»: los códigos
   dependen de la hora; ajusta la hora automática del teléfono.
+
+## Relacionados
+
+- Ingresar a BizView
+- Cambiar la contraseña
+- Tu perfil
+- Seguridad

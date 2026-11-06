@@ -2,8 +2,8 @@
 
 ## Para qué sirve
 
-Es el lugar de trabajo de un proyecto: sus archivos, sus problemas de validación y el chat del
-agente, como un editor de código en la nube.
+Es el lugar de trabajo de un proyecto: sus archivos y sus problemas de validación, como un editor
+de código en la nube. Lo que escribe tu IA entra por la importación.
 
 ## Quién puede usarlo
 
@@ -33,3 +33,9 @@ Solo el **Superusuario**.
 
 - Si alguien cambió un archivo mientras lo editabas, el editor te deja recargar, sobrescribir o
   descartar tus cambios.
+
+## Relacionados
+
+- Proyectos
+- Historial del proyecto
+- Aplicar un proyecto

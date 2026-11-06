@@ -26,3 +26,9 @@ Solo el **Superusuario**.
   ya existe.
 - Para un tablero nuevo con datos de un sistema operativo, el orden habitual es fuente,
   integración, reporte y, si hace falta, distribución.
+
+## Relacionados
+
+- Definir una integración
+- Definir un reporte
+- Distribuciones

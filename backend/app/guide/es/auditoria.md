@@ -20,3 +20,9 @@ Solo el **Superusuario**.
 - Los eventos se conservan 12 meses.
 - Las acciones sensibles (confirmaciones de contraseña, cambios de seguridad, aplicaciones de
   proyectos) siempre quedan registradas.
+
+## Relacionados
+
+- Usuarios
+- Seguridad
+- Administración

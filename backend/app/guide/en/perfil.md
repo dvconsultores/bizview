@@ -19,3 +19,10 @@ Anyone with an account.
 6. **Appearance** and **Language** change the app's theme and language.
 
 To leave, open the **Account menu** and choose **Sign out**.
+
+## Related
+
+- Change your password
+- Two-step verification
+- Telegram
+- Appearance and language

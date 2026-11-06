@@ -27,3 +27,9 @@ Only the **Superuser** writes it; sends reach the users of the chosen roles.
 - On the dashboard screen, a project send shows as **Managed by project** …: there it can only be
   paused or resumed.
 - Sends made by hand in **Scheduled sends** do not depend on any project.
+
+## Related
+
+- Spec kinds
+- Scheduled sends
+- From source to distribution

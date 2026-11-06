@@ -42,3 +42,10 @@ numbers.
   the limits in force.
 - `bizview validate` and `bizview import --dry-run project.zip` print the same numbers from your
   machine, without uploading anything.
+
+## Related
+
+- Projects
+- Projects in VS Code and Git
+- Apply a project
+- Project structure

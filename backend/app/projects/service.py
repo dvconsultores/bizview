@@ -3,7 +3,6 @@
 import json
 import re
 import shutil
-import unicodedata
 from datetime import UTC, date, datetime, timedelta
 from importlib import resources
 
@@ -24,14 +23,9 @@ def plain_slug(name: str) -> str:
     """The slug a name derives to, before asking whether the installation already has it.
 
     Feature 055: an import recognises its own project by the slug it derives to, so the derivation
-    must not quietly answer `ventas-marca-2` — that is what made every re-import a new project."""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    base = s if s and s[0].isalpha() else ("p-" + s if s else "proyecto")
-    base = base[:50].rstrip("-")
-    if not layout.ID_RE.match(base):
-        base = "proyecto"
-    return base
+    must not quietly answer `ventas-marca-2` — that is what made every re-import a new project.
+    Feature 057: the CLI's starter pack derives it the same way, from the one implementation."""
+    return layout.plain_slug(name)
 
 
 def suggest_slug(db: Session, name: str) -> str:

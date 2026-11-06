@@ -6,18 +6,51 @@ the request, the schemas, the rules, the validation step, and one complete examp
 You can follow it by hand, or hand the pack to any AI — the pack's `PROMPT.md` says the same rules
 in the form an agent needs.
 
-## 1. The eight steps
+## 0. The starter pack
 
-| # | Step | Command or screen |
+You do not have to write the folder from nothing. **Proyectos → Nuevo proyecto → Descargar paquete
+inicial** builds `bizview-starter-<slug>.zip` on the server, and that zip is the folder described in
+§2 with the name you typed, the language you picked and, when you choose one, the source's structure.
+
+```text
+PROMPT.md            the rules for your AI, self-contained: works pasted into a chat
+REQUEST.md           the brief you fill in
+project.yaml         name, slug, created
+specs/001-<slug>/    the integration's spec, plan and tasks (kind: integration)
+specs/002-<slug>-reporte/   the report's own spec (kind: report)
+integrations/<id>/   integration.yaml + queries/example.sql (omitted for a direct report)
+reports/<id>/        report.yaml
+sources/<name>/      structure.md + structure.json, when a source was chosen
+.bizview/            schemas/*.json and preset.yaml — what the validator checks
+CONTENIDO.md / CONTENTS.md            what every file is for, in Spanish and English
+QUE-HACE-BIZVIEW.md / WHAT-BIZVIEW-DOES.md   what import and apply do, in both languages
+CLAUDE.md, AGENTS.md                 PROMPT.md's text for tools that read a folder
+```
+
+The rendered project validates with zero errors: what is left to write is marked `REEMPLAZA` /
+`REPLACE`. `make starter-template` publishes the same pack with placeholders as
+[bizview-starter-template.zip](../bizview-starter-template.zip), and
+`bizview init project "<name>" [--source <s>]` writes it from a terminal. One source, three outputs.
+
+### Paste it into a chat
+
+`PROMPT.md` is written to survive a copy-paste: paste it, paste the filled `REQUEST.md`, paste
+`sources/<name>/structure.md` when you have one, and ask for the project. The answer must be **one zip
+with the project files at the root**. With a coding tool, open the folder instead: `CLAUDE.md` and
+`AGENTS.md` carry the same rules.
+
+## 1. The five steps
+
+| # | Step | Screen or command |
 |---|---|---|
 | 1 | Add the source | **Fuentes de datos → Nueva**, then **Probar** |
-| 2 | Describe it | `bizview describe <source>` or **Fuentes de datos → Estructura → Descargar** |
-| 3 | Create the workspace | `bizview init workspace --name mycompany` |
-| 4 | Write the request | edit `REQUEST.md` |
-| 5 | Build the project | `bizview project new "<name>"`, then write the files |
-| 6 | Validate | `bizview validate --write-lock` |
-| 7 | Import | **Proyectos → Importar** (zip) |
-| 8 | Apply and share | **Aplicar**, then **Compartir** / **Enviar por correo** |
+| 2 | Generate its structure | **Estructura → Generar estructura**, or `bizview describe "<source>" --pack --out .` |
+| 3 | Download the starter pack | **Proyectos → Nuevo proyecto → Descargar paquete inicial**, or `bizview init project "<name>"` |
+| 4 | Fill `REQUEST.md` and hand it to your AI | any chat or coding tool |
+| 5 | Import the zip and apply | **Proyectos → Importar proyecto**, then **Aplicar** |
+
+`bizview validate` is optional and never skipped by the product: the import runs the same validator
+before it writes the draft.
 
 `bizview describe` prints structure only — table names, column names, types, row counts. It never
 returns rows, and no credential ever appears in its output.
@@ -151,6 +184,10 @@ views:
 - A metric may be `sql` or a `formula` over other metrics.
 - `views` are what the reader sees: `kpis`, `trend`, `ranking`, `table`, `gauge`, `index`, `share`,
   `asset`.
+- `labels` prints the numbers permanently: `true` on a `bar`, `line` or `area` puts the value at the
+  end of each mark (hidden when it does not fit); `values`, `percent` or `both` on a `pie`/`donut`
+  chooses what each slice prints. Without it, values appear on hover or tap in a chip with the name,
+  the value and the share.
 - A report over an existing table without ETL declares `direct:` instead of `uses:` (see
   [VIBE-REPORTING.md](./VIBE-REPORTING.md) for the direct-source contract). When the source is
   **BI-ready** (the super user declared what it exposes) a table needs no column list: write
@@ -216,7 +253,8 @@ bizview validate --write-lock
 ```
 
 The same validator the server runs, over the same JSON Schemas in `cli/bizview_cli/schemas/` — that
-is why a project that validates here applies there. It checks:
+is why a project that validates here applies there. These are the nine checks the pack's `PROMPT.md`
+names, in the same order:
 
 - the YAML against its schema, and the folders against the layout;
 - that every artifact has an approved spec in its own project;
@@ -228,7 +266,9 @@ is why a project that validates here applies there. It checks:
 - that no dataset carries a column flagged as personal data without the integration's spec listing
   it under `**Datos personales**:` (the same gate the server applies before applying a project);
 - that every report declares at least one filter — a **warning** here, because a report already
-  running keeps validating, but the server will not apply a project whose report offers none.
+  running keeps validating, but the server will not apply a project whose report offers none;
+- that the two import allowances hold: artifacts (400 files, 2 MB each, 20 MB) and images (2 000
+  files, 300 KB each, 25 MB), counted apart so a logo set never spends what the specs need.
 
 `--write-lock` writes `bizview.lock` with a hash per file, so an apply can prove nothing changed
 after validation. A failure is written to `problems.json`:

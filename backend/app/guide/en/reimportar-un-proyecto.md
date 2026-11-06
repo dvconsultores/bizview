@@ -50,3 +50,9 @@ merged. Revision 1 is compared with the zip; revision 2 with revision 1, and so 
   see them. Nothing of the draft reaches the dashboards until it is applied.
 - An image does not come back on a revert: images are stored by hash, not by content, so one
   that left the folder cannot be recovered; BizView says so when it reverts.
+
+## Related
+
+- Import a project
+- Apply a project
+- Project editor

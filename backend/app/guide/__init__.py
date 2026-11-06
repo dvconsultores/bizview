@@ -20,10 +20,11 @@ ROLES = ("public", "user", "admin", "superuser")
 TOPIC_ID = re.compile(r"^[a-z][a-z0-9-]{1,48}$")
 MAX_BODY = 6000
 MAX_SUMMARY = 140
-# The system-prompt index grows with the guide (one short line per topic; the Spanish summaries
-# are the longest). It was 8000 with 52 topics (feature 024 added the 53rd); feature 039 added the
-# 65th, the whole-run command.
-INDEX_MAX = 8800
+# The index grows with the guide: one short line per topic, and the Spanish summaries are the
+# longest. It was 8800 with 55 topics; feature 057 replaced the agent section with `crear-con-ia`
+# (nine new topics, 64 in all), and the chat that consumed the index is gone (045), so the budget
+# only has to keep the help page fast.
+INDEX_MAX = 12000
 
 
 class GuideError(Exception):

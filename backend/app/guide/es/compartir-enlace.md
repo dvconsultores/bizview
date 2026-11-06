@@ -31,3 +31,9 @@ compartidos activos. Cualquiera con el enlace puede abrirlo mientras esté vigen
 - «Este enlace expiró o fue revocado»: pide un enlace nuevo.
 - «Demasiadas visitas»: el enlace recibió muchas visitas seguidas; vuelve a intentarlo en unos
   minutos.
+
+## Relacionados
+
+- Tableros
+- Enviar por correo
+- Envíos programados

@@ -23,6 +23,9 @@ vi.mock("../../src/api/projects", () => ({
     listing: vi.fn(async () => ({ projects: [], folder_writable: true })),
     limits: vi.fn(async () => LIMITS),
     saveLimits: vi.fn(async () => LIMITS),
+    // 057: the panel builds its download from these; the test never removes them.
+    starterUrl: (params: { name: string }) => `/api/projects/starter?name=${params.name}`,
+    starterTemplateUrl: () => "/api/projects/starter-template",
   },
   importProjectZip: vi.fn(),
 }));
@@ -136,12 +139,18 @@ describe("Projects page", () => {
     expect(button(t.projects.replaceDraft)).toBeDefined();
   });
 
-  it("offers no create affordance in either state (049)", async () => {
+  it("offers the two downloads and still creates nothing empty (057)", async () => {
     await open();
     const labels = buttons().map((b) => b.textContent ?? "");
+    // Import is still the only way a project enters; the panel only writes the folder to fill.
     expect(labels.some((label) => label.includes(t.projects.importProject))).toBe(true);
-    expect(container.textContent).not.toContain("Nuevo proyecto");
-    expect(container.querySelector("form")).toBeNull();
+    expect(labels.some((label) => label.includes(t.projects.starter.download))).toBe(true);
+    expect(container.textContent).toContain(t.projects.starter.downloadTemplate);
+    // The starter form is a panel, opened on demand: no modal, no empty project.
+    expect(container.textContent).not.toContain(t.projects.starter.intro);
+    await act(async () => { button(t.projects.starter.open)!.click(); });
+    expect(container.textContent).toContain(t.projects.starter.intro);
+    expect(projectsApi).not.toHaveProperty("create");
   });
 
   it("shows what the zip carries before uploading it", async () => {

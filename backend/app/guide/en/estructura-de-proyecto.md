@@ -2,8 +2,7 @@
 
 ## What it is for
 
-It explains which files a project has and where each thing goes. The editor and the agent accept
-only these paths.
+It explains which files a project has and where each thing goes. The editor accepts only these paths.
 
 ## Who can use it
 
@@ -32,3 +31,9 @@ A project is a folder with:
 - Integration, report and distribution ids are unique across the whole installation.
 - There is a maximum size per file and per project; the editor warns when it is exceeded.
 - Credentials and row data are never stored in a project: sources are named, not configured here.
+
+## Related
+
+- Projects
+- Project editor
+- Spec kinds

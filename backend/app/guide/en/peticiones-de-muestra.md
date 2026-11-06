@@ -33,3 +33,9 @@ Only the **Superuser**.
 - "The source responded with HTTP 403": the credential has no access to that path.
 - "The response is not JSON": the path returns another format; document the structure by hand in
   the notes.
+
+## Related
+
+- A source's structure
+- Integrations
+- ETL and transformations

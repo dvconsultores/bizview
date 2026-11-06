@@ -5,8 +5,11 @@ declarative files becomes a **project** the product versions, applies and runs.
 
 **Import is the only way in.** There is no button that creates an empty project: a project is
 authored with whatever tool you prefer — Claude Code, Codex, DeepSeek, an editor, or by hand — and
-arrives as a zip. The CLI validates the folder you are working on and measures it exactly as the
-server will, so a project that passes on your machine imports on the server.
+arrives as a zip. The folder it starts from is the **starter pack**:
+**Proyectos → Nuevo proyecto → Descargar paquete inicial** (or
+[bizview-starter-template.zip](../bizview-starter-template.zip), or `bizview init project "<name>"`).
+The CLI validates the folder you are working on and measures it exactly as the server will, so a
+project that passes on your machine imports on the server.
 
 ## The path
 
@@ -109,6 +112,29 @@ same shape **Exportar** produces.
 
 An image is stored by hash, never by content (044), so a revert can recover text exactly and an image
 only while the file is still on disk; the response names the ones it could not bring back.
+
+## What import and apply do, in plain language
+
+*Import* — 1 the zip is read in memory, the top folder stripped, executables and scripts in SVG
+rejected; 2 files are mapped to the layout, unknown ones listed as `ignored`; 3 the two allowances are
+checked (artifacts 400 files / 20 MB, assets 2 000 / 25 MB); 4 a slug collision becomes a new
+revision (055) or a `-2` copy on request; 5 the whole tree is validated with the same validator as the
+CLI (schemas, SQL statically, references between files, personal data against the spec, spec
+completeness) and problems are shown per file with a fix; 6 the project is saved as a **draft**:
+nothing runs, nothing is visible to users yet.
+
+*Apply* — 1 the draft is composed with the other applied projects into a new installation
+**version** and checked again (duplicate ids across projects are real errors); 2 each integration is
+registered with the worker: the first run is a full load, then the schedule (`cron`) runs the
+incremental window (`:window_start`/`:window_end`) or a full reload per `incremental.mode`; 3
+datasets land in the warehouse schema `ds_<integration>.<dataset>` with `_run_id` and `_loaded_at`;
+4 each report becomes a dashboard at `/r/<id>`, visible to the roles in `access`, with filters,
+periods, comparison, PDF/CSV and share links; 5 the apply is an audit event and **Volver a la versión
+anterior** rolls everything back; 6 what to look at first: **Integraciones** → last run, **Tableros**
+→ the new dashboard, **Proyectos** → problems.
+
+The same text ships inside every starter zip (`QUE-HACE-BIZVIEW.md` / `WHAT-BIZVIEW-DOES.md`) and is
+the help topic *Qué pasa al importar y aplicar*.
 
 ## Export
 

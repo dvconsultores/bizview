@@ -45,3 +45,9 @@ Anyone whose Google address belongs to an allowed domain. The policy is configur
   what the administrator set, unless the rules also apply to existing users.
 - Unlinking a Google account: an **Administrator** deactivates the user or sets a password; from
   then on the account signs in with email and password.
+
+## Related
+
+- Sign in to BizView
+- Security
+- Users

@@ -63,24 +63,33 @@ bizview.yml up -d`. Ports, TLS behind another proxy, Cloudflare, backups and bra
 
 ## How it works
 
-1. **Add a source** — **Fuentes de datos → Nueva**, with the credentials and **Probar**.
-2. **Describe it** — `bizview describe <source>` prints the tables, columns and types (structure and
-   counts only, never rows).
-3. **Download the authoring pack** — `bizview init workspace --name mycompany` writes the presets,
-   the rules, the schemas and an example project.
-4. **Write the request** — `REQUEST.md`: what the dashboard answers, for whom, with which filters.
-5. **Build it with any AI (or by hand)** — the pack's `PROMPT.md` tells an agent the rules; the
-   output is `specs/NNN-name/spec.md`, `integrations/<id>/integration.yaml|queries/*.sql` and
-   `reports/<id>/report.yaml`.
-6. **Validate** — `bizview validate .` runs the same validator the server runs and writes
-   `problems.json` with a file, a JSON path, a message and, when it can, a fix.
-7. **Import** — **Proyectos → Importar** takes the zip, maps the folders, reports collisions,
-   validates again and shows the tree before anything is applied.
-8. **Apply and share** — **Aplicar** creates a version; **Compartir** mints a read-only link,
-   **Enviar por correo** schedules the PDF.
+1. **Add a source** — **Fuentes de datos → Nueva**, with the credentials, then **Probar**.
+2. **Describe it** — **Estructura** generates the source's structure: tables, columns, types, counts
+   and shapes. Never rows, never a credential.
+3. **Download the starter pack** — **Proyectos → Nuevo proyecto → Descargar paquete inicial** writes
+   `bizview-starter-<slug>.zip`: the rules, `REQUEST.md`, the spec and artifact skeletons, the schemas
+   and, when you pick one, the source's structure. From a terminal:
+   `bizview init project "Ventas" --source "Origen ventas"`. Without an installation, take
+   [bizview-starter-template.zip](bizview-starter-template.zip).
+4. **Write the request** — `REQUEST.md`: what the dashboard answers, for whom, with which filters and
+   period, in which style.
+5. **Build it with any AI (or by hand)** — paste `PROMPT.md` + `REQUEST.md` (+ `structure.md`) into
+   ChatGPT, Claude, Gemini, DeepSeek or Copilot, or open the folder with a coding tool, and ask for
+   the project. The answer is one zip with `specs/NNN-name/`, `integrations/<id>/` and `reports/<id>/`
+   at its root.
+6. **Import** — **Proyectos → Importar proyecto** reads the zip, maps the folders, lists what it
+   ignores, checks the two budgets and validates with the same validator the CLI runs. The project is
+   saved as a draft: nothing runs yet.
+7. **Apply and share** — **Aplicar** composes a new version of the installation and registers the
+   schedules; **Compartir** mints a read-only link and **Enviar por correo** schedules the PDF.
 
 The contract, every file and a complete worked example: [docs/AUTHORING.md](docs/AUTHORING.md). The
-import path: [docs/IMPORT.md](docs/IMPORT.md).
+import path and what happens on apply: [docs/IMPORT.md](docs/IMPORT.md).
+
+**Author with your own AI:** the pack contains `PROMPT.md` (the rules and the nine checks),
+`REQUEST.md` (your brief), the JSON Schemas the validator uses, `CONTENIDO.md`/`CONTENTS.md` (what
+every file is for) and `QUE-HACE-BIZVIEW.md`/`WHAT-BIZVIEW-DOES.md` (what import and apply do). No AI
+key is needed in Bizview: your AI works outside and Bizview validates, runs and shares the result.
 
 ## What it does
 
@@ -90,10 +99,15 @@ import path: [docs/IMPORT.md](docs/IMPORT.md).
 | Reports with metrics, dimensions, views, filters and periods; direct-source reports over an existing table | [005](specs/005-vibe-reporting/spec.md), [019](specs/019-direct-source-reports/spec.md) |
 | Declarative layouts for dashboards and PDFs, rendered by the app on screen and by ReportLab on the server | [026](specs/026-declarative-layouts/spec.md) |
 | BI projects: a folder per project with numbered specs, history and an in-browser editor; export as zip | [020](specs/020-bi-projects/spec.md) |
-| Import and export as the front door: upload → map → collisions → validate → preview → apply | [020](specs/020-bi-projects/spec.md), [046](specs/046-release-docs-governance/spec.md) |
-| The authoring pack: presets, rules, schemas, `PROMPT.md`, `REQUEST.md` and a golden example | [043](specs/043-bizview-refactor-external-authoring/spec.md) |
-| Structure packs: a source's structure and counts as a document an external AI can read | [043](specs/043-bizview-refactor-external-authoring/spec.md) |
+| Import as the front door: upload → map → budgets → validate → preview → draft, and re-import as a revision with its own history | [046](specs/046-release-docs-governance/spec.md), [055](specs/055-project-reimport/spec.md) |
+| The starter pack: a downloadable zip with the prompt, the request, the schemas and the skeletons, served by the app and published as a template | [043](specs/043-bizview-refactor-external-authoring/spec.md), [057](specs/057-docs-help-starter-zip/spec.md) |
+| Structure packs: a source's structure and counts as a document an external AI reads instead of connecting | [048](specs/048-bi-ready-sources/spec.md), [052](specs/052-source-structure-chat/spec.md) |
 | Visual components: gauge, index, share and asset blocks, project images and a URL-image cache | [044](specs/044-visual-components-and-assets/spec.md) |
+| Two import allowances (artifacts and images) that an installation can raise, measured before anything is written | [049](specs/049-import-limits-assets/spec.md) |
+| A design system shared by screens, PDFs and emails | [050](specs/050-ui-design-system/spec.md) |
+| Themes as data: a library of tokens an author can ship inside a project and apply to a report | [047](specs/047-themes-as-data/spec.md), [051](specs/051-theme-application/spec.md) |
+| Parameters and filters as one inline sheet on the report page | [053](specs/053-parameters-sheet/spec.md) |
+| Sign in with Google, with domain rules and role mapping | [054](specs/054-google-signin-rbac/spec.md) |
 | Sharing: expiring read-only links, email delivery, scheduled sends | [018](specs/018-dashboard-sharing/spec.md) |
 | Spanish and English, dark mode, PDF and CSV export | [022](specs/022-i18n-en-es/spec.md), [006](specs/006-dark-mode/spec.md) |
 | Administration: users, roles, access, audit log, `internet` security profile, sign in with Google or Telegram | [002](specs/002-auth-admin-home/spec.md), [004](specs/004-data-sources-security/spec.md), [027](specs/027-google-sign-in/spec.md), [007](specs/007-telegram-sign-in/spec.md) |

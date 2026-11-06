@@ -504,6 +504,8 @@ export interface WebComponent {
   series?: string[];
   orientation?: BarOrientation;
   stacked?: boolean;
+  /** Feature 056: permanent value labels. `true` on bar/line/area; a mode on pie/donut. */
+  labels?: boolean | "values" | "percent" | "both";
 
   // pie | donut
   category?: string;

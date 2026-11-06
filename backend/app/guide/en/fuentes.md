@@ -35,3 +35,9 @@ Only the **Superuser**.
 - "Address not allowed (local, internal or metadata)": BizView does not connect to internal
   addresses of its own server.
 - With the internet profile only encrypted connections (HTTPS/TLS) are allowed.
+
+## Related
+
+- Supabase source
+- Integrations
+- Direct reports

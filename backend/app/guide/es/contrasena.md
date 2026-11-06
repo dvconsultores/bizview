@@ -33,3 +33,9 @@ aplicación hasta cambiarla.
 - Al cambiarla se cierran tus demás sesiones abiertas en otros dispositivos; vuelve a ingresar
   en ellos con la contraseña nueva.
 - «Las contraseñas no coinciden.»: escribe la misma contraseña en los dos campos.
+
+## Relacionados
+
+- Ingresar a BizView
+- Tu perfil
+- Verificación en dos pasos

@@ -47,3 +47,9 @@ con el rol **Superusuario**, en Administración → Seguridad → **Ingreso con 
   usuarios existentes.
 - Desvincular una cuenta de Google: un **Administrador** desactiva el usuario o le asigna una
   contraseña; desde ese momento entra con correo y contraseña.
+
+## Relacionados
+
+- Ingresar a BizView
+- Seguridad
+- Usuarios

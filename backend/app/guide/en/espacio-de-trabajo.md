@@ -31,3 +31,9 @@ Only the **Superuser**.
 
 - A validation error names the file and how to fix it; fix it in the repository or in the project
   and validate again.
+
+## Related
+
+- Apply a project
+- Projects
+- Projects in VS Code and Git

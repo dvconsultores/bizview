@@ -35,3 +35,9 @@ Cualquier persona que prepare un proyecto; subirlo a la instalación lo hace el 
   no la regla.
 - «series[1] vs series[2]: ΔE 4.0»: dos series se parecen demasiado; separa los tonos.
 - El PDF siempre usa la variante clara del tema, aunque el informe esté en oscuro.
+
+## Relacionados
+
+- Apariencia
+- Definir un reporte
+- Estructura de un proyecto

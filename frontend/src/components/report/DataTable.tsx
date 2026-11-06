@@ -24,6 +24,8 @@ interface DataTableProps {
   pageSize?: number;
   /** Feature 044: draw the image of `set` in the cell of `column` (the column the set is keyed by). */
   image?: { set: ReportImageSet; column: string };
+  /** Feature 056: the card is in a layout cell that can be opened full screen. */
+  onMaximize?: () => void;
 }
 
 /** A cached-URL set's picture for one row: the column the set declares, never the key. */
@@ -71,6 +73,7 @@ export function DataTable({
   sort,
   pageSize,
   image,
+  onMaximize,
 }: DataTableProps) {
   const t = useT();
   const [page, setPage] = useState(0);
@@ -110,7 +113,7 @@ export function DataTable({
     <Card>
       <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
         <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{heading}</h2>
-        {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} /> : null}
+        {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
       </div>
       {/* Wide tables scroll inside the card, never the page. */}
       <div className="max-w-full overflow-x-auto rounded-b-card" tabIndex={0} role="region" aria-label={heading}>

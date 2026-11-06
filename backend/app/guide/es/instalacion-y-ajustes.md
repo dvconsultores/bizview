@@ -28,3 +28,9 @@ reinicia la instalación. Por área:
   credenciales guardadas no se pueden leer.
 - Comandos del servidor: `rotate-secret-key` (rota la clave de cifrado) y `reset-superuser-mfa`
   (restablece el doble factor del **Superusuario**).
+
+## Relacionados
+
+- Correo de la instalación
+- Seguridad
+- Inteligencia artificial

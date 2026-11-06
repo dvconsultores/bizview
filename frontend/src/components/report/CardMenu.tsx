@@ -1,15 +1,17 @@
 import { useEffect, useId, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Download, MoreVertical } from "lucide-react";
+import { Download, Maximize2, MoreVertical } from "lucide-react";
 import { useT } from "../../i18n";
 import { iconButtonClass } from "../IconButton";
 
 interface CardMenuProps {
   title: string;
   onDownloadCsv: () => void;
+  /** Feature 056: the same action the card's header button offers, reachable from the menu. */
+  onMaximize?: () => void;
   className?: string;
 }
 
-export function CardMenu({ title, onDownloadCsv, className = "" }: CardMenuProps) {
+export function CardMenu({ title, onDownloadCsv, onMaximize, className = "" }: CardMenuProps) {
   const t = useT();
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -57,6 +59,11 @@ export function CardMenu({ title, onDownloadCsv, className = "" }: CardMenuProps
     onDownloadCsv();
   }
 
+  function handleMaximize() {
+    closeAndRestoreFocus();
+    onMaximize?.();
+  }
+
   return (
     <div ref={wrapperRef} className={`relative ${className}`} onKeyDown={handleKeyDown} onBlur={handleBlur}>
       <button
@@ -77,6 +84,18 @@ export function CardMenu({ title, onDownloadCsv, className = "" }: CardMenuProps
           className="absolute right-0 top-full z-20 mt-1 w-max min-w-[12rem] rounded-xl border border-line bg-surface p-1 shadow-raised"
         >
           <ul>
+            {onMaximize ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={handleMaximize}
+                  className="flex min-h-tap w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink-2 hover:bg-subtle hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-field-focus"
+                >
+                  <Maximize2 aria-hidden className="h-4 w-4 shrink-0" />
+                  {t.layout.maximize(title)}
+                </button>
+              </li>
+            ) : null}
             <li>
               <button
                 ref={itemRef}

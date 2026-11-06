@@ -52,3 +52,9 @@ se mezcla nada. La revisión 1 se compara con el zip; la 2 con la 1, y así.
   ábrelo para verlos. Nada del borrador llega a los tableros hasta que se aplica.
 - Una imagen no vuelve al revertir: las imágenes se guardan por su huella, no por su contenido,
   así que una que ya no está en la carpeta no se puede recuperar; BizView lo dice al revertir.
+
+## Relacionados
+
+- Importar un proyecto
+- Aplicar un proyecto
+- Editor de proyecto

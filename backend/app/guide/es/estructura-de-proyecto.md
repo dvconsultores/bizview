@@ -2,8 +2,7 @@
 
 ## Para qué sirve
 
-Explica qué archivos tiene un proyecto y dónde va cada cosa. El editor y el agente solo aceptan
-estas rutas.
+Explica qué archivos tiene un proyecto y dónde va cada cosa. El editor solo acepta estas rutas.
 
 ## Quién puede usarlo
 
@@ -33,3 +32,9 @@ Un proyecto es una carpeta con:
 - Hay un tamaño máximo por archivo y por proyecto; el editor avisa al pasarlo.
 - Nunca se guardan credenciales ni datos de filas en un proyecto: las fuentes se nombran, no se
   configuran aquí.
+
+## Relacionados
+
+- Proyectos
+- Editor de proyecto
+- Tipos de spec

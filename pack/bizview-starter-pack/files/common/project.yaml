@@ -1,0 +1,5 @@
+# Project manifest. One BI project per folder. / Manifiesto del proyecto. Un proyecto BI por carpeta.
+name: "{{name}}"
+slug: {{slug}}
+description: "REEMPLAZA: una línea que diga qué responde este proyecto. REPLACE: one line saying what this project answers."
+created: "{{date}}"

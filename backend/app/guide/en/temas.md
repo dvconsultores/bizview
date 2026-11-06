@@ -35,3 +35,9 @@ Anyone preparing a project; uploading it to the installation is the **Superuser*
   not the rule.
 - "series[1] vs series[2]: ΔE 4.0": two series look too much alike; separate the shades.
 - The PDF always uses the theme's light variant, even when the report is dark.
+
+## Related
+
+- Appearance
+- Define a report
+- Project structure

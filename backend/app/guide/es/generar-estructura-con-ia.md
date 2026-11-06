@@ -40,3 +40,9 @@ Solo el **Superusuario**, y necesita un proveedor de IA configurado en Administr
 - «La respuesta del modelo no formó un paquete válido»: vuelve a intentarlo; el escaneo sigue
   disponible y no se perdió el paquete anterior.
 - Una fuente SOAP no genera: su estructura es la operación del WSDL, no hay campos que inferir.
+
+## Relacionados
+
+- Estructura de una fuente
+- Inteligencia artificial
+- Peticiones de muestra

@@ -29,3 +29,10 @@ Solo el **Superusuario**.
 - El **Identificador** no se puede cambiar después de aplicar el proyecto.
 - Escribe en **Buscar proyectos** para filtrar la lista por nombre, identificador o descripción
   (da igual mayúsculas y tildes); el contador dice cuántas coincidencias hay.
+
+## Relacionados
+
+- Importar un proyecto
+- Editor de proyecto
+- Aplicar un proyecto
+- Estructura de un proyecto

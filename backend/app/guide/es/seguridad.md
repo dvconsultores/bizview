@@ -30,3 +30,10 @@ Solo el **Superusuario**.
 
 - Un control en **Requiere atención** explica qué falta; corrígelo en la instalación. BizView no
   ofrece formas de desactivar la confirmación de contraseña ni el doble factor obligatorio.
+
+## Relacionados
+
+- Administración
+- Auditoría
+- Verificación en dos pasos
+- Telegram

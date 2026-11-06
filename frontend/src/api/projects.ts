@@ -71,6 +71,17 @@ export const projectsApi = {
   timeline: (slug: string, folder: string) =>
     api.get<SpecTimeline>(`${base(slug)}/specs/${encodeURIComponent(folder)}/timeline`),
   exportUrl: (slug: string) => `${base(slug)}/export.zip`,
+  /** Feature 057: the starter pack, rendered by the server for these selections. */
+  starterUrl: (params: { name: string; source?: string | null; lang?: string;
+                        kind?: "integration" | "direct" }) =>
+    `/api/projects/starter${qs({
+      name: params.name,
+      source: params.source ?? undefined,
+      lang: params.lang,
+      kind: params.kind,
+    })}`,
+  /** The generic template with placeholders: committed, or rendered when the file is absent. */
+  starterTemplateUrl: () => "/api/projects/starter-template",
   /** Feature 055: the project's own revisions, newest first. */
   revisions: (slug: string) => api.get<ProjectRevisionList>(`${base(slug)}/revisions`),
   revisionZipUrl: (slug: string, number: number) =>

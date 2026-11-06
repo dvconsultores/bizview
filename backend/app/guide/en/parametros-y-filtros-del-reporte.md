@@ -41,3 +41,9 @@ Anyone with access to the dashboard.
 - "The end date cannot be before the start date.": fix **From** and **To**.
 - "Wait for the report to finish loading.": the downloads appear once the report finished loading.
 - A chip for a filter the report no longer has: the **Filters** panel says so and ignores it.
+
+## Related
+
+- View a report
+- Export to PDF or CSV
+- Refresh and TV mode

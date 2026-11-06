@@ -29,3 +29,9 @@ Solo el **Superusuario**.
 
 - Si la consulta falla porque una columna no existe, la estructura de la tabla cambió: actualiza
   la spec y el reporte con las columnas nuevas y vuelve a validar.
+
+## Relacionados
+
+- Reportes directos
+- Definir un reporte
+- Aplicar un proyecto

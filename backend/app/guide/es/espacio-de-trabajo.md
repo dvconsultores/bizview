@@ -31,3 +31,9 @@ Solo el **Superusuario**.
 
 - Un error de validación nombra el archivo y cómo corregirlo; corrígelo en el repositorio o en el
   proyecto y vuelve a validar.
+
+## Relacionados
+
+- Aplicar un proyecto
+- Proyectos
+- Proyectos en VS Code y Git

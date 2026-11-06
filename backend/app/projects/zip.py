@@ -133,6 +133,11 @@ def _refusal(refusal: shared_budgets.Refusal) -> ZipRejected:
     return ZipRejected(refusal.code, M(REFUSAL_KEYS[refusal.code], **refusal.params))
 
 
+def refusal_error(refusal: shared_budgets.Refusal) -> ZipRejected:
+    """Public name for the refusal of a budget (the starter pack measures before it renders)."""
+    return _refusal(refusal)
+
+
 def _structural(reason: str) -> ZipRejected:
     return ZipRejected("zip_invalid", M("projects.zip_invalid", reason=reason))
 

@@ -27,3 +27,9 @@ Each run follows these steps:
 
 - A **Skipped** run found nothing to do or the source was unavailable; check the **History** in
   [Open Integrations](app:/admin/integraciones).
+
+## Related
+
+- Integrations
+- Data sources
+- Define an integration

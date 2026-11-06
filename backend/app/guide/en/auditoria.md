@@ -19,3 +19,9 @@ Only the **Superuser**.
 - Events are kept for 12 months.
 - Sensitive actions (password confirmations, security changes, project applies) are always
   recorded.
+
+## Related
+
+- Users
+- Security
+- Administration

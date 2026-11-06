@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ChevronRight, FolderKanban, GitBranch, Image as ImageIcon, Package, Search, Upload, X } from "lucide-react";
+import { ChevronRight, Download, FolderKanban, GitBranch, Image as ImageIcon, Package, Search, Upload, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { importProjectZip, projectsApi } from "../../api/projects";
 import type {
@@ -11,6 +11,7 @@ import type {
   ProjectSummary,
 } from "../../api/types";
 import { RevisionDiff } from "../../components/projects/RevisionDiff";
+import { StarterPanel } from "../../components/projects/StarterPanel";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
@@ -50,6 +51,8 @@ export function Projects() {
   const [copy, setCopy] = useState(false);
   const [preview, setPreview] = useState<{ diff: ProjectDiff; mode: "created" | "reimported" } | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  // 057: the starter pack, built by the server for the selections the dialog collects.
+  const [starterOpen, setStarterOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +178,10 @@ export function Projects() {
             <input ref={fileInput} type="file" accept=".zip,application/zip" className="sr-only" id="project-zip"
                    aria-label={t.projects.chooseZip}
                    onChange={(e) => void choose(e.target.files?.[0])} />
+            <Button icon={<Download className="h-5 w-5" aria-hidden />}
+                    onClick={() => setStarterOpen(true)}>
+              {t.projects.starter.open}
+            </Button>
             <Button variant="secondary" loading={importing} icon={<Upload className="h-5 w-5" aria-hidden />}
                     disabled={!folderWritable || pending !== null} onClick={() => fileInput.current?.click()}>
               {importing ? t.projects.importing : t.projects.importProject}
@@ -271,6 +278,8 @@ export function Projects() {
         }} />
       </Card>
 
+      <StarterPanel open={starterOpen} onClose={() => setStarterOpen(false)} />
+
       {imported && imported.project && (
         <Card className="space-y-3 p-4 sm:p-5">
           <h2 className="text-lg font-semibold text-ink">
@@ -317,7 +326,19 @@ export function Projects() {
       ) : items.length === 0 ? (
         <EmptyState icon={<FolderKanban className="h-7 w-7" aria-hidden />} title={t.projects.empty}>
           <p>{t.projects.emptyText}</p>
-          <Button className="mt-3" icon={<Upload className="h-5 w-5" aria-hidden />}
+          {/* 057: the two downloads first — an author without a terminal starts here. */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <Button icon={<Download className="h-5 w-5" aria-hidden />}
+                    onClick={() => setStarterOpen(true)}>
+              {t.projects.starter.download}
+            </Button>
+            <a href={projectsApi.starterTemplateUrl()} download
+               className="inline-flex min-h-tap items-center justify-center gap-2 rounded-btn border border-line bg-surface px-4 text-base font-semibold text-ink-2 hover:bg-subtle">
+              <Download className="h-5 w-5" aria-hidden />
+              {t.projects.starter.downloadTemplate}
+            </a>
+          </div>
+          <Button className="mt-3" variant="secondary" icon={<Upload className="h-5 w-5" aria-hidden />}
                   disabled={!folderWritable} onClick={() => fileInput.current?.click()}>
             {t.projects.importFirst}
           </Button>
@@ -366,6 +387,7 @@ export function Projects() {
           </ul>
         </>
       )}
+
     </div>
   );
 }

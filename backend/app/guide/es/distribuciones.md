@@ -27,3 +27,9 @@ Solo el **Superusuario** la escribe; los envíos llegan a los usuarios de los ro
 - En la pantalla del tablero, un envío de un proyecto aparece como
   **Gestionado por el proyecto** …: allí solo se puede pausar o reanudar.
 - Los envíos hechos a mano en **Envíos programados** no dependen de ningún proyecto.
+
+## Relacionados
+
+- Tipos de spec
+- Envíos programados
+- De la fuente a la distribución

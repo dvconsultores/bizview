@@ -27,3 +27,9 @@ Cada ejecución sigue estos pasos:
 
 - Una ejecución **Omitida** no encontró nada que hacer o la fuente no estaba disponible; revisa
   el **Historial** en [Abrir Integraciones](app:/admin/integraciones).
+
+## Relacionados
+
+- Integraciones
+- Fuentes de datos
+- Definir una integración

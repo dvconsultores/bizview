@@ -29,3 +29,9 @@ Anyone with an account. Each person sees only the sections of their role.
   access.
 - **Page not found**: the address does not exist or was moved. Go back to
   [Open Home](app:/).
+
+## Related
+
+- Home and favorites
+- Your profile
+- Get help

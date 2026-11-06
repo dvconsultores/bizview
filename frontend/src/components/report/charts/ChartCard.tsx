@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from "react";
 import { Card } from "../../Card";
 import { CHART_MIN_HEIGHT, useChartWidth } from "./chartScale";
+import { useChartHeight } from "./chartScale";
 import { surfaceClass } from "../layoutRoles";
 import type { ChartSeries } from "./series";
 
@@ -19,22 +20,25 @@ export function ChartCard({
   /** Feature 030 (FR-004): the data the chart draws; a change replays a ≤300 ms fade so a filter
    * update is visible without morphing geometry. `prefers-reduced-motion` removes it. */
   signature?: string;
-  children: (width: number) => ReactNode;
+  children: (width: number, height: number) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const width = useChartWidth(ref);
+  // Feature 056: the drawing area's height too, so a chart with few categories fills its card
+  // instead of keeping a fixed 200 px and leaving the rest empty.
+  const height = useChartHeight(ref);
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="flex h-full min-h-0 flex-col p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{title}</h2>
         {legend ? <p className="text-xs text-ink-muted">{legend}</p> : null}
       </div>
-      <figure className="mt-3">
-        <div ref={ref} className="w-full" style={{ minHeight: CHART_MIN_HEIGHT }}>
+      <figure className="mt-3 flex min-h-0 flex-1 flex-col">
+        <div ref={ref} className="flex w-full flex-1 items-end" style={{ minHeight: CHART_MIN_HEIGHT }}>
           {width > 0 ? (
-            <div key={signature} className="chart-data-in">
-              {children(width)}
+            <div key={signature} className="chart-data-in w-full">
+              {children(width, height)}
             </div>
           ) : null}
         </div>

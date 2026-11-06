@@ -31,3 +31,9 @@ Anyone with access to the dashboard.
 ## Common problems
 
 - "The end date can't be earlier than the start date.": fix **From** and **To**.
+
+## Related
+
+- Parameters and filters of the report
+- View a report
+- Export to PDF or CSV

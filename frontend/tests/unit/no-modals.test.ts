@@ -16,11 +16,16 @@ const ARIAMODAL = /aria-modal/i;
 const MODAL_IMPORT = /from\s+["'][^"']*components\/Modal["']|components\/Modal/i;
 const FIXED_INSET = /fixed\s+inset-0/;
 
+/** Feature 056: one deliberate exception — the full-screen card — named here, so the ban holds
+ * everywhere else and a second modal cannot appear unnoticed. */
+const ALLOWED = join("src", "components", "report", "CardDialog.tsx");
+
 describe("modal contract guard", () => {
   it("no Modal.tsx or forbidden modal patterns in src", () => {
     const violations: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const rel = relative(process.cwd(), file);
+      if (rel === ALLOWED) continue;
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, i) => {
         const n = i + 1;
@@ -35,5 +40,13 @@ describe("modal contract guard", () => {
 
   it("Modal.tsx no longer exists", () => {
     expect(existsSync(join(SRC, "components", "Modal.tsx"))).toBe(false);
+  });
+
+  it("the full-screen card is the only allowed exception, and it exists", () => {
+    expect(existsSync(join(process.cwd(), ALLOWED))).toBe(true);
+    const dialogs = sourceFiles(SRC)
+      .map((file) => relative(process.cwd(), file))
+      .filter((rel) => /role\s*=\s*["']dialog["']/i.test(readFileSync(join(process.cwd(), rel), "utf8")));
+    expect(dialogs).toEqual([ALLOWED]);
   });
 });

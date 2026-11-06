@@ -7,7 +7,7 @@ others already applied, and from then on its integrations run and its dashboards
 
 ## Who can use it
 
-Only the **Superuser**. The agent never applies: it is always your action.
+Only the **Superuser**. Applying is always your action: nothing starts on its own.
 
 ## How to
 
@@ -33,3 +33,9 @@ Only the **Superuser**. The agent never applies: it is always your action.
 - If the button is not active, look at **Pending before applying** in the status bar: it says
   what is missing (for example, a query not checked yet or a report without filters).
   **Check again** repeats the checks.
+
+## Related
+
+- Workspace
+- Projects
+- Project history

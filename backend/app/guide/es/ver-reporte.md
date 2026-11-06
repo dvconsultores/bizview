@@ -38,3 +38,9 @@ Cualquier persona con acceso a ese tablero.
 ## Problemas frecuentes
 
 - «Sin datos en el período.»: cambia el período en **Parámetros**.
+
+## Relacionados
+
+- Filtros y períodos
+- Tableros
+- Exportar a PDF o CSV

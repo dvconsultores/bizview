@@ -17,3 +17,10 @@ Un **Administrador** ve **Usuarios**. El **Superusuario** ve además el resto de
    **Inteligencia artificial**.
 
 Los contadores de fuentes e integraciones con fallos están en la página de inicio.
+
+## Relacionados
+
+- Usuarios
+- Seguridad
+- Auditoría
+- Inteligencia artificial

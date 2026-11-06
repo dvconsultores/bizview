@@ -22,3 +22,9 @@ Only the **Superuser**.
 - The list shows when each token expires and when it was last used.
 - Revoke a token you no longer use; revoked or expired tokens stop working at once.
 - Creating and revoking tokens is recorded in the audit.
+
+## Related
+
+- Projects in VS Code and Git
+- Administration
+- Security

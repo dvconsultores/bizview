@@ -17,8 +17,8 @@ es directo por la marca de datos en vivo.
    si quieres, los objetos) que los reportes pueden leer, con su tiempo máximo, su caché y su tope
    de filas (se pide confirmar tu contraseña). Bizview comprueba entonces que la credencial no puede
    escribir, y lo vuelve a comprobar cada día. La base BI de la instalación ya está declarada.
-2. Escribe una spec `reporte` en modo directo y deja que el agente la implemente (ver Un reporte
-   directo paso a paso).
+2. Escribe una spec `reporte` en modo directo y que tu IA la implemente (ver Un reporte directo
+   paso a paso).
 3. Al verlo, el reporte dice «Datos en vivo · … · consultado …».
 
 ## Opciones
@@ -43,3 +43,9 @@ Además:
 - «Datos de …; la fuente no respondió»: se muestran los últimos datos guardados.
 - «La fuente está ocupada»: hay demasiadas consultas en curso; vuelve a intentarlo.
 - Si la estructura de la tabla cambió, el reporte muestra el error y la spec debe actualizarse.
+
+## Relacionados
+
+- Definir un reporte
+- Un reporte directo paso a paso
+- Integraciones

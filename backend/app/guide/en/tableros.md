@@ -24,3 +24,9 @@ Anyone with an account. Each person sees only the dashboards assigned to them.
 
 - **Not authorized**: the dashboard exists but you have no access; ask your administrator.
 - **Dashboard not found**: the link is wrong or the dashboard no longer exists.
+
+## Related
+
+- Home and favorites
+- View a report
+- Share with a link

@@ -23,3 +23,9 @@ An **Administrator** or the **Superuser**, when the installation has email set u
 - Times are in the installation's time zone.
 - A send that says **Managed by project** … comes from a distribution spec: it changes in the
   project's files; here you can only pause or resume it.
+
+## Related
+
+- Send by email
+- Share with a link
+- Distributions

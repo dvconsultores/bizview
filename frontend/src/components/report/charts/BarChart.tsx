@@ -1,5 +1,8 @@
+import { useState } from "react";
 import type { BarOrientation } from "../../../api/types";
-import { formatCompact } from "../../../lib/numbers";
+import { formatCompact, formatValue } from "../../../lib/numbers";
+import { LABEL_ABOVE, fitLabel, labelColumn, measureText, trimLabel } from "../../../lib/chartLabel";
+import { useReducedMotion } from "../../../lib/useReducedMotion";
 import { BottomLabels } from "./ChartAxes";
 import { ChartCard, ChartLegend } from "./ChartCard";
 import {
@@ -20,17 +23,17 @@ export interface BarChartProps {
   series: ChartSeries[];
   orientation: BarOrientation;
   stacked: boolean;
+  /** Feature 056: print the value at the end of each bar, hiding the ones that do not fit. */
+  labels?: boolean;
 }
 
 const HORIZONTAL_ROW = 26;
-const LABEL_LIMIT = 18;
-
-function ellipsis(text: string, limit = LABEL_LIMIT): string {
-  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
-}
+/** Phone layout: one label line over its bar, 12 px bar and 8 px gap (feature 056, FR-005). */
+const ROW_ABOVE = 34;
+const CHIP_W = 190;
 
 /** Bars as SVG: vertical or horizontal, grouped or stacked (feature 026, research R5). */
-export function BarChart({ frame, categories, series, orientation, stacked }: BarChartProps) {
+export function BarChart({ frame, categories, series, orientation, stacked, labels }: BarChartProps) {
   const label = chartSummary(frame);
   const drawn = series.filter((entry) => entry.values.some((value) => value !== null));
 
@@ -41,30 +44,60 @@ export function BarChart({ frame, categories, series, orientation, stacked }: Ba
       caption={label}
       signature={JSON.stringify([stacked, categories.length, drawn.map((entry) => [entry.id, entry.values])])}
     >
-      {(width) =>
+      {(width, available) =>
         orientation === "horizontal" ? (
-          <HorizontalBars width={width} categories={categories} series={drawn} stacked={stacked} label={label} />
+          <HorizontalBars width={width} height={Math.max(CHART_MIN_HEIGHT, available)}
+                          categories={categories} series={drawn} stacked={stacked}
+                          label={label} labels={labels} frame={frame} />
         ) : (
-          <VerticalBars width={width} categories={categories} series={drawn} stacked={stacked} label={label} />
+          <VerticalBars width={width} categories={categories} series={drawn} stacked={stacked}
+                        label={label} labels={labels} frame={frame} />
         )
       }
     </ChartCard>
   );
 }
 
+/** The hovered element's value: full name, formatted value and share of the series total. */
+function ValueChip({ x, y, width, text }: { x: number; y: number; width: number; text: string }) {
+  const left = Math.max(4, Math.min(x, Math.max(4, width - CHIP_W - 4)));
+  return (
+    <div
+      data-value-chip=""
+      role="status"
+      className="pointer-events-none absolute z-10 w-max max-w-[190px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs shadow-raised"
+      style={{ left, top: Math.max(0, y) }}
+    >
+      <span className="block [overflow-wrap:anywhere] text-ink">{text}</span>
+    </div>
+  );
+}
+
+function parts(category: ChartCategory, entry: ChartSeries, index: number, frame: ChartFrame) {
+  const value = entry.values[index];
+  if (value === null || value === undefined) return null;
+  const total = entry.values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+  const share = total === 0 ? null : (value / total) * 100;
+  return {
+    name: trimLabel(category.label),
+    value: formatValue(value, entry.format, frame.currency),
+    share: share === null ? null : `${share.toFixed(1).replace(".", ",")} %`,
+  };
+}
+
 function VerticalBars({
-  width,
-  categories,
-  series,
-  stacked,
-  label,
+  width, categories, series, stacked, label, labels, frame,
 }: {
   width: number;
   categories: ChartCategory[];
   series: ChartSeries[];
   stacked: boolean;
   label?: string;
+  labels?: boolean;
+  frame: ChartFrame;
 }) {
+  const reduced = useReducedMotion();
+  const [hover, setHover] = useState<number | null>(null);
   const scale = chartScale(series.flatMap((entry) => entry.values), categories.length, width);
   const count = Math.max(1, categories.length);
   const step = scale.innerW / count;
@@ -72,76 +105,107 @@ function VerticalBars({
   const bar = stacked ? group : Math.max(1, group / Math.max(1, series.length));
   const base = scale.y(0);
   const center = (i: number) => PAD.left + i * step + step / 2;
+  const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
 
   return (
-    <svg width={width} height={CHART_HEIGHT} role={label ? "img" : undefined} aria-label={label} className="block">
-      <ValueGrid scale={scale} width={width} />
-      {categories.map((category, i) => {
-        // A stacked bar accumulates upward for positive values and downward for negative ones.
-        let positive = 0;
-        let negative = 0;
-        return (
-          <g key={category.key}>
-            {series.map((entry, j) => {
-              const value = entry.values[i];
-              if (value === null || value === undefined) return null;
-              if (stacked) {
-                const from = value >= 0 ? positive : negative;
+    <div className="relative">
+      <svg width={width} height={CHART_HEIGHT} role={label ? "img" : undefined} aria-label={label} className="block">
+        <ValueGrid scale={scale} width={width} />
+        {categories.map((category, i) => {
+          let positive = 0;
+          let negative = 0;
+          const dim = hover !== null && hover !== i;
+          return (
+            <g key={category.key}
+               onPointerEnter={() => setHover(i)}
+               onPointerLeave={() => setHover((current) => (current === i ? null : current))}
+               onClick={() => setHover(i)}>
+              <title>{`${trimLabel(category.label)}: ${formatValue(series[0]?.values[i], series[0]?.format, frame.currency)}`}</title>
+              {series.map((entry, j) => {
+                const value = entry.values[i];
+                if (value === null || value === undefined) return null;
+                const from = stacked ? (value >= 0 ? positive : negative) : 0;
                 const to = from + value;
-                if (value >= 0) positive = to;
-                else negative = to;
+                if (stacked) {
+                  if (value >= 0) positive = to;
+                  else negative = to;
+                }
+                const x = stacked ? center(i) - group / 2 : center(i) - group / 2 + j * bar;
+                const y = Math.min(scale.y(from), scale.y(to));
+                const h = Math.max(0, Math.abs(scale.y(from) - scale.y(to)));
                 return (
                   <rect
                     key={entry.id}
-                    x={center(i) - group / 2}
-                    y={Math.min(scale.y(from), scale.y(to))}
-                    width={Math.max(1, group - 2)}
-                    height={Math.max(0, Math.abs(scale.y(from) - scale.y(to)))}
+                    x={x}
+                    y={y}
+                    width={Math.max(1, stacked ? group : bar - 2)}
+                    height={h}
                     className={fillClass(entry.role)}
+                    opacity={dim ? 0.7 : 1}
+                    style={{
+                      transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
+                      transformBox: "fill-box",
+                      transformOrigin: "center",
+                      transform: hover === i && !reduced ? "scale(1.03)" : undefined,
+                    }}
                   />
                 );
-              }
-              return (
-                <rect
-                  key={entry.id}
-                  x={center(i) - group / 2 + j * bar}
-                  y={Math.min(base, scale.y(value))}
-                  width={Math.max(1, bar - 2)}
-                  height={Math.max(0, Math.abs(base - scale.y(value)))}
-                  className={fillClass(entry.role)}
-                />
-              );
-            })}
-          </g>
-        );
-      })}
-      <BottomLabels
-        indexes={axisLabelIndexes(categories.length)}
-        x={center}
-        height={CHART_HEIGHT}
-        labelAt={(i) => ellipsis(categories[i]?.label ?? "")}
-      />
-    </svg>
+              })}
+              {labels ? (
+                <BarValue x={center(i)} y={Math.min(base, scale.y(series[0]?.values[i] ?? 0)) - 4}
+                          text={formatCompact(series[0]?.values[i] ?? 0)} barPx={Math.abs(base - scale.y(series[0]?.values[i] ?? 0))} />
+              ) : null}
+            </g>
+          );
+        })}
+        <BottomLabels
+          indexes={axisLabelIndexes(categories.length)}
+          x={center}
+          height={CHART_HEIGHT}
+          labelAt={(i) => fitLabel(trimLabel(categories[i]?.label ?? ""), step - 6)}
+        />
+      </svg>
+      {hovered ? (
+        <ValueChip x={center(hover!) - CHIP_W / 2} y={PAD.top - 6} width={width}
+                   text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
+      ) : null}
+    </div>
+  );
+}
+
+/** A value printed above a vertical bar, only when the bar is tall enough to carry it. */
+function BarValue({ x, y, text, barPx }: { x: number; y: number; text: string; barPx: number }) {
+  if (barPx < 18 || measureText(text) > 60) return null;
+  return (
+    <text x={x} y={y} textAnchor="middle" fontSize="10" className="fill-chart-label tabular-nums">
+      {text}
+    </text>
   );
 }
 
 function HorizontalBars({
-  width,
-  categories,
-  series,
-  stacked,
-  label,
+  width, height, categories, series, stacked, label, labels, frame,
 }: {
   width: number;
+  height: number;
   categories: ChartCategory[];
   series: ChartSeries[];
   stacked: boolean;
   label?: string;
+  labels?: boolean;
+  frame: ChartFrame;
 }) {
+  const reduced = useReducedMotion();
+  const [hover, setHover] = useState<number | null>(null);
+  const above = width < LABEL_ABOVE;
   const count = Math.max(1, categories.length);
-  const height = Math.max(CHART_MIN_HEIGHT, PAD.top + PAD.bottom + count * HORIZONTAL_ROW + 6);
-  const left = Math.min(112, Math.max(64, width * 0.28));
-  const innerW = Math.max(1, width - left - PAD.right - 8);
+  // Feature 056: the card's own height wins, so a chart with few categories gets taller bars
+  // instead of a shorter card.
+  const natural = PAD.top + PAD.bottom + count * (above ? ROW_ABOVE : HORIZONTAL_ROW) + 6;
+  const chartHeight = Math.max(natural, height);
+  // Feature 056: the column is measured from the real font, up to 220 px and 40 % of the chart.
+  const left = above ? 8 : labelColumn(width, categories.map((c) => c.label));
+  const innerW = Math.max(1, width - left - PAD.right - (labels ? 56 : 8));
   const [lo, hi] = valueRange(series.flatMap((entry) => entry.values));
   const ticks = niceTicks(lo, hi);
   const span = (ticks[ticks.length - 1] - ticks[0]) || 1;
@@ -149,57 +213,88 @@ function HorizontalBars({
   const zero = xOf(0);
   const row = (height - PAD.top - PAD.bottom) / count;
   const bar = stacked ? row * 0.62 : Math.max(1, (row * 0.62) / Math.max(1, series.length));
-  const axisLine = height - PAD.bottom + 14;
+  const axisLine = chartHeight - PAD.bottom + 14;
+  const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
 
   return (
-    <svg width={width} height={height} role={label ? "img" : undefined} aria-label={label} className="block">
-      {ticks.map((tick) => (
-        <g key={tick}>
-          <line
-            x1={xOf(tick)}
-            x2={xOf(tick)}
-            y1={PAD.top}
-            y2={height - PAD.bottom}
-            className={tick === 0 ? "stroke-chart-axis" : "stroke-chart-grid"}
-          />
-          <text x={xOf(tick)} y={axisLine} textAnchor="middle" fontSize="11" className="fill-chart-label">
-            {formatCompact(tick)}
-          </text>
-        </g>
-      ))}
-      {categories.map((category, i) => {
-        const center = PAD.top + i * row + row / 2;
-        // A stacked row grows away from the zero line, so the running total is the next start.
-        let accumulated = 0;
-        return (
-          <g key={category.key}>
-            <text x={left - 8} y={center + 4} textAnchor="end" fontSize="11" className="fill-chart-label">
-              {ellipsis(category.label)}
-            </text>
-            {series.map((entry, j) => {
-              const value = entry.values[i];
-              if (value === null || value === undefined) return null;
-              const start = xOf(accumulated);
-              if (stacked) accumulated += value;
-              const end = xOf(accumulated);
-              const from = stacked ? start : zero;
-              const to = stacked ? end : xOf(value);
-              return (
-                <rect
-                  key={entry.id}
-                  x={Math.min(from, to)}
-                  y={stacked ? center - bar / 2 : center - (series.length * bar) / 2 + j * bar}
-                  width={Math.max(1, Math.abs(to - from))}
-                  height={Math.max(1, stacked ? bar : bar - 2)}
-                  className={fillClass(entry.role)}
-                />
-              );
-            })}
-          </g>
-        );
-      })}
-      <line x1={left - 2} x2={left - 2} y1={PAD.top} y2={height - PAD.bottom} className="stroke-chart-axis" />
-    </svg>
+    <div className="relative">
+      <svg width={width} height={chartHeight} role={label ? "img" : undefined} aria-label={label} className="block">
+        {!above ? (
+          <>
+            {ticks.map((tick) => (
+              <g key={tick}>
+                <line x1={xOf(tick)} x2={xOf(tick)} y1={PAD.top} y2={chartHeight - PAD.bottom}
+                      className={tick === 0 ? "stroke-chart-axis" : "stroke-chart-grid"} />
+                <text x={xOf(tick)} y={axisLine} textAnchor="middle" fontSize="11" className="fill-chart-label">
+                  {formatCompact(tick)}
+                </text>
+              </g>
+            ))}
+            <line x1={left - 2} x2={left - 2} y1={PAD.top} y2={chartHeight - PAD.bottom} className="stroke-chart-axis" />
+          </>
+        ) : null}
+        {categories.map((category, i) => {
+          const center = above ? PAD.top + i * row + row / 2 + 8 : PAD.top + i * row + row / 2;
+          let accumulated = 0;
+          const dim = hover !== null && hover !== i;
+          return (
+            <g key={category.key}
+               onPointerEnter={() => setHover(i)}
+               onPointerLeave={() => setHover((current) => (current === i ? null : current))}
+               onClick={() => setHover(i)}>
+              <title>{`${trimLabel(category.label)}: ${formatValue(series[0]?.values[i], series[0]?.format, frame.currency)}`}</title>
+              {above ? (
+                <text x={4} y={center - row / 2 + 11} fontSize="11" textAnchor="start" className="fill-chart-label">
+                  {category.label}
+                </text>
+              ) : (
+                <text x={left - 8} y={center + 4} textAnchor="end" fontSize="11" className="fill-chart-label">
+                  {fitLabel(trimLabel(category.label), left - 14)}
+                </text>
+              )}
+              {series.map((entry, j) => {
+                const value = entry.values[i];
+                if (value === null || value === undefined) return null;
+                const start = xOf(accumulated);
+                if (stacked) accumulated += value;
+                const from = stacked ? start : zero;
+                const to = stacked ? xOf(accumulated) : xOf(value);
+                const barHeight = stacked ? (above ? 12 : bar) : Math.max(1, (above ? 12 : bar) - 2);
+                const y = above
+                  ? center + row / 2 - 8 - barHeight
+                  : stacked ? center - bar / 2 : center - (series.length * bar) / 2 + j * bar;
+                return (
+                  <rect
+                    key={entry.id}
+                    x={Math.min(from, to)}
+                    y={y}
+                    width={Math.max(1, Math.abs(to - from))}
+                    height={barHeight}
+                    className={fillClass(entry.role)}
+                    opacity={dim ? 0.7 : 1}
+                    style={{
+                      transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
+                      transformBox: "fill-box",
+                      transformOrigin: "center",
+                      transform: hover === i && !reduced ? "scale(1.03)" : undefined,
+                    }}
+                  />
+                );
+              })}
+              {labels ? (
+                <BarValue x={Math.min(xOf(accumulated), width - PAD.right) + 6}
+                          y={center + 3} text={formatCompact(series[0]?.values[i] ?? 0)}
+                          barPx={Math.abs(xOf(series[0]?.values[i] ?? 0) - zero)} />
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+      {hovered ? (
+        <ValueChip x={left} y={PAD.top + (hover ?? 0) * row - 4} width={width}
+                   text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
+      ) : null}
+    </div>
   );
 }
 

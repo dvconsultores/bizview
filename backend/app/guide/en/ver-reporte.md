@@ -36,3 +36,9 @@ Anyone with access to that dashboard.
 ## Common problems
 
 - "No data in the period.": change the period in **Parameters**.
+
+## Related
+
+- Filters and periods
+- Dashboards
+- Export to PDF or CSV

@@ -22,3 +22,9 @@ Solo el **Superusuario**.
 - La lista muestra cuándo vence cada token y su último uso.
 - Revoca un token que ya no uses; los tokens revocados o vencidos dejan de funcionar al momento.
 - Crear y revocar tokens queda en la auditoría.
+
+## Relacionados
+
+- Proyectos en VS Code y Git
+- Administración
+- Seguridad

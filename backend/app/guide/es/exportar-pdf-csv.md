@@ -39,3 +39,9 @@ Cualquier persona con acceso al tablero.
 - «Espera a que el reporte termine de cargar.»: la exportación aparece cuando el reporte
   terminó de cargar.
 - «No se pudo generar el PDF.»: inténtalo de nuevo en un momento.
+
+## Relacionados
+
+- Ver un reporte
+- Filtros y períodos
+- Enviar por correo

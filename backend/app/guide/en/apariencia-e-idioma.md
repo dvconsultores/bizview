@@ -24,3 +24,8 @@ follows you to other devices.
   texts are shown as written (a report may carry optional English labels).
 - If you see "Theme applied on this device, but could not be saved to your account.", choose it
   again when you are online.
+
+## Related
+
+- Your profile
+- Find your way around
