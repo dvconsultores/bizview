@@ -22,8 +22,12 @@ ENV UV_HTTP_TIMEOUT=600
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 
 # Build context: repository root (the backend depends on the shared cli/ package).
+# `pack/` travels too: the cli's wheel force-includes it as `bizview_cli/starter_pack` (feature 057),
+# and an editable install resolves it at `../pack/bizview-starter-pack` — the backend renders the
+# starter pack at runtime, so a missing folder fails both the build and `/api/projects/starter`.
 WORKDIR /app/backend
 COPY cli /app/cli
+COPY pack /app/pack
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --no-install-project --frozen
 
