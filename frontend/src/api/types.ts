@@ -1095,6 +1095,58 @@ export interface ProjectDetail
   changed_files: ChangedFiles;
   last_applied: ProjectLastApplied | null;
   specs: SpecInfo[];
+  /** Feature 055: `rev 3 · aplicada` / `rev 4 · borrador`; null before the first revision. */
+  revision?: ProjectRevisionChip | null;
+}
+
+/** Feature 055: a project's own revision — a snapshot of its folder, not a workspace version. */
+export type ProjectRevisionStatus = "draft" | "applied" | "previous" | "replaced";
+export type ProjectRevisionSource = "import" | "editor";
+
+export interface ProjectRevisionChip {
+  number: number;
+  status: ProjectRevisionStatus;
+  source: ProjectRevisionSource;
+  /** The revision the active version was composed from. */
+  applied: number | null;
+  /** What "Volver a la revisión anterior" restores. */
+  previous: number | null;
+  keep: number;
+}
+
+/** The diff of a re-import: what it adds, changes and removes, and what it does to specs and ids. */
+export interface ProjectDiff {
+  added: string[];
+  changed: string[];
+  removed: string[];
+  specs: { added: string[]; removed: string[] };
+  ids: { added: string[]; removed: string[] };
+  counts: {
+    added: number; changed: number; removed: number;
+    specs_added: number; specs_removed: number; ids_added: number; ids_removed: number;
+  };
+  truncated: boolean;
+  /** The revision the diff was computed against; null for a project that did not exist. */
+  base_revision?: number | null;
+  created?: boolean;
+}
+
+export interface ProjectRevision {
+  number: number;
+  status: ProjectRevisionStatus;
+  source: ProjectRevisionSource;
+  files: number;
+  diff: ProjectDiff;
+  created_at: string | null;
+  applied_at: string | null;
+  by: string | null;
+}
+
+export interface ProjectRevisionList {
+  items: ProjectRevision[];
+  keep: number;
+  applied: number | null;
+  previous: number | null;
 }
 
 export interface TreeEntry { path: string; size: number; sha256: string }
@@ -1219,11 +1271,20 @@ export interface SpecTimeline {
 }
 
 export interface ProjectImportResult {
-  project: ProjectSummary;
+  /** Null on a dry run of a project that does not exist yet: nothing was created. */
+  project: ProjectSummary | null;
   ignored: string[];
   validation: ProjectValidation;
   /** Feature 049: what the import actually cost, per allowance. */
   budgets?: ImportTally;
+  /** Feature 055: did the archive create a project or become a revision of one? */
+  mode: "created" | "reimported";
+  /** The new revision; null on a dry run and when the answer is a question. */
+  revision: ProjectRevision | null;
+  diff: ProjectDiff;
+  /** The draft holds editor changes: send the import again with `replaceDraft`. */
+  needs_confirmation?: boolean;
+  themes?: { file: string; outcome: string; id?: string; reason?: string }[];
 }
 
 /** Feature 049: one import allowance — how many files, how big each, how big in total. */

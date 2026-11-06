@@ -622,6 +622,8 @@ export const es = {
     project_applied: "Proyecto aplicado",
     project_withdrawn: "Proyecto retirado",
     project_imported: "Proyecto importado",
+    project_reimported: "Proyecto reimportado como revisión",
+    project_reverted: "Revisión anterior restaurada",
     project_limits_changed: "Límites de importación cambiados",
     project_exported: "Proyecto exportado",
     project_fix_applied: "Arreglo aplicado",
@@ -1233,6 +1235,62 @@ export const es = {
     emptyText: "Los proyectos se escriben fuera de Bizview y se importan como zip. Importa el primero para empezar.",
     importFirst: "Importar el primer proyecto",
     importNow: "Importar ahora",
+    // Feature 055: a re-import is a new revision of the same project.
+    copy: "Importar como copia",
+    copyHint: "Crea un proyecto aparte con su propio identificador y sus propios ids.",
+    copyLabel: (slug: string) => `Se creará «${slug}» como proyecto nuevo.`,
+    replaceDraftTitle: "El borrador tiene cambios del editor",
+    replaceDraftText: (slug: string) =>
+      `Importar reemplaza los archivos de «${slug}». Los cambios guardados en el editor se quedan en el historial, pero el borrador se reemplaza.`,
+    replaceDraft: "Reemplazar borrador",
+    reimportedTitle: (name: string, number: number) => `Proyecto «${name}» · revisión ${number}`,
+    diff: {
+      createdTitle: (added: number) =>
+        added === 1 ? "El proyecto nuevo trae 1 archivo." : `El proyecto nuevo trae ${added} archivos.`,
+      reimportTitle: (added: number, changed: number, removed: number, base: number | null) => {
+        const parts = [
+          added ? `${added} ${added === 1 ? "nuevo" : "nuevos"}` : "",
+          changed ? `${changed} ${changed === 1 ? "cambiado" : "cambiados"}` : "",
+          removed ? `${removed} ${removed === 1 ? "eliminado" : "eliminados"}` : "",
+        ].filter(Boolean);
+        const list = parts.length ? parts.join(", ") : "sin cambios";
+        return base ? `Comparado con la revisión ${base}: ${list}.` : `Comparado con el proyecto: ${list}.`;
+      },
+      empty: "El zip es idéntico a lo que ya tiene el proyecto: se guardará una revisión sin cambios.",
+      files: "Archivos",
+      specs: "Specs",
+      ids: "Ids",
+      details: "Ver los archivos afectados",
+      truncated: "La lista se corta en 500 rutas por grupo; los totales son exactos.",
+      fileCounts: (a: number, c: number, r: number) => `+${a} ~${c} −${r}`,
+      specCounts: (a: number, r: number) => `+${a} −${r}`,
+      idCounts: (a: number, r: number) => `+${a} −${r}`,
+    },
+    revision: {
+      label: "Revisión",
+      chip: (number: number, status: string) => `rev ${number} · ${status}`,
+      status: {
+        draft: "borrador", applied: "aplicada", previous: "anterior", replaced: "reemplazada",
+      } as Record<string, string>,
+      source: { import: "Importación", editor: "Editor" } as Record<string, string>,
+      title: "Revisiones",
+      hint: (keep: number) =>
+        `Cada importación es una revisión del mismo proyecto. Se conservan ${keep} como máximo, además de la aplicada y la anterior.`,
+      open: "Ver las revisiones",
+      number: (n: number) => `Rev ${n}`,
+      files: (n: number) => (n === 1 ? "1 archivo" : `${n} archivos`),
+      by: (who: string, when: string) => `${who} · ${when}`,
+      download: (n: number) => `Descargar la revisión ${n}`,
+      revert: "Volver a esta revisión",
+      revertConfirm: (n: number) =>
+        `Se escriben los archivos de la revisión ${n} como una revisión nueva y se aplican: los tableros del proyecto vuelven a esa versión.`,
+      reverted: (n: number) => `Revisión ${n} restaurada y aplicada.`,
+      missing: (n: number) =>
+        (n === 1 ? "1 imagen no se pudo recuperar: " : `${n} imágenes no se pudieron recuperar: `),
+      empty: "Sin revisiones todavía.",
+      isDraft: "Es el borrador actual: nada que restaurar.",
+      current: "Actual",
+    },
     preflight: {
       title: "Lo que trae el zip",
       reading: "Leyendo el contenido del zip…",

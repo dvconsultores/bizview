@@ -8,6 +8,7 @@ from importlib import resources
 import yaml
 from bizview_cli import budgets as shared_budgets
 from bizview_cli import layout
+from sqlalchemy import select
 
 from app.errors import ApiError
 from app.i18n import M
@@ -79,6 +80,31 @@ def export(db, actor, project, ip: str | None = None) -> bytes:
                  detail={"project_id": project.id, "project": project.slug,
                          "files": len(listed)})
     return buffer.getvalue()
+
+
+def export_revision(db, actor, project, revision, ip: str | None = None) -> tuple[bytes, list[str]]:
+    """One revision as a zip of the same shape `export` produces (FR-013).
+
+    Text comes from the history by `(path, sha256)`; an image comes from disk while the file still
+    carries that hash. Whatever cannot be read back is returned so the caller can say it — 044 keeps
+    images by hash, never by content, and silence would look like data loss."""
+    from app.projects import reimport as reimport_rules
+
+    files, missing = reimport_rules.revisions.resolve_files(db, project, revision)
+    entries = {f"{project.slug}/{rel}": data for rel, data in _package_files(project.name).items()}
+    for path, text in sorted(files.items()):
+        if path.startswith(layout.ASSET_PREFIX):
+            entries[f"{project.slug}/{path}"] = fs.read_asset(project.slug, path)[0]
+        else:
+            entries[f"{project.slug}/{path}"] = text.encode("utf-8")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in sorted(entries.items()):
+            zf.writestr(name, data)
+    audit.record(db, "project_exported", actor_id=actor.id, ip=ip,
+                 detail={"project_id": project.id, "project": project.slug,
+                         "revision": revision.number, "files": len(files) + len(missing)})
+    return buffer.getvalue(), missing
 
 
 class ZipRejected(Exception):
@@ -179,14 +205,79 @@ THEME_PATH = re.compile(r"^themes/([a-z][a-z0-9-]{1,39})\.(?:yaml|yml)$")
 THEME_POLICIES = ("skip", "replace", "rename")
 
 
+def _live_project(db, slug: str):
+    """The project a zip's slug belongs to, or None. A deleted one is not re-imported into: the
+    folder is in the trash waiting for its purge, and resurrecting it would surprise everybody."""
+    from app.models import Project
+
+    if not isinstance(slug, str) or not layout.ID_RE.match(slug):
+        return None
+    return db.scalar(select(Project).where(Project.slug == slug, Project.deleted_at.is_(None)))
+
+
+def _copy_suffix(db, slug: str) -> str:
+    """`-2`, `-3`… for a copy: the smallest number whose slug is free."""
+    from app.models import Project
+
+    taken = set(db.scalars(select(Project.slug).where(Project.deleted_at.is_(None))))
+    for number in range(2, 1000):
+        candidate = f"{slug[:50 - len(str(number)) - 1]}-{number}"
+        if candidate not in taken:
+            return f"-{number}"
+    raise ApiError(409, "slug_taken", M("projects.slug_taken", slug=slug))
+
+
+def _reimport(db, actor, project, files: dict[str, str], images: dict[str, bytes],
+              ignored: list[str], report, ip: str | None, *, dry_run: bool,
+              replace_draft: bool, themes_on_conflict: str) -> dict:
+    """Write the archive as the project's new draft revision — or answer the diff and stop."""
+    from app.projects import reimport as reimport_rules
+
+    reimport_rules.pin_slug(files, project.slug)
+    diff = reimport_rules.plan(db, project, files, images)
+    base = {
+        "project": project_service.project_json(project),
+        "mode": "reimported",
+        "ignored": sorted(ignored),
+        "budgets": report.as_json(),
+        "diff": diff,
+        "revision": None,
+    }
+    if dry_run:
+        # Nothing is written: the author is reading what the import would do (FR-009).
+        db.rollback()
+        return {**base, "themes": [], "validation": (project.validation or {}),
+                "needs_confirmation": reimport_rules.plan_needs_confirmation(db, project)}
+    result = reimport_rules.execute(db, actor, project, files=files, images=images, ip=ip,
+                                    replace_draft=replace_draft)
+    if result["needs_confirmation"]:
+        # Nothing was written: the answer is the question (FR-014).
+        db.rollback()
+        return {**base, "themes": [], "validation": (project.validation or {}),
+                "diff": result["diff"], "needs_confirmation": True}
+    themes_report = _project_themes(db, project.id, files, themes_on_conflict)
+    db.commit()
+    validation = project_service.revalidate(db, project)["validation"]
+    db.commit()
+    return {**base, "project": project_service.project_json(project), "themes": themes_report,
+            "validation": validation,
+            "revision": reimport_rules.revision_json(result["revision"]),
+            "diff": result["diff"], "needs_confirmation": False}
+
+
 def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | None = None,
-               themes_on_conflict: str = "skip", ip: str | None = None) -> dict:
-    """New project from a zip: layout files imported (`command=import`), the rest ignored;
-    validation problems are reported, never blocking.
+               themes_on_conflict: str = "skip", ip: str | None = None, copy: bool = False,
+               dry_run: bool = False, replace_draft: bool = False) -> dict:
+    """A zip with one project: imports it, or re-imports it as a new revision (feature 055).
 
     Feature 047: `themes/*.yaml` inside the zip also enters the installation's library, with
     `origin = project`. An id that already exists is answered by `themes_on_conflict` — skip it
-    (the library keeps its own), replace it, or rename the project's so both survive."""
+    (the library keeps its own), replace it, or rename the project's so both survive.
+
+    Feature 055: a slug that already belongs to a project is the *same* project — the archive
+    becomes its new draft revision (full replacement) and the answer says `mode: "reimported"`.
+    A second project is only what `copy=True` asks for, and the copy gets its own artifact ids so it
+    can apply (037). `dry_run` answers the diff and writes nothing."""
     limits = project_budgets.effective(db)
     entries = _entries(data, limits)
     prefix = _strip_top([n for n, _ in entries]) or ""
@@ -222,7 +313,35 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
     title = str(name or meta.get("name") or prefix.strip("/") or "Proyecto importado")[:80]
     wanted = slug or meta.get("slug")
     if not (isinstance(wanted, str) and layout.ID_RE.match(wanted)):
-        wanted = project_service.suggest_slug(db, title)
+        # 055: the derived slug is the project's identity, not a suggestion — a name that is taken
+        # is the same project coming back, so the derivation never appends `-2` (that is `copy`).
+        wanted = project_service.plain_slug(title)
+
+    # 055: the same slug is the same project. `copy` is the only way to ask for a second one.
+    existing = None if copy else _live_project(db, wanted)
+    if existing is not None:
+        return _reimport(db, actor, existing, files, images, ignored, report, ip,
+                         dry_run=dry_run, replace_draft=replace_draft,
+                         themes_on_conflict=themes_on_conflict)
+    if dry_run:
+        # Nothing exists yet: the preview says "created" and writes nothing (FR-009).
+        from app.projects import reimport as reimport_rules
+        from app.projects import revisions
+
+        db.rollback()
+        return {"project": None, "mode": "created", "revision": None,
+                "diff": {**revisions.diff_maps({}, reimport_rules.archive_hashes(files, images)),
+                         "base_revision": None},
+                "ignored": sorted(ignored), "budgets": report.as_json(), "themes": [],
+                "validation": {"errors": [], "warnings": []}, "needs_confirmation": False}
+
+    suffix = ""
+    from app.projects import reimport as reimport_rules
+
+    if copy:
+        suffix = _copy_suffix(db, wanted)
+        wanted = f"{wanted[:50 - len(suffix)]}{suffix}"
+        reimport_rules.rename_ids(files, images, suffix)
     try:
         project = project_service.create(db, actor, title, wanted, "", ip)
     except ApiError as e:
@@ -232,10 +351,8 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
                                          project_service.suggest_slug(db, wanted), "", ip)
     themes_report = _project_themes(db, project.id, files, themes_on_conflict)
     db.commit()
-    if "project.yaml" in files:
-        files["project.yaml"] = re.sub(r"^slug:.*$", f"slug: {project.slug}",
-                                       files["project.yaml"], flags=re.M)
     try:
+        reimport_rules.pin_slug(files, project.slug)
         fs.apply_ops(project.id, [
             {"op": "write", "path": path, "content": text, "base_sha256": None, "force": True}
             for path, text in sorted(files.items())
@@ -257,11 +374,26 @@ def import_zip(db, actor, data: bytes, *, name: str | None = None, slug: str | N
     audit.record(db, "project_imported", actor_id=actor.id, ip=ip,
                  detail={"project_id": project.id, "project": project.slug,
                          "files": len(files), "images": len(images),
-                         "ignored": len(ignored), "source": "zip"})
+                         "ignored": len(ignored), "source": "zip",
+                         **({"copy_of": slug} if copy else {})})
     db.flush()
+    # 055: a project is born at revision 1, so its chip and its history exist from the first import.
+    from app.projects import reimport as reimport_rules
+    from app.projects import revisions
+
+    first = revisions.create(db, project, source="import", status="draft",
+                             files=revisions.snapshot(project.slug),
+                             summary={**revisions.empty_diff(), "created": True},
+                             actor_id=actor.id)
+    db.commit()
     return {"project": project_service.project_json(project), "ignored": sorted(ignored),
             "themes": themes_report, "validation": result["validation"],
-            "budgets": report.as_json()}
+            "budgets": report.as_json(), "mode": "created",
+            # A new project's diff is its whole content: there was nothing to compare against.
+            "diff": {**revisions.diff_maps({}, reimport_rules.archive_hashes(files, images)),
+                     "base_revision": None},
+            "revision": reimport_rules.revision_json(first),
+            "needs_confirmation": False}
 
 
 def _project_themes(db, project_id: int, files: dict[str, str], policy: str) -> list[dict]:

@@ -188,7 +188,8 @@ test("imported project → direct reporte → apply → dashboard; disk, history
   await page.goto(`/proyectos/${slug}`);
   await expect(page.getByText("Cambios sin aplicar").first()).toBeVisible();
 
-  // Download the project and import it as a new one (step-up from the Proyectos page).
+  // Download the project and import it back: since 055 that is the same project at a new revision
+  // (step-up from the Proyectos page), so the list must still hold exactly one with this name.
   const zip = await page.request.get(`/api/projects/${slug}/export.zip`);
   expect(zip.ok()).toBe(true);
   await page.goto("/proyectos");
@@ -196,7 +197,7 @@ test("imported project → direct reporte → apply → dashboard; disk, history
     name: `${slug}.zip`, mimeType: "application/zip", buffer: Buffer.from(await zip.body()),
   });
   // The apply above re-authenticated recently, so the step-up may not be asked again.
-  const importedText = page.getByText(/Proyecto «.+» importado/);
+  const importedText = page.getByText(/Proyecto «.+»/);
   const stepUp = page.getByRole("region", { name: "Confirma tu contraseña" });
   await expect(stepUp.or(importedText).first()).toBeVisible({ timeout: 30_000 });
   if (await stepUp.isVisible()) await confirmPassword(page);
@@ -204,9 +205,8 @@ test("imported project → direct reporte → apply → dashboard; disk, history
   const list = (await (await page.request.get("/api/projects")).json()) as {
     projects: { slug: string; name: string }[];
   };
-  const imported = list.projects.find((p) => p.name === name && p.slug !== slug);
-  expect(imported).toBeTruthy();
-  await diskEqualsExplorer(page, imported!.slug);
+  expect(list.projects.filter((p) => p.name === name)).toHaveLength(1);
+  await diskEqualsExplorer(page, slug);
 
   // Rollback in Espacio de trabajo removes the project's dashboard again.
   await page.goto("/admin/espacio");

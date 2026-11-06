@@ -113,3 +113,56 @@ def test_the_human_reading_names_both_allowances(tmp_path):
     text = render(measure(_project(tmp_path / "ventas", images=3)))
     assert "artifacts" in text and "assets" in text
     assert "400" in text and "2000" in text
+
+
+# --- feature 055: the diff of a re-import ------------------------------------------------------
+
+def test_a_zip_without_a_workspace_folder_is_created(tmp_path):
+    root = _project(tmp_path / "ventas")
+    archive = tmp_path / "ventas.zip"
+    archive.write_bytes(_zip(root))
+    result = measure(archive, workspace=tmp_path)
+    assert result["mode"] == "created" and result["existing"] is None
+    assert result["diff"]["counts"]["added"] == 2
+
+
+def test_a_zip_over_the_workspace_folder_is_reimported_with_its_diff(tmp_path):
+    root = _project(tmp_path / "ventas")
+    workspace = tmp_path / "workspace"
+    (workspace / "projects" / "ventas").mkdir(parents=True)
+    (workspace / "projects" / "ventas" / "project.yaml").write_text("name: Ventas\n", "utf-8")
+    (workspace / "projects" / "ventas" / "specs" / "009-viejo").mkdir(parents=True)
+    (workspace / "projects" / "ventas" / "specs" / "009-viejo" / "spec.md").write_text("x", "utf-8")
+
+    archive = tmp_path / "ventas.zip"
+    archive.write_bytes(_zip(root))
+    result = measure(archive, workspace=workspace)
+    assert result["mode"] == "reimported"
+    assert result["diff"]["added"] == ["specs/001-ventas/spec.md"]
+    assert result["diff"]["removed"] == ["specs/009-viejo/spec.md"]
+    assert result["diff"]["specs"] == {"added": ["001-ventas"], "removed": ["009-viejo"]}
+    # The CLI compares sizes (it does not read every file); the server compares hashes. The
+    # `project.yaml` written by the fixture is shorter than the workspace one, so it reads as changed.
+    assert result["diff"]["changed"] == ["project.yaml"]
+
+
+def test_the_command_prints_the_mode_and_the_diff(tmp_path, capsys, monkeypatch):
+    root = _project(tmp_path / "ventas")
+    archive = tmp_path / "ventas.zip"
+    archive.write_bytes(_zip(root))
+    (tmp_path / "projects" / "ventas").mkdir(parents=True)
+    (tmp_path / "projects" / "ventas" / "project.yaml").write_text("name: Ventas\n", "utf-8")
+    monkeypatch.chdir(tmp_path)          # the workspace the command is run in
+
+    assert main(["import", str(archive)]) == 0
+    out = capsys.readouterr().out
+    assert "reimported" in out and "+1" in out
+
+    # `--dry-run` says the same and writes nothing (the CLI never writes: the app owns the upload).
+    assert main(["import", str(archive), "--dry-run"]) == 0
+    dry = capsys.readouterr().out
+    assert "reimported" in dry and "specs/001-ventas/spec.md" in dry
+
+    assert main(["import", str(archive), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["mode"] == "reimported" and payload["diff"]["counts"]["added"] == 1

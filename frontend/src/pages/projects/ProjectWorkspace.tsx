@@ -19,6 +19,7 @@ import { DiffView } from "../../components/ide/DiffView";
 import { EditorTabs, openTab, type OpenTab } from "../../components/ide/EditorTabs";
 import { Explorer } from "../../components/ide/Explorer";
 import { MarkdownView } from "../../components/ide/MarkdownView";
+import { RevisionList } from "../../components/projects/RevisionList";
 import { PaneTabs, type PaneId } from "../../components/ide/PaneTabs";
 import { ProblemsPanel } from "../../components/ide/ProblemsPanel";
 import { StatusBar, type SaveState } from "../../components/ide/StatusBar";
@@ -137,6 +138,9 @@ export function ProjectWorkspace() {
 
   const readOnly = project?.origin === "git";
   const dirty = tabs.some((tab) => tab.dirty);
+
+  // 055: the revision list is fetched when the panel is opened, not on every page load.
+  const [revisionsSeen, setRevisionsSeen] = useState(false);
 
   const refresh = useCallback(async () => {
     const [detail, files] = await Promise.all([projectsApi.get(slug), projectsApi.tree(slug)]);
@@ -586,6 +590,13 @@ export function ProjectWorkspace() {
           </button>
         )}
         <Badge tone={STATUS_TONE[project.status]} className="shrink-0">{t.projects.status[project.status]}</Badge>
+        {/* 055: which revision the folder is, and which one the dashboards serve. */}
+        {project.revision ? (
+          <Badge tone={project.revision.status === "applied" ? "green" : "amber"} className="shrink-0">
+            {t.projects.revision.chip(project.revision.number,
+                                      t.projects.revision.status[project.revision.status])}
+          </Badge>
+        ) : null}
         {project.origin === "git" && <Badge tone="blue" className="shrink-0" icon={<GitBranch className="h-3.5 w-3.5" aria-hidden />}>{t.projects.origin.git}</Badge>}
         </div>
         {/* Phones: the actions take the row and wrap among themselves; desktop: they sit on the
@@ -733,6 +744,21 @@ export function ProjectWorkspace() {
                                     project.last_applied.by)}
         </p>
       )}
+
+      {/* 055: the project's own revisions. A disclosure, so the editor keeps the viewport it needs on
+          a phone; the download and the revert of each row live inside. */}
+      <details className="rounded-card border border-line bg-surface"
+               onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open) setRevisionsSeen(true); }}>
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-ink-2">
+          {t.projects.revision.title}
+          {project.revision ? ` · ${t.projects.revision.number(project.revision.number)}` : ""}
+        </summary>
+        <div className="border-t border-line-soft p-3">
+          {revisionsSeen ? (
+            <RevisionList slug={slug} onReverted={() => { void refresh(); void revalidate(false); }} />
+          ) : null}
+        </div>
+      </details>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-surface">
         <div className="min-h-0 flex-1">

@@ -583,6 +583,20 @@ topics:
       es: ["importar", "subir proyecto", "zip", "límites de importación", "archivos ignorados"]
       en: ["import", "upload project", "zip", "import limits", "ignored files"]
     related: [proyectos, proyectos-en-vs-code, aplicar-proyecto, estructura-de-proyecto]
+  - id: reimportar-un-proyecto
+    section: proyectos
+    title: {es: "Reimportar un proyecto", en: "Re-import a project"}
+    summary:
+      es: "Cómo una importación nueva del mismo proyecto se convierte en una revisión, con su diff, su historial y la vuelta atrás."
+      en: "How a new import of the same project becomes a revision, with its diff, its history and going back."
+    roles: [superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["reimportar", "revisión", "revisiones", "diff", "volver a la revisión anterior"]
+      en: ["re-import", "reimport", "revision", "revisions", "diff", "revert"]
+    related: [importar-un-proyecto, aplicar-proyecto, editor-de-proyecto]
   - id: proyectos
     section: proyectos
     title: {es: "Proyectos", en: "Projects"}

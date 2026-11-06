@@ -3,7 +3,14 @@ import { Link, useNavigate } from "react-router";
 import { ChevronRight, FolderKanban, GitBranch, Image as ImageIcon, Package, Search, Upload, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { importProjectZip, projectsApi } from "../../api/projects";
-import type { ImportLimits, ProjectImportResult, ProjectStatus, ProjectSummary } from "../../api/types";
+import type {
+  ImportLimits,
+  ProjectDiff,
+  ProjectImportResult,
+  ProjectStatus,
+  ProjectSummary,
+} from "../../api/types";
+import { RevisionDiff } from "../../components/projects/RevisionDiff";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
@@ -39,6 +46,10 @@ export function Projects() {
   const [preflight, setPreflight] = useState<Preflight | null>(null);
   const [preflightFailed, setPreflightFailed] = useState(false);
   const [pending, setPending] = useState<File | null>(null);
+  // 055: what the server says the import would do, and the two choices it can ask about.
+  const [copy, setCopy] = useState(false);
+  const [preview, setPreview] = useState<{ diff: ProjectDiff; mode: "created" | "reimported" } | null>(null);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,18 +86,42 @@ export function Projects() {
     setPreflight(tallyIndex(entries, limits));
   };
 
-  const importZip = async (file: File | undefined = pending ?? undefined) => {
+  /** Dry run: the server answers the diff for this archive without writing anything (055). */
+  const previewImport = async (file: File | undefined = pending ?? undefined) => {
+    if (!file) return;
+    setImporting(true);
+    setError(null);
+    setPreview(null);
+    setNeedsConfirm(false);
+    try {
+      const result = await importProjectZip(file, { copy, dryRun: true });
+      setPreview({ diff: result.diff, mode: result.mode });
+      setNeedsConfirm(Boolean(result.needs_confirmation));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.common.unexpected);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const importZip = async (file: File | undefined = pending ?? undefined,
+                           replaceDraft = false) => {
     if (!file) return;
     setImporting(true);
     setImported(null);
     setError(null);
     try {
-      setImported(await importProjectZip(file));
+      const result = await importProjectZip(file, { copy, replaceDraft });
+      setImported(result);
       setAttempt((n) => n + 1);
       setPending(null);
       setPreflight(null);
+      setPreview(null);
+      setNeedsConfirm(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.common.unexpected);
+      // 409 draft_changed carries the question in the error body when the answer was not accepted.
+      if (err instanceof ApiError && err.code === "draft_changed") setNeedsConfirm(true);
+      else setError(err instanceof ApiError ? err.message : t.common.unexpected);
     } finally {
       setImporting(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -186,13 +221,44 @@ export function Projects() {
                 )}
               </>
             )}
+            <label className="flex items-start gap-2 text-sm text-ink-2">
+              <input type="checkbox" checked={copy} className="mt-1 h-4 w-4"
+                     onChange={(e) => { setCopy(e.target.checked); setPreview(null);
+                                        setNeedsConfirm(false); }} />
+              <span>
+                <span className="block font-medium text-ink">{t.projects.copy}</span>
+                <span className="block text-xs text-ink-muted">{t.projects.copyHint}</span>
+              </span>
+            </label>
+            {preview ? (
+              <RevisionDiff diff={preview.diff} mode={preview.mode}
+                            preflight={preflight} limits={limits}
+                            baseRevision={preview.diff.base_revision} />
+            ) : null}
+            {needsConfirm ? (
+              <Alert tone="warning">
+                <p className="font-semibold">{t.projects.replaceDraftTitle}</p>
+                <p>{t.projects.replaceDraftText(pending?.name ?? "")}</p>
+              </Alert>
+            ) : null}
             <div className="flex flex-wrap gap-2">
-              <Button loading={importing} disabled={!folderWritable || blocked !== null}
-                      onClick={() => void importZip()}>
-                {t.projects.importNow}
-              </Button>
+              {preview === null ? (
+                <Button loading={importing} disabled={!folderWritable || blocked !== null}
+                        onClick={() => void previewImport()}>
+                  {t.projects.importNow}
+                </Button>
+              ) : needsConfirm ? (
+                <Button loading={importing} onClick={() => void importZip(undefined, true)}>
+                  {t.projects.replaceDraft}
+                </Button>
+              ) : (
+                <Button loading={importing} onClick={() => void importZip()}>
+                  {t.projects.importNow}
+                </Button>
+              )}
               <Button variant="ghost" onClick={() => { setPending(null); setPreflight(null);
-                                                      setPreflightFailed(false); }}>
+                                                      setPreflightFailed(false); setPreview(null);
+                                                      setNeedsConfirm(false); }}>
                 {t.common.cancel}
               </Button>
             </div>
@@ -205,9 +271,17 @@ export function Projects() {
         }} />
       </Card>
 
-      {imported && (
+      {imported && imported.project && (
         <Card className="space-y-3 p-4 sm:p-5">
-          <h2 className="text-lg font-semibold text-ink">{t.projects.importedTitle(imported.project.name)}</h2>
+          <h2 className="text-lg font-semibold text-ink">
+            {imported.mode === "reimported" && imported.revision
+              ? t.projects.reimportedTitle(imported.project.name, imported.revision.number)
+              : t.projects.importedTitle(imported.project.name)}
+          </h2>
+          {imported.diff ? (
+            <RevisionDiff diff={imported.diff} mode={imported.mode}
+                          baseRevision={imported.diff.base_revision} />
+          ) : null}
           <div>
             <h3 className="text-sm font-semibold text-ink-2">{t.projects.ignoredFiles}</h3>
             {imported.ignored.length ? (
@@ -226,7 +300,9 @@ export function Projects() {
               </ul>
             ) : <p className="text-sm text-ink-muted">{t.projects.noProblems}</p>}
           </div>
-          <Button onClick={() => navigate(`/proyectos/${imported.project.slug}`)}>{t.projects.openProject}</Button>
+          <Button onClick={() => navigate(`/proyectos/${imported.project!.slug}`)}>
+            {t.projects.openProject}
+          </Button>
         </Card>
       )}
 

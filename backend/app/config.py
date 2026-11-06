@@ -152,6 +152,9 @@ class Settings(BaseSettings):
     project_asset_max_files: int = Field(default=2000, ge=1, le=100_000)
     project_asset_max_kb: int = Field(default=300, ge=1, le=1_048_576)
     project_asset_max_mb: int = Field(default=25, ge=1, le=2000)
+    # Feature 055: how many revisions of a project are kept. A project is re-imported on every
+    # correction, so the list grows by design; the applied and previous ones are never pruned.
+    project_revisions_keep: int = Field(default=20, ge=1, le=200)
     # Images fetched once from an `image_url` column of a report (feature 044): content-addressed
     # files outside PROJECTS_DIR, shared by every project that asks for the same URL.
     image_cache_dir: str = Field(default_factory=lambda: str(ROOT / "image-cache"))

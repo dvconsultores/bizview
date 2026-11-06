@@ -113,8 +113,18 @@ def apply_project(db, actor, project: Project, ip):
         values["first_applied_at"] = now
     db.execute(update(Project).where(Project.id == project.id).values(values))
     files, _ = fs.list_files(project.slug)
+    # 055: what was applied is this revision; the one applied before it becomes `anterior`, which is
+    # what "Volver a la revisión anterior" restores.
+    from app.projects import revisions
+
+    draft = revisions.current(db, project)
+    if draft is None:
+        draft = revisions.ensure_baseline(db, project)
+    before = revisions.mark_applied(db, project, draft) if draft is not None else None
     audit_record(db, "project_applied", actor_id=actor.id, ip=ip,
                  detail={"project_id": project.id, "project": project.slug,
-                         "version": version.id, "files": sorted(files)})
+                         "version": version.id, "files": sorted(files),
+                         **({"revision": draft.number} if draft is not None else {}),
+                         **({"previous_revision": before.number} if before is not None else {})})
     db.flush()
     return version, changed

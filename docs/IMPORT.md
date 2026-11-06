@@ -50,16 +50,39 @@ and a zip of the files themselves all produce the same project. The project's `n
 
 | What collides | What happens |
 |---|---|
-| `slug` already taken | a new unique slug is suggested (`-2`, …) and the project is created with it |
-| a file already in the project | impossible on import: an import always creates a new project |
+| `slug` already taken | it is the **same project**: the zip becomes a new revision of it (see below), never `-2` |
+| the same slug, with **Importar como copia** | a copy is created as `<slug>-2`, and its artifact ids are renamed with it |
+| a file already in the project | the re-import replaces the draft: what the zip carries is written, what it omits is removed |
 | two spec folders with the same number | the whole import is rejected (422) and nothing is left behind |
 | a file outside the layout | it is listed in `ignored`, never written |
 | an image over its allowance, or an SVG with a script | rejected (422) with the asset named |
 | too many files, or too much size, in one allowance | rejected (422) with that allowance named |
 | an executable file anywhere | rejected (422) with `zip_disallowed` and the path |
 
-The response is `{project, ignored, validation}` — `ignored` is what you left in the zip and the
-product will never store.
+The response is `{project, mode, revision, diff, ignored, validation, budgets}` — `ignored` is what
+you left in the zip and the product will never store; `mode` is `created` or `reimported`.
+
+### 5b. The second zip is a revision, not a duplicate
+
+A project is authored outside BizView and corrected there, so the same project arrives again and
+again. The `slug` in `project.yaml` is what identifies it — and when the manifest has none, the slug
+the project's name derives to. An import whose slug already exists is a **re-import**, never
+`<slug>-2`.
+
+- The zip is written over the project's **draft revision** with full-replacement semantics: files
+  and images the zip does not carry leave the folder. Nothing is merged.
+- The project keeps its id, its slug, its shares, its grants, its dashboards, its audit history and
+  the data its integration already loaded.
+- A **diff** is shown before anything is written (added / changed / removed files, specs and ids,
+  the two allowances). `POST /api/projects/import?dry_run=true` answers it and writes nothing.
+- Nothing is applied: the previously applied revision keeps serving the dashboards until you press
+  **Aplicar**.
+- If you saved files in the editor since the last import, the import asks first
+  (`needs_confirmation`); send `replace_draft=true` to accept.
+- `copy=true` is the only way to get a second project, and the copy renames its artifact ids
+  (`ventas` → `ventas-2`, and its references with them) so it can apply.
+- `PROJECT_REVISIONS_KEEP` (default 20) bounds the history; the applied and the previous revision are
+  never pruned.
 
 ### 6. Validate again
 
@@ -78,6 +101,15 @@ report renders at `/api/reports/<id>` — the same rendering a share link and th
 composition again (a duplicate id or a reference into another project is real), and starts the
 integration schedule. **Volver a la versión anterior** rolls back. Both are audit events.
 
+An apply also marks the project's **revision**: the draft becomes `aplicada` and the one applied
+before it becomes `anterior`. **Volver a la revisión anterior** (in the project page) writes that
+previous revision's files as a new revision and applies it — the dashboards go back to that layout —
+and the change is audited as `project_reverted`. Each revision can be downloaded as a zip with the
+same shape **Exportar** produces.
+
+An image is stored by hash, never by content (044), so a revert can recover text exactly and an image
+only while the file is still on disk; the response names the ones it could not bring back.
+
 ## Export
 
 **Exportar** downloads the project as a zip with its specs, artifacts and `assets/` — the same shape
@@ -93,6 +125,7 @@ installation.
 | Describe a source | `bizview describe <source>` |
 | Validate | `bizview validate [--write-lock] [--live]` |
 | Measure a zip or a folder | `bizview import --dry-run <zip> [--json]` |
+| See what a re-import would change | `bizview import <zip>` (mode + diff against `projects/<slug>/`) |
 | Version | `bizview version` |
 
 `bizview project new` writes a folder to author in — it does not create anything inside Bizview.

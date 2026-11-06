@@ -20,14 +20,23 @@ from app.services.audit import record as audit
 FOLDERS = ("specs", "integrations", "reports", "distributions")
 
 
-def suggest_slug(db: Session, name: str) -> str:
-    """Suggest a unique slug from a project name."""
+def plain_slug(name: str) -> str:
+    """The slug a name derives to, before asking whether the installation already has it.
+
+    Feature 055: an import recognises its own project by the slug it derives to, so the derivation
+    must not quietly answer `ventas-marca-2` — that is what made every re-import a new project."""
     s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
     base = s if s and s[0].isalpha() else ("p-" + s if s else "proyecto")
     base = base[:50].rstrip("-")
     if not layout.ID_RE.match(base):
         base = "proyecto"
+    return base
+
+
+def suggest_slug(db: Session, name: str) -> str:
+    """Suggest a unique slug from a project name."""
+    base = plain_slug(name)
     existing = set(db.scalars(select(Project.slug).where(Project.deleted_at.is_(None))))
     if base not in existing:
         return base
@@ -232,10 +241,14 @@ def list_projects(db: Session) -> list[dict]:
 
 def detail(db: Session, project: Project, viewer: AppUser) -> dict:
     """Get project detail with specs and the viewer's conversations."""
+    from app.projects import revisions
+
     data = project_json(project)
     data["status"], data["changed_files"] = status(db, project)
     data["last_applied"] = last_applied(db, project)
     data["specs"] = specs.list_specs(db, project)
+    # 055: the editor's chip, `rev 3 · aplicada` / `rev 4 · borrador`.
+    data["revision"] = revisions.chip(db, project)
     return data
 
 

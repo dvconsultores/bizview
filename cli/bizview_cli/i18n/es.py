@@ -85,8 +85,8 @@ MESSAGES: dict[str, str] = {
     "cli.describe_out_help": "carpeta donde escribir el pack (por defecto, la actual)",
     "describe.pack_written": "escrito: {path}",
     "cli.theme_help": "valida y previsualiza temas (datos: colores y formas, nunca CSS)",
-    "cli.import_help": "mide un proyecto (carpeta o zip) contra los dos límites de importación, sin subirlo",
-    "cli.import_dry_run_help": "solo medir: no escribe ni sube nada",
+    "cli.import_help": "mide un proyecto (carpeta o zip), lo compara con el del espacio de trabajo y muestra el diff, sin subirlo",
+    "cli.import_dry_run_help": "solo el diff de la reimportación: no escribe ni sube nada",
     "cli.import_json_help": "salida JSON (la misma forma que usa el servidor)",
     # Feature 049: the two allowances, measured the same way the server measures them.
     "cli.budget_project_title": "  {project} · límites de importación",
@@ -98,6 +98,10 @@ MESSAGES: dict[str, str] = {
     "cli.budget_not_importable": "  resultado    no importable",
     "cli.budget_reason": "  motivo       {message}",
     "cli.budget_project": "  proyecto     {slug}",
+    # Feature 055: what the import would do, against the workspace the command runs in.
+    "cli.diff_mode": "  modo         {mode} (proyecto en {folder})",
+    "cli.diff_counts": "  cambios      +{added} ~{changed} -{removed} · specs +{specs_added} -{specs_removed}",
+    "cli.diff_more": "  … y {more} más",
     "cli.projects.artifacts_over_files": "El proyecto supera el límite de artefactos: {files} archivos (máximo {max_files}), contados en {label}",
     "cli.projects.artifacts_over_bytes": "El proyecto supera el límite de artefactos: {size_mb} MB en {label} (máximo {max_mb} MB)",
     "cli.projects.artifacts_file_too_large": "{path} supera el máximo por archivo ({max_kb} KB)",

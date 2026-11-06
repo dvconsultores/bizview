@@ -13,6 +13,8 @@ import type {
   ProjectFile,
   ProjectHistory,
   ProjectImportResult,
+  ProjectRevision,
+  ProjectRevisionList,
   ProjectSummary,
   ProjectTree,
   Revision,
@@ -69,14 +71,39 @@ export const projectsApi = {
   timeline: (slug: string, folder: string) =>
     api.get<SpecTimeline>(`${base(slug)}/specs/${encodeURIComponent(folder)}/timeline`),
   exportUrl: (slug: string) => `${base(slug)}/export.zip`,
+  /** Feature 055: the project's own revisions, newest first. */
+  revisions: (slug: string) => api.get<ProjectRevisionList>(`${base(slug)}/revisions`),
+  revisionZipUrl: (slug: string, number: number) =>
+    `${base(slug)}/revisions/${number}/zip`,
+  /** Write an older revision back as a new draft and apply it (step-up). */
+  revert: (slug: string, number: number) =>
+    api.post<{ revision: ProjectRevision; restored: number; missing: string[] }>(
+      `${base(slug)}/revisions/${number}/revert`),
 };
 
 /** Raw zip upload (the JSON client only sends JSON); same step-up retry as `api`. */
+export interface ImportParams {
+  name?: string;
+  slug?: string;
+  /** Ask for a second project instead of a revision of the one this slug belongs to. */
+  copy?: boolean;
+  /** Answer the diff and write nothing. */
+  dryRun?: boolean;
+  /** Accept overwriting the editor changes the draft holds. */
+  replaceDraft?: boolean;
+}
+
 export async function importProjectZip(
   file: Blob,
-  params: { name?: string; slug?: string } = {},
+  params: ImportParams = {},
 ): Promise<ProjectImportResult> {
-  const send = () => fetch(`/api/projects/import${qs(params)}`, {
+  const query = qs({
+    name: params.name, slug: params.slug,
+    copy: params.copy ? "true" : undefined,
+    dry_run: params.dryRun ? "true" : undefined,
+    replace_draft: params.replaceDraft ? "true" : undefined,
+  });
+  const send = () => fetch(`/api/projects/import${query}`, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/zip", "X-Requested-With": "fetch",

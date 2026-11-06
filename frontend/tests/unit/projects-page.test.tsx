@@ -80,16 +80,60 @@ async function chooseZip() {
 }
 
 describe("Projects page", () => {
-  it("imports a zip and opens the project it created", async () => {
+  it("previews the diff and then imports the zip (055)", async () => {
+    const diff = {
+      added: ["reports/cripto/report.yaml"], changed: [], removed: [],
+      specs: { added: [], removed: [] }, ids: { added: [], removed: [] },
+      counts: { added: 1, changed: 0, removed: 0, specs_added: 0, specs_removed: 0,
+                ids_added: 0, ids_removed: 0 },
+      truncated: false, base_revision: 1,
+    };
+    vi.mocked(importProjectZip)
+      .mockResolvedValueOnce({ project: { slug: "ventas" } as never, ignored: [],
+                               validation: { errors: [] } as never, mode: "reimported",
+                               revision: null, diff: diff as never })
+      .mockResolvedValueOnce({ project: { slug: "ventas", name: "Ventas" } as never, ignored: [],
+                               validation: { errors: [] } as never, mode: "reimported",
+                               revision: { number: 2 } as never, diff: diff as never });
+    await open();
+    await chooseZip();
+
+    // First press asks the server what would change; nothing is written.
+    await act(async () => { button(t.projects.importNow)!.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(importProjectZip).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(importProjectZip).mock.calls[0][1]).toEqual({ copy: false, dryRun: true });
+    expect(container.querySelector('[data-testid="revision-diff"]')).not.toBeNull();
+    expect(container.textContent).toContain(t.projects.diff.reimportTitle(1, 0, 0, 1));
+
+    // Second press writes it.
+    await act(async () => { button(t.projects.importNow)!.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(importProjectZip).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(importProjectZip).mock.calls[1][1]).toEqual({ copy: false,
+                                                                 replaceDraft: false });
+    expect(container.textContent).toContain(t.projects.reimportedTitle("Ventas", 2));
+    expect(projectsApi).not.toHaveProperty("create");
+  });
+
+  it("asks before replacing a draft with editor changes (055)", async () => {
+    const diff = {
+      added: [], changed: ["reports/cripto/report.yaml"], removed: [],
+      specs: { added: [], removed: [] }, ids: { added: [], removed: [] },
+      counts: { added: 0, changed: 1, removed: 0, specs_added: 0, specs_removed: 0,
+                ids_added: 0, ids_removed: 0 },
+      truncated: false, base_revision: 2,
+    };
     vi.mocked(importProjectZip).mockResolvedValueOnce({
       project: { slug: "ventas" } as never, ignored: [], validation: { errors: [] } as never,
+      mode: "reimported", revision: null, diff: diff as never, needs_confirmation: true,
     });
     await open();
     await chooseZip();
     await act(async () => { button(t.projects.importNow)!.click(); });
     await act(async () => { await Promise.resolve(); });
-    expect(importProjectZip).toHaveBeenCalledOnce();
-    expect(projectsApi).not.toHaveProperty("create");
+    expect(container.textContent).toContain(t.projects.replaceDraftTitle);
+    expect(button(t.projects.replaceDraft)).toBeDefined();
   });
 
   it("offers no create affordance in either state (049)", async () => {

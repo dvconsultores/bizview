@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Importing a project again is a new revision of it, not a second project (feature 055)**. Every
+  correction to a project arrived as another zip, and **Importar** treated a taken slug as a
+  collision: it appended `-2`, created a different project, and the installation ended up with
+  `ventas-marca`, `ventas-marca-2` and `ventas-marca-3` whose ids collided at apply and whose shares
+  and grants had been left behind. The import now matches by slug — the manifest's, or the one the
+  project's name derives to — and, when the project exists, writes the archive as its **new draft
+  revision** with full-replacement semantics (what the zip no longer carries leaves the folder,
+  images included) while the project keeps its id, slug, shares, grants, dashboards, audit history
+  and loaded data. The incoming `project.yaml` gets the project's own slug (an archive exported from
+  the product carries `slug: ""`, which the schema refuses at apply time). Before writing anything
+  it answers a **diff** — files added / changed / removed, specs and ids, the two allowances of 049
+  — shown in the import card; a dry run writes nothing, and editor changes saved since the last
+  import are overwritten only after **Reemplazar borrador**. A project keeps numbered revisions
+  (`rev 3 · aplicada`, `rev 4 · borrador`), listed in the project page with their date, author,
+  source and diff, each downloadable as a zip; **Aplicar** marks the draft applied and the previous
+  one *anterior*, and **Volver a la revisión anterior** writes that revision back as a new draft and
+  applies it, audited.
+  `PROJECT_REVISIONS_KEEP` (default 20) bounds the history and never prunes the applied or previous
+  revisions. `Importar como copia` is now the only way to get a second project, and the copy renames
+  its artifact ids so it can apply. `bizview import <zip>` prints the mode and the diff against the
+  workspace folder, and the API takes `copy`, `dry_run` and `replace_draft`. Migration
+  `0052_project_revisions` adds `project_revision` and `project.revision_seq`.
 - **Sign in with Google, branded, and a role policy the superuser can edit (feature 054)**. The
   sign-in page showed a plain outline button next to Telegram's: it is now Google's own action — the
   four-colour **G** inlined in the bundle (no external fetch), a light surface on the light theme and

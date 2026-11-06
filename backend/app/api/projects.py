@@ -82,7 +82,15 @@ def save_import_limits(body: LimitsIn, actor: AppUser = Depends(require_superuse
 
 @router.get("/{slug}")
 def get_project(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
-    return projects.detail(db, projects.get(db, slug), actor)
+    from app.projects import revisions
+
+    p = projects.get(db, slug)
+    # 055: a project that predates the revisions table gets its revision 1 here — the migration must
+    # not read PROJECTS_DIR (research R8). Idempotent: a project with revisions pays one query.
+    if revisions.current(db, p) is None:
+        revisions.ensure_baseline_quietly(db, p)
+        db.commit()
+    return projects.detail(db, p, actor)
 
 
 @router.patch("/{slug}")
@@ -205,6 +213,17 @@ class OpsBody(BaseModel):
 OP_COMMANDS = {"rename": "rename", "delete": "delete", "rmdir": "delete", "mkdir": "edit"}
 
 
+def _editor_revision(db: Session, p: Project, actor: AppUser) -> None:
+    """One revision per save (055, FR-008): the folder after the write, whoever wrote it."""
+    from app.projects import revisions
+
+    try:
+        revisions.register_editor_revision(db, p, _user(actor, "edit"))
+        db.commit()
+    except (OSError, fs.ProjectPathError):      # the save itself already succeeded
+        db.rollback()
+
+
 def _user(actor: AppUser, command: str) -> dict:
     return {"kind": "user", "user_id": actor.id, "session_id": None, "command": command}
 
@@ -221,6 +240,7 @@ def save_file(slug: str, body: FileSave, actor: AppUser = Depends(require_superu
                            _user(actor, "edit"))
     except fs.ProjectPathError as e:
         raise path_error(e) from e
+    _editor_revision(db, p, actor)
     return {"file": {"path": body.path, "sha256": res[0]["sha256"],
                      "revision_id": res[0]["revision_id"]},
             **projects.revalidate(db, p)}
@@ -240,6 +260,7 @@ def file_ops(slug: str, body: OpsBody, actor: AppUser = Depends(require_superuse
             results.extend(fs.apply_ops(p.id, [op], _user(actor, OP_COMMANDS[op["op"]])))
         except fs.ProjectPathError as e:
             raise path_error(e) from e
+    _editor_revision(db, p, actor)
     return {"results": results, **projects.revalidate(db, p)}
 
 
@@ -410,19 +431,66 @@ def import_zip(request: Request, data: bytes = Body(..., media_type="application
                name: str | None = Query(None, max_length=80),
                slug: str | None = Query(None, max_length=50),
                themes: str = Query("skip", pattern="^(skip|replace|rename)$"),
+               copy: bool = Query(False), dry_run: bool = Query(False),
+               replace_draft: bool = Query(False),
                actor: AppUser = Depends(require_superuser), _: Auth = Depends(recent_reauth),
                db: Session = DB):
-    """A zip with one project (raw `application/zip` body) becomes a new project (R13).
+    """A zip with one project (raw `application/zip` body): imports it or re-imports it.
 
     `themes` answers a theme id the installation already has: skip it (default), replace it, or
-    rename the project's copy so both survive (047)."""
+    rename the project's copy so both survive (047). Feature 055: a slug that already belongs to a
+    project makes this a new *revision* of that project; `copy=true` asks for a second project
+    instead, `dry_run=true` answers the diff and writes nothing, and `replace_draft=true` accepts
+    overwriting editor changes the draft holds."""
     from app.projects import zip as project_zip
 
     try:
         return project_zip.import_zip(db, actor, data, name=name, slug=slug,
-                                      themes_on_conflict=themes, ip=client_ip(request))
+                                      themes_on_conflict=themes, ip=client_ip(request),
+                                      copy=copy, dry_run=dry_run, replace_draft=replace_draft)
     except project_zip.ZipRejected as e:
         raise ApiError(413 if e.code == "too_large" else 422, e.code, e.message) from e
+
+
+@router.get("/{slug}/revisions")
+def project_revisions(slug: str, actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """The project's own revisions, newest first (feature 055)."""
+    from app.projects import revisions
+
+    return revisions.listing(db, projects.get(db, slug))
+
+
+@router.get("/{slug}/revisions/{number}/zip")
+def project_revision_zip(slug: str, number: int, request: Request,
+                         actor: AppUser = Depends(require_superuser), db: Session = DB):
+    """One revision as a zip with the shape **Exportar** produces."""
+    from app.projects import revisions
+    from app.projects import zip as project_zip
+
+    p = projects.get(db, slug)
+    row = revisions.by_number(db, p, number)
+    if row is None:
+        raise not_found(M("projects.revision_not_found", number=number))
+    data, missing = project_zip.export_revision(db, actor, p, row, client_ip(request))
+    headers = {"Content-Disposition": f'attachment; filename="{p.slug}-rev{number}.zip"'}
+    if missing:
+        # The caller sees which paths the zip could not carry, without failing the download.
+        headers["X-Bizview-Missing"] = ",".join(missing)[:1000]
+    return Response(data, media_type="application/zip", headers=headers)
+
+
+@router.post("/{slug}/revisions/{number}/revert")
+def revert_revision(slug: str, number: int, request: Request,
+                    actor: AppUser = Depends(require_superuser),
+                    _: Auth = Depends(recent_reauth), db: Session = DB):
+    """Write that revision back as a new draft and apply it (feature 055, FR-012)."""
+    from app.projects import revisions
+
+    p = projects.get(db, slug)
+    projects.ensure_editable(p)
+    result = revisions.revert_to(db, actor, p, number, client_ip(request))
+    db.refresh(p)
+    return {**result, "project": projects.detail(db, p, actor)}
 
 
 @router.get("/{slug}/assets/{path:path}")

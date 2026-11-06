@@ -641,6 +641,8 @@ export const en: Catalogue = {
     project_applied: "Project applied",
     project_withdrawn: "Project withdrawn",
     project_imported: "Project imported",
+    project_reimported: "Project re-imported as a revision",
+    project_reverted: "Previous revision restored",
     project_limits_changed: "Import limits changed",
     project_exported: "Project exported",
     project_fix_applied: "Fix applied",
@@ -1251,6 +1253,62 @@ export const en: Catalogue = {
     emptyText: "Projects are authored outside Bizview and imported as a zip. Import the first one to start.",
     importFirst: "Import the first project",
     importNow: "Import now",
+    // Feature 055: a re-import is a new revision of the same project.
+    copy: "Import as a copy",
+    copyHint: "Creates a separate project with its own slug and its own ids.",
+    copyLabel: (slug: string) => `"${slug}" will be created as a new project.`,
+    replaceDraftTitle: "The draft holds editor changes",
+    replaceDraftText: (slug: string) =>
+      `Importing replaces the files of "${slug}". What you saved in the editor stays in the history, but the draft is replaced.`,
+    replaceDraft: "Replace draft",
+    reimportedTitle: (name: string, number: number) => `Project "${name}" · revision ${number}`,
+    diff: {
+      createdTitle: (added: number) =>
+        added === 1 ? "The new project brings 1 file." : `The new project brings ${added} files.`,
+      reimportTitle: (added: number, changed: number, removed: number, base: number | null) => {
+        const parts = [
+          added ? `${added} added` : "",
+          changed ? `${changed} changed` : "",
+          removed ? `${removed} removed` : "",
+        ].filter(Boolean);
+        const list = parts.length ? parts.join(", ") : "no changes";
+        return base ? `Compared with revision ${base}: ${list}.` : `Compared with the project: ${list}.`;
+      },
+      empty: "The zip is identical to what the project already holds: a revision with no changes will be recorded.",
+      files: "Files",
+      specs: "Specs",
+      ids: "Ids",
+      details: "Show the affected files",
+      truncated: "The list stops at 500 paths per group; the totals are exact.",
+      fileCounts: (a: number, c: number, r: number) => `+${a} ~${c} −${r}`,
+      specCounts: (a: number, r: number) => `+${a} −${r}`,
+      idCounts: (a: number, r: number) => `+${a} −${r}`,
+    },
+    revision: {
+      label: "Revision",
+      chip: (number: number, status: string) => `rev ${number} · ${status}`,
+      status: {
+        draft: "draft", applied: "applied", previous: "previous", replaced: "replaced",
+      } as Record<string, string>,
+      source: { import: "Import", editor: "Editor" } as Record<string, string>,
+      title: "Revisions",
+      hint: (keep: number) =>
+        `Every import is a revision of the same project. Up to ${keep} are kept, plus the applied one and the previous one.`,
+      open: "Show revisions",
+      number: (n: number) => `Rev ${n}`,
+      files: (n: number) => (n === 1 ? "1 file" : `${n} files`),
+      by: (who: string, when: string) => `${who} · ${when}`,
+      download: (n: number) => `Download revision ${n}`,
+      revert: "Go back to this revision",
+      revertConfirm: (n: number) =>
+        `Revision ${n}'s files are written as a new revision and applied: the project's dashboards go back to that version.`,
+      reverted: (n: number) => `Revision ${n} restored and applied.`,
+      missing: (n: number) =>
+        (n === 1 ? "1 image could not be recovered: " : `${n} images could not be recovered: `),
+      empty: "No revisions yet.",
+      isDraft: "It is the current draft: nothing to restore.",
+      current: "Current",
+    },
     preflight: {
       title: "What the zip carries",
       reading: "Reading the zip's contents…",

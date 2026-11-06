@@ -121,8 +121,9 @@ def _run(args) -> int:
 
 
 def _import(args) -> int:
-    """Feature 049: measure a folder or a zip against both allowances. The only mode is a dry run —
-    the app owns the upload, and nothing here writes anything."""
+    """Feature 049/055: measure a folder or a zip against both allowances and diff it against the
+    workspace this command runs in. The app owns the upload: nothing here writes anything, and
+    `--dry-run` says the same and writes nothing (it never does)."""
     import json
 
     from bizview_cli import importer

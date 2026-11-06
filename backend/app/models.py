@@ -56,6 +56,8 @@ AUDIT_KINDS = (
     # feature 020
     "project_created", "project_updated", "project_deleted", "project_purged", "project_applied",
     "project_withdrawn", "project_imported", "project_exported", "project_converted",
+    # 055: the same project came back as a revision, and a revert applied an older one.
+    "project_reimported", "project_reverted",
     "project_fix_applied",
     # feature 049
     "project_limits_changed",
@@ -813,6 +815,10 @@ class TelegramRequest(Base):
 PROJECT_ORIGINS = ("app", "git")
 REVISION_OPS = ("create", "update", "delete", "rename", "restore", "import", "external", "git")
 REVISION_ACTORS = ("user", "agent", "system", "external", "git")
+#: Feature 055: a project's own revision — a numbered snapshot of its folder, not a workspace
+#: version. `anterior` is the applied revision before the current one and is what a revert restores.
+PROJECT_REVISION_STATUSES = ("draft", "applied", "previous", "replaced")
+PROJECT_REVISION_SOURCES = ("import", "editor")
 SLUG_PATTERN = "^[a-z][a-z0-9-]{1,49}$"
 SPEC_FOLDER_PATTERN = "^[0-9]{3}-[a-z0-9][a-z0-9-]{0,59}$"
 
@@ -865,6 +871,8 @@ class Project(Base):
     description: Mapped[str] = mapped_column(Text, server_default=text("''"))
     origin: Mapped[str] = mapped_column(Text, server_default=text("'app'"))
     spec_seq: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    #: Feature 055: the highest revision number handed out, so two imports cannot share one.
+    revision_seq: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     validation: Mapped[dict | None] = mapped_column(JSONB)
     query_checks: Mapped[dict | None] = mapped_column(JSONB)
     first_applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -908,6 +916,41 @@ class ProjectFileRevision(Base):
     command: Mapped[str] = mapped_column(Text)
     group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProjectRevision(Base):
+    """One numbered snapshot of a project's folder (feature 055).
+
+    A re-import writes the zip as a new revision of the same project instead of creating a second
+    one. The row keeps a *map of hashes* (`path → sha256`), never the contents: those already live
+    per file in `project_file_revision` (020), and 20 snapshots of a 45 MB project would be the
+    wrong price for a list. Images are stored by hash only (044), so a download resolves text from
+    the history and takes an image from disk while the file still has that hash."""
+
+    __tablename__ = "project_revision"
+    __table_args__ = (
+        CheckConstraint("number >= 1", name="revision_number"),
+        CheckConstraint(_in("status", PROJECT_REVISION_STATUSES), name="revision_status"),
+        CheckConstraint(_in("source", PROJECT_REVISION_SOURCES), name="revision_source"),
+        CheckConstraint("jsonb_typeof(files) = 'object'", name="revision_files_object"),
+        CheckConstraint("jsonb_typeof(summary) = 'object'", name="revision_summary_object"),
+        UniqueConstraint("project_id", "number", name="uq_project_revision_number"),
+        # The unique constraint above already walks a project's numbers; this one reads them
+        # newest first.
+        Index("ix_project_revision_number_desc", "project_id", text("number DESC")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    project_id: Mapped[int] = mapped_column(BigInteger,
+                                            ForeignKey("project.id", ondelete="CASCADE"))
+    number: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(Text, server_default=text("'draft'"))
+    source: Mapped[str] = mapped_column(Text, server_default=text("'import'"))
+    files: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    summary: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ShareLink(Base):

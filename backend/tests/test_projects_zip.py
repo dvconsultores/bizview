@@ -55,14 +55,21 @@ def test_round_trip(client, projects):
         assert name in names, name
     assert any(n.startswith("ventas/.specify/templates/") for n in names)
 
+    # 055: the export carries the project's own slug, so importing it back is the *same* project
+    # at a new revision — the `-2` copy only happens when the author asks with `copy=true`.
     r = post(client, data, name="Ventas copia")
     assert r.status_code == 200, r.text
     body = r.json()
-    new = body["project"]["slug"]
-    assert new == "ventas-2"
+    assert body["mode"] == "reimported"
+    assert body["project"]["slug"] == slug
+    assert sql("SELECT count(*) FROM project")[0][0] == 1
+    assert {"README.md", ".bizview/schemas/project.schema.json"} <= set(body["ignored"])
+
+    copy = post(client, data, name="Ventas copia", copy=True).json()
+    new = copy["project"]["slug"]
+    assert new == "ventas-2" and copy["mode"] == "created"
     assert (projects / new / "specs/001-a/spec.md").read_text() == spec
     assert "slug: ventas-2" in (projects / new / "project.yaml").read_text()
-    assert {"README.md", ".bizview/schemas/project.schema.json"} <= set(body["ignored"])
     assert sql("SELECT count(*) FROM audit_event WHERE kind = 'project_exported'")[0][0] == 1
 
 
@@ -126,7 +133,9 @@ def test_export_after_a_spec_delete_imports_back(client, projects):
                                                                 "path": "specs/002-b"}]})
     assert r.status_code == 200, r.text
     data = client.get(f"/api/projects/{slug}/export.zip").content
-    r = post(client, data, name="Huecos copia")
+    # A copy keeps its own numbers and gaps (020 T085); a re-import is the same project, so the
+    # copy path is what proves the numbers travel.
+    r = post(client, data, name="Huecos copia", copy=True)
     assert r.status_code == 200, r.text
     copy = r.json()["project"]["slug"]
     assert sorted(p.name for p in (projects / copy / "specs").iterdir()) == ["001-a", "003-c"]
