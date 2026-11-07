@@ -74,6 +74,10 @@ export interface LayoutRendererProps {
   params?: LayoutParamsWiring;
   /** Feature 056: opens the card full screen; the screen owns `?ampliar=` so it can be shared. */
   onMaximize?: (id: string) => void;
+  /** Feature 056b: the grid and its single cell stretch to the container (the dialog). */
+  fill?: boolean;
+  /** Feature 056b: the card is drawn inside the dialog: no own title, no menu, no chrome. */
+  maximized?: boolean;
 }
 
 export function LayoutRenderer({
@@ -85,6 +89,8 @@ export function LayoutRenderer({
   problems,
   params,
   onMaximize,
+  fill = false,
+  maximized = false,
 }: LayoutRendererProps) {
   const t = useT();
   const notes = problems ?? data.layout_problems ?? def.layout_problems ?? [];
@@ -92,19 +98,20 @@ export function LayoutRenderer({
   if (components.length === 0 && notes.length === 0) return null;
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-12 ${GUTTER[layout.gutter ?? "md"] ?? GUTTER.md}`} data-testid="layout-grid">
+    <div className={`grid grid-cols-1 md:grid-cols-12 ${GUTTER[layout.gutter ?? "md"] ?? GUTTER.md}${fill ? " h-full min-h-0" : ""}`} data-testid="layout-grid">
       {components.map((component, index) => (
         <div
           key={`${component.id}-${index}`}
-          className={`group/cell relative min-w-0 h-full ${SPAN[clampSpan(component)]}${TILE_TYPES.has(component.type) && component.span === undefined ? " xl:col-span-3" : ""}`}
+          className={`group/cell relative min-w-0 ${fill ? "h-full" : "h-full"} ${SPAN[clampSpan(component)]}${TILE_TYPES.has(component.type) && component.span === undefined ? " xl:col-span-3" : ""}`}
           style={MIN_HEIGHT[component.type] ? { minHeight: MIN_HEIGHT[component.type] } : undefined}
           data-layout-id={component.id}
           data-layout-type={component.type}
           data-layout-span={clampSpan(component)}
         >
           <Component component={component} data={data} def={def} size={size} csvBase={csvBase}
-                     params={params} onMaximize={onMaximize ? () => onMaximize(component.id) : undefined} />
-          {onMaximize && MAXIMIZABLE.has(component.type) ? (
+                     params={params} maximized={maximized}
+                     onMaximize={maximized ? undefined : onMaximize ? () => onMaximize(component.id) : undefined} />
+          {onMaximize && !maximized && MAXIMIZABLE.has(component.type) ? (
             <button
               type="button"
               onClick={() => onMaximize(component.id)}
@@ -180,6 +187,7 @@ function Component({
   csvBase,
   params,
   onMaximize,
+  maximized,
 }: {
   component: WebComponent;
   data: ReportData;
@@ -188,6 +196,7 @@ function Component({
   csvBase?: string;
   params?: LayoutParamsWiring;
   onMaximize?: () => void;
+  maximized?: boolean;
 }) {
   const t = useT();
 
@@ -241,16 +250,17 @@ function Component({
       return <AssetGrid component={component} view={view} image={imageSet(def, component)} />;
     }
     case "kpi":
-      return <KpiComponent component={component} view={view} data={data} def={def} size={size} />;
+      return <KpiComponent component={component} view={view} data={data} def={def} size={size}
+                           maximized={maximized} />;
     case "line":
     case "area":
     case "bar":
     case "pie":
     case "donut":
-      return <ChartComponent component={component} view={view} def={def} />;
+      return <ChartComponent component={component} view={view} def={def} maximized={maximized} />;
     case "table":
       return <TableComponent component={component} view={view} def={def} csvBase={csvBase}
-                             size={size} onMaximize={onMaximize} />;
+                             size={size} onMaximize={onMaximize} maximized={maximized} />;
     default:
       return (
         <ErrorCard code="layout_component_unknown" component={component.id} type={component.type}
@@ -282,12 +292,14 @@ function KpiComponent({
   data,
   def,
   size,
+  maximized,
 }: {
   component: WebComponent;
   view: ReportView;
   data: ReportData;
   def: ReportDefinition;
   size: "normal" | "tv";
+  maximized?: boolean;
 }) {
   const t = useT();
   if (view.type !== "kpis") {
@@ -310,6 +322,7 @@ function KpiComponent({
   return (
     <KpiGrid
       mode="single"
+      maximized={maximized}
       items={view.items}
       currency={def.currency}
       compared={component.delta !== "none" && Boolean(data.selection.previous)}
@@ -453,10 +466,12 @@ function ChartComponent({
   component,
   view,
   def,
+  maximized,
 }: {
   component: WebComponent;
   view: ReportView;
   def: ReportDefinition;
+  maximized?: boolean;
 }) {
   const t = useT();
   const roles = componentRoles(component);
@@ -486,6 +501,7 @@ function ChartComponent({
         format={first.format}
         emptyText={t.reportParams.display.noData}
         labels={component.labels}
+        maximized={maximized}
       />
     );
   }
@@ -506,13 +522,14 @@ function ChartComponent({
         // `stacked` needs two or more series; with fewer it draws as the grouped bars it is.
         stacked={component.stacked === true && series.length >= 2}
         labels={component.labels === true}
+        maximized={maximized}
       />
     );
   }
 
   if (built.ordered) {
     const props = { frame, categories: built.categories, series: built.series,
-                    labels: component.labels === true };
+                    labels: component.labels === true, maximized };
     return component.type === "area" ? <AreaChart {...props} /> : <LineChart {...props} />;
   }
 
@@ -525,6 +542,7 @@ function ChartComponent({
       orientation="vertical"
       stacked={false}
       labels={component.labels === true}
+      maximized={maximized}
     />
   );
 }
@@ -540,6 +558,7 @@ function TableComponent({
   csvBase,
   size,
   onMaximize,
+  maximized,
 }: {
   component: WebComponent;
   view: ReportView;
@@ -547,6 +566,7 @@ function TableComponent({
   csvBase?: string;
   size: "normal" | "tv";
   onMaximize?: () => void;
+  maximized?: boolean;
 }) {
   const t = useT();
   if (view.type !== "table") {
@@ -578,6 +598,7 @@ function TableComponent({
       pageSize={clampNumber(component.page_size, 5, 200, DEFAULT_PAGE_SIZE)}
       image={tableImage(def, component)}
       onMaximize={onMaximize}
+      maximized={maximized}
     />
   );
 }

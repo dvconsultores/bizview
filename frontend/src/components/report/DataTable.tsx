@@ -26,6 +26,8 @@ interface DataTableProps {
   image?: { set: ReportImageSet; column: string };
   /** Feature 056: the card is in a layout cell that can be opened full screen. */
   onMaximize?: () => void;
+  /** Feature 056b: the dialog shows the title, so the card drops its heading and its menu. */
+  maximized?: boolean;
 }
 
 /** A cached-URL set's picture for one row: the column the set declares, never the key. */
@@ -74,6 +76,7 @@ export function DataTable({
   pageSize,
   image,
   onMaximize,
+  maximized = false,
 }: DataTableProps) {
   const t = useT();
   const [page, setPage] = useState(0);
@@ -110,11 +113,14 @@ export function DataTable({
   }
 
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
-        <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{heading}</h2>
-        {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
-      </div>
+    <Card className={maximized ? "flex h-full min-h-0 flex-col border-0 p-0 shadow-none" : undefined}
+          data-maximized={maximized ? "" : undefined}>
+      {maximized ? null : (
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
+          <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{heading}</h2>
+          {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
+        </div>
+      )}
       {/* Wide tables scroll inside the card, never the page. */}
       <div className="max-w-full overflow-x-auto rounded-b-card" tabIndex={0} role="region" aria-label={heading}>
         <table className="min-w-full text-left text-sm">

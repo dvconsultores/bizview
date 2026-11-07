@@ -57,6 +57,7 @@ export function KpiCard({
   sparklineRole,
   image,
   className = "",
+  maximized = false,
 }: {
   item: KpiItem;
   currency: string;
@@ -66,6 +67,8 @@ export function KpiCard({
   sparklineRole?: ColorRole;
   image?: ReportImageSet;
   className?: string;
+  /** Feature 056b: the dialog draws the card, so it drops its own chrome and grows the value. */
+  maximized?: boolean;
 }) {
   const t = useT();
   const isTv = size === "tv";
@@ -74,8 +77,10 @@ export function KpiCard({
   const full = formatValue(item.value, item.format, currency);
 
   return (
-    <Card className={`flex h-full w-full flex-col p-5 ${className}`}
-          data-kpi-card={item.metric} style={{ minHeight: KPI_MIN_HEIGHT }}>
+    <Card className={`flex h-full w-full flex-col ${maximized ? "border-0 p-0 shadow-none" : "p-5"} ${className}`}
+          data-kpi-card={item.metric}
+          data-maximized={maximized ? "" : undefined}
+          style={maximized ? undefined : { minHeight: KPI_MIN_HEIGHT }}>
       <div className="flex items-center gap-3">
         <span
           aria-hidden
@@ -94,7 +99,11 @@ export function KpiCard({
 
       <div
         className="mt-3 font-bold leading-tight tracking-tight text-ink"
-        style={{ fontSize: isTv ? "clamp(32px, 3.2vw, 56px)" : "clamp(28px, 2.6vw, 44px)" }}
+        style={{
+          fontSize: maximized
+            ? "clamp(44px, 6vw, 96px)"
+            : isTv ? "clamp(32px, 3.2vw, 56px)" : "clamp(28px, 2.6vw, 44px)",
+        }}
         title={full !== display ? full : undefined}
         data-kpi-value=""
       >
@@ -106,7 +115,7 @@ export function KpiCard({
       ) : null}
 
       {/* The row exists with and without a comparison: the cards in a row keep the same rhythm. */}
-      <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 text-xs"
+      <div className={`mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 ${maximized ? "pt-4 text-sm" : "pt-3 text-xs"}`}
            style={{ minHeight: `calc(12px + ${DELTA_ROW})` }} data-kpi-delta-row="">
         {compared ? (
           <>

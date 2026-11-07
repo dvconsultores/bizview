@@ -13,6 +13,9 @@ export function CardDialog({
   open,
   title,
   caption,
+  period,
+  comparison,
+  filters,
   onClose,
   onPrevious,
   onNext,
@@ -23,6 +26,10 @@ export function CardDialog({
   open: boolean;
   title: string;
   caption?: string;
+  /** Feature 056b: read in the dialog — the period, the comparison and the active filters. */
+  period?: string;
+  comparison?: string;
+  filters?: string[];
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -81,9 +88,27 @@ export function CardDialog({
            data-card-dialog=""
            className="flex h-full w-full max-w-[92rem] flex-col overflow-hidden bg-surface sm:rounded-card sm:shadow-raised">
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-          <h2 id={titleId} className="min-w-0 flex-1 text-lg font-semibold text-ink [overflow-wrap:anywhere]">
-            {title}
-          </h2>
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="text-lg font-semibold text-ink [overflow-wrap:anywhere]">
+              {title}
+            </h2>
+            {period || comparison || (filters && filters.length > 0) ? (
+              <ul className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted"
+                  data-dialog-meta="">
+                {period ? (
+                  <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{period}</li>
+                ) : null}
+                {comparison ? (
+                  <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{comparison}</li>
+                ) : null}
+                {(filters ?? []).map((chip) => (
+                  <li key={chip} className="rounded-full border border-line px-2 py-0.5 [overflow-wrap:anywhere]">
+                    {chip}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
           {onPrevious ? (
             <button type="button" onClick={onPrevious} aria-label={t.layout.previousCard}
                     className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
@@ -113,7 +138,7 @@ export function CardDialog({
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">{children}</div>
+        <div data-card-dialog-body="" className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">{children}</div>
         {caption ? (
           <p className="border-t border-line px-4 py-2 text-xs text-ink-muted [overflow-wrap:anywhere]">{caption}</p>
         ) : null}

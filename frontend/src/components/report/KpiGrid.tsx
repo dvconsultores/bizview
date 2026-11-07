@@ -19,6 +19,7 @@ export function KpiGrid({
   sparklineRole,
   image,
   mode = "grid",
+  maximized = false,
 }: {
   items: KpiItem[];
   currency: string;
@@ -33,6 +34,8 @@ export function KpiGrid({
   image?: ReportImageSet;
   /** `single`: the component fills its span, so no inner grid is drawn. */
   mode?: "grid" | "single";
+  /** Feature 056b: drawn inside the full-screen dialog — bigger value, no card chrome. */
+  maximized?: boolean;
 }) {
   const t = useT();
   const isTv = size === "tv";
@@ -43,6 +46,7 @@ export function KpiGrid({
     if (k.error) return <RenderErrorCard error={k.error} />;
     return (
       <KpiCard
+        maximized={maximized}
         item={k}
         currency={currency}
         compared={compared}

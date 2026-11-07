@@ -17,9 +17,12 @@ interface RankingTableProps {
   csvFileBase?: string;
   /** Feature 056: the card is in a layout cell that can be opened full screen. */
   onMaximize?: () => void;
+  /** Feature 056b: in the dialog the rows breathe and the card drops its own heading. */
+  maximized?: boolean;
 }
 
-export function RankingTable({ view, currency, compared, better, csvFileBase, onMaximize }: RankingTableProps) {
+export function RankingTable({ view, currency, compared, better, csvFileBase, onMaximize,
+                              maximized = false }: RankingTableProps) {
   const t = useT();
   const max = Math.max(0, ...view.items.map((i) => Math.abs(i.value ?? 0)));
 
@@ -31,15 +34,18 @@ export function RankingTable({ view, currency, compared, better, csvFileBase, on
   }
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{localized(view, "title")}</h2>
-        {view.items.length > 0 ? <CardMenu title={localized(view, "title")} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
-      </div>
+    <Card className={maximized ? "flex h-full min-h-0 flex-col border-0 p-0 shadow-none" : "p-5 sm:p-6"}
+          data-maximized={maximized ? "" : undefined}>
+      {maximized ? null : (
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{localized(view, "title")}</h2>
+          {view.items.length > 0 ? <CardMenu title={localized(view, "title")} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
+        </div>
+      )}
       {view.items.length === 0 ? (
         <p className="mt-3 text-sm text-ink-muted">{t.reportParams.display.noData}</p>
       ) : (
-        <ol className="mt-4 space-y-4">
+        <ol className={`${maximized ? "mt-0 space-y-5 sm:space-y-6" : "mt-4 space-y-4"}`}>
           {view.items.map((it, i) => (
             <li key={`${it.key}-${i}`} className="min-w-0">
               <div className="flex items-baseline justify-between">

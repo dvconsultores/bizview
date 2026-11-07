@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { BottomLabels, ValueAxis } from "./ChartAxes";
 import { ChartCard, ChartLegend } from "./ChartCard";
-import { CHART_HEIGHT, axisLabelIndexes, chartScale, gapPath } from "./chartScale";
+import { CHART_HEIGHT, PAD, axisLabelIndexes, chartScale, gapPath } from "./chartScale";
 import { formatValue } from "../../../lib/numbers";
 import { trimLabel } from "../../../lib/chartLabel";
 import { useReducedMotion } from "../../../lib/useReducedMotion";
+import { usePointerChip } from "../../../lib/usePointerChip";
 import { fillClass, strokeClass } from "../layoutRoles";
 import { chartSummary, type ChartCategory, type ChartFrame, type ChartSeries } from "./series";
 
@@ -17,32 +18,48 @@ export interface TrendChartProps {
   area?: boolean;
   /** Feature 056: print the last point's value at the end of the line. */
   labels?: boolean;
+  /** Feature 056b: drawn in the dialog, so it takes the dialog's height and shows no own title. */
+  maximized?: boolean;
 }
 
-/** Feature 056: the current series' last value, at the right edge where the line ends. */
-function LineEndLabel({ current, scale, length, currency }: {
+/**
+ * Feature 056 `labels` on a trend; 056b makes it honour the requirement: the value at each mark,
+ * drawn only where a label fits (a crowded series stays readable instead of printing a black band).
+ */
+function PointLabels({ current, scale, count, width, currency }: {
   current: ChartSeries;
   scale: ReturnType<typeof chartScale>;
-  length: number;
+  count: number;
+  width: number;
   currency: string;
 }) {
-  const last = current.values[length - 1];
-  if (last === null || last === undefined) return null;
+  const step = count > 1 ? ((width - PAD.left - PAD.right) / (count - 1)) : width;
+  const roomy = step >= 34 || count <= 12;
   return (
-    <text x={scale.x(length - 1)} y={scale.y(last) - 6} textAnchor="end" fontSize="10"
-          className="fill-chart-label tabular-nums">
-      {formatValue(last, current.format, currency)}
-    </text>
+    <>
+      {current.values.map((value, index) => {
+        if (value === null || value === undefined) return null;
+        if (!roomy && index % 2 !== 0) return null;
+        return (
+          <text key={`label-${index}`} x={scale.x(index)} y={scale.y(value) - 6} textAnchor="middle"
+                fontSize="10" className="fill-chart-label tabular-nums">
+            {formatValue(value, current.format, currency)}
+          </text>
+        );
+      })}
+    </>
   );
 }
 
 /** The trend chart's line (and fill) as a component; gaps stay gaps instead of a bridged line. */
-export function LineChart({ frame, categories, series, area = false, labels }: TrendChartProps) {
+export function LineChart({ frame, categories, series, area = false, labels,
+                            maximized = false }: TrendChartProps) {
   const label = chartSummary(frame);
   const drawn = series.filter((entry) => entry.values.some((value) => value !== null));
   const current = drawn[0];
   const previous = drawn.find((entry) => entry.dashed);
   const reduced = useReducedMotion();
+  const pointer = usePointerChip();
   const [hover, setHover] = useState<number | null>(null);
   const filled = area && current !== undefined && current.values.length > 1 && current.values.every((value) => value !== null);
 
@@ -52,6 +69,7 @@ export function LineChart({ frame, categories, series, area = false, labels }: T
       legend={<ChartLegend series={drawn} />}
       caption={label}
       signature={JSON.stringify(drawn.map((entry) => [entry.id, entry.values]))}
+      maximized={maximized}
     >
       {(width) => {
         const scale = chartScale(drawn.flatMap((entry) => entry.values), categories.length, width);
@@ -59,7 +77,8 @@ export function LineChart({ frame, categories, series, area = false, labels }: T
         const base = scale.y(0);
         const hovered = hover !== null && current ? current.values[hover] : null;
         return (
-          <div className="relative">
+          <div className="relative" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
+               onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
           <svg
             width={width}
             height={CHART_HEIGHT}
@@ -111,8 +130,10 @@ export function LineChart({ frame, categories, series, area = false, labels }: T
                   );
                 })
               : null}
-            {labels && current ? <LineEndLabel current={current} scale={scale} length={categories.length}
-                                              currency={frame.currency} /> : null}
+            {labels && current ? (
+              <PointLabels current={current} scale={scale} count={categories.length}
+                           width={width} currency={frame.currency} />
+            ) : null}
             <BottomLabels
               indexes={indexes}
               x={scale.x}
@@ -123,8 +144,13 @@ export function LineChart({ frame, categories, series, area = false, labels }: T
           {hovered !== null && hovered !== undefined && current && hover !== null ? (
             <div data-value-chip="" role="status"
                  className="pointer-events-none absolute z-10 w-max max-w-[190px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs shadow-raised"
-                 style={{ left: Math.max(4, Math.min(scale.x(hover) - 90, width - 194)),
-                          top: Math.max(0, scale.y(hovered) - 46) }}>
+                 style={(() => {
+                   const spot = pointer.place(width, CHART_HEIGHT, 190, 40);
+                   return {
+                     left: Math.max(4, Math.min(spot?.left ?? scale.x(hover) - 90, width - 194)),
+                     top: Math.max(0, spot?.top ?? scale.y(hovered) - 46),
+                   };
+                 })()}>
               <span className="block text-ink [overflow-wrap:anywhere]">
                 {[trimLabel(categories[hover]?.label ?? ""),
                   formatValue(hovered, current.format, frame.currency),

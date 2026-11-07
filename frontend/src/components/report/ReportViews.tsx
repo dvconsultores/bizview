@@ -20,11 +20,13 @@ interface CardProps {
   csvBase?: string;
   params?: LayoutParamsWiring;
   onMaximize?: (id: string) => void;
+  /** Feature 056b: this card is the one the dialog draws. */
+  maximized?: boolean;
 }
 
 /** One payload view as a card; `id` is what the full-screen dialog needs to find it again. */
 function ViewCard({ index, view, card }: { index: number; view: ReportView; card: CardProps }) {
-  const { data, def, kpiSize = "normal", csvBase, onMaximize } = card;
+  const { data, def, kpiSize = "normal", csvBase, onMaximize, maximized } = card;
   const compared = !!data.selection.previous;
   const maximize = onMaximize ? () => onMaximize(`${VIEW_CARD_PREFIX}${index}`) : undefined;
 
@@ -32,21 +34,24 @@ function ViewCard({ index, view, card }: { index: number; view: ReportView; card
   if (view.error) return <RenderErrorCard error={view.error} />;
   if (view.empty) return <NoDataCard error={view.empty} />;
   if (view.type === "kpis") {
-    return <KpiGrid items={view.items} currency={def.currency} compared={compared} size={kpiSize} />;
+    return <KpiGrid items={view.items} currency={def.currency} compared={compared} size={kpiSize}
+                    maximized={maximized} />;
   }
-  if (view.type === "trend") return <TrendChart view={view} currency={def.currency} />;
+  if (view.type === "trend") {
+    return <TrendChart view={view} currency={def.currency} maximized={maximized} />;
+  }
   if (view.type === "ranking") {
     return (
       <RankingTable view={view} currency={def.currency} compared={compared}
                     better={def.metrics[view.metric]?.better ?? "higher"}
                     csvFileBase={kpiSize === "normal" ? csvBase : undefined}
-                    onMaximize={maximize} />
+                    onMaximize={maximize} maximized={maximized} />
     );
   }
   return (
     <DataTable view={view} currency={def.currency}
                csvFileBase={kpiSize === "normal" ? csvBase : undefined}
-               onMaximize={maximize} />
+               onMaximize={maximize} maximized={maximized} />
   );
 }
 
@@ -102,5 +107,5 @@ export function SingleView({ index, data, def, csvBase, params }: Omit<CardProps
 }) {
   const view = data.views[index];
   if (!view) return null;
-  return <ViewCard index={index} view={view} card={{ data, def, csvBase, params }} />;
+  return <ViewCard index={index} view={view} card={{ data, def, csvBase, params, maximized: true }} />;
 }

@@ -9,7 +9,12 @@ import { CHART_HEIGHT as HEIGHT, PAD, chartScale, gapPath, useChartWidth } from 
 type Trend = Extract<ReportView, { type: "trend" }>;
 
 /** Line chart drawn as SVG at the container's width; gaps where a bucket has no data. */
-export function TrendChart({ view, currency }: { view: Trend; currency: string }) {
+export function TrendChart({ view, currency, maximized = false }: {
+  view: Trend;
+  currency: string;
+  /** Feature 056b: the dialog header carries the title; the card drops its own chrome. */
+  maximized?: boolean;
+}) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -52,9 +57,12 @@ export function TrendChart({ view, currency }: { view: Trend; currency: string }
     : localized(view, "label");
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className={`flex h-full min-h-0 flex-col ${maximized ? "border-0 p-0 shadow-none" : "p-5 sm:p-6"}`}
+          data-maximized={maximized ? "" : undefined}>
       <div className="flex flex-wrap items-baseline justify-between">
-        <h2 className="mr-3 text-lg font-semibold text-ink">{t.reportParams.display.trend(localized(view, "label"))}</h2>
+        {maximized ? null : (
+          <h2 className="mr-3 text-lg font-semibold text-ink">{t.reportParams.display.trend(localized(view, "label"))}</h2>
+        )}
         <p className="text-xs text-ink-muted" aria-live="polite">
           {active
             ? `${formatBucket(active.bucket, view.grain)}: ${formatValue(active.value, view.format, currency)}${
@@ -63,7 +71,7 @@ export function TrendChart({ view, currency }: { view: Trend; currency: string }
             : hasPrev ? t.reportParams.display.legend : ""}
         </p>
       </div>
-      <div ref={ref} className="mt-2 w-full" style={{ minHeight: HEIGHT }}>
+      <div ref={ref} className="mt-2 w-full flex-1" style={{ minHeight: HEIGHT }}>
         {width > 0 && (
           <svg
             width={width}

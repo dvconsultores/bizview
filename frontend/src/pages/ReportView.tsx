@@ -146,10 +146,10 @@ export function ReportView() {
 
   // Feature 056: one card full screen, shareable as `?ampliar=<component id>`; TV mode ignores it.
   const maximizedId = tv ? null : params.get("ampliar");
-  const maximize = useCallback((id: string) => {
+  const maximize = useCallback((id: string, replace = false) => {
     const next = new URLSearchParams(params);
     next.set("ampliar", id);
-    setParams(next, { replace: false });
+    setParams(next, { replace });
   }, [params, setParams]);
   const closeMaximized = useCallback(() => {
     const next = new URLSearchParams(params);
@@ -823,7 +823,7 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
   def: ReportDefinition;
   csvBase?: string;
   params?: LayoutParamsWiring;
-  onMaximize: (id: string) => void;
+  onMaximize: (id: string, replace?: boolean) => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -847,9 +847,11 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
       ?? t.reportParams.detailTitle
     : maximizedTitle(def, id, t);
 
+  // Feature 056b: moving between cards replaces the history entry, so Back closes the dialog
+  // instead of stepping through it.
   const go = (step: -1 | 1) => {
     const target = cards[position + step];
-    if (target) onMaximize(target);
+    if (target) onMaximize(target, true);
   };
 
   return (
@@ -865,17 +867,26 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
             csvBase ? csvFileName(`${csvBase}-${table.title}`) : csvFileName(table.title),
             toCsv(table.columns, table.rows))
         : undefined}
+      period={t.reportParams.periodLabels[data.selection.period] ?? data.selection.period}
+      comparison={data.selection.previous && data.selection.compare !== "none"
+        ? t.reportParams.compareLabels[data.selection.compare] : undefined}
+      filters={Object.entries(data.filters ?? {})
+        .flatMap(([field, values]) => values.map((value) => `${field}: ${value}`))}
     >
-      <div ref={frame} className="min-h-0">
+      {/* Feature 056b: the frame is the height the chart measures, and the card is told it is the
+          dialog's: one card across the whole width, no own title, no menu. */}
+      <div ref={frame} className="flex h-full min-h-0 flex-col">
         {byView ? (
           <SingleView index={index} data={data} def={def} csvBase={csvBase} params={params} />
         ) : def.layout?.web && component ? (
           <LayoutRenderer
-            layout={{ ...def.layout.web, gutter: "md", components: [component] }}
+            layout={{ ...def.layout.web, gutter: "md", components: [{ ...component, span: 12 }] }}
             data={data}
             def={def}
             csvBase={csvBase}
             params={params}
+            fill
+            maximized
           />
         ) : null}
       </div>

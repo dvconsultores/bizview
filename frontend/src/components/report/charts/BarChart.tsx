@@ -3,6 +3,7 @@ import type { BarOrientation } from "../../../api/types";
 import { formatCompact, formatValue } from "../../../lib/numbers";
 import { LABEL_ABOVE, fitLabel, labelColumn, measureText, trimLabel } from "../../../lib/chartLabel";
 import { useReducedMotion } from "../../../lib/useReducedMotion";
+import { usePointerChip } from "../../../lib/usePointerChip";
 import { BottomLabels } from "./ChartAxes";
 import { ChartCard, ChartLegend } from "./ChartCard";
 import {
@@ -25,6 +26,8 @@ export interface BarChartProps {
   stacked: boolean;
   /** Feature 056: print the value at the end of each bar, hiding the ones that do not fit. */
   labels?: boolean;
+  /** Feature 056b: the card is drawn in the dialog, so its labels get the dialog's width. */
+  maximized?: boolean;
 }
 
 const HORIZONTAL_ROW = 26;
@@ -33,7 +36,8 @@ const ROW_ABOVE = 34;
 const CHIP_W = 190;
 
 /** Bars as SVG: vertical or horizontal, grouped or stacked (feature 026, research R5). */
-export function BarChart({ frame, categories, series, orientation, stacked, labels }: BarChartProps) {
+export function BarChart({ frame, categories, series, orientation, stacked, labels,
+                          maximized = false }: BarChartProps) {
   const label = chartSummary(frame);
   const drawn = series.filter((entry) => entry.values.some((value) => value !== null));
 
@@ -43,12 +47,13 @@ export function BarChart({ frame, categories, series, orientation, stacked, labe
       legend={<ChartLegend series={drawn} />}
       caption={label}
       signature={JSON.stringify([stacked, categories.length, drawn.map((entry) => [entry.id, entry.values])])}
+      maximized={maximized}
     >
       {(width, available) =>
         orientation === "horizontal" ? (
           <HorizontalBars width={width} height={Math.max(CHART_MIN_HEIGHT, available)}
                           categories={categories} series={drawn} stacked={stacked}
-                          label={label} labels={labels} frame={frame} />
+                          label={label} labels={labels} frame={frame} maximized={maximized} />
         ) : (
           <VerticalBars width={width} categories={categories} series={drawn} stacked={stacked}
                         label={label} labels={labels} frame={frame} />
@@ -97,6 +102,7 @@ function VerticalBars({
   frame: ChartFrame;
 }) {
   const reduced = useReducedMotion();
+  const pointer = usePointerChip();
   const [hover, setHover] = useState<number | null>(null);
   const scale = chartScale(series.flatMap((entry) => entry.values), categories.length, width);
   const count = Math.max(1, categories.length);
@@ -107,8 +113,10 @@ function VerticalBars({
   const center = (i: number) => PAD.left + i * step + step / 2;
   const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
 
+  const spot = pointer.place(width, CHART_HEIGHT);
   return (
-    <div className="relative">
+    <div className="relative" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
+         onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
       <svg width={width} height={CHART_HEIGHT} role={label ? "img" : undefined} aria-label={label} className="block">
         <ValueGrid scale={scale} width={width} />
         {categories.map((category, i) => {
@@ -166,7 +174,8 @@ function VerticalBars({
         />
       </svg>
       {hovered ? (
-        <ValueChip x={center(hover!) - CHIP_W / 2} y={PAD.top - 6} width={width}
+        <ValueChip x={spot?.left ?? center(hover!) - CHIP_W / 2} y={spot?.top ?? PAD.top - 6}
+                   width={width}
                    text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
       ) : null}
     </div>
@@ -184,7 +193,7 @@ function BarValue({ x, y, text, barPx }: { x: number; y: number; text: string; b
 }
 
 function HorizontalBars({
-  width, height, categories, series, stacked, label, labels, frame,
+  width, height, categories, series, stacked, label, labels, frame, maximized = false,
 }: {
   width: number;
   height: number;
@@ -194,8 +203,10 @@ function HorizontalBars({
   label?: string;
   labels?: boolean;
   frame: ChartFrame;
+  maximized?: boolean;
 }) {
   const reduced = useReducedMotion();
+  const pointer = usePointerChip();
   const [hover, setHover] = useState<number | null>(null);
   const above = width < LABEL_ABOVE;
   const count = Math.max(1, categories.length);
@@ -204,7 +215,7 @@ function HorizontalBars({
   const natural = PAD.top + PAD.bottom + count * (above ? ROW_ABOVE : HORIZONTAL_ROW) + 6;
   const chartHeight = Math.max(natural, height);
   // Feature 056: the column is measured from the real font, up to 220 px and 40 % of the chart.
-  const left = above ? 8 : labelColumn(width, categories.map((c) => c.label));
+  const left = above ? 8 : labelColumn(width, categories.map((c) => c.label), { maximized });
   const innerW = Math.max(1, width - left - PAD.right - (labels ? 56 : 8));
   const [lo, hi] = valueRange(series.flatMap((entry) => entry.values));
   const ticks = niceTicks(lo, hi);
@@ -216,8 +227,10 @@ function HorizontalBars({
   const axisLine = chartHeight - PAD.bottom + 14;
   const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
 
+  const spot = pointer.place(width, chartHeight);
   return (
-    <div className="relative">
+    <div className="relative" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
+         onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
       <svg width={width} height={chartHeight} role={label ? "img" : undefined} aria-label={label} className="block">
         {!above ? (
           <>
@@ -291,7 +304,8 @@ function HorizontalBars({
         })}
       </svg>
       {hovered ? (
-        <ValueChip x={left} y={PAD.top + (hover ?? 0) * row - 4} width={width}
+        <ValueChip x={spot?.left ?? left} y={spot?.top ?? PAD.top + (hover ?? 0) * row - 4}
+                   width={width}
                    text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
       ) : null}
     </div>

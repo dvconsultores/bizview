@@ -117,6 +117,18 @@ All notable changes to this project are documented here. The format follows
   identifies it. The column is measured from the real font now (at most 220 px and 40 % of the
   chart, at least 96 px), the text is shortened with a trailing ellipsis, `<title>` keeps the whole
   name, and below 480 px the label moves above its bar so nothing is truncated at all.
+- **The card opened with Ampliar fills the screen (feature 056, converged)**. The dialog was right
+  and the card inside kept its dashboard geometry: it was rendered untouched, so a `span: 6` landed
+  in half of a twelve-column grid, the frame around it had no height for `useChartHeight` to
+  measure, and the card drew its own title, its own **Ampliar** and its own `⋯` a second time inside
+  the dialog. The card is now passed as `span: 12` with the height chain (`h-full min-h-0 flex-col`)
+  and a `maximized` flag that drops its title, its controls, its border, its shadow and its padding,
+  so the chart is drawn at the size of the dialog: bars grow taller, the label column may take half
+  the width and 480 px (`BIOLOGICOS PROVIACOL FORTE` fits whole from 1200 px up), a donut ring is
+  `min(60vh, 520px)` with its legend beside it, and a KPI shows its value at up to 96 px. The dialog
+  header carries the period, the comparison and the active filter chips, ← → no longer fill the
+  history (Back closes the dialog), a tip follows the pointer instead of sitting on the mark, and a
+  `line`/`area` with `labels` now prints a value at each point.
 
 ### Changed
 

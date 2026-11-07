@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportData, ReportDefinition, ReportView, WebComponent } from "../../src/api/types";
 import { CardDialog } from "../../src/components/report/CardDialog";
 import { LayoutRenderer } from "../../src/components/report/LayoutRenderer";
+import axe from "axe-core";
 import { fitLabel, labelColumn, measureText } from "../../src/lib/chartLabel";
 import { ReportViews } from "../../src/components/report/ReportViews";
 import { RankingTable } from "../../src/components/report/RankingTable";
@@ -332,5 +333,196 @@ describe("the layout without a card open", () => {
     render([{ id: "ventas", type: "kpi", view: "resumen", metric: "net_sales", span: 6 }],
            { onMaximize: vi.fn() });
     expect(container.querySelector("[data-card-dialog]")).toBeNull();
+  });
+});
+
+/** Feature 056b: the maximised card must fill the dialog, not keep its dashboard size. */
+describe("the maximised card fills the dialog (056b)", () => {
+  function mountDialog(component: WebComponent, options: { width?: number; height?: number } = {}) {
+    // jsdom has no layout engine: the frame's measured size is stubbed so the fill chain is proved
+    // end to end — the same numbers a 1440 × 900 dialog reports in a browser.
+    const width = options.width ?? 1400;
+    const height = options.height ?? 900;
+    const proto = HTMLElement.prototype as unknown as {
+      clientWidth: number; clientHeight: number;
+    };
+    const originalWidth = Object.getOwnPropertyDescriptor(proto, "clientWidth");
+    const originalHeight = Object.getOwnPropertyDescriptor(proto, "clientHeight");
+    Object.defineProperty(proto, "clientWidth", { configurable: true, get: () => width });
+    Object.defineProperty(proto, "clientHeight", { configurable: true, get: () => height });
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ ...component, span: 12 }] }}
+        data={data}
+        def={def}
+        fill
+        maximized
+      />,
+    );
+    return {
+      node,
+      restore: () => {
+        if (originalWidth) Object.defineProperty(proto, "clientWidth", originalWidth);
+        if (originalHeight) Object.defineProperty(proto, "clientHeight", originalHeight);
+      },
+    };
+  }
+
+  it("takes the whole grid and stretches the cell", () => {
+    const { restore } = mountDialog({ id: "ancho", type: "bar", view: "marcas", x: "product",
+                                      series: ["net_sales"], orientation: "horizontal" });
+    try {
+      const grid = container.querySelector("[data-testid='layout-grid']") as HTMLElement;
+      expect(grid.className).toContain("h-full");
+      const cell = container.querySelector("[data-layout-id='ancho']") as HTMLElement;
+      expect(cell.className).toContain("h-full");
+      // span 12 = the whole width, never half of it.
+      expect(cell.getAttribute("data-layout-span")).toBe("12");
+    } finally {
+      restore();
+    }
+  });
+
+  it("draws the chart at the dialog's size, with no ellipsis on a 45-character name", () => {
+    const { restore } = mountDialog({ id: "ancho", type: "bar", view: "marcas", x: "product",
+                                      series: ["net_sales"], orientation: "horizontal" });
+    try {
+      const svg = container.querySelector("svg") as SVGSVGElement;
+      expect(Number(svg.getAttribute("width"))).toBe(1400);
+      expect(Number(svg.getAttribute("height"))).toBe(900);
+      const labels = Array.from(svg.querySelectorAll("text")).map((node) => node.textContent ?? "");
+      expect(labels).toContain(LONG);
+      expect(labels.some((label) => label.endsWith("…") && label.includes("BIOLOGICOS"))).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  it("drops its own title, the Ampliar control and the menu", () => {
+    const { restore } = mountDialog({ id: "ancho", type: "bar", view: "marcas", x: "product",
+                                      series: ["net_sales"], orientation: "horizontal" });
+    try {
+      expect(container.querySelectorAll("h2")).toHaveLength(0);
+      expect(container.querySelector("[data-maximize]")).toBeNull();
+      expect(container.querySelector("button[aria-expanded]")).toBeNull();
+      const card = container.querySelector("[data-maximized]") as HTMLElement;
+      expect(card).not.toBeNull();
+      expect(card.className).toContain("p-0");
+    } finally {
+      restore();
+    }
+  });
+
+  it("sizes a donut ring for the dialog and enlarges the KPI value", () => {
+    const { restore } = mountDialog({ id: "torta", type: "donut", view: "marcas",
+                                      category: "product", value: "net_sales" });
+    try {
+      const ring = container.querySelector("svg") as SVGSVGElement;
+      expect(Number(ring.getAttribute("width"))).toBeGreaterThan(400);
+    } finally {
+      restore();
+    }
+
+    const second = mountDialog({ id: "ventas", type: "kpi", view: "resumen", metric: "net_sales" });
+    try {
+      const value = container.querySelector("[data-kpi-value]") as HTMLElement;
+      expect(value.style.fontSize).toBe("clamp(44px, 6vw, 96px)");
+      expect(container.querySelector("[data-maximize]")).toBeNull();
+    } finally {
+      second.restore();
+    }
+  });
+
+  it("gives a table card no heading and no menu inside the dialog", () => {
+    const { restore } = mountDialog({ id: "tabla", type: "table", view: "marcas" });
+    try {
+      expect(container.querySelector("h2")).toBeNull();
+      expect(container.querySelector("button[aria-expanded]")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("label policy in the dialog", () => {
+  it("fits 45 characters at 1440 px without shortening them", () => {
+    const column = labelColumn(1440, [LONG], { maximized: true });
+    expect(column).toBeGreaterThanOrEqual(measureText(LONG));
+    expect(fitLabel(LONG, column)).toBe(LONG);
+    // The dashboard cap still applies outside the dialog.
+    expect(fitLabel(LONG, labelColumn(1000, [LONG]))).not.toBe(LONG);
+  });
+});
+
+describe("moving between cards", () => {
+  it("replaces the history entry so Back closes the dialog", async () => {
+    // Read from the source: the arrow handler must not push a second history entry.
+    const source = await import("node:fs").then(({ readFileSync }) =>
+      readFileSync("src/pages/ReportView.tsx", "utf8"));
+    expect(source).toMatch(/const go = \(step: -1 \| 1\) => \{[\s\S]*?onMaximize\(target, true\);/);
+  });
+});
+
+describe("the dialog's accessibility", () => {
+  it("has no serious or critical axe violations with the card inside", async () => {
+    mount(
+      <CardDialog open title="Clientes por monto" period="Mes en curso"
+                  comparison="Período anterior" filters={["estado: pagado"]} onClose={vi.fn()}>
+        <p>gráfico</p>
+      </CardDialog>,
+    );
+    const results = await axe.run(container, {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
+      rules: { "color-contrast": { enabled: false } },
+    });
+    const serious = results.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    );
+    expect(serious.map((violation) => violation.id)).toEqual([]);
+  });
+
+  it("names the period, the comparison and the filters in its header", () => {
+    mount(
+      <CardDialog open title="Clientes por monto" period="Mes en curso"
+                  comparison="Período anterior" filters={["estado: pagado"]} onClose={vi.fn()}>
+        <p>gráfico</p>
+      </CardDialog>,
+    );
+    const meta = container.querySelector("[data-dialog-meta]") as HTMLElement;
+    expect(meta).not.toBeNull();
+    expect(meta.textContent).toContain("Mes en curso");
+    expect(meta.textContent).toContain("Período anterior");
+    expect(meta.textContent).toContain("estado: pagado");
+  });
+});
+
+describe("a slice and a point carry their value", () => {
+  it("shows a chip on a slice with the name, the value and the share", () => {
+    render([{ id: "torta", type: "pie", view: "marcas", category: "product", value: "net_sales" }]);
+    const slice = container.querySelector("svg path") as SVGPathElement;
+    expect(slice).not.toBeNull();
+    act(() => { slice.dispatchEvent(new PointerEvent("pointerover", { bubbles: true })); });
+    const chip = container.querySelector("[data-value-chip]");
+    expect(chip).not.toBeNull();
+    expect(chip!.textContent).toContain("BIOLOGICOS");
+    expect(chip!.textContent).toContain("%");
+  });
+
+  it("prints a value at each mark when the trend declares labels", () => {
+    const trend: ReportView = {
+      type: "trend", id: "diaria", metric: "net_sales", label: "Ventas netas", format: "currency",
+      grain: "day", summary: "Ventas por día.",
+      points: [
+        { bucket: "2026-09-01", value: 10, previous: 5 },
+        { bucket: "2026-09-02", value: 30, previous: 12 },
+        { bucket: "2026-09-03", value: 20, previous: 8 },
+      ],
+    };
+    mount(<LayoutRenderer layout={{ components: [{ id: "linea", type: "line", view: "diaria",
+                                                    labels: true }] }}
+                          data={{ ...data, views: [trend] }} def={def} />);
+    const texts = Array.from(container.querySelectorAll("svg text")).map((node) => node.textContent ?? "");
+    expect(texts.filter((text) => text.includes("10,00")).length).toBeGreaterThan(0);
+    expect(texts.filter((text) => text.includes("30,00")).length).toBeGreaterThan(0);
   });
 });

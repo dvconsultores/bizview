@@ -60,12 +60,27 @@ export function fitLabel(text: string, maxPx: number, fontPx = 11): string {
 
 export const LABEL_MIN = 96;
 export const LABEL_MAX = 220;
+/** The dialog's cap: a maximised card may give half its width to the category names. */
+export const LABEL_MAX_MAXIMIZED = 480;
 /** Below this chart width the label moves above its bar instead of beside it (phones). */
 export const LABEL_ABOVE = 480;
 
-/** Width of the label column: 40 % of the chart at most, the widest label at most 220 px. */
-export function labelColumn(width: number, labels: string[], fontPx = 11): number {
+/**
+ * Width of the label column: 40 % of the chart at most, the widest label at most 220 px.
+ *
+ * Feature 056b: the full-screen card has the room a dashboard card does not — 50 % and 480 px — so a
+ * name of 45 characters fits there and is only shortened when it really is too long.
+ */
+export function labelColumn(
+  width: number,
+  labels: string[],
+  { maximized = false, fontPx = 11 }: { maximized?: boolean; fontPx?: number } = {},
+): number {
+  const share = maximized ? 0.5 : 0.4;
+  const cap = maximized ? LABEL_MAX_MAXIMIZED : LABEL_MAX;
   const widest = labels.reduce((max, label) => Math.max(max, measureText(trimLabel(label), fontPx)), 0);
-  const wanted = Math.min(width * 0.4, Math.min(LABEL_MAX, widest + 10));
+  // Room for the drawn width plus the gap to the bar: a name that fits must not be shortened by
+  // the column's own margin (the 056b defect was a name short by 4 px).
+  const wanted = Math.min(width * share, Math.min(cap, widest + 16));
   return Math.max(Math.min(LABEL_MIN, Math.max(0, width - 40)), Math.round(wanted));
 }

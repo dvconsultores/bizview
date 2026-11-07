@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ColorRole, MetricFormat } from "../../../api/types";
 import { formatValue } from "../../../lib/numbers";
 import { useReducedMotion } from "../../../lib/useReducedMotion";
+import { usePointerChip } from "../../../lib/usePointerChip";
 import { ChartCard } from "./ChartCard";
 import { fillClass, roleAt, surfaceClass } from "../layoutRoles";
 import { chartSummary, type ChartCategory, type ChartFrame } from "./series";
@@ -19,6 +20,8 @@ export interface PieChartProps {
   emptyText: string;
   /** Feature 056: `true`/`values`/`percent`/`both` prints the figure on each slice. */
   labels?: boolean | "values" | "percent" | "both";
+  /** Feature 056b: the dialog gives the ring its own size instead of the card's 240 px. */
+  maximized?: boolean;
 }
 
 interface Slice {
@@ -106,26 +109,36 @@ export function PieChart({
   format,
   emptyText,
   labels,
+  maximized = false,
 }: PieChartProps) {
   const label = chartSummary(frame);
   const reduced = useReducedMotion();
+  const pointer = usePointerChip();
   const [hover, setHover] = useState<string | null>(null);
   const slices = topSlices(categories, values, topN, otherLabel, roles);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
   return (
-    <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}>
+    <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}
+               maximized={maximized}>
       {() => {
         if (total <= 0) return <p className="text-sm text-ink-muted">{emptyText}</p>;
-        const radius = SIZE / 2 - 4;
+        // Feature 056b: the ring grows with the dialog — 60 vh at most, 520 px — and the legend
+        // keeps its own column beside it.
+        const size = maximized
+          ? Math.min(520, Math.max(280, Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.6)))
+          : SIZE;
+        const radius = size / 2 - 4;
         const inner = donut ? radius * 0.55 : 0;
         let angle = 0;
         return (
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative shrink-0" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
+                 onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
             <svg
-              width={SIZE}
-              height={SIZE}
-              viewBox={`0 0 ${SIZE} ${SIZE}`}
+              width={size}
+              height={size}
+              viewBox={`0 0 ${size} ${size}`}
               role={label ? "img" : undefined}
               aria-label={label}
               className="shrink-0"
@@ -133,8 +146,8 @@ export function PieChart({
               {slices.length === 1 ? (
                 // A 360° arc has coincident endpoints, which SVG draws as nothing: use a circle.
                 <>
-                  <circle cx={SIZE / 2} cy={SIZE / 2} r={radius} className={fillClass(slices[0].role)} />
-                  {inner > 0 ? <circle cx={SIZE / 2} cy={SIZE / 2} r={inner} className="fill-surface" /> : null}
+                  <circle cx={size / 2} cy={size / 2} r={radius} className={fillClass(slices[0].role)} />
+                  {inner > 0 ? <circle cx={size / 2} cy={size / 2} r={inner} className="fill-surface" /> : null}
                 </>
               ) : null}
               {(slices.length === 1 ? [] : slices).map((slice) => {
@@ -144,7 +157,7 @@ export function PieChart({
                 angle += sweep;
                 const dim = hover !== null && hover !== slice.key;
                 const mid = from + sweep / 2;
-                const [lx, ly] = point(SIZE / 2, SIZE / 2, radius * (inner > 0 ? 0.78 : 0.68), mid);
+                const [lx, ly] = point(size / 2, size / 2, radius * (inner > 0 ? 0.78 : 0.68), mid);
                 return (
                   <g key={slice.key}
                      onPointerEnter={() => setHover(slice.key)}
@@ -152,7 +165,7 @@ export function PieChart({
                      onClick={() => setHover(slice.key)}>
                     <title>{`${slice.label}: ${formatValue(slice.value, format, frame.currency)} · ${formatValue((slice.value / total) * 100, "percent")}`}</title>
                     <path
-                      d={arcPath(SIZE / 2, SIZE / 2, radius, inner, from, to)}
+                      d={arcPath(size / 2, size / 2, radius, inner, from, to)}
                       className={fillClass(slice.role)}
                       opacity={dim ? 0.7 : 1}
                       style={{
@@ -168,6 +181,27 @@ export function PieChart({
                 );
               })}
             </svg>
+            {(() => {
+              const slice = slices.find((entry) => entry.key === hover);
+              if (!slice) return null;
+              const mid = slices.slice(0, slices.indexOf(slice))
+                .reduce((sum, entry) => sum + (entry.value / total) * 360, 0)
+                + (slice.value / total) * 180;
+              const [ax, ay] = point(size / 2, size / 2, radius * 0.6, mid);
+              const spot = pointer.place(size, size);
+              return (
+                <div data-value-chip="" role="status"
+                     className="pointer-events-none absolute z-10 w-max max-w-[190px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs shadow-raised"
+                     style={{ left: Math.max(4, Math.min(spot?.left ?? ax - 80, size - 150)),
+                              top: Math.max(0, spot?.top ?? ay - 20) }}>
+                  <span className="block text-ink [overflow-wrap:anywhere]">
+                    {slice.label} · {formatValue(slice.value, format, frame.currency)} ·{" "}
+                    {formatValue((slice.value / total) * 100, "percent")}
+                  </span>
+                </div>
+              );
+            })()}
+            </div>
             <ul className="w-full min-w-0 space-y-1.5 text-sm">
               {slices.map((slice) => (
                 <li key={slice.key}
