@@ -316,7 +316,35 @@ topics:
     aliases:
       es: ["correo", "enviar", "destinatarios", "adjuntar pdf", "email"]
       en: ["email", "send", "recipients", "attach pdf", "mail"]
-    related: [compartir-enlace, exportar-pdf-csv, envios-programados]
+    related: [compartir-enlace, exportar-pdf-csv, envios-programados, listas-de-correo]
+  - id: listas-de-correo
+    section: compartir
+    title: {es: "Listas de correo", en: "Mailing lists"}
+    summary:
+      es: "Cómo crear una lista de direcciones, compartirla, importarla o exportarla y usarla en un envío."
+      en: "How to create a list of addresses, share it, import or export it and use it in a send."
+    roles: [user, admin]
+    routes: ["/mis-listas", "/admin/listas-de-correo"]
+    tiles: ["/admin/listas-de-correo"]
+    commands: []
+    aliases:
+      es: ["listas de correo", "mis listas", "csv de correo", "importar direcciones"]
+      en: ["mailing list", "my lists", "email csv", "import addresses"]
+    related: [enviar-por-correo, envios-programados, corregir-envio-de-correo]
+  - id: corregir-envio-de-correo
+    section: compartir
+    title: {es: "Corregir un envío de correo", en: "Fixing an email send"}
+    summary:
+      es: "Por qué un envío no llegó, cómo leer el estado de cada destinatario y cómo reenviar solo los fallidos."
+      en: "Why a send did not arrive, how to read each recipient's status and how to re-send only the failed ones."
+    roles: [user, admin]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["envío fallido", "reenviar", "no llega el correo", "estado del envío", "destinatario rechazado"]
+      en: ["failed send", "re-send", "email did not arrive", "send status", "recipient refused"]
+    related: [enviar-por-correo, listas-de-correo, envios-programados]
   - id: envios-programados
     section: compartir
     title: {es: "Envíos programados", en: "Scheduled sends"}

@@ -17,12 +17,28 @@ describe.skipIf(!existsSync(MODELS))("audit event kind labels", () => {
     // hold from before 045. Both must be labelled — history is readable — but only the first is
     // emittable, and that distinction stays in the backend.
     const kindsOf = (name: string): Set<string> => {
-      // `AUDIT_KINDS = (` and `HISTORICAL_AUDIT_KINDS: tuple[str, ...] = (` both count.
-      const match = sourceText.match(
-        new RegExp(`${name}(?:\\s*:\\s*[^=]+)?\\s*=\\s*\\((.*?)\\)`, "s"),
+      // `AUDIT_KINDS = (` and `HISTORICAL_AUDIT_KINDS: tuple[str, ...] = (` both count. The tuple
+      // body is walked with balanced parentheses: a comment may legitimately contain `)`.
+      const start = sourceText.search(
+        new RegExp(`${name}(?:\\s*:\\s*[^=]+)?\\s*=\\s*\\(`),
       );
-      expect(match, `${name} tuple not found in models.py`).not.toBeNull();
-      return new Set([...match![1].matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]));
+      expect(start, `${name} tuple not found in models.py`).toBeGreaterThanOrEqual(0);
+      let depth = 0;
+      let end = -1;
+      for (let i = sourceText.indexOf("(", start); i < sourceText.length; i += 1) {
+        if (sourceText[i] === "(") depth += 1;
+        else if (sourceText[i] === ")") {
+          depth -= 1;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      expect(end, `${name} tuple is not closed in models.py`).toBeGreaterThan(start);
+      return new Set(
+        [...sourceText.slice(start, end).matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]),
+      );
     };
     const writable = kindsOf("AUDIT_KINDS");
     const historical = kindsOf("HISTORICAL_AUDIT_KINDS");

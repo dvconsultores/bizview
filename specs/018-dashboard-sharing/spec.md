@@ -200,6 +200,28 @@ Supersedes US4 AC1/AC3 and FR-006's settings form:
   (sender address), `SMTP_FROM_NAME`, `EMAIL_ALLOWED_DOMAINS` (comma-separated external domains,
   default none), `SHARE_LINKS_ENABLED` (default `false`). Email is enabled when `SMTP_HOST` and
   `SMTP_FROM` are set.
+### Amendment 2026-11-06 (feature 058): no volume limits, any address, lists
+
+The owner replaced the two volume guards this feature introduced. They made the feature unusable
+outside a small team: a domain allowlist that — unset — refused every external address, and a
+ceiling of 20 recipients per send with 30 sends per user per hour.
+
+- **FR-012 (amended)**: `EMAIL_ALLOWED_DOMAINS` is **optional**: empty (the default) accepts any
+  domain; when set it limits the free addresses a sender types and the members of a mailing list,
+  never the installation's own users. `EMAIL_BATCH_SIZE` (default 50), `EMAIL_SEND_RATE` (default
+  10 messages per second, `0` = unlimited), `EMAIL_INDIVIDUAL_MESSAGES` (default `false`),
+  `EMAIL_SENDING_PAUSED` (default `false`), `EMAIL_FROM_MODE` (`installation` | `user`, default
+  `installation`) and `EMAIL_FREE_ADDRESSES_ROLE` (`user` | `admin`, default `user`) complete the
+  list.
+- **FR-004 (superseded)**: the per-send recipient ceiling and the per-user hourly ceiling are
+  **removed**, and no quota replaces them: volume is governed by the mail provider the installation
+  chooses. The only guard is throughput — batching and pacing — which protects the provider, not
+  the product.
+- **FR-010 (extended)**: a send and a scheduled delivery accept three recipient kinds mixed:
+  installation users, **mailing lists** (feature 058: owned, optionally shared, optionally dynamic
+  by role) and free addresses typed or pasted. A project's `distributions/<id>.yaml` names lists,
+  never addresses.
+
 - **FR-013**: There is no email option in Administración (no Correo tile or page). Email and shared
   links are available in the dashboard views when the environment enables them; the setup is checked
   with `python -m app.cli mail-test <address>` (sends a test email, prints a sanitized result).

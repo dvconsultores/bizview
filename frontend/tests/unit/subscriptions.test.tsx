@@ -226,6 +226,7 @@ describe("SubscriptionsPanel", () => {
         attach_pdf: true,
         link_days: null,
         users: [7],
+        lists: [],
         emails: [],
       },
     );

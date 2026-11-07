@@ -701,3 +701,53 @@ def test_period_label_and_auto_subject_follow_the_viewer(applied, smtp):
     assert c.patch("/api/me/preferences", json={"locale": "es"}).status_code == 200
     history = c.get("/api/dashboards/ventas/email").json()["items"]
     assert [s["subject"] for s in history] == ["Ventas · Últimos 7 días"]
+
+
+def test_a_list_delivers_once_per_member_on_the_tick(applied, smtp):
+    """058 US3: a scheduled delivery to a list resolves its members at delivery time."""
+    enable_mail(domains=())
+    set_mail(**{**MAIL_ENV, "email_allowed_domains": ""})
+    c = signed_in("root@example.com")
+    row = c.post("/api/mail/lists", json={"name": "Semanal"}).json()
+    c.put(f"/api/mail/lists/{row['id']}/members",
+          json={"members": [{"address": "ana@cliente.com"}, {"address": "luis@cliente.com"},
+                            {"address": "pausado@cliente.com", "paused": True}]})
+    created = create_sub(c, lists=[row["id"]], emails=[])
+    assert created.status_code == 201, created.text
+    sub_id = created.json()["id"]
+    recipients = created.json()["recipients"]
+    assert recipients[0]["kind"] == "list" and recipients[0]["name"] == "Semanal"
+
+    with get_sessionmaker().begin() as db:
+        sql("UPDATE email_subscription SET next_due_at = now() - interval '1 minute' "
+            "WHERE id = :i", i=sub_id)
+        created_count = subscriptions.tick(db)
+    assert created_count == 1
+    # The paused member is skipped; the two live ones are queued.
+    assert sql("SELECT count(*) FROM email_delivery d JOIN email_send s ON s.id = d.send_id "
+               "WHERE s.subscription_id = :i", i=sub_id)[0][0] == 2
+    assert sql("SELECT count(*) FROM email_delivery WHERE list_id = :l", l=row["id"])[0][0] == 2
+
+    assert sends.process_due() == 2
+    # The tests' MAIL_ENV asks for one message per address; both members are reached, the paused one
+    # is not.
+    assert sorted(env["to"][0] for env in smtp.envelopes) == ["ana@cliente.com", "luis@cliente.com"]
+
+
+def test_a_new_member_joins_the_next_delivery(applied, smtp):
+    """The list is resolved every tick, so nobody has to edit the schedule."""
+    enable_mail(domains=())
+    set_mail(**{**MAIL_ENV, "email_allowed_domains": ""})
+    c = signed_in("root@example.com")
+    row = c.post("/api/mail/lists", json={"name": "Equipo"}).json()
+    c.put(f"/api/mail/lists/{row['id']}/members",
+          json={"members": [{"address": "ana@cliente.com"}]})
+    sub_id = create_sub(c, lists=[row["id"]], emails=[]).json()["id"]
+    c.put(f"/api/mail/lists/{row['id']}/members",
+          json={"members": [{"address": "ana@cliente.com"}, {"address": "nuevo@cliente.com"}]})
+    with get_sessionmaker().begin() as db:
+        sql("UPDATE email_subscription SET next_due_at = now() - interval '1 minute' "
+            "WHERE id = :i", i=sub_id)
+        assert subscriptions.tick(db) == 1
+    assert sql("SELECT count(*) FROM email_delivery d JOIN email_send s ON s.id = d.send_id "
+               "WHERE s.subscription_id = :i", i=sub_id)[0][0] == 2

@@ -35,11 +35,35 @@ def _previous_paused(previous, dist_id: str, index: int) -> bool | None:
     return bool(items[index].get("paused", False))
 
 
-def _fields(dashboard, item: dict) -> dict:
+def _recipients(db, item: dict, *, slug: str | None, dist_id: str | None) -> list[dict]:
+    """The YAML's recipients as stored entries: roles as-is, list **names** resolved to ids.
+
+    058: a distribution names lists, never addresses (constitution II). A name with no list in this
+    installation is refused here — apply is the moment the project meets the installation, and the
+    message names what is missing so the author can create it or fix the YAML."""
+    from app.errors import ApiError
+    from app.i18n import M
+    from app.mail import lists as mail_lists
+
+    recipients = item.get("recipients") or {}
+    out = [{"role": r} for r in recipients.get("roles") or []]
+    for name in recipients.get("lists") or []:
+        row = mail_lists.by_name(db, str(name))
+        if row is None:
+            raise ApiError(409, "distribution_list_missing",
+                           M("mail.list_missing", name=str(name)),
+                           extra={"distribution": dist_id, "project": slug,
+                                  "list": str(name)})
+        out.append({"list": row.id})
+    return out
+
+
+def _fields(db, dashboard, item: dict, *, slug: str | None = None,
+            dist_id: str | None = None) -> dict:
     frequency = item["frequency"]
     return {
         "dashboard_id": dashboard.id,
-        "recipients": [{"role": r} for r in item["recipients"]["roles"]],
+        "recipients": _recipients(db, item, slug=slug, dist_id=dist_id),
         "frequency": frequency,
         "hour": item["hour"],
         "weekday": item.get("weekday") if frequency == "weekly" else None,
@@ -85,7 +109,7 @@ def sync(db, version, actor, *, previous=None) -> dict[str, int]:
         dashboard = dashboards.get(definition.get("report"))
         if project is None or dashboard is None:
             continue
-        fields = _fields(dashboard, item)
+        fields = _fields(db, dashboard, item, slug=slug, dist_id=dist_id)
         yaml_paused = bool(item.get("paused", False))
         detail = {"dashboard": dashboard.code, "project": slug, "distribution": dist_id}
         row = rows.get((slug, dist_id, index))

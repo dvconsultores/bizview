@@ -528,7 +528,7 @@ expire after 1–90 days.
    SMTP_PASSWORD=...
    SMTP_FROM=bizview@cliente.com
    SMTP_FROM_NAME=Cliente Demo  # optional; defaults to ORGANIZATION_NAME
-   EMAIL_ALLOWED_DOMAINS=cliente.com,socio.com   # empty = installation users only
+   EMAIL_ALLOWED_DOMAINS=       # optional: empty = any domain (see "Sending to any address")
    SHARE_LINKS_ENABLED=true     # lets administrators press Compartir on a dashboard
    ```
 
@@ -546,11 +546,34 @@ verifies the certificate. `SMTP_PASSWORD` stays in the installation environment:
 stored in the database, returned by the API, shown or logged, and must be ASCII without line
 breaks. Test emails and sends are audited.
 
-Limits. At most 20 recipients per send, 30 sends per user per hour, and a 10 MB PDF; when a PDF
-exceeds that limit with **Incluir enlace** checked the email carries only the link, and without a
-link the delivery fails with the reason "El PDF supera 10 MB y no se pidió un enlace.". Failed
-deliveries retry after 1, 5 and 15 minutes, and the status of every recipient is listed under
-**Envíos**.
+Sending to any address (feature 058). Senders stay internal — only a signed-in user with access to
+the dashboard can send — but a send may reach **any address**: users of the installation, a
+**mailing list** created in **Listas de correo**, or addresses typed or pasted in the dialog. The
+product imposes **no volume limits**: the provider decides. What it does is pace and batch the
+delivery so a big list neither stalls the worker nor trips the provider:
+
+```
+EMAIL_BATCH_SIZE=50            # recipients per SMTP message (BCC, the sender in To)
+EMAIL_SEND_RATE=10             # messages per second; 0 = no pause
+EMAIL_INDIVIDUAL_MESSAGES=false  # true = one message per address (SES per-address bounces)
+EMAIL_SENDING_PAUSED=false     # true = hold the queue; sends keep being accepted
+EMAIL_FROM_MODE=installation   # installation = SMTP_FROM + Reply-To sender; user = From sender
+EMAIL_FREE_ADDRESSES_ROLE=user # admin = only administrators may type free addresses
+```
+
+What each provider needs:
+
+| Provider | Settings |
+|---|---|
+| Amazon SES | verify the domain (DKIM), leave `EMAIL_FROM_MODE=installation` with `SMTP_FROM` on the verified domain, and set `EMAIL_INDIVIDUAL_MESSAGES=true` so a bounce is attributed to one address; keep `EMAIL_SEND_RATE` at or below your sending rate (SES default is 14/s) |
+| Google Workspace | SMTP relay `smtp-relay.gmail.com:587` with STARTTLS, `SMTP_USER` an account with "Less secure app"/app password or the relay's IP allowlist; `EMAIL_FROM_MODE=user` works when the tenant allows "send as" for its users |
+| Microsoft 365 | `smtp.office365.com:587` with STARTTLS and SMTP AUTH enabled on the mailbox; a shared mailbox as `SMTP_FROM` keeps the From stable, `EMAIL_FROM_MODE=installation` with `Reply-To` the sender |
+
+A 10 MB PDF still has its own limit: when it exceeds it with **Incluir enlace** checked the email
+carries only the link, and without a link the delivery fails with the reason "El PDF supera 10 MB y
+no se pidió un enlace.". Failed deliveries retry after 1, 5 and 15 minutes, the status of every
+recipient is listed under **Envíos**, and **Reenviar los fallidos** queues only the addresses that
+failed.
 
 Links. Anyone holding a link sees that one dashboard read-only until it expires or is revoked
 (**Revocar**), with at most 20 active links per dashboard. Links are stored only as a hash, so a

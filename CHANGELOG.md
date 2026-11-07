@@ -8,6 +8,38 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A dashboard can be mailed to any list of addresses (feature 058)**. "Enviar por correo" reached
+  installation users, and outside them only addresses inside `EMAIL_ALLOWED_DOMAINS`, twenty at a
+  time, typed one by one; scheduled deliveries addressed roles. A send now takes three kinds of
+  recipient, mixed: users, **mailing lists** and free addresses typed or pasted (`Nombre <correo>`,
+  separated by comma, semicolon, space or newline, duplicates collapsed, the sender's own address
+  dropped, invalid ones shown and blocking). **Listas de correo** keeps reusable lists — name,
+  description, members with an optional display name, a paused flag, CSV import and export, up to
+  1,000 members — `personal` or `compartida` (only administrators create shared ones), and a list may
+  instead be **dynamic by role**, resolving to the installation's users of that role at send time.
+  Deleting a list pauses the scheduled deliveries that named it, with the reason, instead of deleting
+  them. A project's `distributions/<id>.yaml` still names **roles and list names, never addresses**;
+  apply refuses a name with no list, naming it. Every send keeps one status per address under
+  **Envíos**, and **Reenviar los fallidos** queues only what failed.
+
+### Changed
+
+- **The product no longer limits how much mail an installation sends (feature 058)**. The ceiling of
+  20 recipients per send and the limit of 30 sends per user per hour are gone, and nothing replaces
+  them: the volume is the mail provider's call (SES, a corporate relay for several senders). The
+  only guard is throughput, which protects the provider rather than the product — `EMAIL_BATCH_SIZE`
+  recipients per message via BCC (sender in To, default 50), `EMAIL_SEND_RATE` messages per second
+  (default 10, `0` unlimited), and `EMAIL_INDIVIDUAL_MESSAGES` for one message per address, which is
+  what SES recommends for per-address bounce handling. `EMAIL_ALLOWED_DOMAINS` becomes optional: unset
+  or empty (the default now) accepts any domain, and when set it limits the free addresses and the
+  members of a list, never the installation's own users. `EMAIL_SENDING_PAUSED` holds the queue while
+  sends keep being accepted, `EMAIL_FROM_MODE` chooses whether mail comes from `SMTP_FROM` with the
+  sender as `Reply-To` or from the sender's own address, and `EMAIL_FREE_ADDRESSES_ROLE=admin`
+  restricts typed addresses to administrators (lists keep working for everybody). The catalogue keeps
+  the change: `docs/INSTALL.md` lists what each provider needs, `.env.example` documents every
+  variable, the 018 specification is amended, and a grep gate refuses the two removed constants by
+  name.
+
 - **A document that says what BizView does with a `report.yaml`, in both languages (feature 057b)**.
   AUTHORING and REPORTS told an author how to write a report and never how it is executed, so the
   questions that matter — why a figure changes with the period, where the comparison comes from, how

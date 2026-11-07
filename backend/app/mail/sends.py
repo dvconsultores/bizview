@@ -2,19 +2,22 @@
 
 import base64
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import or_, select
 
 from app.api import reports
 from app.config import get_settings
-from app.db import get_sessionmaker, lock_key
+from app.db import get_sessionmaker
 from app.engine import report as engine
 from app.errors import ApiError, validation
 from app.i18n import M, localized, t, use_locale
 from app.i18n import current as i18n_current
+from app.mail import addresses as mail_addresses
+from app.mail import lists as mail_lists
 from app.mail import send as mail_send
 from app.mail import settings as mail_settings
 from app.mail.send import MailError
@@ -33,8 +36,6 @@ from app.sharing import links
 
 log = logging.getLogger("app.mail")
 
-MAX_RECIPIENTS = 20
-SENDS_PER_HOUR = 30
 MAX_ATTEMPTS = 4
 BACKOFF = (
     timedelta(minutes=1),
@@ -43,6 +44,8 @@ BACKOFF = (
 )
 LEASE = timedelta(minutes=10)
 CLAIM_LIMIT = 20
+#: 058: how many deliveries one pass may claim once it has chosen its sends (a whole big send).
+BULK_CLAIM_LIMIT = 5000
 SUBJECT_MAX = 200
 MESSAGE_MAX = 2000
 MAX_FILTER_KEYS = 20
@@ -63,6 +66,10 @@ def can_open(db, user: AppUser | None, dash: Dashboard, ctx) -> bool:
 class Recipient:
     address: str
     user_id: int | None
+    #: 058: the list this address came from, when it came from one.
+    list_id: int | None = None
+    #: 058: the display name kept with the address, when there is one.
+    name: str | None = None
 
 
 def resolve_recipients(
@@ -73,6 +80,9 @@ def resolve_recipients(
     user_ids: list[int],
     emails: list[str],
     allowed_domains: list[str],
+    list_ids: list[int] | None = None,
+    sender_email: str | None = None,
+    free_addresses: bool = True,
 ) -> list[Recipient]:
     errors: dict[str, str] = {}
     users_by_id: dict[int, AppUser] = {}
@@ -94,30 +104,56 @@ def resolve_recipients(
 
     user_emails = {users_by_id[uid].email for uid in users_by_id}
 
+    # 058: free addresses and list members are parsed with one shared grammar, so the dialog's
+    # counter and the deliveries cannot disagree about what an address is.
     normalized_emails: list[tuple[str, str | None]] = []
-    for email in emails:
-        addr = mail_settings.normalize_email(email) if email else None
-        if addr is None:
-            errors["emails"] = "invalid"
-            break
-        normalized_emails.append((addr, email.strip()))
+    if emails:
+        for entry in emails:
+            parsed, bad = mail_addresses.parse_recipients(str(entry or ""))
+            if bad or not parsed:
+                errors["emails"] = "invalid"
+                break
+            normalized_emails.extend(parsed)
+    if not free_addresses and normalized_emails:
+        # EMAIL_FREE_ADDRESSES_ROLE=admin: a non-administrator sends to users and lists, not to a
+        # typed address. Installation users are always allowed — they are inside.
+        errors["emails"] = "role_not_allowed"
 
-    if "emails" not in errors and normalized_emails:
+    list_members = mail_lists.resolve(db, list(list_ids or []), exclude=sender_email)
+    if list_ids:
+        found = set(db.scalars(
+            select(mail_lists.MailList.id).where(mail_lists.MailList.id.in_(set(list_ids)),
+                                                  mail_lists.MailList.deleted_at.is_(None))))
+        if len(found) != len(set(list_ids)):
+            errors["lists"] = "not_found"
+
+    if allowed_domains and not errors:
+        # The filter is the installation's: it limits what a sender may reach *outside*, which is
+        # exactly the free addresses and the members of a list. Users of the installation are not
+        # external, and the sender's own address never reaches this list.
         bad_domains = []
         for addr, _ in normalized_emails:
             if addr in user_emails:
                 continue
-            domain = mail_settings.email_domain(addr)
-            if domain not in allowed_domains:
+            if mail_settings.email_domain(addr) not in allowed_domains:
                 bad_domains.append(addr)
+        for member in list_members:
+            if member["address"] in user_emails:
+                continue
+            if mail_settings.email_domain(member["address"]) not in allowed_domains:
+                bad_domains.append(member["address"])
         if bad_domains:
             errors["emails"] = "domain_not_allowed"
 
     if errors:
         if errors.get("users") == "no_access":
             message = M("mail.users_no_access")
+        elif errors.get("lists") == "not_found":
+            message = M("mail.list_not_found")
         elif errors.get("emails") == "invalid":
             message = M("mail.invalid_emails")
+        elif errors.get("emails") == "role_not_allowed":
+            message = M("mail.free_addresses_admins")
         elif errors.get("emails") == "domain_not_allowed":
             if allowed_domains:
                 message = M("mail.domains_only", domains=", ".join(allowed_domains))
@@ -132,22 +168,48 @@ def resolve_recipients(
     for uid in user_ids:
         if uid in users_by_id:
             user = users_by_id[uid]
+            # 058: the sender is dropped from a pasted block or a list — they are the sender — but
+            # an installation user the sender picked on purpose may still receive their own send
+            # ("send me a copy"), which is what the dialog has always allowed.
             if user.email not in seen:
-                recipients.append(Recipient(user.email, user.id))
+                recipients.append(Recipient(user.email, user.id, name=user.full_name))
                 seen.add(user.email)
-    for _, raw in normalized_emails:
-        addr = mail_settings.normalize_email(raw)
-        if addr and addr not in seen:
-            recipients.append(Recipient(addr, None))
-            seen.add(addr)
+    for member in list_members:
+        addr = member["address"]
+        if addr in seen:
+            continue
+        recipients.append(Recipient(addr, None, list_id=member["list_id"], name=member["name"]))
+        seen.add(addr)
+    for addr, name in normalized_emails:
+        if addr == sender_email or addr in seen:
+            continue
+        recipients.append(Recipient(addr, None, name=name))
+        seen.add(addr)
 
     if not recipients:
         raise validation({"recipients": "empty"}, M("mail.select_recipient"))
-    if len(recipients) > MAX_RECIPIENTS:
-        raise validation(
-            {"recipients": "too_many"}, M("mail.max_recipients", n=MAX_RECIPIENTS)
-        )
     return recipients
+
+
+def recipient_kinds(
+    db, recipients: list[Recipient], *, user_ids: list[int], list_ids: list[int],
+) -> dict:
+    """What a send carried, for the history and the audit: counts and list **names** only.
+
+    An address never lands here: the audit event and the `email_send.kinds` column are read by more
+    people than the send itself (FR-018)."""
+    names = []
+    if list_ids:
+        rows = db.scalars(select(mail_lists.MailList)
+                          .where(mail_lists.MailList.id.in_(set(list_ids)))
+                          .order_by(mail_lists.MailList.name)).all()
+        names = [row.name for row in rows]
+    return {
+        "users": len({uid for uid in user_ids}),
+        "lists": names,
+        "emails": sum(1 for r in recipients if r.user_id is None and r.list_id is None),
+        "total": len(recipients),
+    }
 
 
 def selection_params(selection: dict[str, str | list[str]] | None) -> list[list[str]]:
@@ -191,6 +253,8 @@ def queue_send(
     selection: dict | None,
     attach_pdf: bool,
     link_days: int | None,
+    list_ids: list[int] | None = None,
+    save_as_list: str | None = None,
     base_url: str | None = None,
     ip: str | None,
 ) -> EmailSend:
@@ -205,27 +269,6 @@ def queue_send(
     if ctx is None or not can_open(db, user, dash, ctx):
         raise ApiError(
             409, "not_sendable", M("mail.not_sendable")
-        )
-
-    db.execute(
-        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
-        {"k": lock_key("email_send_rate", user.id)},
-    )
-    hour_ago = datetime.now(UTC) - timedelta(hours=1)
-    sent_count = db.scalar(
-        select(func.count())
-        .select_from(EmailSend)
-        .where(
-            EmailSend.requested_by == user.id,
-            EmailSend.subscription_id.is_(None),
-            EmailSend.created_at > hour_ago,
-        )
-    )
-    if sent_count >= SENDS_PER_HOUR:
-        raise ApiError(
-            429,
-            "rate_limited",
-            M("mail.hourly_limit", n=SENDS_PER_HOUR),
         )
 
     if link_days is not None:
@@ -277,6 +320,11 @@ def queue_send(
     params = selection_params(selection)
     engine.selection(ctx, (tuple(p) for p in params), reports._today())
 
+    # 058: `EMAIL_FREE_ADDRESSES_ROLE=admin` keeps typed addresses for administrators; lists and
+    # installation users are unaffected, so a regular sender still reaches a whole list.
+    free_allowed = (user.role == "admin"
+                    or get_settings().email_free_addresses_role == "user")
+    list_ids = list(dict.fromkeys(list_ids or []))
     recipients = resolve_recipients(
         db,
         dash,
@@ -284,6 +332,9 @@ def queue_send(
         user_ids=user_ids,
         emails=emails,
         allowed_domains=mail_settings.allowed_domains(),
+        list_ids=list_ids,
+        sender_email=user.email,
+        free_addresses=free_allowed,
     )
     send_selection = {"params": params}
     if (
@@ -292,6 +343,7 @@ def queue_send(
         and base_url.startswith(("http://", "https://"))
     ):
         send_selection["base"] = base_url
+    kinds = recipient_kinds(db, recipients, user_ids=user_ids, list_ids=list_ids)
     send = EmailSend(
         dashboard_id=dash.id,
         requested_by=user.id,
@@ -301,6 +353,7 @@ def queue_send(
         attach_pdf=attach_pdf,
         link_days=link_days,
         status="queued",
+        kinds=kinds,
     )
     db.add(send)
     db.flush()
@@ -310,10 +363,20 @@ def queue_send(
                 send_id=send.id,
                 recipient=recipient.address,
                 user_id=recipient.user_id,
+                list_id=recipient.list_id,
                 status="queued",
             )
         )
     db.flush()
+    if save_as_list and save_as_list.strip():
+        # The dialog's "save these recipients as a list": free addresses only, because users and
+        # list members are already reachable by their own means.
+        saved = [r for r in recipients if r.user_id is None and r.list_id is None]
+        if saved:
+            row = mail_lists.create(db, user, name=save_as_list, ip=ip)
+            mail_lists.replace_members(
+                db, user, row,
+                [{"address": r.address, "name": r.name} for r in saved])
     audit.record(
         db,
         "email_sent",
@@ -323,6 +386,8 @@ def queue_send(
             "send_id": send.id,
             "dashboard": dash.code,
             "recipients": len(recipients),
+            "kinds": {"users": kinds["users"], "lists": kinds["lists"],
+                      "emails": kinds["emails"]},
             "attach_pdf": attach_pdf,
             "link_days": link_days,
         },
@@ -330,7 +395,12 @@ def queue_send(
     return send
 
 
-def send_json(db, send: EmailSend) -> dict:
+def send_json(db, send: EmailSend, *, full_addresses: bool = False) -> dict:
+    """One send for the history.
+
+    `full_addresses` is only true for whoever asked for the send: everybody else sees the masked
+    form (`a***@dominio`), which is enough to recognise a person and not enough to build a list out
+    of somebody else's send (FR-017, FR-018)."""
     deliveries = db.scalars(
         select(EmailDelivery)
         .where(EmailDelivery.send_id == send.id)
@@ -351,11 +421,14 @@ def send_json(db, send: EmailSend) -> dict:
         "link_days": send.link_days,
         "subscription_id": send.subscription_id,
         "requested_by": requester,
+        "kinds": send.kinds or {},
+        "count": len(deliveries),
         "deliveries": [
             {
                 "id": d.id,
-                "recipient": d.recipient,
+                "recipient": d.recipient if full_addresses else mail_addresses.mask(d.recipient),
                 "user_id": d.user_id,
+                "list_id": d.list_id,
                 "status": d.status,
                 "attempts": d.attempts,
                 "error": d.error,
@@ -464,8 +537,9 @@ def site_base() -> str:
     return base
 
 
-def _fail(db, delivery_id: int, code: str, permanent: bool, now: datetime) -> None:
-    delivery = db.get(EmailDelivery, delivery_id)
+def _fail(db, delivery_id: int, code: str, permanent: bool, now: datetime,
+          row=None) -> None:
+    delivery = row if row is not None else db.get(EmailDelivery, delivery_id)
     if delivery is None or delivery.status != "queued":
         return
     if permanent or delivery.attempts >= MAX_ATTEMPTS:
@@ -641,8 +715,40 @@ def _subject(send, dash, loc: str, definition: dict | None = None) -> str:
     return send.subject
 
 
-def _process_send(
-    send_id: int, delivery_ids: list[int], now: datetime, base_url: str
+#: Feature 058: the sleep the pacer uses. Tests replace it to prove the pacing without waiting.
+sleep = time.sleep
+
+
+class _Pacer:
+    """`EMAIL_SEND_RATE` messages per second, measured from the previous message (0 = no pause)."""
+
+    def __init__(self, rate: int):
+        self.interval = 1.0 / rate if rate and rate > 0 else 0.0
+        self.last: float | None = None
+
+    def wait(self) -> None:
+        if not self.interval:
+            return
+        now = time.monotonic()
+        if self.last is not None:
+            remaining = self.interval - (now - self.last)
+            if remaining > 0:
+                sleep(remaining)
+        self.last = time.monotonic()
+
+
+def _envelopes(ids: list[int], locales: dict[int, str], size: int) -> list[list[int]]:
+    """The deliveries grouped into messages: never two languages in one, at most `size` each."""
+    groups: list[list[int]] = []
+    for did in ids:
+        if groups and len(groups[-1]) < size and locales[groups[-1][0]] == locales[did]:
+            groups[-1].append(did)
+        else:
+            groups.append([did])
+    return groups
+
+
+def _process_send(    send_id: int, delivery_ids: list[int], now: datetime, base_url: str
 ) -> None:
     db = get_sessionmaker()()
     try:
@@ -652,44 +758,47 @@ def _process_send(
         dash = db.get(Dashboard, send.dashboard_id)
         if dash is None:
             return
+        # 058: a send may now carry thousands of recipients, and the product database is often a
+        # remote one (~200 ms per round trip). Load the batch once and work from memory: one query
+        # for the deliveries, one for the users they name — never a `db.get` per address.
+        rows = {row.id: row for row in db.scalars(
+            select(EmailDelivery).where(EmailDelivery.id.in_(delivery_ids))).all()}
+        user_ids = {row.user_id for row in rows.values() if row.user_id is not None}
+        users = ({u.id: u for u in db.scalars(
+            select(AppUser).where(AppUser.id.in_(user_ids))).all()} if user_ids else {})
+
+        def queued() -> list:
+            return [row for row in rows.values() if row.status == "queued"]
+
         ctx = links.report_context(db, dash)
-        requester = None
-        if send.requested_by is not None:
+        requester = users.get(send.requested_by) if send.requested_by else None
+        if requester is None and send.requested_by is not None:
             requester = db.get(AppUser, send.requested_by)
         if not mail_settings.available():
-            for did in delivery_ids:
-                delivery = db.get(EmailDelivery, did)
-                if delivery is not None and delivery.status == "queued":
-                    delivery.attempts -= 1
-                    delivery.next_attempt_at = now + BACKOFF[0]
+            for delivery in queued():
+                delivery.attempts -= 1
+                delivery.next_attempt_at = now + BACKOFF[0]
             db.commit()
             return
         if ctx is None:
-            for did in delivery_ids:
-                delivery = db.get(EmailDelivery, did)
-                if delivery is not None and delivery.status == "queued":
-                    delivery.status = "skipped"
-                    delivery.error = mail_send.reason("unavailable")
+            for delivery in queued():
+                delivery.status = "skipped"
+                delivery.error = mail_send.reason("unavailable")
             _roll_up(db, send.id, now)
             db.commit()
             return
         if not can_open(db, requester, dash, ctx):
-            for did in delivery_ids:
-                delivery = db.get(EmailDelivery, did)
-                if delivery is not None and delivery.status == "queued":
-                    delivery.status = "skipped"
-                    delivery.error = mail_send.reason("requester_no_access")
+            for delivery in queued():
+                delivery.status = "skipped"
+                delivery.error = mail_send.reason("requester_no_access")
             _roll_up(db, send.id, now)
             db.commit()
             return
 
         eligible: list[int] = []
-        for did in delivery_ids:
-            delivery = db.get(EmailDelivery, did)
-            if delivery is None or delivery.status != "queued":
-                continue
+        for delivery in queued():
             if delivery.user_id is not None:
-                recipient_user = db.get(AppUser, delivery.user_id)
+                recipient_user = users.get(delivery.user_id)
                 if recipient_user is None or not recipient_user.is_active:
                     delivery.status = "skipped"
                     delivery.error = mail_send.reason("no_access")
@@ -698,7 +807,7 @@ def _process_send(
                     delivery.status = "skipped"
                     delivery.error = mail_send.reason("no_access")
                     continue
-            eligible.append(did)
+            eligible.append(delivery.id)
         db.commit()
         if not eligible:
             _roll_up(db, send.id, now)
@@ -710,13 +819,12 @@ def _process_send(
         definition = engine.definition_json(ctx)
         locales: dict[int, str] = {}
         for did in eligible:
-            delivery = db.get(EmailDelivery, did)
-            if delivery is not None and delivery.user_id is not None:
-                user = db.get(AppUser, delivery.user_id)
-                if user is not None and user.locale in ("es", "en"):
-                    locales[did] = user.locale
-                    continue
-            locales[did] = settings.default_locale
+            delivery = rows[did]
+            user = users.get(delivery.user_id) if delivery.user_id is not None else None
+            if user is not None and user.locale in ("es", "en"):
+                locales[did] = user.locale
+            else:
+                locales[did] = settings.default_locale
         attachments: dict[str, tuple[str, bytes]] = {}
         too_large_by: dict[str, bool] = {}
         if send.attach_pdf:
@@ -728,8 +836,8 @@ def _process_send(
                     raise
                 db.rollback()
                 for did in eligible:
-                    delivery = db.get(EmailDelivery, did)
-                    if delivery is not None and delivery.status == "queued":
+                    delivery = rows[did]
+                    if delivery.status == "queued":
                         delivery.status = "failed"
                         delivery.error = t("mail.pdf_failed", detail=e.message)
                 _roll_up(db, send_pk, now)
@@ -779,8 +887,8 @@ def _process_send(
                     link_url, link_expires = result
             if code is not None:
                 for did in eligible:
-                    delivery = db.get(EmailDelivery, did)
-                    if delivery is not None and delivery.status == "queued":
+                    delivery = rows[did]
+                    if delivery.status == "queued":
                         delivery.status = "failed"
                         delivery.error = mail_send.reason(code)
                 _roll_up(db, send.id, now)
@@ -789,8 +897,8 @@ def _process_send(
 
         sendable: list[int] = []
         for did in eligible:
-            delivery = db.get(EmailDelivery, did)
-            if delivery is None or delivery.status != "queued":
+            delivery = rows[did]
+            if delivery.status != "queued":
                 continue
             loc = locales[did]
             if link_url is None and loc not in attachments:
@@ -809,14 +917,28 @@ def _process_send(
         logo_url = mail_send.logo_src(
             settings.logo_url, (send.selection or {}).get("base") or base_url
         )
-        for did in sendable:
-            delivery = db.get(EmailDelivery, did)
-            if delivery is None or delivery.status != "queued":
-                continue
-            loc = locales[did]
+        # 058: one SMTP message per EMAIL_BATCH_SIZE recipients (BCC, the sender in To) — or one per
+        # address when the installation asks for it, which is what SES recommends for per-address
+        # bounce handling. `EMAIL_SEND_RATE` paces the messages, never the recipients: it is the only
+        # guard the product keeps, and it protects the provider, not the product's own quota.
+        batch_size = 1 if settings.email_individual_messages else settings.email_batch_size
+        batch_size = max(1, batch_size)
+        sender_address = requester.email if requester is not None else None
+        from_mode_user = settings.email_from_mode == "user" and sender_address is not None
+        pace = _Pacer(settings.email_send_rate)
+        envelopes = _envelopes(sendable, locales, batch_size)
+        for group in envelopes:
+            pace.wait()
+            loc = locales[group[0]]
+            addresses = [rows[did].recipient for did in group]
+            batched = len(addresses) > 1
             msg = mail_send.build_message(
                 cfg=cfg,
-                to=delivery.recipient,
+                to=(sender_address or cfg.sender_address) if batched else addresses[0],
+                bcc=addresses if batched else None,
+                from_address=sender_address if from_mode_user else None,
+                reply_to=sender_address if sender_address else None,
+                sent_by=(requester.full_name if requester is not None else None),
                 subject=_subject(send, dash, loc, definition),
                 organization=settings.organization_name,
                 product=settings.product_name,
@@ -831,17 +953,73 @@ def _process_send(
             )
             try:
                 mail_send.deliver(cfg, msg)
-                delivery.status = "sent"
-                delivery.sent_at = now
-                delivery.error = None
+                for did in group:
+                    delivery = rows[did]
+                    delivery.status = "sent"
+                    delivery.sent_at = now
+                    delivery.error = None
             except MailError as e:
-                _fail(db, delivery.id, e.code, e.permanent, now)
-                log.warning("email delivery %s failed: %s", delivery.id, e.code)
+                for did in group:
+                    _fail(db, did, e.code, e.permanent, now, row=rows[did])
+                log.warning("email batch failed: %s deliveries, code %s", len(group), e.code)
             db.commit()
         _roll_up(db, send.id, now)
         db.commit()
     finally:
         db.close()
+
+
+def resend_failed(
+    db,
+    user: AppUser,
+    dash: Dashboard,
+    send_id: int,
+    *,
+    ip: str | None = None,
+) -> EmailSend:
+    """Queue a new send with the addresses that failed in `send_id`, and nothing else (FR-016).
+
+    The reason a sender asks for this is a provider hiccup or a wrong mailbox fixed later, so the
+    new send repeats the subject, the message and the selection of the original and points at it in
+    `selection.resend_of`; the history shows two sends, which is the truth."""
+    original = db.get(EmailSend, send_id)
+    if original is None or original.dashboard_id != dash.id:
+        raise validation({"send": "not_found"}, M("mail.send_not_found"))
+    if user.role != "admin" and original.requested_by != user.id:
+        raise ApiError(403, "forbidden", M("common.forbidden"))
+    failed = db.scalars(
+        select(EmailDelivery)
+        .where(EmailDelivery.send_id == send_id, EmailDelivery.status == "failed")
+        .order_by(EmailDelivery.id)).all()
+    if not failed:
+        raise validation({"send": "nothing_failed"}, M("mail.nothing_failed"))
+    selection = dict(original.selection or {})
+    selection["resend_of"] = original.id
+    new = EmailSend(
+        dashboard_id=original.dashboard_id,
+        requested_by=user.id,
+        subscription_id=original.subscription_id,
+        subject=original.subject,
+        message=original.message,
+        selection=selection,
+        attach_pdf=original.attach_pdf,
+        link_days=original.link_days,
+        status="queued",
+        kinds={"users": sum(1 for d in failed if d.user_id is not None),
+               "lists": [], "emails": sum(1 for d in failed
+                                          if d.user_id is None and d.list_id is None),
+               "total": len(failed), "resend_of": original.id},
+    )
+    db.add(new)
+    db.flush()
+    for delivery in failed:
+        db.add(EmailDelivery(send_id=new.id, recipient=delivery.recipient,
+                             user_id=delivery.user_id, list_id=delivery.list_id,
+                             status="queued"))
+    db.flush()
+    audit.record(db, "mail_send_resent", actor_id=user.id, ip=ip,
+                 detail={"send_id": new.id, "from": original.id, "recipients": len(failed)})
+    return new
 
 
 def process_due(
@@ -852,18 +1030,33 @@ def process_due(
 ) -> int:
     if now is None:
         now = datetime.now(UTC)
+    if get_settings().email_sending_paused:
+        # 058: the operator's panic switch. The queue keeps accepting sends and the worker holds
+        # them, so the decision costs nobody the message they already composed.
+        return 0
     base = base_url or site_base()
     claimed: list[tuple[int, int]] = []
     with get_sessionmaker().begin() as db:
+        # 058: claim whole sends, not a slice of one. A send of 1.500 recipients has to reach the
+        # provider as ⌈1500/EMAIL_BATCH_SIZE⌉ messages (SC-002); claiming in pieces of twenty would
+        # turn it into 75 tiny messages. `limit` bounds the *sends* per pass, and the deliveries of
+        # those sends come together, up to the bulk ceiling that keeps one pass finite.
+        due_sends = (
+            select(EmailDelivery.send_id)
+            .where(EmailDelivery.status == "queued", EmailDelivery.next_attempt_at <= now)
+            .distinct()
+            .limit(limit)
+        )
         rows = db.scalars(
             select(EmailDelivery)
             .where(
                 EmailDelivery.status == "queued",
                 EmailDelivery.next_attempt_at <= now,
+                EmailDelivery.send_id.in_(due_sends),
             )
             .order_by(EmailDelivery.next_attempt_at, EmailDelivery.id)
             .with_for_update(skip_locked=True)
-            .limit(limit)
+            .limit(BULK_CLAIM_LIMIT)
         ).all()
         send_ids = set()
         for delivery in rows:

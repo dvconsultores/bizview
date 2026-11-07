@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.engine import report as engine
 from app.errors import ApiError, not_found, validation
 from app.i18n import M, t
+from app.mail import lists as mail_lists
 from app.mail import sends
 from app.mail import settings as mail_settings
 from app.models import (
@@ -114,6 +115,8 @@ def _validate(
     link_days: int | None,
     user_ids: list[int],
     emails: list[str],
+    list_ids: list[int] | None = None,
+    sender_email: str | None = None,
 ) -> list[dict]:
     errors: dict[str, str] = {}
     if frequency not in SUBSCRIPTION_FREQUENCIES:
@@ -143,6 +146,10 @@ def _validate(
     if not attach_pdf and link_days is None:
         errors["attach_pdf"] = "nothing_to_send"
 
+    list_ids = list(dict.fromkeys(list_ids or []))
+    # 058: a subscription takes the same recipients as a send — users, lists and free addresses —
+    # and the list is stored by id, so its members are resolved at delivery time (this is what makes
+    # "a new administrator joins the weekly board" work without editing the subscription).
     recipients = sends.resolve_recipients(
         db,
         dash,
@@ -150,11 +157,15 @@ def _validate(
         user_ids=user_ids,
         emails=emails,
         allowed_domains=mail_settings.allowed_domains(),
+        list_ids=list_ids,
+        sender_email=sender_email,
     )
     if errors:
         raise validation(errors)
-    result: list[dict] = []
+    result: list[dict] = [{"list": lid} for lid in list_ids]
     for recipient in recipients:
+        if recipient.list_id is not None:
+            continue
         if recipient.user_id is not None:
             result.append({"user_id": recipient.user_id})
         else:
@@ -176,6 +187,7 @@ def create(
     link_days: int | None,
     user_ids: list[int],
     emails: list[str],
+    list_ids: list[int] | None = None,
     paused: bool = False,
     ip: str | None,
 ) -> EmailSubscription:
@@ -222,6 +234,8 @@ def create(
         link_days=link_days,
         user_ids=user_ids,
         emails=emails,
+        list_ids=list_ids,
+        sender_email=user.email,
     )
     next_due_at = next_due(
         frequency,
@@ -319,8 +333,10 @@ def update(
         r["user_id"] for r in sub.recipients if "user_id" in r
     ]
     current_emails = [r["email"] for r in sub.recipients if "email" in r]
+    current_lists = [r["list"] for r in sub.recipients if "list" in r]
     user_ids = changes.get("user_ids", current_user_ids)
     emails = changes.get("emails", current_emails)
+    list_ids = changes.get("lists", current_lists)
 
     if (
         "link_days" in changes
@@ -347,6 +363,8 @@ def update(
         link_days=link_days,
         user_ids=user_ids,
         emails=emails,
+        list_ids=list_ids,
+        sender_email=user.email,
     )
 
     schedule_changed = (
@@ -379,6 +397,10 @@ def update(
     sub.link_days = link_days
     sub.paused = paused
     sub.recipients = recipients
+    if not paused:
+        # 058: editing a delivery that the product paused (its list was deleted) resumes it; the
+        # reason belonged to that pause, not to this one.
+        sub.paused_reason = None
 
     if schedule_changed:
         sub.next_due_at = next_due(
@@ -418,6 +440,7 @@ def _set_paused(
     if changed:
         sub.paused = paused
         if not paused:
+            sub.paused_reason = None
             sub.next_due_at = next_due(
                 sub.frequency,
                 sub.hour,
@@ -483,7 +506,8 @@ def delete(
 
 
 def to_json(sub: EmailSubscription, names: dict[int, str],
-            projects: dict[int, Project] | None = None) -> dict:
+            projects: dict[int, Project] | None = None,
+            lists: dict[int, dict] | None = None) -> dict:
     recipients = []
     for entry in sub.recipients:
         if "user_id" in entry:
@@ -492,6 +516,11 @@ def to_json(sub: EmailSubscription, names: dict[int, str],
             )
         elif "role" in entry:
             recipients.append({"role": entry["role"]})
+        elif "list" in entry:
+            row = (lists or {}).get(entry["list"])
+            recipients.append({"kind": "list", "id": entry["list"],
+                               "name": (row or {}).get("name"),
+                               "count": (row or {}).get("count")})
         else:
             recipients.append({"email": entry["email"]})
     managed_by = None
@@ -512,6 +541,7 @@ def to_json(sub: EmailSubscription, names: dict[int, str],
         "attach_pdf": sub.attach_pdf,
         "link_days": sub.link_days,
         "paused": sub.paused,
+        "paused_reason": sub.paused_reason,
         "last_due_at": sub.last_due_at,
         "next_due_at": sub.next_due_at,
         "created_at": sub.created_at,
@@ -542,7 +572,21 @@ def list_for(db, dash: Dashboard) -> list[dict]:
         users = db.scalars(select(AppUser).where(AppUser.id.in_(user_ids))).all()
         names = {u.id: u.full_name for u in users}
     projects = project_map(db, subs)
-    return [to_json(sub, names, projects) for sub in subs]
+    lists = list_map(db, subs)
+    return [to_json(sub, names, projects, lists) for sub in subs]
+
+
+def list_map(db, subs) -> dict[int, dict]:
+    """The names and sizes of the lists these subscriptions name (never their addresses)."""
+    from app.models import MailList
+
+    ids = {entry["list"] for sub in subs for entry in sub.recipients or []
+           if isinstance(entry, dict) and "list" in entry}
+    if not ids:
+        return {}
+    rows = db.scalars(select(MailList).where(MailList.id.in_(ids))).all()
+    return {row.id: {"name": row.name, "count": mail_lists.summary(db, row)["count"]}
+            for row in rows}
 
 
 def tick(db, now: datetime | None = None, *, limit: int = TICK_LIMIT) -> int:
@@ -589,6 +633,20 @@ def tick(db, now: datetime | None = None, *, limit: int = TICK_LIMIT) -> int:
         recipients: list[sends.Recipient] = []
         seen: set[str] = set()
         for entry in sub.recipients:
+            if "list" in entry:
+                # 058: members resolve now, so the delivery reaches whoever is in the list today —
+                # paused members and the creator's own address excluded, as in a manual send.
+                for member in mail_lists.resolve(db, [entry["list"]], exclude=creator.email):
+                    if member["address"] in seen:
+                        continue
+                    if allowed_domains and mail_settings.email_domain(
+                            member["address"]) not in allowed_domains:
+                        continue
+                    recipients.append(sends.Recipient(member["address"], None,
+                                                      list_id=member["list_id"],
+                                                      name=member["name"]))
+                    seen.add(member["address"])
+                continue
             if "role" in entry:
                 for member in role_users(db, entry["role"]):
                     if member.email not in seen and sends.can_open(db, member, dash, ctx):
@@ -635,6 +693,11 @@ def tick(db, now: datetime | None = None, *, limit: int = TICK_LIMIT) -> int:
             attach_pdf=sub.attach_pdf,
             link_days=link_days,
             status="queued",
+            kinds={"users": sum(1 for r in recipients if r.user_id is not None),
+                   "lists": [s["name"] for s in list_map(db, [sub]).values()],
+                   "emails": sum(1 for r in recipients
+                                 if r.user_id is None and r.list_id is None),
+                   "total": len(recipients)},
         )
         db.add(send)
         db.flush()
@@ -644,6 +707,7 @@ def tick(db, now: datetime | None = None, *, limit: int = TICK_LIMIT) -> int:
                     send_id=send.id,
                     recipient=recipient.address,
                     user_id=recipient.user_id,
+                    list_id=recipient.list_id,
                     status="queued",
                     next_attempt_at=now,
                 )

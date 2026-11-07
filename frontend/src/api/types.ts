@@ -965,6 +965,14 @@ export interface EmailDelivery {
   sent_at: string | null;
 }
 
+/** Feature 058: what the recipients of a send were — counts and list **names**, never addresses. */
+export interface EmailSendKinds {
+  users?: number;
+  lists?: string[];
+  emails?: number;
+  total?: number;
+}
+
 export interface EmailSend {
   id: number;
   subject: string;
@@ -975,18 +983,108 @@ export interface EmailSend {
   link_days: number | null;
   subscription_id: number | null;
   requested_by: { id: number; name: string | null } | null;
+  /** Feature 058: present on the history and on every write answer. */
+  kinds?: EmailSendKinds;
+  count?: number;
   deliveries: EmailDelivery[];
+}
+
+/** Feature 058: one list a sender may put in the recipient box. */
+export interface MailListOption {
+  id: number;
+  name: string;
+  count: number;
+  visibility: MailListVisibility;
+  kind: MailListKind;
+  role: string | null;
 }
 
 export interface EmailOptions {
   available: boolean;
   can_link: boolean;
   allowed_domains: string[];
-  max_recipients: number;
+  /** Feature 058: `null` is the contract for "no ceiling"; the dialog renders no limit. */
+  max_recipients: number | null;
+  free_addresses_role?: "admin" | "user";
+  sending_paused?: boolean;
+  batch_size?: number;
+  send_rate?: number;
+  individual_messages?: boolean;
+  from_mode?: string;
+  lists?: MailListOption[];
   link_days: { min: number; max: number; default: number };
   links_active?: number; // administrators only
   links_max?: number; // administrators only
   items: EmailSend[];
+}
+
+// Feature 058: reusable lists of addresses (`/api/mail/lists`).
+export type MailListVisibility = "personal" | "compartida";
+export type MailListKind = "members" | "role";
+
+export interface MailListMember {
+  id: number;
+  address: string;
+  name: string | null;
+  paused: boolean;
+}
+
+export interface MailList {
+  id: number;
+  name: string;
+  description: string | null;
+  visibility: MailListVisibility;
+  kind: MailListKind;
+  role: string | null;
+  owner: { id: number; name: string };
+  mine: boolean;
+  editable: boolean;
+  count: number;
+  paused: number;
+  /** Only on `GET /{id}` and on the write answers. */
+  members?: MailListMember[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MailListsPage {
+  items: MailList[];
+  can_share: boolean;
+  max_members: number;
+}
+
+export interface MailListInput {
+  name: string;
+  description?: string | null;
+  visibility?: MailListVisibility;
+  kind?: MailListKind;
+  role?: "user" | "admin" | null;
+}
+
+export interface MailListPatch {
+  name?: string;
+  description?: string | null;
+  visibility?: MailListVisibility;
+}
+
+export interface MailMemberInput {
+  address: string;
+  name?: string | null;
+  paused?: boolean;
+}
+
+export interface MailImportError {
+  line: number;
+  value: string;
+  code: string;
+}
+
+export interface MailImportResult {
+  added: number;
+  updated: number;
+  skipped: number;
+  errors: MailImportError[];
+  list?: MailList;
 }
 
 export interface RecipientOption {
@@ -1000,7 +1098,9 @@ export type SubscriptionFrequency = "daily" | "weekly" | "monthly";
 export type SubscriptionRecipient =
   | { user_id: number; name: string | null }
   | { email: string }
-  | { role: string };
+  | { role: string }
+  /** Feature 058: a list by id; `name` and `count` come from the answer. */
+  | { kind: "list"; id: number; name?: string | null; count?: number | null };
 
 export interface Subscription {
   id: number;
@@ -1013,6 +1113,8 @@ export interface Subscription {
   attach_pdf: boolean;
   link_days: number | null;
   paused: boolean;
+  /** Feature 058: `list_deleted` when the list it used was deleted. */
+  paused_reason?: string | null;
   last_due_at: string | null;
   next_due_at: string;
   created_at: string;

@@ -17,6 +17,7 @@ from app.api import (
     dashboards,
     guide,
     health,
+    mail_lists,
     me,
     oauth,
     projects,
@@ -103,7 +104,7 @@ def create_app() -> FastAPI:
 
     for module in (health, auth, me, dashboards, admin, ai, sources, security, workspace,
                    reports, tokens, telegram, projects, shared, sharing, guide, oauth,
-                   appearance, themes, google_admin):
+                   appearance, themes, google_admin, mail_lists):
         app.include_router(module.router)
     if os.environ.get("BIZVIEW_TEST_HOOKS") == "1":   # e2e only (feature 007); never in images
         from app.api import testhooks

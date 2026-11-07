@@ -25,6 +25,7 @@ import { ChangePassword } from "./pages/ChangePassword";
 import { DashboardGate } from "./pages/DashboardGate";
 import { Forbidden } from "./pages/Forbidden";
 import { Dashboards } from "./pages/Dashboards";
+import { Lists } from "./pages/mail/Lists";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { Profile } from "./pages/Profile";
@@ -59,6 +60,9 @@ export function App() {
                   <Route element={<RequireAuth><AppShell /></RequireAuth>}>
                     <Route index element={<Home />} />
                     <Route path="tableros" element={<Dashboards />} />
+                    {/* Feature 058: every user's lists and the shared ones they may use. */}
+                    <Route path="mis-listas" element={<Lists />} />
+                    <Route path="admin/listas-de-correo" element={<RequireAdmin><Lists admin /></RequireAdmin>} />
                     <Route path="d/:code" element={<DashboardGate />} />
                     <Route path="r/:id" element={<ReportView />} />
                     <Route path="perfil" element={<Profile />} />

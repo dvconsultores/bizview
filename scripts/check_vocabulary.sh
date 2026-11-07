@@ -9,6 +9,8 @@
 #   token_budget   the retired conversation budget
 #   AI Powered     the name the product dropped in 0.2.0 (046)
 #   source_chat    the structure chat 052 shipped and then removed (one generator button instead)
+#   MAX_RECIPIENTS / SENDS_PER_HOUR   the volume ceilings 058 removed: the product has no quota, the
+#                   mail provider governs the volume (spec 058 FR-004, SC-003)
 #
 # Excluded on purpose: cli/bizview_cli/workspace_template/ (the external authoring contract),
 # specs/ (historical feature documents, and specs/_deprecated/ is where the removed features live),
@@ -20,7 +22,7 @@ cd "$(dirname "$0")/.."
 
 PATHS=${*:-"backend/app frontend/src docs README.md README.es.md SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md"}
 
-hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget|AI Powered|source_chat' $PATHS \
+hits=$(grep -rInE 'asistente|speckit-|run_contract|token_budget|AI Powered|source_chat|MAX_RECIPIENTS|SENDS_PER_HOUR' $PATHS \
          --exclude-dir=workspace_template --exclude-dir=node_modules 2>/dev/null \
          | grep -v 'vocab-allow' || true)
 

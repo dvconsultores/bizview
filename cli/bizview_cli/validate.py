@@ -2017,7 +2017,9 @@ def _check_distribution(entry: Entry, reports: dict[str, Entry], issues: list[Is
                                   max=max_days),
                                 file=file, path=f"{base}/link_days"))
         if roles is not None:
-            for role in sub["recipients"]["roles"]:
+            # 058: a subscription may name lists instead of roles; the roles it does name still
+            # have to be ones the report's `access.roles` lets in.
+            for role in (sub["recipients"].get("roles") or []):
                 if role not in roles:
                     issues.append(Issue(entry.key, "distribution_role",
                                         t("validate.distribution_role", role=role),

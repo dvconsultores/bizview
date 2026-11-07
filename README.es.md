@@ -2,8 +2,6 @@
 
 🇬🇧 [English](README.md) · 🇪🇸 **Español**
 
-[![Bizview en el teléfono: un tablero de ventas](docs/assets/readme-phone.png)](docs/assets/readme-phone.png)
-
 **Los datos de tu negocio en tu teléfono. Arma los reportes con la IA que quieras — Bizview los
 valida, los ejecuta y los comparte.**
 
@@ -122,7 +120,7 @@ Paso a paso, con el archivo detrás de cada paso y el diagrama: [docs/es/RENDERI
 | Temas como datos: una biblioteca de tokens que un autor puede traer dentro de un proyecto y aplicar a un reporte | [047](specs/047-themes-as-data/spec.md), [051](specs/051-theme-application/spec.md) |
 | Parámetros y filtros como una sola hoja en la página del reporte | [053](specs/053-parameters-sheet/spec.md) |
 | Ingreso con Google, con reglas de dominio y asignación de rol | [054](specs/054-google-signin-rbac/spec.md) |
-| Compartir: enlaces de solo lectura que expiran, envío por correo, envíos programados | [018](specs/018-dashboard-sharing/spec.md) |
+| Compartir: enlaces de solo lectura que expiran, envío por correo a cualquier lista de direcciones, envíos programados | [018](specs/018-dashboard-sharing/spec.md), [058](specs/058-mailing-lists/spec.md) |
 | Español e inglés, modo oscuro, exportación a PDF y CSV | [022](specs/022-i18n-en-es/spec.md), [006](specs/006-dark-mode/spec.md) |
 | Administración: usuarios, roles, acceso, auditoría, perfil `internet`, ingreso con Google o Telegram | [002](specs/002-auth-admin-home/spec.md), [004](specs/004-data-sources-security/spec.md), [027](specs/027-google-sign-in/spec.md), [007](specs/007-telegram-sign-in/spec.md) |
 | Guía dentro de la app, aviso de actualización, búsqueda de proyectos | [023](specs/023-chat-app-guide/spec.md), [025](specs/025-app-updates-and-search/spec.md) |

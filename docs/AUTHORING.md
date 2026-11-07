@@ -224,12 +224,18 @@ subscriptions:
     weekday: 1
     hour: 7
     period: mtd
-    recipients: {roles: [admin]}
+    recipients: {roles: [admin], lists: ["Gerencia comercial"]}
     attach_pdf: true
     link_days: 7
 ```
 
-Recipients are **roles**, never addresses.
+Recipients are **roles** and **list names**, never addresses: a project is committed to Git, and a
+list of customers is personal data the installation owns (constitution II). `lists:` names the
+mailing lists created in **Listas de correo** — the same name may exist as a personal list of
+somebody and as a shared one, and the shared one wins. On apply, a name with no list in the
+installation is refused and the message names it, so the project keeps saying what it needs. The
+validator refuses an `@` anywhere in `recipients:`: *addresses are not allowed in a distribution;
+name a list instead*.
 
 ### Images — `assets/`
 

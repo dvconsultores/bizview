@@ -51,6 +51,8 @@ AUDIT_KINDS = (
     "email_settings_updated", "email_test_sent", "email_sent",
     "email_subscription_created", "email_subscription_updated",
     "email_subscription_deleted",
+    # 058: reusable lists of addresses (the addresses themselves never reach the event).
+    "mail_list_created", "mail_list_updated", "mail_list_deleted", "mail_send_resent",
     # feature 019
     "source_direct_reports_changed",
     # feature 020
@@ -994,6 +996,74 @@ class ShareLink(Base):
     theme: Mapped[str | None] = mapped_column(String(5))
 
 
+MAIL_LIST_VISIBILITIES = ("personal", "compartida")
+MAIL_LIST_KINDS = ("members", "role")
+#: Roles a dynamic list may resolve to. `superuser` is never a recipient of a mailing list.
+MAIL_LIST_ROLES = ("user", "admin")
+MAIL_LIST_MAX_MEMBERS = 1000
+
+
+class MailList(Base):
+    """A reusable list of recipients (feature 058).
+
+    Two kinds share one entity: `members` holds rows in `mail_list_member`; `role` resolves at send
+    time to the installation's users of that role — which is what a project's
+    `distributions/<id>.yaml` meant by `recipients: {roles: […]}` before this feature, so no authored
+    file changes. The addresses live here and never in a project folder (constitution II)."""
+
+    __tablename__ = "mail_list"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 80", name="name_len"),
+        CheckConstraint("description IS NULL OR char_length(description) <= 200",
+                        name="description_len"),
+        CheckConstraint(_in("visibility", MAIL_LIST_VISIBILITIES), name="visibility"),
+        CheckConstraint(_in("kind", MAIL_LIST_KINDS), name="kind"),
+        CheckConstraint("(kind = 'role') = (role IS NOT NULL)", name="role_kind"),
+        CheckConstraint("role IS NULL OR role IN ('user', 'admin')", name="role_value"),
+        Index("uq_mail_list_owner_name", "owner_id", text("lower(name)"), unique=True,
+              postgresql_where=text("deleted_at IS NULL")),
+        Index("ix_mail_list_owner", "owner_id", postgresql_where=text("deleted_at IS NULL")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    visibility: Mapped[str] = mapped_column(Text, server_default=text("'personal'"))
+    kind: Mapped[str] = mapped_column(Text, server_default=text("'members'"))
+    role: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MailListMember(Base):
+    """One address of a list: the only personal data this feature stores."""
+
+    __tablename__ = "mail_list_member"
+    __table_args__ = (
+        CheckConstraint("char_length(address) BETWEEN 3 AND 254", name="address_len"),
+        CheckConstraint("name IS NULL OR char_length(name) <= 120", name="name_len"),
+        UniqueConstraint("list_id", "address", name="uq_mail_list_member"),
+        Index("ix_mail_list_member_list", "list_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    list_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mail_list.id", ondelete="CASCADE"))
+    address: Mapped[str] = mapped_column(Text)
+    name: Mapped[str | None] = mapped_column(Text)
+    paused: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class EmailSubscription(Base):
     """Scheduled delivery of a dashboard."""
 
@@ -1048,6 +1118,8 @@ class EmailSubscription(Base):
         BigInteger, ForeignKey("project.id", ondelete="SET NULL"))
     distribution_id: Mapped[str | None] = mapped_column(Text)
     distribution_index: Mapped[int | None] = mapped_column(SmallInteger)
+    # 058: a delivery paused by the product (its list was deleted), not by its owner.
+    paused_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -1090,6 +1162,8 @@ class EmailSend(Base):
     attach_pdf: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     link_days: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(Text, server_default=text("'queued'"))
+    # 058: {"users": n, "lists": [names], "emails": n} — counts and names, never an address.
+    kinds: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -1123,6 +1197,10 @@ class EmailDelivery(Base):
     recipient: Mapped[str] = mapped_column(Text)
     user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("app_user.id", ondelete="SET NULL")
+    )
+    # 058: the list this address came from, when it came from one (informative only).
+    list_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("mail_list.id", ondelete="SET NULL")
     )
     status: Mapped[str] = mapped_column(Text, server_default=text("'queued'"))
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))

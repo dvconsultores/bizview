@@ -1,57 +1,23 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { type FormEvent } from "react";
-import { RefreshCw, Send } from "lucide-react";
+import { RefreshCw, Save, Send } from "lucide-react";
 import { api, ApiError } from "../../api/client";
-import type {
-  EmailOptions,
-  EmailSend,
-  EmailSendStatus,
-} from "../../api/types";
+import type { EmailOptions, EmailSend } from "../../api/types";
 import type { ReportSelection } from "../../lib/reportQuery";
-import { t, useT } from "../../i18n";
-import { formatDateTime } from "../../lib/format";
+import { useT } from "../../i18n";
+import { errorText, selectionPayload } from "../../lib/sharing";
 import {
-  errorText,
-  selectionPayload,
-} from "../../lib/sharing";
-import { RecipientPicker } from "./RecipientPicker";
-import type { PickedRecipients } from "./RecipientPicker";
+  emptyRecipients,
+  RecipientPicker,
+  type PickedRecipients,
+} from "./RecipientPicker";
+import { SendHistory } from "./SendHistory";
 import { Alert } from "../Alert";
-import { Badge } from "../Badge";
 import { Button } from "../Button";
 import { Card } from "../Card";
-import { EmptyState } from "../EmptyState";
 import { Input } from "../Input";
 import { Spinner } from "../Spinner";
 import { useToast } from "../Toast";
-
-function sendStatusBadge(status: EmailSendStatus) {
-  const tone =
-    status === "queued"
-      ? "gray"
-      : status === "sending"
-        ? "accent"
-        : status === "sent"
-          ? "green"
-          : status === "partial"
-            ? "amber"
-            : "red";
-  return <Badge tone={tone}>{t.sharing.email.sendStatus[status]}</Badge>;
-}
-
-function deliveryStatusBadge(status: string) {
-  const tone =
-    status === "queued"
-      ? "gray"
-      : status === "sent"
-        ? "green"
-        : status === "failed"
-          ? "red"
-          : "amber";
-  return (
-    <Badge tone={tone}>{t.sharing.email.deliveryStatus[status]}</Badge>
-  );
-}
 
 function linkCapReached(o: EmailOptions): boolean {
   return o.links_max !== undefined && (o.links_active ?? 0) >= o.links_max;
@@ -62,26 +28,24 @@ export function EmailSendPanel(props: {
   dashboardName: string;
   selection: ReportSelection | null;
   pdfAvailable: boolean;
+  /** `EMAIL_FREE_ADDRESSES_ROLE=admin` leaves typed addresses to administrators. */
+  isAdmin?: boolean;
   onSent?: () => void;
 }) {
   const t = useT();
-  const { code, dashboardName, selection, pdfAvailable, onSent } = props;
+  const { code, dashboardName, selection, pdfAvailable, isAdmin = false, onSent } = props;
   const [options, setOptions] = useState<EmailOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [recipients, setRecipients] = useState<PickedRecipients>({
-    users: [],
-    emails: [],
-  });
+  const [recipients, setRecipients] = useState<PickedRecipients>(emptyRecipients());
   const initialSubject = dashboardName.slice(0, 200);
   const [subject, setSubject] = useState(initialSubject);
   const [message, setMessage] = useState("");
   const [attachPdf, setAttachPdf] = useState(pdfAvailable);
   const [includeLink, setIncludeLink] = useState(false);
   const [linkDays, setLinkDays] = useState(7);
-  const [recipientsError, setRecipientsError] = useState<string | null>(
-    null,
-  );
+  const [saveAsList, setSaveAsList] = useState("");
+  const [recipientsError, setRecipientsError] = useState<string | null>(null);
   const [linkDaysError, setLinkDaysError] = useState<string | null>(null);
   const [postError, setPostError] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
@@ -120,8 +84,7 @@ export function EmailSendPanel(props: {
   const hasPending = useMemo(
     () =>
       options?.items.some(
-        (send) =>
-          send.status === "queued" || send.status === "sending",
+        (send) => send.status === "queued" || send.status === "sending",
       ) ?? false,
     [options],
   );
@@ -143,15 +106,23 @@ export function EmailSendPanel(props: {
     if (!options) return;
     const wantsLink = options.can_link && includeLink && !linkCapReached(options);
 
-    if (recipients.users.length === 0 && recipients.emails.length === 0) {
-      setRecipientsError(t.sharing.email.noRecipients);
+    if (recipients.invalid.length > 0) {
+      setRecipientsError(
+        t.sharing.email.invalidAddresses(recipients.invalid.length),
+      );
       return;
     }
 
     if (
-      (!pdfAvailable || !attachPdf) &&
-      !wantsLink
+      recipients.users.length === 0 &&
+      recipients.lists.length === 0 &&
+      recipients.emails.length === 0
     ) {
+      setRecipientsError(t.sharing.email.noRecipients);
+      return;
+    }
+
+    if ((!pdfAvailable || !attachPdf) && !wantsLink) {
       setPostError(t.sharing.email.nothingToSend);
       return;
     }
@@ -178,18 +149,21 @@ export function EmailSendPanel(props: {
         `/api/dashboards/${encodeURIComponent(code)}/email`,
         {
           users: recipients.users.map((u) => u.id),
+          lists: recipients.lists.map((l) => l.id),
           emails: recipients.emails,
           subject: subject.trim() || null,
           message: message.trim() || null,
           selection: selection ? selectionPayload(selection) : null,
           attach_pdf: pdfAvailable && attachPdf,
           link_days: wantsLink ? linkDays : null,
+          save_as_list: saveAsList.trim() || null,
         },
       );
       toast(t.sharing.email.queuedToast);
-      setRecipients({ users: [], emails: [] });
+      setRecipients(emptyRecipients());
       setSubject(initialSubject);
       setMessage("");
+      setSaveAsList("");
       if (options) {
         setOptions({ ...options, items: [send, ...options.items] });
       }
@@ -198,6 +172,7 @@ export function EmailSendPanel(props: {
       if (e instanceof ApiError && (e.status === 422 || e.status === 409)) {
         if (
           e.fields.users !== undefined ||
+          e.fields.lists !== undefined ||
           e.fields.emails !== undefined ||
           e.fields.recipients !== undefined
         ) {
@@ -244,9 +219,15 @@ export function EmailSendPanel(props: {
   }
 
   const capReached = linkCapReached(options);
+  // `max_recipients: null` is the contract for "no ceiling": nothing is rendered.
+  const freeAddressesAllowed =
+    options.free_addresses_role !== "admin" || isAdmin;
 
   return (
     <div className="space-y-8">
+      {options.sending_paused && (
+        <Alert tone="info">{t.sharing.email.sendingPaused}</Alert>
+      )}
       {options.available ? (
         <Card tone="accent" className="p-5">
           <form onSubmit={(e) => void submit(e)} className="space-y-5">
@@ -254,6 +235,8 @@ export function EmailSendPanel(props: {
               code={code}
               allowedDomains={options.allowed_domains}
               max={options.max_recipients}
+              freeAddressesAllowed={freeAddressesAllowed}
+              lists={options.lists ?? []}
               value={recipients}
               onChange={setRecipients}
               error={recipientsError}
@@ -325,9 +308,7 @@ export function EmailSendPanel(props: {
                       value={linkDays}
                       onChange={(e) =>
                         setLinkDays(
-                          e.target.value === ""
-                            ? 0
-                            : Number(e.target.value),
+                          e.target.value === "" ? 0 : Number(e.target.value),
                         )
                       }
                       min={options.link_days.min}
@@ -338,6 +319,15 @@ export function EmailSendPanel(props: {
                 )}
               </div>
             )}
+
+            <Input
+              label={t.sharing.email.saveAsList}
+              hint={t.sharing.email.saveAsListHint}
+              maxLength={120}
+              value={saveAsList}
+              onChange={(e) => setSaveAsList(e.target.value)}
+              trailing={<Save className="h-5 w-5 text-ink-muted" aria-hidden />}
+            />
 
             {selection && (
               <p className="text-sm text-ink-muted">
@@ -377,63 +367,11 @@ export function EmailSendPanel(props: {
             {t.sharing.email.refresh}
           </Button>
         </div>
-        {options.items.length === 0 ? (
-          <EmptyState title={t.sharing.email.noSends} />
-        ) : (
-          <Card className="p-0">
-            <ul className="divide-y divide-line">
-              {options.items.map((send) => (
-                <li key={send.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-ink">
-                          {send.subject}
-                        </p>
-                        {sendStatusBadge(send.status)}
-                        {send.subscription_id !== null && (
-                          <Badge tone="accent">
-                            {t.sharing.email.scheduledBadge}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-ink-muted">
-                        {t.sharing.email.requestedBy(
-                          send.requested_by?.name ?? "—",
-                          formatDateTime(send.created_at),
-                        )}
-                      </p>
-                      {send.deliveries.length > 0 && (
-                        <ul className="space-y-1.5">
-                          {send.deliveries.map((delivery) => (
-                            <li
-                              key={delivery.id}
-                              className="text-sm text-ink"
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="break-all">
-                                  {delivery.recipient}
-                                </span>
-                                {deliveryStatusBadge(delivery.status)}
-                              </div>
-                              {delivery.error && (
-                                <p className="mt-1 text-sm text-danger">
-                                  {delivery.error}
-                                  {delivery.attempts > 0 &&
-                                    ` · ${t.sharing.email.attempts(delivery.attempts)}`}
-                                </p>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
+        <SendHistory
+          code={code}
+          sends={options.items}
+          onResent={() => void load(true)}
+        />
       </section>
     </div>
   );

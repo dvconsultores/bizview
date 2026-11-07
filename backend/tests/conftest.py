@@ -178,7 +178,10 @@ def clean(database):
 
 
 MAIL_FIELDS = ("smtp_host", "smtp_port", "smtp_security", "smtp_user", "smtp_password",
-               "smtp_from", "smtp_from_name", "email_allowed_domains", "share_links_enabled")
+               "smtp_from", "smtp_from_name", "email_allowed_domains", "share_links_enabled",
+               # 058: the delivery shape (batch, pacing, pause, sender) an installation chooses.
+               "email_batch_size", "email_send_rate", "email_individual_messages",
+               "email_sending_paused", "email_from_mode", "email_free_addresses_role")
 
 
 @pytest.fixture(autouse=True)
@@ -217,6 +220,9 @@ MAIL_ENV = dict(
     smtp_from_name="Bizview",
     email_allowed_domains="cliente.com",
     share_links_enabled=False,
+    # 058: the shape the 018 tests were written against — one message per address, so a test can
+    # look at "the email of that recipient". Batching is proved on its own (test_mail_send_batches).
+    email_individual_messages=True,
 )
 
 

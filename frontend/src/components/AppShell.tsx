@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, CircleHelp, FolderKanban, Home, LayoutDashboard, LayoutGrid, LogOut, Moon, Sun, User as UserIcon, type LucideIcon } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, CircleHelp, FolderKanban, Home, LayoutDashboard, LayoutGrid, LogOut, Mails, Moon, Sun, User as UserIcon, type LucideIcon } from "lucide-react";
 import {
   useCallback, useEffect, useMemo, useRef, useState,
   type ReactNode,
@@ -48,8 +48,9 @@ function useNavItems(): { full: NavItem[]; compact: NavItem[] } {
   const { user } = useAuth();
   const home: NavItem = { to: "/", label: t.nav.home, icon: Home, end: true };
   const dashboards: NavItem = { to: "/tableros", label: t.nav.dashboards, icon: LayoutDashboard };
+  const mailLists: NavItem = { to: "/mis-listas", label: t.nav.mailLists, icon: Mails };
   const profile: NavItem = { to: "/perfil", label: t.nav.profile, icon: UserIcon };
-  const full: NavItem[] = [home, dashboards];
+  const full: NavItem[] = [home, dashboards, mailLists];
   // Every admin section is reached from the Administración page; the item stays highlighted
   // on all of them.
   if (user?.is_superuser) full.push({ to: "/proyectos", label: t.nav.projects, icon: FolderKanban });

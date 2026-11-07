@@ -138,6 +138,11 @@ def build_message(
     attachment: tuple[str, bytes] | None,
     logo_url: str | None = None,
     locale: str | None = None,
+    # 058: the batch, the sender of the mail, and the name the footer names.
+    bcc: list[str] | None = None,
+    from_address: str | None = None,
+    reply_to: str | None = None,
+    sent_by: str | None = None,
 ) -> EmailMessage:
     with use_locale(locale or current()):
         return _compose(
@@ -153,6 +158,10 @@ def build_message(
             link_expires=link_expires,
             attachment=attachment,
             logo_url=logo_url,
+            bcc=bcc,
+            from_address=from_address,
+            reply_to=reply_to,
+            sent_by=sent_by,
         )
 
 
@@ -170,11 +179,19 @@ def _compose(
     link_expires,
     attachment,
     logo_url,
+    bcc=None,
+    from_address=None,
+    reply_to=None,
+    sent_by=None,
 ) -> EmailMessage:
     msg = EmailMessage()
     sender_name = cfg.sender_name or organization or product
-    msg["From"] = formataddr((safe_header(sender_name), cfg.sender_address))
+    msg["From"] = formataddr((safe_header(sender_name), from_address or cfg.sender_address))
     msg["To"] = to
+    if reply_to:
+        msg["Reply-To"] = reply_to
+    if bcc:
+        msg["Bcc"] = ", ".join(bcc)
     msg["Subject"] = safe_header(subject)
     msg["Date"] = formatdate(usegmt=True)
     domain = cfg.sender_address.rsplit("@", 1)[-1]
@@ -195,7 +212,8 @@ def _compose(
         if link_expires:
             text_lines.append(t("mail.link_expires", date=pdf_date(link_expires)))
     text_lines.append("")
-    text_lines.append(t("mail.footer", sender=organization or product, product=product))
+    text_lines.append(t("mail.footer", sender=sent_by or organization or product,
+                        product=product))
     msg.set_content("\n".join(text_lines))
 
     heading_style = "margin:0 0 8px;"
@@ -270,7 +288,13 @@ def smtp_transport(cfg: SmtpConfig, msg: EmailMessage) -> None:
                 conn.login(cfg.username, cfg.password or "")
             except (UnicodeError, ValueError):
                 raise MailError("auth_failed", permanent=True) from None
-        conn.send_message(msg, from_addr=cfg.sender_address, to_addrs=[msg["To"]])
+        # 058: a batched send is one message with the recipients in BCC. `To:` shows the sender so
+        # the mail reads like a normal one, but the envelope carries only the batch — otherwise the
+        # sender would receive a copy of every batch of their own send.
+        batch = [addr.strip() for addr in (msg["Bcc"] or "").split(",") if addr.strip()]
+        recipients = batch or [msg["To"]]
+        conn.send_message(msg, from_addr=msg["From"].addresses[0].addr_spec,
+                          to_addrs=[addr for addr in recipients if addr])
     except smtplib.SMTPAuthenticationError:
         raise MailError("auth_failed", permanent=True) from None
     except smtplib.SMTPRecipientsRefused:

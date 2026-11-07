@@ -11,9 +11,10 @@ from app.auth.deps import client_ip, current_user, require_admin
 from app.config import get_settings
 from app.db import DB
 from app.errors import validation
+from app.mail import lists as mail_lists
 from app.mail import sends, subscriptions
 from app.mail import settings as mail_settings
-from app.models import AppUser, EmailSubscription
+from app.models import AppUser, EmailSend, EmailSubscription
 from app.services import dashboards
 from app.sharing import links
 
@@ -33,8 +34,13 @@ class LinkIn(BaseModel):
 class EmailIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    users: list[int] = Field(default_factory=list, max_length=50)
-    emails: list[Email] = Field(default_factory=list, max_length=50)
+    users: list[int] = Field(default_factory=list)
+    #: 058: free addresses, typed or pasted. No ceiling: the provider governs the volume.
+    emails: list[Email] = Field(default_factory=list)
+    #: 058: the lists to include, by id.
+    lists: list[int] = Field(default_factory=list)
+    #: 058: save the free addresses of this send as a personal list with this name.
+    save_as_list: str | None = Field(None, max_length=mail_lists.NAME_MAX)
     subject: str | None = Field(None, max_length=200)
     message: str | None = Field(None, max_length=2000)
     selection: dict[str, SelectionValue] | None = None
@@ -52,8 +58,10 @@ class SubscriptionIn(BaseModel):
     period: str = Field(min_length=1, max_length=40)
     attach_pdf: bool = True
     link_days: int | None = Field(None, ge=1, le=90)
-    users: list[int] = Field(default_factory=list, max_length=50)
-    emails: list[Email] = Field(default_factory=list, max_length=50)
+    users: list[int] = Field(default_factory=list)
+    emails: list[Email] = Field(default_factory=list)
+    #: 058: the lists to deliver to; their members resolve at delivery time.
+    lists: list[int] = Field(default_factory=list)
     paused: bool = False
 
 
@@ -67,8 +75,10 @@ class SubscriptionPatch(BaseModel):
     period: str | None = Field(None, min_length=1, max_length=40)
     attach_pdf: bool | None = None
     link_days: int | None = Field(None, ge=1, le=90)
-    users: list[int] | None = Field(None, max_length=50)
-    emails: list[Email] | None = Field(None, max_length=50)
+    users: list[int] | None = None
+    emails: list[Email] | None = None
+    #: 058: the lists to deliver to; an empty list removes them.
+    lists: list[int] | None = None
     paused: bool | None = None
 
 
@@ -147,7 +157,15 @@ def get_email_options(
         "available": mail_settings.available(),
         "can_link": user.role == "admin" and links.sharing_enabled(),
         "allowed_domains": mail_settings.allowed_domains(),
-        "max_recipients": sends.MAX_RECIPIENTS,
+        # 058: no recipient ceiling anywhere — `null` is the contract, and the dialog renders none.
+        "max_recipients": None,
+        "free_addresses_role": get_settings().email_free_addresses_role,
+        "sending_paused": get_settings().email_sending_paused,
+        "batch_size": get_settings().email_batch_size,
+        "send_rate": get_settings().email_send_rate,
+        "individual_messages": get_settings().email_individual_messages,
+        "from_mode": get_settings().email_from_mode,
+        "lists": mail_lists.usable(db, user),
         "link_days": {
             "min": links.MIN_DAYS,
             "max": links.MAX_DAYS,
@@ -190,6 +208,8 @@ def post_email(
         dash,
         user_ids=body.users,
         emails=body.emails,
+        list_ids=body.lists,
+        save_as_list=body.save_as_list,
         subject=body.subject,
         message=body.message,
         selection=body.selection,
@@ -201,6 +221,37 @@ def post_email(
     return sends.send_json(db, send)
 
 
+@router.get("/{code}/email/sends")
+def get_sends(
+    code: str,
+    limit: int = Query(50, ge=1, le=200),
+    user: AppUser = Depends(current_user),
+    db: Session = DB,
+):
+    """The send history of one dashboard (FR-016): who sent what, when, and how each address went."""
+    dash = dashboards.get_for_open(db, user, code)
+    items = []
+    for send in db.scalars(
+            select(EmailSend).where(EmailSend.dashboard_id == dash.id)
+            .order_by(EmailSend.id.desc()).limit(limit)).all():
+        items.append(sends.send_json(
+            db, send, full_addresses=user.role == "admin" or send.requested_by == user.id))
+    return {"items": items}
+
+
+@router.post("/{code}/email/sends/{send_id}/resend-failed", status_code=201)
+def post_resend_failed(
+    code: str,
+    send_id: int,
+    request: Request,
+    user: AppUser = Depends(current_user),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    send = sends.resend_failed(db, user, dash, send_id, ip=client_ip(request))
+    return sends.send_json(db, send, full_addresses=True)
+
+
 def _sub_json(db: Session, sub: EmailSubscription) -> dict:
     user_ids: set[int] = {sub.created_by}
     for entry in sub.recipients:
@@ -210,7 +261,8 @@ def _sub_json(db: Session, sub: EmailSubscription) -> dict:
     if user_ids:
         users = db.scalars(select(AppUser).where(AppUser.id.in_(user_ids))).all()
         names = {u.id: u.full_name for u in users}
-    return subscriptions.to_json(sub, names, subscriptions.project_map(db, [sub]))
+    return subscriptions.to_json(sub, names, subscriptions.project_map(db, [sub]),
+                                 subscriptions.list_map(db, [sub]))
 
 
 @router.get("/{code}/subscriptions")
@@ -250,6 +302,7 @@ def create_subscription(
         link_days=body.link_days,
         user_ids=body.users,
         emails=body.emails,
+        list_ids=body.lists,
         paused=body.paused,
         ip=client_ip(request),
     )
@@ -275,6 +328,7 @@ def patch_subscription(
         "attach_pdf",
         "users",
         "emails",
+        "lists",
         "paused",
     )
     for field in required_fields:

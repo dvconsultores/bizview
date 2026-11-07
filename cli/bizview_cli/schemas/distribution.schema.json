@@ -82,10 +82,7 @@
           "recipients": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "roles"
-            ],
-            "description": "Destinatarios del envío, solo por rol.",
+            "description": "Destinatarios del envío: roles de la instalación y nombres de listas de correo, nunca direcciones (el proyecto no lleva datos personales).",
             "properties": {
               "roles": {
                 "type": "array",
@@ -99,8 +96,34 @@
                   ],
                   "description": "Rol de los destinatarios."
                 }
+              },
+              "lists": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 20,
+                "uniqueItems": true,
+                "description": "Nombres de listas de correo de la instalación que reciben el reporte. Se resuelven al aplicar el proyecto; una dirección de correo no se acepta aquí.",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "pattern": "^[^@]+$",
+                  "description": "Nombre de una lista de correo de la instalación."
+                }
               }
-            }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "roles"
+                ]
+              },
+              {
+                "required": [
+                  "lists"
+                ]
+              }
+            ]
           },
           "attach_pdf": {
             "type": "boolean",

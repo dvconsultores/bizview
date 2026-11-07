@@ -78,7 +78,21 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     smtp_from: str | None = None
     smtp_from_name: str | None = Field(default=None, max_length=120)
-    email_allowed_domains: str = ""   # comma-separated external recipient domains
+    # 058: an optional restriction. Empty (the default) accepts any domain; a list limits the free
+    # addresses and the members of a mailing list, never the installation's own users.
+    email_allowed_domains: str = ""
+    # 058: delivery throughput, the only guard the product keeps. A big list is one job delivered in
+    # messages of EMAIL_BATCH_SIZE recipients (BCC) at EMAIL_SEND_RATE messages per second (0 = no
+    # pause); EMAIL_INDIVIDUAL_MESSAGES sends one message per address instead (SES bounce handling).
+    email_batch_size: int = Field(default=50, ge=1, le=500)
+    email_send_rate: int = Field(default=10, ge=0, le=100)
+    email_individual_messages: bool = False
+    email_sending_paused: bool = False
+    # 058: who the mail says it comes from — the installation's address with the sender as Reply-To,
+    # or the sender's own address through the same relay (a corporate send-as account).
+    email_from_mode: Literal["installation", "user"] = "installation"
+    # 058: `admin` restricts free addresses to administrators; list members are unaffected.
+    email_free_addresses_role: Literal["user", "admin"] = "user"
     share_links_enabled: bool = False
 
     # Google sign-in (feature 027): an additional identity for accounts that already exist, off
@@ -258,6 +272,22 @@ class Settings(BaseSettings):
                 return None
         return v
 
+    @field_validator("email_from_mode", "email_free_addresses_role", mode="before")
+    @classmethod
+    def _lower_or_default(cls, v, info):
+        if isinstance(v, str):
+            v = v.strip().lower()
+            if v == "":
+                return "installation" if info.field_name == "email_from_mode" else "user"
+        return v
+
+    @field_validator("email_batch_size", "email_send_rate", mode="before")
+    @classmethod
+    def _empty_int_to_default(cls, v, info):
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return 50 if info.field_name == "email_batch_size" else 10
+        return v
+
     @field_validator("smtp_security", mode="before")
     @classmethod
     def _smtp_security_lower(cls, v):
@@ -281,7 +311,8 @@ class Settings(BaseSettings):
             return 587
         return v
 
-    @field_validator("share_links_enabled", "google_auth_enabled", mode="before")
+    @field_validator("email_individual_messages", "email_sending_paused",
+                     "share_links_enabled", "google_auth_enabled", mode="before")
     @classmethod
     def _empty_bool_to_false(cls, v):
         if v is None or (isinstance(v, str) and v.strip() == ""):

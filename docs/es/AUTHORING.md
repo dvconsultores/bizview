@@ -229,12 +229,18 @@ subscriptions:
     weekday: 1
     hour: 7
     period: mtd
-    recipients: {roles: [admin]}
+    recipients: {roles: [admin], lists: ["Gerencia comercial"]}
     attach_pdf: true
     link_days: 7
 ```
 
-Los destinatarios son **roles**, nunca direcciones.
+Los destinatarios son **roles** y **nombres de listas**, nunca direcciones: un proyecto vive en Git, y
+una lista de clientes es dato personal de la instalación (constitución II). `lists:` nombra las listas
+de correo creadas en **Listas de correo** — el mismo nombre puede existir como lista personal de
+alguien y como compartida, y gana la compartida. Al aplicar, un nombre que no existe en la instalación
+se rechaza y el mensaje lo nombra, así el proyecto sigue diciendo lo que necesita. El validador
+rechaza cualquier `@` dentro de `recipients:`: *las direcciones no se permiten en una distribución;
+nombra una lista*.
 
 ### Imágenes — `assets/`
 

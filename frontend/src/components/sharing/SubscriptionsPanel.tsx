@@ -53,6 +53,7 @@ function recipientsFromSubscription(
 ): PickedRecipients {
   const users: PickedRecipients["users"] = [];
   const emails: string[] = [];
+  const lists: PickedRecipients["lists"] = [];
   for (const recipient of sub.recipients) {
     if ("user_id" in recipient) {
       users.push({
@@ -61,9 +62,15 @@ function recipientsFromSubscription(
       });
     } else if ("email" in recipient) {
       emails.push(recipient.email);
+    } else if ("kind" in recipient && recipient.kind === "list") {
+      lists.push({
+        id: recipient.id,
+        name: recipient.name ?? `#${recipient.id}`,
+        count: recipient.count ?? 0,
+      });
     }
   }
-  return { users, emails };
+  return { users, lists, emails, invalid: [] };
 }
 
 function recipientLabel(recipient: SubscriptionRecipient, t: Catalogue): string {
@@ -73,7 +80,13 @@ function recipientLabel(recipient: SubscriptionRecipient, t: Catalogue): string 
   if ("role" in recipient) {
     return t.sharing.schedules.roleRecipient(t.roles[recipient.role] ?? recipient.role);
   }
-  return recipient.email;
+  if ("kind" in recipient && recipient.kind === "list") {
+    return t.sharing.schedules.listRecipient(
+      recipient.name ?? `#${recipient.id}`,
+      recipient.count ?? 0,
+    );
+  }
+  return "email" in recipient ? recipient.email : "";
 }
 
 export function SubscriptionsPanel(props: {
@@ -132,6 +145,12 @@ export function SubscriptionsPanel(props: {
     (p): p is PeriodPreset => p !== "custom",
   );
 
+  /** Feature 058: the subscription being edited may be paused because its list was deleted. */
+  const editedPausedReason =
+    form?.mode === "edit"
+      ? (subs?.items.find((item) => item.id === form.id)?.paused_reason ?? null)
+      : null;
+
   const defaultPeriod: PeriodPreset =
     def.periods.default !== "custom" &&
     allowedPeriods.includes(def.periods.default)
@@ -148,7 +167,7 @@ export function SubscriptionsPanel(props: {
     attachPdf: def.pdf,
     includeLink: false,
     linkDays: email?.link_days.default ?? 7,
-    recipients: { users: [], emails: [] },
+    recipients: { users: [], lists: [], emails: [], invalid: [] },
   });
 
   const openCreate = () => {
@@ -193,9 +212,16 @@ export function SubscriptionsPanel(props: {
 
     if (
       form.recipients.users.length === 0 &&
+      form.recipients.lists.length === 0 &&
       form.recipients.emails.length === 0
     ) {
       setRecipientsError(t.sharing.email.noRecipients);
+      return;
+    }
+    if (form.recipients.invalid.length > 0) {
+      setRecipientsError(
+        t.sharing.email.invalidAddresses(form.recipients.invalid.length),
+      );
       return;
     }
     if (
@@ -233,6 +259,7 @@ export function SubscriptionsPanel(props: {
       link_days:
         subs.can_link && form.includeLink ? form.linkDays : null,
       users: form.recipients.users.map((u) => u.id),
+      lists: form.recipients.lists.map((l) => l.id),
       emails: form.recipients.emails,
     };
 
@@ -257,6 +284,7 @@ export function SubscriptionsPanel(props: {
       if (e instanceof ApiError && e.status === 422) {
         if (
           e.fields.users !== undefined ||
+          e.fields.lists !== undefined ||
           e.fields.emails !== undefined ||
           e.fields.recipients !== undefined
         ) {
@@ -507,10 +535,20 @@ export function SubscriptionsPanel(props: {
               code={code}
               allowedDomains={email.allowed_domains}
               max={email.max_recipients}
+              freeAddressesAllowed
+              lists={email.lists ?? []}
               value={form.recipients}
               onChange={(recipients) => setForm({ ...form, recipients })}
               error={recipientsError}
             />
+
+            {form.mode === "edit" && editedPausedReason && (
+              <Alert tone="warning">
+                {editedPausedReason === "list_deleted"
+                  ? t.sharing.schedules.pausedListDeleted
+                  : t.sharing.schedules.pausedReason(editedPausedReason)}
+              </Alert>
+            )}
 
             {formError && <Alert tone="error">{formError}</Alert>}
 
@@ -564,6 +602,13 @@ export function SubscriptionsPanel(props: {
                           formatDateTime(sub.last_due_at, subs.timezone),
                         )}
                     </p>
+                    {sub.paused && sub.paused_reason && (
+                      <Alert tone="warning">
+                        {sub.paused_reason === "list_deleted"
+                          ? t.sharing.schedules.pausedListDeleted
+                          : t.sharing.schedules.pausedReason(sub.paused_reason)}
+                      </Alert>
+                    )}
                     <p className="text-sm text-ink-muted">
                       {t.sharing.schedules.recipientsLine(
                         sub.recipients.map((r) => recipientLabel(r, t)).join(", "),

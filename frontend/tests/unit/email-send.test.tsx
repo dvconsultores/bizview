@@ -132,7 +132,7 @@ describe("EmailSendPanel", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it("rejects external domains not in the allowed list", async () => {
+  it("marks an address outside the allowed domains invalid and blocks the send", async () => {
     await renderPanel();
 
     const externalInput = inputByLabel(t.sharing.email.external)!;
@@ -141,10 +141,21 @@ describe("EmailSendPanel", () => {
       byText(t.sharing.email.add)?.click();
     });
 
+    // Feature 058: the raw text stays visible as a red chip and the send is refused.
+    expect(container.textContent).toContain("x@other.com");
+    expect(container.textContent).toContain(t.sharing.email.invalidAddress);
     expect(container.textContent).toContain(
       t.sharing.email.domainNotAllowed(["acme.com"]),
     );
-    expect(container.textContent).not.toContain("x@other.com");
+
+    await act(async () => {
+      byText(t.sharing.email.send)?.click();
+    });
+    await flush();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      t.sharing.email.invalidAddresses(1),
+    );
   });
 
   it("sends with recipients, subject and current selection", async () => {
@@ -182,6 +193,7 @@ describe("EmailSendPanel", () => {
       "/api/dashboards/ventas/email",
       {
         users: [7],
+        lists: [],
         emails: ["luis@acme.com"],
         subject: "Cierre",
         message: null,
@@ -192,6 +204,7 @@ describe("EmailSendPanel", () => {
         },
         attach_pdf: true,
         link_days: null,
+        save_as_list: null,
       },
     );
     expect(container.textContent).toContain("Cierre");

@@ -1,4 +1,4 @@
-import { CalendarClock, FileDown, Mail, Moon, Share2, Sun, Tv } from "lucide-react";
+import { CalendarClock, FileDown, History, Mail, Moon, Share2, Sun, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { api, ApiError } from "../api/client";
@@ -79,6 +79,7 @@ import { formatRange } from "../lib/numbers";
 import { useToast } from "../components/Toast";
 import { useTheme } from "../theme/ThemeContext";
 import { EmailSendPanel } from "../components/sharing/EmailSendPanel";
+import { SendHistoryPanel } from "../components/sharing/SendHistory";
 import { ShareLinksPanel } from "../components/sharing/ShareLinksPanel";
 import { SubscriptionsPanel } from "../components/sharing/SubscriptionsPanel";
 
@@ -251,7 +252,7 @@ export function ReportView() {
   }, [loaded, user, id]);
 
   const [sharePanel, setSharePanel] = useState<
-    "share" | "email" | "schedules" | null
+    "share" | "email" | "sends" | "schedules" | null
   >(null);
   const [dashCode, setDashCode] = useState<string | null>(null);
   const [emailAvailable, setEmailAvailable] = useState(false);
@@ -605,6 +606,13 @@ export function ReportView() {
                   show: !!dashCode && emailAvailable,
                 },
                 {
+                  id: "sends",
+                  label: t.reportActions.sends,
+                  icon: History,
+                  onClick: () => setSharePanel("sends"),
+                  show: !!dashCode && emailAvailable,
+                },
+                {
                   id: "schedules",
                   label: t.reportActions.schedules,
                   icon: CalendarClock,
@@ -780,8 +788,17 @@ export function ReportView() {
             dashboardName={localized(def, "title")}
             selection={applied}
             pdfAvailable={!!def.pdf}
+            isAdmin={user?.role === "admin"}
           />
         ) : null}
+      </View>
+
+      <View
+        open={sharePanel === "sends"}
+        title={t.sharing.email.sends}
+        onClose={() => setSharePanel(null)}
+      >
+        {sharePanel === "sends" && dashCode ? <SendHistoryPanel code={dashCode} /> : null}
       </View>
 
       <View

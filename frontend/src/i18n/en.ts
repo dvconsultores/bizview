@@ -36,6 +36,8 @@ export const en: Catalogue = {
     help: "Help",
     dashboards: "Dashboards",
     home: "Home",
+    mailLists: "My lists",
+    mailListsAdmin: "Mailing lists",
     admin: "Administration",
     users: "Users",
     audit: "Audit",
@@ -685,6 +687,10 @@ export const en: Catalogue = {
     email_subscription_created: "Scheduled send created",
     email_subscription_updated: "Scheduled send updated",
     email_subscription_deleted: "Scheduled send deleted",
+    mail_list_created: "Mailing list created",
+    mail_list_updated: "Mailing list edited",
+    mail_list_deleted: "Mailing list deleted",
+    mail_send_resent: "Failed deliveries re-sent",
     source_direct_reports_changed: "Source direct reports changed",
     source_bi_ready_changed: "Source declared BI-ready",
     source_bi_ready_verified: "Read-only credential proven",
@@ -1580,8 +1586,8 @@ export const en: Catalogue = {
       external: "External email",
       externalHint: (domains: string[]) =>
         domains.length > 0
-          ? `Allowed: ${domains.join(", ")}`
-          : "External addresses are not allowed.",
+          ? `Only these domains are allowed: ${domains.join(", ")}`
+          : "Any domain is accepted.",
       add: "Add",
       invalidEmail: "Invalid email.",
       domainNotAllowed: (domains: string[]) =>
@@ -1589,6 +1595,40 @@ export const en: Catalogue = {
       alreadyAdded: "That recipient is already added.",
       tooMany: (max: number) => `Maximum ${max} recipients.`,
       removeRecipient: (name: string) => `Remove ${name}`,
+      /** Feature 058: lists, pasted addresses and the live counter. */
+      lists: "Mailing lists",
+      noLists: "There are no mailing lists yet.",
+      noListsHint: "Create one in My lists and it will show up here.",
+      listChip: (name: string, count: number) => `📋 ${name} · ${count}`,
+      removeList: (name: string) => `Remove the list ${name}`,
+      addList: (name: string) => `Add the list ${name}`,
+      listHint:
+        "Picking a list adds its members; the ones on pause receive nothing.",
+      paste: "Paste a list",
+      pasteHint:
+        "Addresses separated by comma, semicolon, space or newline; Name <address> also works.",
+      pastePlaceholder: "ana@client.com, Luis Pérez <luis@client.com>",
+      pasteButton: "Add pasted",
+      invalidAddress: "Invalid address",
+      invalidAddresses: (n: number) =>
+        `${n} invalid address(es): fix or remove them to send.`,
+      recipientCount: (n: number) =>
+        n === 1 ? "1 recipient" : `${n} recipients`,
+      freeAddressesAdmin:
+        "Only administrators may type addresses. You can send to installation users and to lists.",
+      sendingPaused:
+        "Email sending is paused in this installation: the send is queued and goes out once it resumes.",
+      saveAsList: "Save these recipients as a list",
+      saveAsListHint:
+        "Only the typed addresses are saved, not the users or lists. Leave it empty to skip.",
+      kinds: {
+        users: (n: number) => `${n} user(s)`,
+        lists: (names: string) => `Lists: ${names}`,
+        emails: (n: number) => `${n} address(es)`,
+      },
+      resendFailed: "Re-send the failed ones",
+      resentToast: "Re-send queued.",
+      failedCount: (n: number) => `${n} failed`,
       subject: "Subject",
       subjectHint: "If left empty, the dashboard name is used.",
       message: "Message (optional)",
@@ -1667,6 +1707,11 @@ export const en: Catalogue = {
       listTitle: "Scheduled for this dashboard",
       recipientsLine: (list: string) => `To: ${list}`,
       roleRecipient: (role: string) => `${role} (role)`,
+      listRecipient: (name: string, count: number) => `📋 ${name} (${count})`,
+      listsLabel: "Mailing lists",
+      pausedListDeleted:
+        "The list of this scheduled send was deleted. Pick another list and save.",
+      pausedReason: (reason: string) => `Paused: ${reason}`,
       managedBy: (project: string) => `Managed by project ${project}`,
       managedHint: "it changes in the project's files; here you can only pause or resume it.",
     },
@@ -1683,6 +1728,79 @@ export const en: Catalogue = {
     themeAuto: "The viewer's",
     themeLight: "Light",
     themeDark: "Dark",
+  },
+  /** Feature 058: `/mis-listas` and `/admin/listas-de-correo`. */
+  mailLists: {
+    title: "My lists",
+    adminTitle: "Mailing lists",
+    subtitle:
+      "Group addresses once and use them in any send or scheduled delivery.",
+    adminSubtitle:
+      "Every list in the installation. Shared and role lists are created here.",
+    newList: "New list",
+    search: "Search lists",
+    empty: "There are no lists yet.",
+    emptyHint:
+      "Create a list, paste the addresses and reuse it in every send.",
+    count: (n: number, max: number) => `${n} of ${max} members`,
+    pausedCount: (n: number) => `${n} paused`,
+    personal: "Personal",
+    shared: "Shared",
+    roleKind: (role: string) => `By role: ${role}`,
+    membersKind: "Members",
+    owner: (name: string) => `By ${name}`,
+    readOnly: "Read only",
+    sharedReadOnly: "Shared by another user: you may use it, not edit it.",
+    open: "Edit",
+    createTitle: "New list",
+    editTitle: "Edit list",
+    name: "Name",
+    nameHint: "Unique among your lists.",
+    description: "Description (optional)",
+    visibility: "Visibility",
+    visibilityPersonal: "Personal (only you)",
+    visibilityShared: "Shared (anybody who sends may use it)",
+    kind: "Kind",
+    kindMembers: "Members",
+    kindRole: "By role (resolved at send time)",
+    role: "Role",
+    roleHint: (count: number) =>
+      `Resolved at send time: today it reaches ${count} user(s).`,
+    members: "Members",
+    membersHint: "One address per line, in the form address,name.",
+    membersPlaceholder: "ana@client.com,Ana\nluis@client.com,Luis",
+    membersNote:
+      "New lines are added to the current members on save; the ones already there are not duplicated.",
+    save: "Save list",
+    saveMembers: "Save members",
+    savedToast: "List saved.",
+    deletedToast: "List deleted.",
+    delete: "Delete",
+    confirmDelete: "Confirm deletion",
+    deleteWarning:
+      "Scheduled sends that use this list are paused; they are not deleted.",
+    importCsv: "Import CSV",
+    importHint: "File with address,name columns (one row per person).",
+    importResult: (added: number, updated: number, skipped: number) =>
+      `${added} added, ${updated} updated, ${skipped} skipped.`,
+    importErrors: (n: number) => `${n} line(s) with problems:`,
+    importLine: (line: number, value: string, code: string) =>
+      `Line ${line}: ${value} · ${code}`,
+    importEmpty: "The file has no valid rows.",
+    exportCsv: "Export CSV",
+    exportHint: "Downloads address,name,paused.",
+    memberAddress: "Address",
+    memberName: "Name",
+    memberState: "Status",
+    memberActive: "Active",
+    memberPaused: "Paused",
+    pauseMember: (address: string) => `Pause ${address}`,
+    resumeMember: (address: string) => `Resume ${address}`,
+    removeMember: (address: string) => `Remove ${address}`,
+    noMembers: "The list has no members yet.",
+    cap: (max: number) => `Up to ${max} members per list.`,
+    readOnlyRole: "The members of a role list are computed for you.",
+    listsLabel: "Lists",
   },
   /** Feature 030: the filters/parameters sheet (never a modal). */
   reportSheet: {
@@ -1706,6 +1824,7 @@ export const en: Catalogue = {
     csv: "Download CSV",
     share: "Share",
     email: "Send by email",
+    sends: "Sends",
     schedules: "Scheduled sends",
     tv: "TV mode",
     modeDark: "View in dark",

@@ -2,7 +2,6 @@
 
 🇬🇧 **English** · 🇪🇸 [Español](README.es.md)
 
-[![Bizview on a phone: a dashboard of sales KPIs](docs/assets/readme-phone.png)](docs/assets/readme-phone.png)
 
 **Your business data on your phone. Build the reports with any AI — Bizview validates, runs and
 shares them.**
@@ -119,7 +118,7 @@ Step by step, with the file behind each step and the diagram: [docs/RENDERING.md
 | Themes as data: a library of tokens an author can ship inside a project and apply to a report | [047](specs/047-themes-as-data/spec.md), [051](specs/051-theme-application/spec.md) |
 | Parameters and filters as one inline sheet on the report page | [053](specs/053-parameters-sheet/spec.md) |
 | Sign in with Google, with domain rules and role mapping | [054](specs/054-google-signin-rbac/spec.md) |
-| Sharing: expiring read-only links, email delivery, scheduled sends | [018](specs/018-dashboard-sharing/spec.md) |
+| Sharing: expiring read-only links, email delivery to any list of addresses, scheduled sends | [018](specs/018-dashboard-sharing/spec.md), [058](specs/058-mailing-lists/spec.md) |
 | Spanish and English, dark mode, PDF and CSV export | [022](specs/022-i18n-en-es/spec.md), [006](specs/006-dark-mode/spec.md) |
 | Administration: users, roles, access, audit log, `internet` security profile, sign in with Google or Telegram | [002](specs/002-auth-admin-home/spec.md), [004](specs/004-data-sources-security/spec.md), [027](specs/027-google-sign-in/spec.md), [007](specs/007-telegram-sign-in/spec.md) |
 | In-app guide, update notice, project search | [023](specs/023-chat-app-guide/spec.md), [025](specs/025-app-updates-and-search/spec.md) |

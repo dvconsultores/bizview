@@ -23,6 +23,8 @@ export const es = {
     help: "Ayuda",
     dashboards: "Tableros",
     home: "Inicio",
+    mailLists: "Mis listas",
+    mailListsAdmin: "Listas de correo",
     admin: "Administración",
     users: "Usuarios",
     audit: "Auditoría",
@@ -666,6 +668,10 @@ export const es = {
     email_subscription_created: "Envío programado creado",
     email_subscription_updated: "Envío programado editado",
     email_subscription_deleted: "Envío programado eliminado",
+    mail_list_created: "Lista de correo creada",
+    mail_list_updated: "Lista de correo editada",
+    mail_list_deleted: "Lista de correo eliminada",
+    mail_send_resent: "Reenvío de los fallidos",
     source_direct_reports_changed: "Reportes directos modificados",
     source_bi_ready_changed: "Fuente declarada lista para BI",
     source_bi_ready_verified: "Credencial de solo lectura comprobada",
@@ -1566,8 +1572,8 @@ export const es = {
       external: "Correo externo",
       externalHint: (domains: string[]) =>
         domains.length > 0
-          ? `Se permiten: ${domains.join(", ")}`
-          : "No se permiten direcciones externas.",
+          ? `Solo se permiten estos dominios: ${domains.join(", ")}`
+          : "Se acepta cualquier dominio.",
       add: "Agregar",
       invalidEmail: "Correo no válido.",
       domainNotAllowed: (domains: string[]) =>
@@ -1575,6 +1581,40 @@ export const es = {
       alreadyAdded: "Ese destinatario ya está agregado.",
       tooMany: (max: number) => `Máximo ${max} destinatarios.`,
       removeRecipient: (name: string) => `Quitar a ${name}`,
+      /** Feature 058: lists, pasted addresses and the live counter. */
+      lists: "Listas de correo",
+      noLists: "Aún no hay listas de correo.",
+      noListsHint: "Crea una en Mis listas y aparecerá aquí.",
+      listChip: (name: string, count: number) => `📋 ${name} · ${count}`,
+      removeList: (name: string) => `Quitar la lista ${name}`,
+      addList: (name: string) => `Agregar la lista ${name}`,
+      listHint:
+        "Al elegir una lista se suman sus miembros; los que están en pausa no reciben nada.",
+      paste: "Pegar lista",
+      pasteHint:
+        "Correos separados por coma, punto y coma, espacio o salto de línea; también Nombre <correo>.",
+      pastePlaceholder: "ana@cliente.com, Luis Pérez <luis@cliente.com>",
+      pasteButton: "Agregar pegados",
+      invalidAddress: "Dirección no válida",
+      invalidAddresses: (n: number) =>
+        `${n} dirección(es) no válidas: corrígelas o quítalas para enviar.`,
+      recipientCount: (n: number) =>
+        n === 1 ? "1 destinatario" : `${n} destinatarios`,
+      freeAddressesAdmin:
+        "Solo los administradores pueden escribir direcciones. Puedes enviar a usuarios de la instalación y a listas.",
+      sendingPaused:
+        "El envío de correo está en pausa en esta instalación: el envío queda en cola y sale cuando se reanude.",
+      saveAsList: "Guardar estos destinatarios como lista",
+      saveAsListHint:
+        "Se guardan las direcciones escritas, no los usuarios ni las listas. Déjalo vacío para no guardar.",
+      kinds: {
+        users: (n: number) => `${n} usuario(s)`,
+        lists: (names: string) => `Listas: ${names}`,
+        emails: (n: number) => `${n} dirección(es)`,
+      },
+      resendFailed: "Reenviar los fallidos",
+      resentToast: "Reenvío en cola.",
+      failedCount: (n: number) => `${n} fallido(s)`,
       subject: "Asunto",
       subjectHint: "Si lo dejas vacío se usa el nombre del tablero.",
       message: "Mensaje (opcional)",
@@ -1653,6 +1693,11 @@ export const es = {
       listTitle: "Programados para este tablero",
       recipientsLine: (list: string) => `Para: ${list}`,
       roleRecipient: (role: string) => `${role} (rol)`,
+      listRecipient: (name: string, count: number) => `📋 ${name} (${count})`,
+      listsLabel: "Listas de correo",
+      pausedListDeleted:
+        "La lista de este envío programado se eliminó. Elige otra lista y guarda.",
+      pausedReason: (reason: string) => `En pausa: ${reason}`,
       managedBy: (project: string) => `Gestionado por el proyecto ${project}`,
       managedHint: "se cambia en los archivos del proyecto; aquí solo puedes pausarlo o reanudarlo.",
     },
@@ -1669,6 +1714,79 @@ export const es = {
     themeAuto: "El del visitante",
     themeLight: "Claro",
     themeDark: "Oscuro",
+  },
+  /** Feature 058: `/mis-listas` and `/admin/listas-de-correo`. */
+  mailLists: {
+    title: "Mis listas",
+    adminTitle: "Listas de correo",
+    subtitle:
+      "Agrupa direcciones una vez y úsalas en cualquier envío o envío programado.",
+    adminSubtitle:
+      "Todas las listas de la instalación. Aquí se crean las compartidas y las dinámicas por rol.",
+    newList: "Nueva lista",
+    search: "Buscar listas",
+    empty: "Aún no hay listas.",
+    emptyHint:
+      "Crea una lista, pega las direcciones y reutilízala en todos tus envíos.",
+    count: (n: number, max: number) => `${n} de ${max} miembros`,
+    pausedCount: (n: number) => `${n} en pausa`,
+    personal: "Personal",
+    shared: "Compartida",
+    roleKind: (role: string) => `Por rol: ${role}`,
+    membersKind: "Miembros",
+    owner: (name: string) => `De ${name}`,
+    readOnly: "Solo lectura",
+    sharedReadOnly: "Compartida por otro usuario: puedes usarla, no editarla.",
+    open: "Editar",
+    createTitle: "Nueva lista",
+    editTitle: "Editar lista",
+    name: "Nombre",
+    nameHint: "Único entre tus listas.",
+    description: "Descripción (opcional)",
+    visibility: "Visibilidad",
+    visibilityPersonal: "Personal (solo tú)",
+    visibilityShared: "Compartida (la puede usar cualquiera que envíe)",
+    kind: "Tipo",
+    kindMembers: "Miembros",
+    kindRole: "Por rol (se resuelve al enviar)",
+    role: "Rol",
+    roleHint: (count: number) =>
+      `Se resuelve al enviar: hoy alcanza a ${count} usuario(s).`,
+    members: "Miembros",
+    membersHint: "Una dirección por línea, con el formato correo,nombre.",
+    membersPlaceholder: "ana@cliente.com,Ana\nluis@cliente.com,Luis",
+    membersNote:
+      "Las líneas nuevas se agregan a los miembros actuales al guardar; las que ya están no se duplican.",
+    save: "Guardar lista",
+    saveMembers: "Guardar miembros",
+    savedToast: "Lista guardada.",
+    deletedToast: "Lista eliminada.",
+    delete: "Eliminar",
+    confirmDelete: "Confirmar eliminación",
+    deleteWarning:
+      "Los envíos programados que usan esta lista quedan en pausa; no se eliminan.",
+    importCsv: "Importar CSV",
+    importHint: "Archivo con columnas correo,nombre (una fila por persona).",
+    importResult: (added: number, updated: number, skipped: number) =>
+      `${added} agregados, ${updated} actualizados, ${skipped} omitidos.`,
+    importErrors: (n: number) => `${n} línea(s) con problemas:`,
+    importLine: (line: number, value: string, code: string) =>
+      `Línea ${line}: ${value} · ${code}`,
+    importEmpty: "El archivo no tiene filas válidas.",
+    exportCsv: "Exportar CSV",
+    exportHint: "Descarga correo,nombre,pausado.",
+    memberAddress: "Correo",
+    memberName: "Nombre",
+    memberState: "Estado",
+    memberActive: "Activo",
+    memberPaused: "En pausa",
+    pauseMember: (address: string) => `Pausar a ${address}`,
+    resumeMember: (address: string) => `Reanudar a ${address}`,
+    removeMember: (address: string) => `Quitar a ${address}`,
+    noMembers: "La lista no tiene miembros todavía.",
+    cap: (max: number) => `Hasta ${max} miembros por lista.`,
+    readOnlyRole: "Los miembros de una lista por rol se calculan solos.",
+    listsLabel: "Listas",
   },
   /** Feature 030: the filters/parameters sheet (never a modal). */
   reportSheet: {
@@ -1692,6 +1810,7 @@ export const es = {
     csv: "Descargar CSV",
     share: "Compartir",
     email: "Enviar por correo",
+    sends: "Envíos",
     schedules: "Envíos programados",
     tv: "Modo TV",
     modeDark: "Ver en oscuro",

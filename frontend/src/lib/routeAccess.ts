@@ -13,6 +13,8 @@ export const ROUTES: { pattern: string; access: RouteAccess }[] = [
   { pattern: "/r/:id", access: "user" },
   { pattern: "/perfil", access: "user" },
   { pattern: "/ayuda", access: "user" },
+  { pattern: "/mis-listas", access: "user" },
+  { pattern: "/admin/listas-de-correo", access: "admin" },
   { pattern: "/admin/usuarios", access: "admin" },
   { pattern: "/admin/usuarios/nuevo", access: "admin" },
   { pattern: "/admin/usuarios/:id", access: "admin" },

@@ -110,10 +110,11 @@ def test_recipient_rules(applied, user):
     r = send(c)
     assert r.status_code == 422
     assert r.json()["error"]["fields"]["recipients"] == "empty"
+    # 058: there is no recipient ceiling. Twenty-one addresses are a send, not a refusal.
     r = send(c, emails=[f"p{i}@cliente.com" for i in range(21)])
-    assert r.status_code == 422
-    assert r.json()["error"]["fields"]["recipients"] == "too_many"
-    assert sql("SELECT count(*) FROM email_send")[0][0] == 0
+    assert r.status_code == 201, r.text
+    assert r.json()["count"] == 21
+    assert sql("SELECT count(*) FROM email_send")[0][0] == 1
 
 
 def test_link_only_for_admins_and_needs_sharing(applied, user, smtp):
@@ -137,7 +138,8 @@ def test_link_only_for_admins_and_needs_sharing(applied, user, smtp):
     assert r.status_code == 422
 
 
-def test_rate_limit_per_user(applied, user):
+def test_no_hourly_limit(applied, user):
+    """058 FR-004: a sender is not throttled by the product. Volume is the mail provider's call."""
     enable_mail()
     uid = grant_user(user.id)
     dash_id = sql("SELECT id FROM dashboard WHERE code = 'ventas'")[0][0]
@@ -150,8 +152,7 @@ def test_rate_limit_per_user(applied, user):
     r = signed_in(user.email).post(
         "/api/dashboards/ventas/email", json={"selection": SEL, "users": [uid]}
     )
-    assert r.status_code == 429
-    assert r.json()["error"]["code"] == "rate_limited"
+    assert r.status_code == 201, r.text
 
 
 def test_send_delivers_pdf_equal_to_download(applied, smtp):
@@ -565,7 +566,9 @@ def test_email_html_includes_logo(applied, smtp, monkeypatch):
     assert "<img" not in html
 
 
-def test_rate_limit_serialized_per_user(applied, user):
+def test_two_sends_at_once_both_succeed(applied, user):
+    """058 FR-004: no hourly ceiling, so two senders' requests no longer wait on a lock to be
+    refused — both are accepted, and the queue is what serialises the delivery."""
     enable_mail()
     uid = grant_user(user.id)
     sql(
@@ -612,9 +615,8 @@ def test_rate_limit_serialized_per_user(applied, user):
     for t in threads:
         t.join(timeout=60)
     assert all(not t.is_alive() for t in threads)
-    assert sorted(results) == ["429", "ok"]
-    rows = sql("SELECT count(*) FROM email_send WHERE requested_by = :u", u=uid)
-    assert rows and rows[0][0] == 30
+    assert sorted(results) == ["ok", "ok"]
+    assert sql("SELECT count(*) FROM email_send WHERE requested_by = :u", u=uid)[0][0] == 31
 
 
 def test_large_pdf_without_link_fails(applied, smtp, monkeypatch):

@@ -547,7 +547,7 @@ administradores crear enlaces de solo lectura que caducan a los 1–90 días.
    SMTP_PASSWORD=...
    SMTP_FROM=bizview@cliente.com
    SMTP_FROM_NAME=Cliente Demo  # opcional; por defecto ORGANIZATION_NAME
-   EMAIL_ALLOWED_DOMAINS=cliente.com,socio.com   # vacío = solo usuarios de la instalación
+   EMAIL_ALLOWED_DOMAINS=       # opcional: vacío = cualquier dominio (ver «Enviar a cualquier dirección»)
    SHARE_LINKS_ENABLED=true     # permite a los administradores pulsar Compartir en un tablero
    ```
 
@@ -565,11 +565,35 @@ verifica el certificado. `SMTP_PASSWORD` queda en el entorno de la instalación:
 base de datos, ni lo devuelve la API, ni se muestra, ni se registra, y debe ser ASCII sin saltos de
 línea. Los correos de prueba y los envíos quedan auditados.
 
-Límites. Como máximo 20 destinatarios por envío, 30 envíos por usuario por hora y un PDF de 10 MB;
-cuando un PDF supera ese límite con **Incluir enlace** marcado, el correo lleva solo el enlace, y sin
-enlace el envío falla con el motivo «El PDF supera 10 MB y no se pidió un enlace.». Las entregas
-fallidas se reintentan a los 1, 5 y 15 minutos, y el estado de cada destinatario se lista en
-**Envíos**.
+Enviar a cualquier dirección (funcionalidad 058). Quien envía sigue siendo interno —solo un usuario
+con sesión y con acceso al tablero puede enviar—, pero un envío puede llegar a **cualquier
+dirección**: usuarios de la instalación, una **lista de correo** creada en **Listas de correo**, o
+direcciones escritas o pegadas en el diálogo. El producto no impone **límites de volumen**: los pone
+el proveedor. Lo que sí hace es dosificar y agrupar la entrega para que una lista grande no atasque
+al worker ni dispare al proveedor:
+
+```
+EMAIL_BATCH_SIZE=50            # destinatarios por mensaje SMTP (CCO, el remitente en Para)
+EMAIL_SEND_RATE=10             # mensajes por segundo; 0 = sin pausa
+EMAIL_INDIVIDUAL_MESSAGES=false  # true = un mensaje por dirección (rebotes por dirección en SES)
+EMAIL_SENDING_PAUSED=false     # true = retiene la cola; los envíos se siguen aceptando
+EMAIL_FROM_MODE=installation   # installation = SMTP_FROM + Reply-To al remitente; user = desde el remitente
+EMAIL_FREE_ADDRESSES_ROLE=user # admin = solo los administradores escriben direcciones sueltas
+```
+
+Qué necesita cada proveedor:
+
+| Proveedor | Configuración |
+|---|---|
+| Amazon SES | verifica el dominio (DKIM), deja `EMAIL_FROM_MODE=installation` con `SMTP_FROM` en el dominio verificado y pon `EMAIL_INDIVIDUAL_MESSAGES=true` para que un rebote se atribuya a una dirección; mantén `EMAIL_SEND_RATE` en o por debajo de tu ritmo de envío (el de SES por defecto es 14/s) |
+| Google Workspace | relay SMTP `smtp-relay.gmail.com:587` con STARTTLS, `SMTP_USER` una cuenta con contraseña de aplicación o la lista de IP del relay; `EMAIL_FROM_MODE=user` funciona cuando el tenant permite «enviar como» a sus usuarios |
+| Microsoft 365 | `smtp.office365.com:587` con STARTTLS y SMTP AUTH activado en el buzón; un buzón compartido como `SMTP_FROM` mantiene el remitente estable, `EMAIL_FROM_MODE=installation` con `Reply-To` al remitente |
+
+Un PDF de 10 MB sigue teniendo su propio límite: cuando lo supera con **Incluir enlace** marcado, el
+correo lleva solo el enlace, y sin enlace el envío falla con el motivo «El PDF supera 10 MB y no se
+pidió un enlace.». Las entregas fallidas se reintentan a los 1, 5 y 15 minutos, el estado de cada
+destinatario se lista en **Envíos**, y **Reenviar los fallidos** encola solo las direcciones que
+fallaron.
 
 Enlaces. Quien tenga un enlace ve ese tablero en solo lectura hasta que caduque o se revoque
 (**Revocar**), con un máximo de 20 enlaces activos por tablero. Los enlaces se guardan solo como hash,
