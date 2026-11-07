@@ -234,6 +234,13 @@ capability they describe in the tree; every one exists (or is explicitly superse
   `/api/health` does not report the repository's version.
 - **FR-019**: Markdown lint and link checking MUST run over the top-level documents and fail on a
   broken link or a malformed table.
+- **FR-020 (057b)**: Every Markdown document the product ships MUST exist in English and in
+  Spanish with the same shape — English at the canonical path, Spanish under `docs/es/` or as
+  `<NAME>.es.md` at the repository root, and `es/` ↔ `en/` in the in-app help and in the starter
+  pack. A translation keeps the heading skeleton (same levels, same order), the same number of code
+  blocks and tables, and the same resolved links; the prose is translated, never summarised.
+- **FR-021 (057b)**: An automated check MUST fail on a missing or drifted pair and MUST print what
+  differs: `scripts/check_docs_parity.py`, run by `make check` and by the gates workflow.
 
 ### Key Entities
 

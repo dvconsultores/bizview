@@ -23,6 +23,8 @@ toca · **CLI** = lo genera `bizview`.
 | `CONTENTS.md` | No | BizView | El mismo documento en inglés. Ignorado. |
 | `QUE-HACE-BIZVIEW.md` | No | BizView | Qué pasa al importar y al aplicar. Ignorado. |
 | `WHAT-BIZVIEW-DOES.md` | No | BizView | Lo mismo en inglés. Ignorado. |
+| `COMO-SE-DIBUJA.md` | No | BizView | Qué hace BizView con tu `report.yaml` al ejecutarlo: contexto, consultas, caché y dibujo. Ignorado. |
+| `HOW-IT-RENDERS.md` | No | BizView | Lo mismo en inglés. Ignorado. |
 | `specs/001-<slug>/*` | Sí | Tu IA | `spec.md` es obligatorio: BizView lo muestra en el editor y lo exige para ejecutar. `plan.md` y `tasks.md` completan el expediente; si faltan, el proyecto queda marcado como incompleto. |
 | `specs/001-<slug>/spec.md` | Sí | Tu IA | Declara el tipo (`integracion` o `reporte`) y `**Status**: Approved`. Sin spec aprobada, el proyecto no se puede aplicar, y la línea `**Datos personales**` se compara con las columnas del dataset. |
 | `specs/002-<slug>-reporte/*` | Sí | Tu IA | La spec del reporte: tipo `reporte`, `**Status**: Approved` y las métricas que verá el lector. Sin ella el tablero no tiene dueño. |
@@ -49,7 +51,8 @@ toca · **CLI** = lo genera `bizview`.
 ## Qué ignora la importación
 
 - Todo lo que no es del formato del proyecto: `PROMPT.md`, `REQUEST.md`, `README.md`,
-  `CONTENIDO.md`, `CONTENTS.md`, `QUE-HACE-BIZVIEW.md`, `WHAT-BIZVIEW-DOES.md`, `CLAUDE.md`,
+  `CONTENIDO.md`, `CONTENTS.md`, `QUE-HACE-BIZVIEW.md`, `WHAT-BIZVIEW-DOES.md`,
+  `COMO-SE-DIBUJA.md`, `HOW-IT-RENDERS.md`, `CLAUDE.md`,
   `AGENTS.md`, `bizview.yaml`, `sources/`, `.bizview/`, `bizview.lock` y los archivos del sistema
   (`.DS_Store`).
 - Los archivos repetidos que no son texto.

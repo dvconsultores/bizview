@@ -1,6 +1,6 @@
 # Bizview
 
-**English** · [Español](README.es.md)
+🇬🇧 **English** · 🇪🇸 [Español](README.es.md)
 
 [![Bizview on a phone: a dashboard of sales KPIs](docs/assets/readme-phone.png)](docs/assets/readme-phone.png)
 
@@ -90,6 +90,17 @@ import path and what happens on apply: [docs/IMPORT.md](docs/IMPORT.md).
 `REQUEST.md` (your brief), the JSON Schemas the validator uses, `CONTENIDO.md`/`CONTENTS.md` (what
 every file is for) and `QUE-HACE-BIZVIEW.md`/`WHAT-BIZVIEW-DOES.md` (what import and apply do). No AI
 key is needed in Bizview: your AI works outside and Bizview validates, runs and shares the result.
+
+## How it works inside
+
+Your `report.yaml` never becomes code, and nothing is written by the app.
+**Apply** validates the tree again and composes an immutable version where each report is a dashboard row.
+**Context** resolves every `uses` alias to `ds_<integration>.<dataset>` and takes the column contracts from the integration.
+**A request** carries period, comparison and filters; its hash plus the last successful load is the cache key, and that is what the ETag answers.
+**Each view becomes one SQL aggregation per period** — the comparison is a second run over the previous range — and the browser draws the payload with your `layout.web`, or one card per view when you declared none.
+**Freshness is the last load**: a new run changes the data version and the numbers recompute on the next request.
+
+Step by step, with the file behind each step and the diagram: [docs/RENDERING.md](docs/RENDERING.md).
 
 ## What it does
 

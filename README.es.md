@@ -1,6 +1,6 @@
 # Bizview
 
-[English](README.md) · **Español**
+🇬🇧 [English](README.md) · 🇪🇸 **Español**
 
 [![Bizview en el teléfono: un tablero de ventas](docs/assets/readme-phone.png)](docs/assets/readme-phone.png)
 
@@ -93,6 +93,17 @@ camino de importación y qué pasa al aplicar: [docs/IMPORT.md](docs/IMPORT.md).
 cada archivo) y `QUE-HACE-BIZVIEW.md`/`WHAT-BIZVIEW-DOES.md` (qué hacen importar y aplicar). Bizview
 no necesita ninguna clave de IA: tu IA trabaja fuera y Bizview valida, ejecuta y comparte el
 resultado.
+
+## Cómo funciona por dentro
+
+Tu `report.yaml` nunca se convierte en código, y la app no escribe nada.
+**Aplicar** valida el árbol otra vez y compone una versión inmutable donde cada reporte es una fila de tablero.
+**El contexto** resuelve cada alias de `uses` a `ds_<integración>.<conjunto>` y toma los contratos de columna de la integración.
+**Una petición** lleva periodo, comparación y filtros; su hash más la última carga exitosa es la clave de caché, y eso es lo que responde el ETag.
+**Cada vista se vuelve una agregación SQL por periodo** — la comparación es una segunda corrida sobre el rango anterior — y el navegador dibuja el payload con tu `layout.web`, o una tarjeta por vista si no declaraste ninguno.
+**La frescura es la última carga**: una corrida nueva cambia la versión de datos y los números se recalculan en la siguiente petición.
+
+Paso a paso, con el archivo detrás de cada paso y el diagrama: [docs/es/RENDERING.md](docs/es/RENDERING.md).
 
 ## Qué hace
 

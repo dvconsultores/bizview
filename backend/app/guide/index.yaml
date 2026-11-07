@@ -779,6 +779,20 @@ topics:
       es: ["importar", "aplicar", "qué pasa", "borrador", "worker", "versión"]
       en: ["import", "apply", "what happens", "draft", "worker", "version"]
     related: [importar-un-proyecto, aplicar-proyecto, reimportar-cambios]
+  - id: como-se-dibuja-un-tablero
+    section: crear-con-ia
+    title: {es: "Cómo se dibuja un tablero", en: "How a dashboard is drawn"}
+    summary:
+      es: "Qué hace BizView con tu report.yaml: contexto, consultas por período, caché, dibujo y frescura."
+      en: "What BizView does with your report.yaml: context, per-period queries, cache, drawing and freshness."
+    roles: [user, superuser]
+    routes: []
+    tiles: []
+    commands: []
+    aliases:
+      es: ["cómo se dibuja", "consulta", "sql", "caché", "frescura", "render", "fórmula", "materialize"]
+      en: ["how it renders", "query", "sql", "cache", "freshness", "render", "formula", "materialize"]
+    related: [definir-un-reporte, importar-y-aplicar, corregir-problemas]
   - id: reimportar-cambios
     section: crear-con-ia
     title: {es: "Reimportar cambios", en: "Re-import changes"}

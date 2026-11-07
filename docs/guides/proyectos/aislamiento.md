@@ -1,74 +1,74 @@
-# Aislamiento por proyecto
+🇬🇧 English · 🇪🇸 [Español](../../es/guides/proyectos/aislamiento.md)
 
-Este documento explica cómo BizView garantiza que un proyecto nunca muestre, corrija ni
-previsualice los archivos de otro. Nació de un incidente real (2026-10-26): la página de `artemisa`
-mostraba un problema de `coinmarketcap`, su botón «Aplicar arreglo» respondía «El archivo
-projects/coinmarketcap/… ya no existe» y la vista previa decía que no veía ningún archivo del
-proyecto.
+# Isolation per project
 
-## La regla
+This document explains how BizView guarantees that one project never shows, fixes or previews
+another project's files. It came from a real incident (2026-10-26): the `artemisa` page showed a
+problem from `coinmarketcap`, its **Apply fix** button answered "The file
+projects/coinmarketcap/… no longer exists" and the preview said it saw no file of the project.
 
-**Un proyecto es una configuración separada: su página, su validación, sus arreglos y su vista previa
-hablan solo de los archivos de su carpeta.** Nadie lee ni escribe los archivos de otro proyecto.
+## The rule
 
-La validación *compone* el espacio de trabajo (este proyecto + la copia aplicada de los demás)
-porque un id duplicado o una referencia a otra integración son problemas reales. Lo que cambia es
-**dónde se publica el hallazgo**: cada proyecto publica solo lo suyo.
+**A project is a separate configuration: its page, its validation, its fixes and its preview talk
+only about the files in its folder.** Nobody reads or writes another project's files.
 
-## Dónde vive cada cosa
+Validation *composes* the workspace (this project + the applied copy of the others) because a
+duplicated id or a reference to another integration are real problems. What changes is **where the
+finding is published**: each project publishes only its own.
 
-| Dato | Dónde | Alcance |
+## Where each thing lives
+
+| Data | Where | Scope |
 |---|---|---|
-| Archivos del proyecto | `PROJECTS_DIR/<slug>/…` | la carpeta, resuelta desde `project_id` |
-| Borrador | la carpeta (lectura) | el proyecto |
-| Validación y «problemas» | `project.validation` | el proyecto |
-| Vista previa | `project.preview` | el proyecto |
-| Conversaciones | `assistant_session.project_id` | el proyecto (y su autor) |
-| Historial de archivos | `project_file_revision.project_id` | el proyecto |
-| Contratos de ejecución | `assistant_auto_run.project_id` | el proyecto |
-| Solicitudes de vista previa | `assistant_preview_request.project_id` | el proyecto |
-| Perfiles de ejecución | `assistant_run_profile` | la instalación (formulario: etapas, límites y nombres de fuente; no son archivos de un proyecto) |
+| Project files | `PROJECTS_DIR/<slug>/…` | the folder, resolved from `project_id` |
+| Draft | the folder (read) | the project |
+| Validation and "problems" | `project.validation` | the project |
+| Preview | `project.preview` | the project |
+| Conversations | `assistant_session.project_id` | the project (and its author) |
+| File history | `project_file_revision.project_id` | the project |
+| Run contracts | `assistant_auto_run.project_id` | the project |
+| Preview requests | `assistant_preview_request.project_id` | the project |
+| Run profiles | `assistant_run_profile` | the installation (a form: stages, limits and source names; they are not a project's files) |
 
-## Rutas
+## Paths
 
-- Los archivos se nombran **relativos a la carpeta del proyecto**: `reports/panorama-cripto/report.yaml`.
-- `projects/<slug>/…` es el prefijo de la *composición* (lo que ve el validador). Nunca es una ruta
-  de un proyecto: se rechaza con `path_outside_project` («ruta fuera del proyecto»).
-- Tampoco se aceptan rutas absolutas, `..` ni enlaces simbólicos que salgan de la carpeta.
-- La única forma de pasar de un proyecto al disco es
-  `fs.resolve_project_path(project_id, relative)`: resuelve la carpeta desde la fila del proyecto
-  (`project_id → PROJECTS_DIR/<slug>`) y aplica las reglas anteriores.
+- Files are named **relative to the project's folder**: `reports/panorama-cripto/report.yaml`.
+- `projects/<slug>/…` is the prefix of the *composition* (what the validator sees). It is never a
+  project path: it is refused with `path_outside_project` ("path outside the project").
+- Absolute paths, `..` and symlinks that leave the folder are refused too.
+- The only way from a project to disk is `fs.resolve_project_path(project_id, relative)`: it
+  resolves the folder from the project row (`project_id → PROJECTS_DIR/<slug>`) and applies the
+  rules above.
 
-## Qué ve el lector
+## What the reader sees
 
-- **Panel de problemas**: solo los problemas de este proyecto, con su archivo relativo y su botón
-  «Aplicar arreglo». Si el espacio de trabajo tiene problemas en otros proyectos, aparece una nota
-  con sus nombres — sin botón, porque no se corrigen desde aquí.
-- **Estado**: `Válido` significa «los archivos de este proyecto son válidos». Aplicar exige además
-  que la composición entera sea válida (`composed_valid`): si otro proyecto la rompe, «Listo para
-  aplicar» queda pendiente y nombra a ese proyecto.
-- **Chat**: el panel muestra el proyecto de la conversación; una conversación de otro proyecto no se
-  abre desde esta página (el enlace `?chat=` se comprueba).
-- **Vista previa**: la solicitud lleva su `project_id`; el worker resuelve la carpeta desde él y, si
-  está vacía o no existe, falla diciendo el slug y la ruta montada, para distinguir un volumen que
-  falta de un error de alcance. El registro anota la carpeta resuelta al empezar la validación, la
-  vista previa y el aplicar.
+- **Problems panel**: only this project's problems, with their relative file and their **Apply fix**
+  button. If the workspace has problems in other projects, a note appears with their names — and no
+  button, because they are not fixed from here.
+- **Status**: `Valid` means "the files of this project are valid". Applying also requires the whole
+  composition to be valid (`composed_valid`): if another project breaks it, "Ready to apply" stays
+  pending and names that project.
+- **Chat**: the panel shows the conversation's project; a conversation from another project is not
+  opened from this page (the `?chat=` link is checked).
+- **Preview**: the request carries its `project_id`; the worker resolves the folder from it and, if
+  it is empty or does not exist, fails naming the slug and the mounted path, to tell a missing
+  volume from a scoping error. The log records the resolved folder when validation, the preview and
+  apply start.
 
-## Qué hacer si aparece «ruta fuera del proyecto»
+## What to do when "path outside the project" appears
 
-1. Vuelve a comprobar los problemas del proyecto (el panel se recalcula sobre la carpeta actual).
-2. Si el problema sigue apareciendo, mira a qué proyecto pertenece: la nota del panel lo dice.
-3. Un problema de otro proyecto se corrige en **su** página.
+1. Re-check the project's problems (the panel is recomputed on the current folder).
+2. If the problem persists, look at which project it belongs to: the panel's note says so.
+3. Another project's problem is fixed on **its** page.
 
-## Notas de implementación
+## Implementation notes
 
-- `compose.validate_project` publica `errors`/`warnings` (propios), `other_projects`
-  (`{slug: {errors, warnings}}`), `workspace_errors`/`workspace_warnings` y `composed_valid`.
-- `POST /api/projects/{slug}/fix` resuelve cada archivo con `resolve_project_path`; una ruta de otro
-  proyecto es `422 path_outside_project` y un archivo válido que ya no está sigue siendo
-  `409 fix_gone`. Un `problem_id` debe nombrar el mismo archivo que el arreglo.
-- `PUT /api/projects/{slug}/apply` compone desde la carpeta del proyecto y se niega si esa carpeta no
-  existe (una versión sin sus archivos sería una pérdida de datos).
-- `backend/tests/test_project_scope.py` y `test_project_scope_guard.py` son la regresión: dos
-  proyectos, un usuario, y ninguna consulta sobre una tabla con `project_id` sin filtrar por
-  proyecto.
+- `compose.validate_project` publishes `errors`/`warnings` (its own), `other_projects`
+  (`{slug: {errors, warnings}}`), `workspace_errors`/`workspace_warnings` and `composed_valid`.
+- `POST /api/projects/{slug}/fix` resolves each file with `resolve_project_path`; another project's
+  path is `422 path_outside_project` and a valid file that is gone is still `409 fix_gone`. A
+  `problem_id` must name the same file as the fix.
+- `PUT /api/projects/{slug}/apply` composes from the project's folder and refuses when that folder
+  does not exist (a version without its files would be data loss).
+- `backend/tests/test_project_scope.py` and `test_project_scope_guard.py` are the regression: two
+  projects, one user, and no query over a table with `project_id` without filtering by project.

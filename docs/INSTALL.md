@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/INSTALL.md)
+
 # Installing Bizview for a customer
 
 Bizview is one open-source product. Each customer gets an **installation**: a folder on their
@@ -234,7 +236,7 @@ To change the default language, set `DEFAULT_LOCALE=en` in `.env` and run
 `docker compose -f bizview.yml up -d`.
 
 Report specs can carry optional English labels for titles, descriptions, metrics, and
-dimensions; see `docs/VIBE-REPORTING.md`, section "English labels (optional)".
+dimensions; see [REPORTS.md](./REPORTS.md), section "English labels (optional)".
 
 ## 4. Security profile and secret key
 

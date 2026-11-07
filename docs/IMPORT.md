@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/IMPORT.md)
+
 # Getting a project into Bizview
 
 Authoring happens outside Bizview ([AUTHORING.md](./AUTHORING.md)). This is the way in: a folder of

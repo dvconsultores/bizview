@@ -32,8 +32,9 @@ def test_index_loads_with_valid_ids_sections_and_related(loaded):
     ids = [topic.id for topic in loaded.topics]
     # 045 removed the nine topics of the in-app assistant (2026-10-31); 047 added `temas`;
     # 049 added `importar-un-proyecto`; 052 added the three structure topics; 053 added
-    # `parametros-y-filtros-del-reporte`; 054 added `ingreso-con-google`.
-    assert len(ids) == len(set(ids)) == 64
+    # `parametros-y-filtros-del-reporte`; 054 added `ingreso-con-google`; 057b added
+    # `como-se-dibuja-un-tablero`.
+    assert len(ids) == len(set(ids)) == 65
     sections = {section.id for section in loaded.sections}
     for topic in loaded.topics:
         assert guide.TOPIC_ID.match(topic.id), topic.id

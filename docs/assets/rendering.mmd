@@ -1,0 +1,24 @@
+%% How a report becomes a dashboard — source of docs/assets/rendering.svg.
+%% Regenerate with: node scripts/render_mermaid.js docs/assets/rendering.mmd docs/assets/rendering.svg
+sequenceDiagram
+    autonumber
+    actor A as Author / Autor
+    participant Z as Starter zip / Zip inicial
+    participant I as Import / Importación
+    participant V as Version / Versión
+    participant B as Browser / Navegador
+    participant Api as GET /api/reports/{id}/data
+    participant E as Engine / Motor
+    participant W as Warehouse / Almacén
+    participant R as Renderer / Renderizador
+    A->>Z: report.yaml + specs
+    Z->>I: one zip / un zip
+    I->>V: draft, validated
+    V->>V: apply: checks again, composes
+    B->>Api: period, compare, filters
+    Api->>E: context + selection hash
+    E->>W: one aggregation per view and period
+    W-->>E: rows
+    E-->>Api: payload (views, freshness)
+    Api-->>B: JSON + ETag
+    B->>R: layout.web or default cards

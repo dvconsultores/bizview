@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/REPORTS.md)
+
 # Report reference — the report and integration contract in depth
 
 **Every integration and every report is a spec, and Bizview runs exactly what the spec says.**

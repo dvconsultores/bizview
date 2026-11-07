@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/THEMES.md)
+
 # Themes
 
 A theme is a **file of data**: colours and a few shape decisions. Never CSS, never a font, never

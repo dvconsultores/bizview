@@ -1,5 +1,7 @@
 # Contributing to Bizview
 
+🇬🇧 English · 🇪🇸 [Español](CONTRIBUTING.es.md)
+
 Thanks for helping! Bizview is open source under the [GNU AGPL-3.0-or-later](LICENSE). By
 contributing you agree that your contribution is licensed under the same terms — there is no CLA
 and no copyright assignment: your work stays yours, published under the same licence as the rest.
@@ -75,9 +77,16 @@ under `docs/` describes it, and which help topic (see below) the user finds in t
 
 ## Documentation and help topics
 
+- **Every document ships in both languages.** English lives at the canonical path and Spanish
+  beside it: `docs/es/<name>.md` in `docs/`, `<NAME>.es.md` at the repository root, `es/` and `en/`
+  in the guide and in the starter pack. A translation keeps the shape of its original — the same
+  headings in the same order, the same code blocks and tables, the same links — and the prose is
+  translated, never summarised. `python3 scripts/check_docs_parity.py`, run by `make check` and by
+  CI, fails on a missing or drifted pair and prints what differs.
 - Reader documents live in `docs/`: [`AUTHORING.md`](./docs/AUTHORING.md) (the contract and the
   worked example), [`IMPORT.md`](./docs/IMPORT.md) (the way in),
-  [`VIBE-REPORTING.md`](./docs/VIBE-REPORTING.md) (the field-by-field reference),
+  [`REPORTS.md`](./docs/REPORTS.md) (the field-by-field reference),
+  [`RENDERING.md`](./docs/RENDERING.md) (what the engine does with a `report.yaml`),
   [`INSTALL.md`](./docs/INSTALL.md) (installations).
 - The in-app help is `backend/app/guide/`: `index.yaml` holds the topics' metadata (`id`, `section`,
   `title`, `summary`, `roles`, `routes`, `tiles`, `commands`, `aliases`, `related`) and
@@ -95,7 +104,7 @@ The artifact schemas are versioned with the product:
 1. Change the schema in `cli/bizview_cli/schemas/` and bump its `format_version` when the change is
    not backward compatible.
 2. Update the validator in `cli/bizview_cli/validate.py` and the rules it applies, plus the CLI
-   tests and [`docs/VIBE-REPORTING.md`](./docs/VIBE-REPORTING.md) (the field reference).
+   tests and [`docs/REPORTS.md`](./docs/REPORTS.md) (the field reference).
 3. If existing projects would stop validating, add a migration note to the specification and say in
    the changelog what an author has to change.
 4. Regenerate the authoring pack so new workspaces get the new schema

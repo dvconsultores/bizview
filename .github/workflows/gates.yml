@@ -38,6 +38,8 @@ jobs:
           (cd frontend && npm ci)
       - name: vocabulary, dead code, dependencies, routes, settings
         run: . .venv/bin/activate && sh scripts/gates/all.sh
+      - name: documents exist in both languages and stay in step (057b)
+        run: . .venv/bin/activate && python scripts/check_docs_parity.py
       - name: migration (seeded database, rescue verified, tables gone)
         run: . .venv/bin/activate && sh scripts/gates/05-migration.sh
       - name: backend suite

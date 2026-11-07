@@ -62,3 +62,35 @@ Legend: `[P]` can run in parallel with its neighbours; `[X]` done.
 ## Dependencies
 
 T001–T003 → T004 → (T006, T007, T009) → T010 → T011/T012 → T015/T016; T018 → T019 → T020/T021 → T022.
+
+## Convergence 057b — what the product does, and every document in both languages
+
+Found after 057 (2026-11-06), assessed against the code: nothing in the shipped documents said how
+a `report.yaml` is **executed** — periods, comparison, cache, rollups, layouts — and bilingual
+coverage was partial (`docs/es/` held three shortened documents; INSTALL, THEMES, DESIGN-SYSTEM,
+CONTRIBUTING, SECURITY, CODE_OF_CONDUCT and DIAGNOSIS had no Spanish at all).
+
+- [X] T032 `docs/RENDERING.md` + `docs/es/RENDERING.md`: six numbered steps, each citing the file that
+      does it (`engine/report.py`, `engine/periods.py`, `api/reports.py`, `engine/rollup.py`,
+      `engine/snapshot.py`, `reports/pdf.py`, `LayoutRenderer.tsx`), the "What each key controls at run
+      time" table and one real generated statement quoted from the engine (partial)
+- [X] T033 `docs/assets/rendering.mmd` + `docs/assets/rendering.svg` (rendered with
+      `scripts/render_mermaid.js`) and a six-line block in both READMEs linking the document (missing)
+- [X] T034 The two short forms of the same text: `COMO-SE-DIBUJA.md` / `HOW-IT-RENDERS.md` inside every
+      starter zip (wired into `cli/bizview_cli/starter.py`, documented in CONTENIDO.md/CONTENTS.md,
+      template regenerated) and the guide topic `como-se-dibuja-un-tablero` in `crear-con-ia`, both
+      languages (missing)
+- [X] T035 `scripts/check_docs_parity.py`: heading skeleton, fenced blocks (language and size), tables
+      and resolved links per pair, for the root documents, `docs/`, the guide and the pack; `make
+      check`, the gates workflow and `backend/tests/test_docs_parity.py` prove both directions (missing)
+- [X] T036 Bring every Spanish document to parity and create the missing ones: `docs/es/{INSTALL,
+      THEMES,DESIGN-SYSTEM}.md`, the rewritten `docs/es/{AUTHORING,IMPORT,REPORTS}.md`, and
+      `{CONTRIBUTING,SECURITY,CODE_OF_CONDUCT,DIAGNOSIS}.es.md` (partial)
+- [X] T037 Language switch line in every paired document; remove `docs/VIBE-REPORTING.md` and repoint
+      its inbound links (partial)
+- [X] T038 Record the rule in `specs/046-release-docs-governance/spec.md` (FR-020, FR-021) and in
+      `CONTRIBUTING.md`; CHANGELOG under Unreleased (missing)
+
+## Dependencies
+
+T032 → T033/T034 → T035 → T036/T037 → T038.

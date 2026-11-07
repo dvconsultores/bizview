@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/DESIGN-SYSTEM.md)
+
 # The BizView design system
 
 One place for the rules every screen follows. It exists because four screens did not: the theme

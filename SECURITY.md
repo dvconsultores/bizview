@@ -1,5 +1,7 @@
 # Security policy
 
+🇬🇧 English · 🇪🇸 [Español](SECURITY.es.md)
+
 Bizview is a self-hosted product: the code, the CLI and the images are ours; the server, the
 database and the data are yours. This page says how to report a problem and what the product
 protects by itself.

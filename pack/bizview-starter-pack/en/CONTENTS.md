@@ -23,6 +23,8 @@ Legend: **You** = you edit it · **Your AI** = the AI writes it · **BizView** =
 | `CONTENTS.md` | No | BizView | This document. Ignored on import. |
 | `QUE-HACE-BIZVIEW.md` | No | BizView | What happens on import and apply, in Spanish. Ignored. |
 | `WHAT-BIZVIEW-DOES.md` | No | BizView | The same in English. Ignored. |
+| `COMO-SE-DIBUJA.md` | No | BizView | What BizView does with your `report.yaml` when it runs it: context, queries, cache and drawing. Ignored. |
+| `HOW-IT-RENDERS.md` | No | BizView | The same, in English. Ignored. |
 | `specs/001-<slug>/*` | Yes | Your AI | `spec.md` is required: BizView shows it in the editor and demands it to run. `plan.md` and `tasks.md` complete the record; when missing, the project is flagged as incomplete. |
 | `specs/001-<slug>/spec.md` | Yes | Your AI | States the kind (`integracion` or `reporte`) and `**Status**: Approved`. Without an approved spec the project cannot be applied, and the `**Datos personales**` line is compared with the dataset's columns. |
 | `specs/002-<slug>-reporte/*` | Yes | Your AI | The report's own spec: kind `reporte`, `**Status**: Approved` and the metrics the reader sees. Without it the dashboard has no owner. |
@@ -49,8 +51,9 @@ Legend: **You** = you edit it · **Your AI** = the AI writes it · **BizView** =
 ## What import ignores
 
 - Everything that is not the project format: `PROMPT.md`, `REQUEST.md`, `README.md`, `CONTENIDO.md`,
-  `CONTENTS.md`, `QUE-HACE-BIZVIEW.md`, `WHAT-BIZVIEW-DOES.md`, `CLAUDE.md`, `AGENTS.md`,
-  `bizview.yaml`, `sources/`, `.bizview/`, `bizview.lock` and system files (`.DS_Store`).
+  `CONTENTS.md`, `QUE-HACE-BIZVIEW.md`, `WHAT-BIZVIEW-DOES.md`, `COMO-SE-DIBUJA.md`,
+  `HOW-IT-RENDERS.md`, `CLAUDE.md`, `AGENTS.md`, `bizview.yaml`, `sources/`, `.bizview/`,
+  `bizview.lock` and system files (`.DS_Store`).
 - Repeated files that are not text.
 - A file that looks like a program (`.js`, `.sh`, `.exe`…) **cancels** the import: that is not noise.
 

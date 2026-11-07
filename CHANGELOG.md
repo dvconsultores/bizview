@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A document that says what BizView does with a `report.yaml`, in both languages (feature 057b)**.
+  AUTHORING and REPORTS told an author how to write a report and never how it is executed, so the
+  questions that matter — why a figure changes with the period, where the comparison comes from, how
+  long a cached answer lives — had no answer outside the source. `docs/RENDERING.md` is that answer:
+  six numbered steps with the file behind each one (apply composes an immutable version; `uses`
+  resolves to `ds_<integration>.<dataset>` with the integration's column contracts; the request's
+  period becomes two local dates and its hash plus the last load is the cache key the `ETag`
+  answers; each view is one aggregation per period, with a real generated statement quoted and the
+  comparison as a second run over the previous range; `layout.web` binds components by view id and
+  the formats are applied in the browser and again in the PDF; freshness is the last load), a
+  sequence diagram (`docs/assets/rendering.svg`, source in `docs/assets/rendering.mmd`) and a table
+  of what each key controls at run time. Its short form is a block in both READMEs, a topic in the
+  guide (**Crear con tu IA → Cómo se dibuja un tablero**) and two documents inside every starter
+  zip, `COMO-SE-DIBUJA.md` / `HOW-IT-RENDERS.md`.
+
 - **The product writes the starter pack, so an author without a terminal can start (feature 057)**.
   Authoring moved outside Bizview in 043/045, but the only way to obtain the folder it needs was
   `bizview init workspace` on a machine with the CLI. **Proyectos → Nuevo proyecto → Descargar paquete
@@ -132,6 +147,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Every shipped document exists in Spanish and in English, and a gate keeps them in step (feature
+  057b)**. `docs/es/` held three shortened documents while INSTALL, THEMES, DESIGN-SYSTEM,
+  CONTRIBUTING, SECURITY, CODE_OF_CONDUCT and DIAGNOSIS had no Spanish at all, so a Spanish reader
+  got a summary of one third of the product. Each one now has its counterpart: same heading
+  skeleton, same code blocks, same tables, same links, with the prose translated instead of
+  summarised, and the pair cross-links at the top of the file. `scripts/check_docs_parity.py`
+  measures exactly that — headings, fenced blocks, tables and resolved links — for the root
+  documents, `docs/`, the in-app help (`es/` ↔ `en/`) and the starter pack; it runs in
+  `make check` and in the gates workflow, and it fails naming the file that drifted. The
+  `docs/VIBE-REPORTING.md` stub is gone (REPORTS.md replaced it; the inbound links were repointed),
+  and the rule is recorded in CONTRIBUTING and in the 046 governance requirements (FR-020, FR-021).
 - **Help, README and docs describe the product that exists (feature 057)**. The guide's *Agente y
   Spec Kit* section is gone; **Crear con tu IA** holds the starter pack, the request, handing it to
   any AI, validating, fixing problems, re-importing and a complete worked example, plus a topic that
@@ -405,8 +431,8 @@ makes the written product match the shipped one (feature 046).
   propose a schema change; the Contributor Covenant's contact address.
 - **The authoring contract (feature 044)**: `report.yaml` gains `images:`; the `table`, `kpi` and
   `asset` components accept `image:`; `layout.pdf.blocks` accepts the four visual types, and the
-  validation rejects a block bound to a view it cannot draw. [`docs/VIBE-REPORTING.md`](docs/VIBE-REPORTING.md)
-  is now the field-by-field reference the authoring guide links to.
+  validation rejects a block bound to a view it cannot draw. `docs/REPORTS.md`
+  (then `docs/VIBE-REPORTING.md`) is the field-by-field reference the authoring guide links to.
 - **Administración**: the AI card and the "IA funcionando" pill are gone; the access-tokens and
   projects cards say what they now do; the grid is 3/2/1.
 - **Upgrading from 0.1.x**: migration `0041_drop_authoring_agent` copies every draft spec document

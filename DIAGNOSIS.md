@@ -1,5 +1,7 @@
 # DIAGNOSIS — why `/speckit-all` cannot finish `001-mercado-cripto` (041-speckit-all-root-cause)
 
+🇬🇧 English · 🇪🇸 [Español](DIAGNOSIS.es.md)
+
 Date: 2026-10-28. Method: code reading end to end first, then evidence, then failing tests.
 All file references are to the current `main` (f7feae3).
 

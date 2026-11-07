@@ -1,3 +1,5 @@
+🇬🇧 English · 🇪🇸 [Español](es/AUTHORING.md)
+
 # Authoring a Bizview project
 
 Bizview runs what you write; it does not write it. This document is the whole contract: the folder,
@@ -58,7 +60,7 @@ returns rows, and no credential ever appears in its output.
 Feature 052: the same content is on the source page — **Fuentes de datos → «source» → Estructura**
 — with **Descargar estructura (.md)** and **(.json)**, or from the terminal. Press **Generar
 estructura con IA** first and the pack carries the logical tables, fields, relations and notes an
-author's AI needs (see VIBE-REPORTING.md).
+author's AI needs (see [REPORTS.md](./REPORTS.md)).
 
 ```bash
 bizview describe "Origen ERP" --pack --out .   # writes sources/<name>/structure.md + structure.json
@@ -189,7 +191,7 @@ views:
   chooses what each slice prints. Without it, values appear on hover or tap in a chip with the name,
   the value and the share.
 - A report over an existing table without ETL declares `direct:` instead of `uses:` (see
-  [VIBE-REPORTING.md](./VIBE-REPORTING.md) for the direct-source contract). When the source is
+  [REPORTS.md](./REPORTS.md) for the direct-source contract). When the source is
   **BI-ready** (the super user declared what it exposes) a table needs no column list: write
   `alias: schema.object` and the columns come from the source's own structure, exactly what the
   structure pack shows you.

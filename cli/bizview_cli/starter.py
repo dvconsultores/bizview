@@ -28,8 +28,10 @@ SOURCE_PLACEHOLDER = "<fuente>"
 #: travels beside it with its suffix, so a chat-based author can read both.
 BILINGUAL = ("PROMPT.md", "REQUEST.md", "README.md")
 #: Documents that always ship in both languages under their own names (one per language).
-FIXED = {"es": {"CONTENIDO.md": "CONTENIDO.md", "QUE-HACE-BIZVIEW.md": "QUE-HACE-BIZVIEW.md"},
-         "en": {"CONTENTS.md": "CONTENTS.md", "WHAT-BIZVIEW-DOES.md": "WHAT-BIZVIEW-DOES.md"}}
+FIXED = {"es": {"CONTENIDO.md": "CONTENIDO.md", "QUE-HACE-BIZVIEW.md": "QUE-HACE-BIZVIEW.md",
+                  "COMO-SE-DIBUJA.md": "COMO-SE-DIBUJA.md"},
+         "en": {"CONTENTS.md": "CONTENTS.md", "WHAT-BIZVIEW-DOES.md": "WHAT-BIZVIEW-DOES.md",
+                "HOW-IT-RENDERS.md": "HOW-IT-RENDERS.md"}}
 #: Agentic tools read a fixed name; it carries the prompt's text.
 AGENT_FILES = ("CLAUDE.md", "AGENTS.md")
 #: Skeletons shared by both kinds, then the ones each kind adds.
