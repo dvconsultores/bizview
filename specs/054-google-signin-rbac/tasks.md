@@ -116,3 +116,24 @@ task is ticked only when it is implemented and its file exists.
 - [x] T034 Justify or drop `POST /api/testing/google-reset` in `backend/app/api/testhooks.py`: either
       restore the `google.client` seam from it after the e2e suite (so the hook is the one the plan
       counts) or delete it, since nothing references it per the plan's test-hook scope (unrequested)
+
+## Convergence 059 — sign-in on a phone (2026-11-06)
+
+Feature 059 changed the layout of `/ingresar` below 640 px and the two-provider row; the 054 contract
+(real mark, equal height, `type=button`, the start endpoint) is unchanged.
+
+- [x] C059-1 `frontend/src/pages/SignIn.tsx`: the hero is the page header on a phone (logo 40 px,
+      product name 18 px, organisation 12 px, tagline only from 600 px of height), the card no longer
+      overlaps it and starts below it, and the root is `min-h-dvh` with `scroll-pb-32`.
+- [x] C059-2 The language toggle left its absolute position over the product name: it is a compact
+      segmented control under the header, right aligned.
+- [x] C059-3 `GoogleSignInButton` gained `compact`: brand mark + `google.signInShort`, with
+      `aria-label={google.signIn}` so the accessible name is still the full sentence. Google and
+      Telegram share one `grid-cols-2` row when both are enabled (`telegram.signInShort` for the
+      Telegram button) and take the full width when only one is.
+- [x] C059-4 `Input`/`PasswordField`/`Select` are 44 px under 640 px (`max-sm:min-h-11`), and the email
+      field now declares `autocomplete="email"` (it was `username`), the password
+      `current-password`.
+- [x] C059-5 `frontend/tests/unit/sign-in-phone.test.tsx` and the `sign-in on a phone` cases of
+      `frontend/tests/e2e/mobile-first.spec.ts` pin the layout; the 054 tests
+      (`google-sign-in.test.tsx`, `google-signin-button.test.tsx`, `e2e/google-rbac.spec.ts`) still pass.

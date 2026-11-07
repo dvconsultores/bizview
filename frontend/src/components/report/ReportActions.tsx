@@ -78,6 +78,7 @@ export function ReportActions({
       <span data-sheet-opener className="contents">
         <Button
           variant="secondary"
+          className="max-[420px]:w-[72px] max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
           icon={<SlidersHorizontal className="h-5 w-5" aria-hidden />}
           onClick={onOpenFilters}
           aria-label={t.reportActions.filters(activeFilters)}
@@ -88,6 +89,7 @@ export function ReportActions({
       <span data-sheet-opener className="contents">
         <Button
           variant="secondary"
+          className="max-[420px]:w-[72px] max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
           icon={<SlidersHorizontal className="h-5 w-5" aria-hidden />}
           onClick={onOpenParams}
           aria-label={t.reportActions.params}

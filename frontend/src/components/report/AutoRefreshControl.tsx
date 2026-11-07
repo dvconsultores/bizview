@@ -26,7 +26,7 @@ export function AutoRefreshControl({
 
   return (
     <section aria-labelledby={headingId} className="mt-5 space-y-4 border-t border-line pt-5">
-      <h3 id={headingId} className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+      <h3 id={headingId} className="text-xs font-semibold uppercase tracking-wide text-ink-soft max-sm:sr-only">
         {t.autoRefresh.label}
       </h3>
 

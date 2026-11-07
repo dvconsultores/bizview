@@ -202,8 +202,16 @@ export function ParamsForm({
   const grouped = def.filters.length >= 10;
   const shownFilters = grouped ? def.filters.slice(0, 6) : def.filters;
 
-  const heading = (text: string) => (
-    <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{text}</h3>
+  // Feature 059: on phones the section title repeated the control's own label, so it is only
+  // announced there (still a landmark name for a screen reader, no space taken).
+  const heading = (text: string, duplicated = true) => (
+    <h3
+      className={`text-xs font-semibold uppercase tracking-wide text-ink-soft${
+        duplicated ? " max-sm:sr-only" : ""
+      }`}
+    >
+      {text}
+    </h3>
   );
 
   return (
@@ -213,86 +221,92 @@ export function ParamsForm({
       className={className}
       data-testid="params-form"
     >
-      <div className="space-y-4">
-        {section !== "filters" && (
-          <div className="space-y-4">
-            {heading(t.reportParams.periodSection)}
+      <div className="space-y-4 max-sm:space-y-3">
+        {/* Feature 059: one label per control, 12 px apart on phones; the period and the comparison
+            share a row whenever two 160 px columns fit (below that they stack). */}
+        <div className="max-sm:grid max-sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] max-sm:gap-3">
+          {section !== "filters" && (
+            <div className="space-y-4 max-sm:order-1 max-sm:space-y-0">
+              {heading(t.reportParams.periodSection)}
 
-            <div>
-              <Select
-                label={t.reportParams.period}
-                value={draft.period}
-                onChange={(e) => handlePeriodChange(e.target.value as PeriodPreset)}
-              >
-                {periodOptions.map((period) => (
-                  <option key={period} value={period}>
-                    {periodLabels[period] ?? period}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            {draft.period === "custom" && (
-              <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-2">
-                <Input
-                  ref={fromInputRef}
-                  label={t.reportParams.from}
-                  type="date"
-                  required
-                  value={draft.from}
-                  max={draft.to || undefined}
-                  error={errors.from}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
-                />
-                <Input
-                  ref={toInputRef}
-                  label={t.reportParams.to}
-                  type="date"
-                  required
-                  value={draft.to}
-                  min={draft.from || undefined}
-                  error={errors.to}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {section !== "filters" && (
-          <div className="mt-5 space-y-4 border-t border-line pt-5">
-            {heading(t.reportParams.compareSection)}
-
-            <div>
-              {compareOptions.length > 1 ? (
+              <div>
                 <Select
-                  label={t.reportParams.compare}
-                  value={draft.compare}
-                  onChange={(e) => handleCompareChange(e.target.value as CompareMode)}
+                  label={t.reportParams.period}
+                  value={draft.period}
+                  onChange={(e) => handlePeriodChange(e.target.value as PeriodPreset)}
                 >
-                  {compareOptions.map((compare) => (
-                    <option key={compare} value={compare}>
-                      {compareLabels[compare] ?? compare}
+                  {periodOptions.map((period) => (
+                    <option key={period} value={period}>
+                      {periodLabels[period] ?? period}
                     </option>
                   ))}
                 </Select>
-              ) : (
-                <Input
-                  label={t.reportParams.compare}
-                  readOnly
-                  value={compareLabels[compareOptions[0]] ?? compareOptions[0]}
-                />
-              )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {section !== "filters" && draft.period === "custom" && (
+            <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 max-sm:order-3 max-sm:col-span-full max-sm:mt-0">
+              <Input
+                ref={fromInputRef}
+                label={t.reportParams.from}
+                type="date"
+                required
+                value={draft.from}
+                max={draft.to || undefined}
+                error={errors.from}
+                className="min-w-0"
+                onChange={(e) => setDraft((prev) => ({ ...prev, from: e.target.value }))}
+              />
+              <Input
+                ref={toInputRef}
+                label={t.reportParams.to}
+                type="date"
+                required
+                value={draft.to}
+                min={draft.from || undefined}
+                error={errors.to}
+                className="min-w-0"
+                onChange={(e) => setDraft((prev) => ({ ...prev, to: e.target.value }))}
+              />
+            </div>
+          )}
+
+          {section !== "filters" && (
+            <div className="mt-5 space-y-4 border-t border-line pt-5 max-sm:order-2 max-sm:m-0 max-sm:space-y-0 max-sm:border-0 max-sm:p-0">
+              {heading(t.reportParams.compareSection)}
+
+              <div>
+                {compareOptions.length > 1 ? (
+                  <Select
+                    label={t.reportParams.compare}
+                    value={draft.compare}
+                    onChange={(e) => handleCompareChange(e.target.value as CompareMode)}
+                  >
+                    {compareOptions.map((compare) => (
+                      <option key={compare} value={compare}>
+                        {compareLabels[compare] ?? compare}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    label={t.reportParams.compare}
+                    readOnly
+                    value={compareLabels[compareOptions[0]] ?? compareOptions[0]}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {section !== "period" && def.filters.length > 0 && (
           <section
             aria-labelledby={filtersSectionId}
-            className="mt-5 space-y-4 border-t border-line pt-5"
+            className="mt-5 space-y-4 border-t border-line pt-5 max-sm:mt-3 max-sm:space-y-3 max-sm:pt-3"
           >
-            {heading(t.reportParams.filtersSection)}
+            {heading(t.reportParams.filtersSection, false)}
 
             {shownFilters.map(renderFilter)}
             {grouped ? (

@@ -20,7 +20,7 @@ export function Breadcrumbs({ back, items, className = "" }: BreadcrumbsProps) {
     <div className={`mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 ${className}`}>
       {back ? <BackLink to={back} className="" /> : null}
       {items.length > 0 ? (
-        <nav aria-label={t.design.breadcrumbs} className="min-w-0">
+        <nav aria-label={t.design.breadcrumbs} className="hidden min-w-0 min-[480px]:block">
           <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-muted">
             {items.map((item, index) => {
               const isLast = index === items.length - 1;

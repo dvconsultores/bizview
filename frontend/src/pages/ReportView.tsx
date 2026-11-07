@@ -716,11 +716,9 @@ export function ReportView() {
         onTabChange={(id) => setPanel(id as "filters" | "params")}
         footer={
           <div className="flex gap-2">
-            {panel === "params" ? (
-              <Button variant="secondary" block onClick={clearAll}>
-                {t.reportSheet.clear}
-              </Button>
-            ) : null}
+            <Button variant="ghost" block onClick={clearAll}>
+              {t.reportSheet.clear}
+            </Button>
             <Button variant="primary" block onClick={closePanel}>
               {t.reportSheet.done}
             </Button>

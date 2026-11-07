@@ -6,6 +6,7 @@ import { isPaletteId, PRESET_IDS, themeStyle } from "../../theme/palette";
 import { BUILTIN_THEMES, type ThemeMode } from "../../theme/themes";
 import { Button } from "../Button";
 import { Select } from "../Select";
+import { ChipRow, type ChipOption } from "./ChipRow";
 
 interface PaletteSelectProps {
   /** The preset in force: the report's declared one, or `null` for the installation's. */
@@ -45,21 +46,49 @@ export function PaletteSelect({ value, onChange, mode = "light" }: PaletteSelect
   const shown: PaletteId = declared ?? "impacto";
   const snippet = `layout:\n  theme:\n    palette: ${declared ?? "impacto"}`;
 
+  // Feature 059: one horizontal chip row on phones (a swatch pair + the name), the select above 640.
+  const chips: ChipOption[] = [
+    { id: "", label: t.palette.installation },
+    ...PRESET_IDS.map((id) => ({
+      id,
+      label: t.palette[id],
+      visual: (
+        <span aria-hidden style={themeStyle(BUILTIN_THEMES[id], mode)} className="flex items-center gap-0.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-chart-1" />
+          <span className="h-2.5 w-2.5 rounded-full bg-chart-2" />
+          <span className="h-2.5 w-2.5 rounded-full bg-chart-3" />
+        </span>
+      ),
+    })),
+  ];
+
   return (
     <section className="space-y-3 border-t border-line pt-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">{t.palette.label}</h3>
-      <Select
-        label={t.palette.label}
-        value={declared ?? ""}
-        onChange={(event) => onChange(event.target.value || null)}
-      >
-        <option value="">{t.palette.installation}</option>
-        {PRESET_IDS.map((id) => (
-          <option key={id} value={id}>
-            {t.palette[id]}
-          </option>
-        ))}
-      </Select>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft max-sm:sr-only">{t.palette.label}</h3>
+      <div className="sm:hidden">
+        <ChipRow
+          label={t.palette.label}
+          labelHidden
+          testId="palette-chips"
+          options={chips}
+          value={declared ?? ""}
+          onChange={(id) => onChange(id || null)}
+        />
+      </div>
+      <div className="max-sm:hidden">
+        <Select
+          label={t.palette.label}
+          value={declared ?? ""}
+          onChange={(event) => onChange(event.target.value || null)}
+        >
+          <option value="">{t.palette.installation}</option>
+          {PRESET_IDS.map((id) => (
+            <option key={id} value={id}>
+              {t.palette[id]}
+            </option>
+          ))}
+        </Select>
+      </div>
       {/* The selected theme's colours, painted with the same derivation the dashboard uses. */}
       <div
         data-testid="palette-swatches"

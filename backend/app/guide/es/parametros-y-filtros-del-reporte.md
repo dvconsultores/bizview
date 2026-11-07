@@ -13,15 +13,19 @@ Cualquier persona con acceso al tablero.
 ## Cómo se hace
 
 1. En el reporte, la fila de acciones tiene **Filtros** y **Parámetros**. Los dos abren el mismo
-   panel a la derecha (abajo, en el teléfono) y eligen su pestaña.
-2. En la pestaña **Parámetros**, cada control va en su propia fila, con su nombre arriba:
+   panel —a la derecha en el computador, a pantalla completa en el teléfono— y eligen su pestaña.
+2. En la pestaña **Parámetros**, cada control lleva un solo nombre encima, en este orden:
    **Período** (con **Desde** y **Hasta** si eliges **Personalizado**), **Comparar con**,
-   **Frecuencia de actualización**, **Paleta** y **Tema del reporte**.
+   **Frecuencia de actualización**, **Paleta** y **Tema del reporte**. En el teléfono **Período** y
+   **Comparar con** comparten una fila, y **Paleta** y **Tema del reporte** son filas de fichas que
+   se desplazan de lado.
 3. En la pestaña **Filtros** elige uno o varios valores; la lista muestra hasta 200 coincidencias y
    puedes escribir para acotar.
 4. Los cambios se aplican solos, con una pausa de un cuarto de segundo, mientras el tablero sigue
    visible detrás del panel.
-5. Pulsa **Listo** para cerrarlo, o **Limpiar** para volver a los valores del reporte.
+5. Pulsa **Listo** para cerrarlo, o **Limpiar** para volver a los valores del reporte. En el
+   teléfono el pie con **Limpiar** y **Listo** queda siempre a la vista, y el botón de volver del
+   sistema también cierra el panel.
 
 ## Opciones
 

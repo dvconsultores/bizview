@@ -94,3 +94,27 @@ task is ticked only when it is implemented and its file exists.
       through the Parámetros tab instead of `param-bar`
 - [x] T027 Gates: `npx tsc -b`, `npx vitest run`, and
       `grep -rn "param-bar\|ParamBar\|Generar reporte\|exportSection" src` empty
+
+## Convergence 059 — the sheet on a phone (2026-11-06)
+
+Feature 059 rewrote the phone behaviour of this sheet; nothing in 053's desktop contract changed.
+
+- [x] C059-1 Geometry (`frontend/src/components/report/ReportSheet.tsx`): below 640 px the sheet is
+      full screen (`h-dvh`, no drag handle, no 70 % bottom sheet); 640–1023 px is the bottom sheet at
+      85 %; from 1024 px the 360 px side sheet is untouched. A downward drag only dismisses when it
+      starts outside the scrollable body, so scrolling the controls never closes the sheet.
+- [x] C059-2 Footer and body: the footer is a sticky flex row with `env(safe-area-inset-bottom)` and
+      the body keeps `scroll-padding-bottom`, so **Limpiar** and **Listo** are visible and never cover
+      the last control (measured in `frontend/tests/e2e/mobile-first.spec.ts`).
+- [x] C059-3 `Limpiar` moved to `variant="ghost"` and now shows on both tabs
+      (`frontend/src/pages/ReportView.tsx`, `SharedDashboard.tsx`); **Listo** only closes.
+- [x] C059-4 Density (`ReportParamsPanel`, `ParamsForm`, `AutoRefreshControl`, `PaletteSelect`): one
+      label per control, the repeated section titles are `max-sm:sr-only`, 44 px controls with 12 px
+      gaps, **Período** + **Comparar con** in one row (`auto-fit minmax(160px,1fr)`), and **Paleta** /
+      **Tema del reporte** become scrollable chip rows (`components/report/ChipRow.tsx`) on phones
+      while the selects stay above 640 px.
+- [x] C059-5 The Filtros tab keeps `MultiSelect`, whose combobox input is the search box and whose
+      selected values are the chips above the list.
+- [x] C059-6 The phone's back button closes the sheet (`frontend/src/lib/historyLayer.ts`) and focus
+      still returns to the opener.
+- [x] C059-7 Help topic `parametros-y-filtros-del-reporte` (ES/EN) describes the phone layout.

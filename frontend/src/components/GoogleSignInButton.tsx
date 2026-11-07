@@ -51,9 +51,12 @@ interface GoogleSignInButtonProps {
   onClick: () => void;
   /** Rendered on the sign-in screen; a spec or a test can override it (English, a fixture). */
   label?: string;
+  /** Feature 059: the short form ("Google") of the two-provider row below 640 px; the full sentence
+   * is painted from 640 px up and is always the accessible name. */
+  compact?: boolean;
 }
 
-export function GoogleSignInButton({ onClick, label }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({ onClick, label, compact = false }: GoogleSignInButtonProps) {
   const t = useT();
   const { resolved } = useTheme();
   const text = label ?? t.google.signIn;
@@ -63,12 +66,20 @@ export function GoogleSignInButton({ onClick, label }: GoogleSignInButtonProps) 
       onClick={onClick}
       data-testid="google-sign-in"
       data-variant={resolved}
-      className={`inline-flex min-h-tap w-full items-center justify-center gap-3 rounded-btn border px-4 text-base font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
-        resolved === "dark" ? DARK : LIGHT
-      }`}
+      aria-label={compact ? t.google.signIn : undefined}
+      className={`inline-flex min-h-tap w-full items-center justify-center rounded-btn border font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+        compact ? "gap-2 px-2 text-sm sm:gap-3 sm:px-4 sm:text-base" : "gap-3 px-4 text-base"
+      } ${resolved === "dark" ? DARK : LIGHT}`}
     >
       <GoogleMark />
-      <span>{text}</span>
+      {compact ? (
+        <>
+          <span className="max-sm:hidden">{t.google.signIn}</span>
+          <span className="sm:hidden">{text}</span>
+        </>
+      ) : (
+        <span>{text}</span>
+      )}
     </button>
   );
 }

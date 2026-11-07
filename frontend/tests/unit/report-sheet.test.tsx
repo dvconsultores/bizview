@@ -102,14 +102,40 @@ describe("ReportSheet", () => {
     expect(sheet()?.contains(document.activeElement)).toBe(true);
   });
 
-  it("is a bottom sheet with a drag handle below 1024 px and a side sheet above", async () => {
+  it("is full screen on phones, a bottom sheet from 640 px and a side sheet from 1024 px", async () => {
     await renderSheet();
     const panel = sheet();
-    expect(panel.className).toContain("max-h-[70vh]");
+    // Feature 059: `100dvh`, no drag handle and a sticky footer below 640 px.
+    expect(panel.className).toContain("h-dvh");
+    expect(panel.className).toContain("sm:h-[85vh]");
     expect(panel.className).toContain("rounded-t-2xl");
     expect(panel.className).toContain("lg:w-[360px]");
     expect(panel.className).toContain("motion-reduce:transition-none");
-    expect(panel.querySelector('[aria-hidden][class*="rounded-full"]')).toBeTruthy();
+    const handle = panel.querySelector('[aria-hidden][class*="rounded-full"]') as HTMLElement;
+    expect(handle.className).toContain("hidden");
+    expect(handle.className).toContain("sm:block");
+  });
+
+  it("keeps the footer out of the way of the last control (sticky, safe area, scroll padding)", async () => {
+    await renderSheet({
+      footer: <button type="button">Listo</button>,
+    });
+    const panel = sheet();
+    const body = panel.querySelector('[role="tabpanel"], .overflow-y-auto') as HTMLElement;
+    expect(body.className).toContain("[scroll-padding-bottom:5rem]");
+    const footer = panel.lastElementChild as HTMLElement;
+    expect(footer.className).toContain("sticky");
+    expect(footer.className).toContain("env(safe-area-inset-bottom)");
+  });
+
+  it("pushes one history entry and closes on the phone's back button", async () => {
+    const { onClose } = await renderSheet();
+    expect((window.history.state as { bizviewLayer?: string }).bizviewLayer).toBe("report-sheet");
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("closes on an outside click on desktop, and not when the click hits the opener", async () => {

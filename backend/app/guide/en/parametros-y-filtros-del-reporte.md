@@ -11,16 +11,19 @@ Anyone with access to the dashboard.
 
 ## How to
 
-1. On the report, the actions row has **Filters** and **Parameters**. Both open the same panel on the
-   right (at the bottom on a phone) and select their tab.
-2. In the **Parameters** tab each control has its own row, with its name above: **Period** (with
-   **From** and **To** when you choose **Custom**), **Compare with**, **Refresh frequency**,
-   **Palette** and **Report theme**.
+1. On the report, the actions row has **Filters** and **Parameters**. Both open the same panel — on
+   the right on a computer, full screen on a phone — and select their tab.
+2. In the **Parameters** tab each control carries a single name above it, in this order: **Period**
+   (with **From** and **To** when you choose **Custom**), **Compare with**, **Refresh frequency**,
+   **Palette** and **Report theme**. On a phone **Period** and **Compare with** share one row, and
+   **Palette** and **Report theme** are chip rows that scroll sideways.
 3. In the **Filters** tab pick one or more values; the list shows up to 200 matches and you can type
    to narrow it.
 4. Changes apply by themselves, after a quarter-second pause, while the dashboard stays visible
    behind the panel.
-5. Press **Done** to close it, or **Clear** to return to the report's values.
+5. Press **Done** to close it, or **Clear** to return to the report's values. On a phone the footer
+   with **Clear** and **Done** always stays in view, and the system back button closes the panel
+   too.
 
 ## Options
 

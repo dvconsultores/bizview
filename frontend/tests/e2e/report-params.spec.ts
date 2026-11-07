@@ -212,7 +212,7 @@ test.describe("desktop", () => {
 test.describe("phone", () => {
   test.use({ viewport: { width: 375, height: 667 }, colorScheme: "light" });
 
-  test("the sheet is a bottom sheet with the dashboard visible above it", async ({ page }) => {
+  test("the sheet fills the phone screen", async ({ page }) => {
     await signIn(page);
     await page.goto(`/r/ventas?${SELECTION}`);
     await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
@@ -222,7 +222,9 @@ test.describe("phone", () => {
     const box = await sheet(page).boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThan(300); // full width at 375 px
-    expect(box!.height).toBeLessThanOrEqual(667 * 0.72);
+    // Feature 059: no 72 % bottom sheet on a phone — the whole viewport, no wasted quarter.
+    expect(Math.round(box!.height)).toBe(667);
+    expect(Math.round(box!.y)).toBe(0);
 
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
@@ -291,7 +293,10 @@ for (const width of [375, 768, 1280, 1920]) {
       expect(box).not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
-      expect(box!.height).toBeLessThanOrEqual(900 * 0.72 + 1);
+      // Feature 059 replaced "at most 72 %" with three explicit geometries: full screen on phones,
+      // 85 % as a bottom sheet on a tablet, and the full-height side sheet from 1024 px.
+      const expectedHeight = width < 640 ? 900 : width < 1024 ? Math.round(900 * 0.85) : 900;
+      expect(Math.round(box!.height)).toBe(expectedHeight);
       await expect(panel.getByLabel("Período")).toBeVisible();
       await expectNoHorizontalScroll(page);
       expect(await theme(page)).toBe(scheme);

@@ -31,7 +31,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={selectId}
         aria-invalid={error ? true : undefined}
         aria-describedby={[errorId, hintId].filter(Boolean).join(" ") || undefined}
-        className={`block min-h-[3.25rem] w-full rounded-xl border px-4 text-base text-ink transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`block min-h-[3.25rem] w-full rounded-xl border px-4 text-base text-ink max-sm:min-h-tap transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 ${
           error
             ? "border-danger-border bg-field focus:ring-danger-focus"
             : "border-transparent bg-field focus:ring-field-focus"

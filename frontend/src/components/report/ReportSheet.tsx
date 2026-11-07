@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useT } from "../../i18n";
+import { useHistoryLayer } from "../../lib/historyLayer";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -35,8 +36,9 @@ interface ReportSheetProps {
 
 /**
  * Feature 030 (FR-003): one non-blocking sheet for filters and parameters. A right side sheet from
- * 1024 px (360 px, no backdrop, the dashboard stays interactive) and a bottom sheet below it (drag
- * handle, 70% height, swipe or Esc to close). It is a landmark `region` with its own heading — never
+ * 1024 px (360 px, no backdrop, the dashboard stays interactive), a bottom sheet at 85% height with
+ * a drag handle from 640 px, and full screen (`100dvh`, no handle, sticky footer) on phones
+ * (059). The phone's back button closes it. It is a landmark `region` with its own heading — never
  * a dialog, per the app's no-modals rule (`tests/unit/no-modals.test.ts`): focus moves in and cycles
  * while it is open, Esc closes it and returns focus to the opener, and the page behind stays usable.
  */
@@ -52,6 +54,7 @@ export function ReportSheet({
 }: ReportSheetProps) {
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<number | null>(null);
   const titleId = useId();
@@ -81,6 +84,9 @@ export function ReportSheet({
     openerRef.current?.focus?.();
     openerRef.current = null;
   }, [onClose]);
+
+  // Feature 059: a full-screen sheet owns the phone's back button.
+  useHistoryLayer(open, close, "report-sheet");
 
   // Remembers the opener so closing can return focus to it (FR-003).
   useEffect(() => {
@@ -140,6 +146,8 @@ export function ReportSheet({
       aria-labelledby={titleId}
       data-testid="report-sheet"
       onTouchStart={(event) => {
+        // A drag that starts in the body is the reader scrolling the controls, not a dismissal.
+        if (event.target instanceof Node && bodyRef.current?.contains(event.target)) return;
         dragRef.current = event.touches[0]?.clientY ?? null;
       }}
       onTouchMove={(event) => {
@@ -153,9 +161,9 @@ export function ReportSheet({
       onTouchEnd={() => {
         dragRef.current = null;
       }}
-      className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-2xl border-t border-line bg-surface shadow-raised outline-none transition-transform duration-200 ease-out motion-reduce:transition-none lg:inset-y-0 lg:left-auto lg:right-0 lg:max-h-none lg:w-[360px] lg:rounded-none lg:border-l lg:border-t-0"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-dvh max-h-dvh flex-col bg-surface shadow-raised outline-none transition-transform duration-200 ease-out motion-reduce:transition-none sm:h-[85vh] sm:rounded-t-2xl sm:border-t sm:border-line lg:inset-y-0 lg:left-auto lg:right-0 lg:h-auto lg:max-h-none lg:w-[360px] lg:rounded-none lg:border-l lg:border-t-0"
     >
-      <div aria-hidden className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-line-strong lg:hidden" />
+      <div aria-hidden className="mx-auto mt-2 hidden h-1.5 w-10 shrink-0 rounded-full bg-line-strong sm:block lg:hidden" />
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         {selected === null ? (
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
@@ -187,7 +195,7 @@ export function ReportSheet({
                   onKeyDown={onTabKeyDown}
                   className={`min-h-tap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 ${
                     isSelected
-                      ? "bg-accent-soft text-accent-deep"
+                      ? "bg-accent-soft text-accent"
                       : "text-ink-2 hover:bg-subtle hover:text-ink"
                   }`}
                 >
@@ -207,15 +215,16 @@ export function ReportSheet({
         </button>
       </div>
       <div
+        ref={bodyRef}
         id={selected !== null ? panelId : undefined}
         role={selected !== null ? "tabpanel" : undefined}
         aria-labelledby={selected !== null ? tabId(selected) : undefined}
         tabIndex={selected !== null ? 0 : undefined}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-4 outline-none"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 outline-none [scroll-padding-bottom:5rem] sm:py-4"
       >
         {children}
       </div>
-      <div className="shrink-0 border-t border-line px-4 py-3 pb-safe">
+      <div className="sticky bottom-0 shrink-0 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         {footer ?? (
           <button
             type="button"

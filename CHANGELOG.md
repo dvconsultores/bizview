@@ -149,6 +149,33 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The sign-in page fits a phone, and the language switch stopped covering the product name
+  (feature 059)**. On a 393 × 851 Android screen the `Español | English` toggle floated over the
+  header and cut "Bizview AI Po…" in half, the hero (logo, name, organisation, tagline) took a third
+  of the viewport and the form card overlapped it with `-mt-8`, so "Ingresa a tu cuenta" was half
+  hidden under the banner edge and Google and Telegram sat below the fold. The hero is the page's own
+  header below 640 px now — logo 40 px, name 18 px, organisation 12 px, tagline only from 600 px of
+  height — the toggle is a compact segmented control under it, right aligned, the card starts below
+  the header with 16 px gutters and no negative margin, the heading is 20 px and the helper text
+  14 px, inputs are 44 px with the password eye as a 44 px target, `Ingresar` is 48 px and full width,
+  and the two providers share one row with their short labels (`Google`, `Telegram`) while keeping
+  the full sentence as the accessible name — a single enabled provider takes the whole width. The
+  email field declares `autocomplete="email"` (it said `username`), the page keeps
+  `scroll-padding-bottom` so a focused field and the button stay in view, and failures are reported
+  inside the card instead of a banner that pushes the form down. From 640 px up nothing changed.
+- **The Filtros | Parámetros sheet uses the whole screen on a phone (feature 059)**. It opened at
+  72 % height behind a drag handle, so the top quarter showed the greyed dashboard and was useless,
+  every control repeated its section title (`PERÍODO` above `Período`, `COMPARAR CON` above
+  `Comparar con`), 52 px tall cards needed two screens of scrolling for four controls, and the footer
+  covered the last one. Below 640 px the sheet is full screen (`100dvh`, no handle, tabs on the left
+  and `×` on the right, sticky footer with **Limpiar** and **Listo**, `env(safe-area-inset-bottom)`),
+  the repeated titles are only announced to a screen reader, controls are 44 px with 12 px gaps,
+  **Período** and **Comparar con** share one row whenever two 160 px columns fit (the custom range
+  keeps its own two-column row), and **Paleta** and **Tema del reporte** are single scrolling chip
+  rows instead of selects. Tablet keeps the bottom sheet at 85 % and the desktop keeps its 360 px side
+  sheet. Opening pushes one history entry, so the phone's back button closes the sheet, **Limpiar**
+  restores the report's defaults, and a downward drag only dismisses when it starts outside the
+  scrolling body. Live apply keeps its 250 ms debounce.
 - **A KPI fills the width its author gave it, and cards in a row share a height (feature 056)**. A
   `layout.web` `kpi` component rendered through `KpiGrid`, whose `<ul>` kept its `grid-cols-2
   lg:grid-cols-4` even for a single metric: a `span: 6` card drew a ~200 px card at the left of its
@@ -179,6 +206,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The shell is mobile first, measured at 360 px (feature 059)**. The page title is 22 px with the
+  description clamped to two lines and the meta line wrapping; the breadcrumb trail is hidden below
+  480 px while **Volver** stays; `Filtros`, `Parámetros` and `⋯` become 72 px icon-above-label buttons
+  below 420 px with their full name still as the accessible name; every input, select and combobox is
+  44 px under 640 px. `frontend/tests/e2e/mobile-first.spec.ts` measures the sign-in screen at
+  393 × 640, the sheet at 393/768/1280, and asserts no route scrolls sideways at 360 px, with axe
+  clean at 360/393/414/768/1280 in both themes.
 - **Every shipped document exists in Spanish and in English, and a gate keeps them in step (feature
   057b)**. `docs/es/` held three shortened documents while INSTALL, THEMES, DESIGN-SYSTEM,
   CONTRIBUTING, SECURITY, CODE_OF_CONDUCT and DIAGNOSIS had no Spanish at all, so a Spanish reader

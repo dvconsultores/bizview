@@ -7,6 +7,7 @@ import type { ThemeMode } from "../../theme/themes";
 import type { MultiSelectOptions } from "../MultiSelect";
 import { Select } from "../Select";
 import { AutoRefreshControl } from "./AutoRefreshControl";
+import { ChipRow } from "./ChipRow";
 import { PaletteSelect } from "./PaletteSelect";
 import { ParamsForm } from "./ParamsForm";
 
@@ -85,20 +86,35 @@ export function ReportParamsPanel({
 
         {themeMode ? (
           <section className="mt-5 border-t border-line pt-5">
-            <Select
-              label={t.reportParams.theme}
-              value={themeMode.value ?? ""}
-              onChange={(event) =>
-                themeMode.onChange((event.target.value || null) as ThemeMode | null)
-              }
-              hint={t.reportParams.themeHint}
-            >
-              {modeOptions.map((option) => (
-                <option key={option.id ?? "auto"} value={option.id ?? ""}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+            {/* Feature 059: a chip row on phones, the select (with its hint) from 640 px. */}
+            <div className="sm:hidden">
+              <ChipRow
+                label={t.reportParams.theme}
+                testId="theme-chips"
+                options={modeOptions.map((option) => ({
+                  id: option.id ?? "",
+                  label: option.label,
+                }))}
+                value={themeMode.value ?? ""}
+                onChange={(id) => themeMode.onChange((id || null) as ThemeMode | null)}
+              />
+            </div>
+            <div className="max-sm:hidden">
+              <Select
+                label={t.reportParams.theme}
+                value={themeMode.value ?? ""}
+                onChange={(event) =>
+                  themeMode.onChange((event.target.value || null) as ThemeMode | null)
+                }
+                hint={t.reportParams.themeHint}
+              >
+                {modeOptions.map((option) => (
+                  <option key={option.id ?? "auto"} value={option.id ?? ""}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </section>
         ) : null}
 

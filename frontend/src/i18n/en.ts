@@ -65,6 +65,7 @@ export const en: Catalogue = {
   },
   google: {
     signIn: "Continue with Google",
+    signInShort: "Google",
     errors: {
       // Every refusal reads the same; the real reason lives in the audit log (feature 054).
       failed: "Couldn't sign in with Google. Try again.",
@@ -223,6 +224,7 @@ export const en: Catalogue = {
   },
   telegram: {
     signIn: "Sign in with Telegram",
+    signInShort: "Telegram",
     openTelegram: "Open Telegram",
     instructions: "In Telegram, tap Start and choose this code:",
     countdown: (m: number, ss: string) => `Expires in ${m}:${ss}`,

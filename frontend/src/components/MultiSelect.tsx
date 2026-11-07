@@ -347,7 +347,7 @@ export function MultiSelect({
           onFocus={handleInputFocus}
           onClick={handleInputClick}
           onKeyDown={handleKeyDown}
-          className="block min-h-[3.25rem] w-full rounded-xl border px-4 py-3 pr-11 text-ink placeholder-ink-faint transition-colors focus:outline-none focus:ring-2 border-transparent bg-field focus:ring-field-focus disabled:cursor-not-allowed disabled:opacity-50"
+          className="block min-h-[3.25rem] w-full rounded-xl border px-4 py-3 pr-11 text-ink max-sm:min-h-tap max-sm:py-2 placeholder-ink-faint transition-colors focus:outline-none focus:ring-2 border-transparent bg-field focus:ring-field-focus disabled:cursor-not-allowed disabled:opacity-50"
         />
         <ChevronDown
           aria-hidden="true"
