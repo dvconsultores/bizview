@@ -381,6 +381,77 @@ nunca garantiza. Si el mensaje nombra el host de BizView en lugar del del origen
 la base de datos del producto: sube `DB_POOL_SIZE` / `DB_POOL_OVERFLOW` y revisa
 `docker compose logs backend`.
 
+### MySQL, MariaDB, SQL Server, SQLite, BigQuery y Google Sheets
+
+Los cinco tipos siguientes se comportan como PostgreSQL: **Probar conexión**, **Ver estructura**,
+el paquete de estructura que lleva el zip inicial y la extracción de solo lectura son iguales en
+todos. Cambian el controlador, el privilegio mínimo y, en dos casos, un ajuste.
+
+La imagen publicada instala todos los controladores (`uv sync --extra sources`). Una imagen
+construida sin uno muestra ese tipo en **Nueva fuente** con el motivo en lugar de fallar: añade el
+extra (`bizview[mysql]`, `[mssql]`, `[bigquery]`, `[sheets]`) y reconstruye.
+
+**MySQL / MariaDB** (`PyMySQL`). Un usuario de solo lectura y nada más:
+
+```sql
+CREATE USER 'bizview'@'%' IDENTIFIED BY '<contraseña>';
+GRANT SELECT ON erp.* TO 'bizview'@'%';
+-- la tarjeta de veredicto revisa los permisos: avisa si el usuario puede escribir
+```
+
+Puerto 3306 por defecto; TLS `require` (o `verify-full` con la CA del servidor pegada). La sesión se
+abre `READ ONLY` y con `MAX_EXECUTION_TIME`, así que una consulta desbocada no puede escribir ni
+colgar al worker. En Linux los nombres de tabla distinguen mayúsculas: escríbelos como los muestra
+el catálogo.
+
+**SQL Server** (`pymssql`, sin gestor ODBC en la imagen). Un inicio de sesión solo con
+`db_datareader`:
+
+```sql
+CREATE LOGIN bizview WITH PASSWORD = '<contraseña>';
+USE erp; CREATE USER bizview FOR LOGIN bizview;
+ALTER ROLE db_datareader ADD MEMBER bizview;
+```
+
+Puerto 1433; `encrypt=yes` por defecto (una conexión `optional` se rechaza con el perfil de
+seguridad `internet`). SQL Server no tiene un modo de solo lectura por sesión, así que las lecturas
+se garantizan rechazando toda sentencia que no sea una lectura, y la tarjeta de veredicto ejecuta
+`IS_MEMBER('db_datawriter')` y avisa si el inicio de sesión puede escribir. No se admite
+autenticación de Azure AD: usa un inicio de sesión SQL.
+
+**SQLite** (biblioteca estándar, no hay controlador que instalar). Deja la exportación del cliente
+en una carpeta montada en el contenedor y apunta `SOURCES_FILES_DIR` a ella:
+
+```env
+SOURCES_FILES_DIR=/data/sources
+```
+
+```yaml
+# docker-compose.yml, servicio backend
+volumes:
+  - /srv/bizview-fuentes:/data/sources:ro
+```
+
+El formulario lista solo los archivos de esa carpeta (`.sqlite`, `.sqlite3`, `.db`, `.db3`, hasta
+4 GB) y la ruta se vuelve a comprobar al guardar la fuente: un `..`, un enlace simbólico que salga
+de la carpeta o la base de datos del propio producto no se pueden guardar. El archivo se abre
+`mode=ro`, nunca se crea ni se migra. Sin `SOURCES_FILES_DIR` el tipo no se ofrece.
+
+**Google BigQuery** (`google-cloud-bigquery`). Crea una cuenta de servicio con **BigQuery Data
+Viewer** y **BigQuery Job User** en el proyecto, descarga su clave JSON y pégala en el formulario:
+se guarda cifrada y no se vuelve a mostrar. Indica el proyecto, la ubicación, los conjuntos de datos
+que BizView puede ver y el **Máximo de bytes facturados por consulta** (1 GB por defecto). Cada
+consulta se ejecuta primero en seco: la que leería más que el tope no se ejecuta y el run dice
+cuánto habría leído. Una cuenta de servicio con rol de escritura se muestra con un aviso.
+
+**Google Sheets** (`google-api-python-client`). Pega el enlace de la hoja y el mismo tipo de cuenta
+de servicio, y **comparte la hoja** con la dirección que muestra el formulario (el `client_email` de
+la cuenta; basta con permiso de lectura). Cada pestaña es una tabla; la primera fila es el
+encabezado; los tipos se infieren al leer la estructura y se declaran en la integración, así que una
+celda cambiada nunca cambia el tipo de una columna. `materialize: daily` es la programación
+recomendada: una hoja es una fuente pequeña, y la cuota de lectura de Google se responde con una
+pausa ámbar cuando se agota.
+
 ## 6. Proyectos
 
 Las integraciones (ETL) y los reportes son **specs**, y viven en **proyectos BI**: una carpeta por

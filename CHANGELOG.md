@@ -8,6 +8,27 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Five more kinds of data source (feature 061)**. A customer's ERP on MySQL or SQL Server, a
+  desktop system exported to a `.sqlite` file, a consultant's data in BigQuery and a business's
+  prices in a Google Sheet could not be read until now. Each of the five behaves exactly like a
+  PostgreSQL source for the user — **Probar conexión** with its verdict card, **Ver estructura**, the
+  structure pack the starter zip carries and a read-only extraction — and each brings its own
+  read-only guarantee: a `READ ONLY` MySQL session, `db_datareader` checked with
+  `IS_MEMBER('db_datawriter')` in SQL Server, `mode=ro` for SQLite, the BigQuery role list, and the
+  statement rule for everyone. A full origin (MySQL 1040, SQL Server 17809, Google's quota, a locked
+  SQLite file) is 060's amber pause, not a defect. The kind is now declared **once**, in
+  `app/sources/connectors/registry.py`: the connection test, the structure reader, the extractor, the
+  BI-ready check, the sample requests, the AI structure prompt, the worker and the CLI all read it,
+  so the next engine (Oracle, `062`) is one module and one row.
+- **A cost ceiling for BigQuery**: every query is dry-run first and refused before it runs when the
+  estimate exceeds **Máximo de bytes facturados por consulta** (1 GB by default), so a wrong query
+  costs nothing.
+- **`SOURCES_FILES_DIR`**, the only folder a SQLite source may read from; when it is unset the kind
+  is not offered at all, and a path outside it (a `..`, a symlink escaping it, the product's own
+  database) cannot be saved.
+- **`docs/INSTALL.md` and its Spanish pair gain one section per kind**: the minimum privilege, the
+  exact `GRANT`/`CREATE LOGIN` to paste, TLS, and the mounted folder for SQLite — plus a help topic
+  «MySQL, SQL Server, SQLite, BigQuery y Google Sheets» in both languages.
 - **A dashboard can be mailed to any list of addresses (feature 058)**. "Enviar por correo" reached
   installation users, and outside them only addresses inside `EMAIL_ALLOWED_DOMAINS`, twenty at a
   time, typed one by one; scheduled deliveries addressed roles. A send now takes three kinds of
@@ -172,7 +193,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
-- **The navigation tells you where you are and how to get back (feature 061)**. The four counters on
+- **The navigation tells you where you are and how to get back**. The four counters on
   Inicio were dead numbers; each one is now a link to the menu option it counts (Tableros, Usuarios,
   Fuentes de datos, Integraciones). "Mis listas" left the sidebar — lists live in **Administración →
   Listas de correo**, which now carries the same **Volver** and breadcrumb as every other page — and

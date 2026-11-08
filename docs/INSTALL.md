@@ -368,6 +368,73 @@ it never guarantees. If the message names BizView's own host instead of the orig
 database ran out of connections: raise `DB_POOL_SIZE` / `DB_POOL_OVERFLOW` and read
 `docker compose logs backend`.
 
+### MySQL, MariaDB, SQL Server, SQLite, BigQuery and Google Sheets
+
+The five kinds below behave like PostgreSQL: **Probar conexión**, **Ver estructura**, the structure
+pack the starter zip carries and the read-only extraction are the same for all of them. What changes
+is the driver, the minimum privilege and, in two cases, one setting.
+
+The published image installs every driver (`uv sync --extra sources`). An image built without one
+shows that kind in **Nueva fuente** with the reason instead of failing: add the extra
+(`bizview[mysql]`, `[mssql]`, `[bigquery]`, `[sheets]`) and rebuild.
+
+**MySQL / MariaDB** (`PyMySQL`). A read-only user with nothing else:
+
+```sql
+CREATE USER 'bizview'@'%' IDENTIFIED BY '<password>';
+GRANT SELECT ON erp.* TO 'bizview'@'%';
+-- the verdict card also checks the grants: it warns when the user can write
+```
+
+Port 3306 by default; TLS `require` (or `verify-full` with the server's CA pasted). The session is
+opened `READ ONLY` and with `MAX_EXECUTION_TIME`, so a runaway query cannot write and cannot hang
+the worker. On Linux table names are case-sensitive: write them as the catalogue shows them.
+
+**SQL Server** (`pymssql`, no ODBC manager in the image). A login with `db_datareader` only:
+
+```sql
+CREATE LOGIN bizview WITH PASSWORD = '<password>';
+USE erp; CREATE USER bizview FOR LOGIN bizview;
+ALTER ROLE db_datareader ADD MEMBER bizview;
+```
+
+Port 1433; `encrypt=yes` by default (an `optional` connection is refused under the `internet`
+security profile). SQL Server has no session-wide read-only switch, so reads are enforced by
+refusing any statement that is not a read, and the verdict card runs `IS_MEMBER('db_datawriter')`
+and warns when the login can write. Azure AD authentication is not supported; use a SQL login.
+
+**SQLite** (standard library, no driver to install). Drop the customer's export in a folder mounted
+into the container and point `SOURCES_FILES_DIR` at it:
+
+```env
+SOURCES_FILES_DIR=/data/sources
+```
+
+```yaml
+# docker-compose.yml, backend service
+volumes:
+  - /srv/bizview-sources:/data/sources:ro
+```
+
+The form lists only the files inside that folder (`.sqlite`, `.sqlite3`, `.db`, `.db3`, up to 4 GB)
+and the path is checked again when the source is saved: a `..`, a symlink escaping the folder or
+the product's own database cannot be stored. The file is opened `mode=ro`, never created, never
+migrated. Without `SOURCES_FILES_DIR` the kind is not offered at all.
+
+**Google BigQuery** (`google-cloud-bigquery`). Create a service account with
+**BigQuery Data Viewer** and **BigQuery Job User** on the project, download its JSON key and paste
+it in the form; it is stored encrypted and never shown again. Set the project, the location, the
+datasets BizView may see and **Máximo de bytes facturados por consulta** (1 GB by default). Every
+query is dry-run first: one that would scan more than the ceiling does not run and the run says how
+much it would have read. A service account with a writing role is shown with a warning.
+
+**Google Sheets** (`google-api-python-client`). Paste the spreadsheet link and the same kind of
+service account JSON, then **share the sheet** with the address the form shows (the service
+account's `client_email`; read-only access is enough). One worksheet is one table; the first row is
+the header; types are inferred when the structure is read and declared in the integration, so a
+changed cell never changes a column's type. `materialize: daily` is the recommended schedule: a
+sheet is a small source, and Google's read quota is answered with an amber pause when it is hit.
+
 ## 6. Projects
 
 Integrations (ETL) and reports are **specs**, and they live in **BI projects**: one folder per
