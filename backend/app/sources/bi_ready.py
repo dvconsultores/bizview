@@ -248,6 +248,6 @@ def service_ok(src: Any, app: Any) -> tuple[bool, str]:
 
     def describe(source: Any, write_probe: bool = False) -> dict:
         return describer.describe("postgresql", source.settings, service.secrets_of(source), app,
-                                  write_probe=write_probe)
+                                  write_probe=write_probe, name=source.name)
 
     return prove_read_only(src, describe, app)

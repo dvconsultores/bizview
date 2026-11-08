@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useState } from "react";
+import { Link } from "react-router";
 import { api, ApiError } from "../../api/client";
 import type { Integration, IntegrationControl, IntegrationControlUpdate, IntegrationRun } from "../../api/types";
 import { Alert } from "../../components/Alert";
@@ -41,18 +42,30 @@ import {
   type PresetId,
 } from "../../lib/schedule";
 
+/** `45 s` / `7 min`: the same words the stored message uses, from the run's own record. */
+export function waitWords(seconds: number): string {
+  return seconds < 60 ? `${Math.round(seconds)} s` : `${Math.round(seconds / 60)} min`;
+}
+
 export function RunStatus({ run }: { run: IntegrationRun | null }) {
   const t = useT();
   if (!run) return <Badge tone="gray" icon={<Clock className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.page.noRunsBadge}</Badge>;
   if (run.status === "succeeded") return <Badge tone="green" icon={<CheckCircle2 className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runBadge.ok}</Badge>;
   if (run.status === "failed") return <Badge tone="red" icon={<XCircle className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runBadge.failed}</Badge>;
   if (run.status === "skipped") return <Badge tone="amber" icon={<AlertTriangle className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runBadge.skipped}</Badge>;
+  // Feature 060: the origin was full — amber, never red, and never a defect of ours.
+  if (run.status === "skipped_busy") return <Badge tone="amber" icon={<AlertTriangle className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runBadge.busy}</Badge>;
   if (run.status === "stopped") return <Badge tone="gray" icon={<Square className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runStopped}</Badge>;
   return <Badge tone="blue" icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}>{t.integrations.runBadge.running}</Badge>;
 }
 
 function Runs({ id }: { id: string }) {
   const t = useT();
+  const busyLine = (run: IntegrationRun): string | null => {
+    const busy = run.busy ?? {};
+    if (!busy.attempts || busy.attempts < 1) return null;
+    return t.integrations.busy.attempts(busy.attempts, waitWords(busy.waited_s ?? 0));
+  };
   const [runs, setRuns] = useState<IntegrationRun[] | null>(null);
   useEffect(() => {
     api
@@ -78,7 +91,20 @@ function Runs({ id }: { id: string }) {
               .join(" · ") || "—"}
           </p>
           {rollupSummary(r.rollups) ? <p className="mt-1 text-ink-3 [overflow-wrap:anywhere]">{rollupSummary(r.rollups)}</p> : null}
-          {r.message ? <p className="mt-1 text-danger-strong [overflow-wrap:anywhere]">{r.message}</p> : null}
+          {busyLine(r) ? (
+            <p className="mt-1 text-warning-deep" data-testid="run-busy">
+              {busyLine(r)}{" "}
+              <Link to="/ayuda?tema=la-fuente-no-admite-mas-conexiones" className="font-semibold underline">
+                {t.integrations.busy.whatToDo}
+              </Link>
+            </p>
+          ) : null}
+          {r.message && r.status !== "skipped_busy" ? (
+            <p className="mt-1 text-danger-strong [overflow-wrap:anywhere]">{r.message}</p>
+          ) : null}
+          {r.status === "skipped_busy" && r.message ? (
+            <p className="mt-1 text-ink-3 [overflow-wrap:anywhere]">{r.message}</p>
+          ) : null}
           {r.checks
             .filter((c) => !c.ok)
             .map((c, i) => (
@@ -663,6 +689,24 @@ export function Integrations() {
                     </div>
                   </dl>
 
+                  {/* Feature 060: the lane of the source, and when the origin has been full. */}
+                  {it.busy && it.busy.ceiling ? (
+                    <p className="mt-3 text-sm text-ink-muted" data-testid="source-ceiling">
+                      {t.integrations.busy.ceiling(it.busy.ceiling)}
+                    </p>
+                  ) : null}
+                  {it.busy && it.busy.busy_today >= 3 ? (
+                    <p className="mt-1 flex items-start gap-2 text-sm text-warning-deep" data-testid="busy-hint">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                      <span>
+                        {t.integrations.busy.busyToday(it.busy.busy_today)}
+                        {it.busy.quiet_hour !== null && it.busy.quiet_hour !== undefined
+                          ? ` ${t.integrations.busy.quietHour(it.busy.quiet_hour)}`
+                          : ""}
+                      </span>
+                    </p>
+                  ) : null}
+
                   {fullOutside !== null ? (
                     <p className="mt-3 flex items-start gap-2 text-sm text-warning-deep">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -670,7 +714,7 @@ export function Integrations() {
                     </p>
                   ) : null}
 
-                  {it.last_run?.message ? (
+                  {it.last_run?.message && it.last_run.status !== "skipped_busy" ? (
                     <p className="mt-3 text-sm text-danger-strong [overflow-wrap:anywhere]">
                       {it.last_run.message}
                     </p>

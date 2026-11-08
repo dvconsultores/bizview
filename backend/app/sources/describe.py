@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.config import Settings
+from app.engine import source_slots
 from app.engine.extract import ExtractError, _pg_connect, same_origin
 from app.i18n import t
 from app.security import profile
@@ -17,13 +18,27 @@ from app.sources.connectors import rest, soap
 from app.sources.connectors.base import temp_pem
 
 MAX_TABLES, MAX_COLUMNS, MAX_OPERATIONS, MAX_DEPTH = 500, 200, 200, 6
+
+
+def _slot_key(name: str | None, settings: dict) -> str:
+    """The lane of this source: its catalogue name, the same key a run uses (feature 060)."""
+    return str(name or settings.get("host") or "describe").lower()
+
+
+class _PermitSource:
+    """The two things `source_slots.limit_of` reads, from a settings dict (describe has no row)."""
+
+    def __init__(self, kind: str, settings: dict) -> None:
+        self.kind = kind
+        self.settings = settings
 #: Feature 052: how many date columns per table get a `min`/`max` in the structure pack.
 MAX_DATE_COLUMNS = 3
 DATE_TYPES = {"date", "timestamp without time zone", "timestamp with time zone"}
 
 
 def postgresql(settings: dict, secrets: dict, app: Settings,
-               write_probe: bool = False, date_ranges: bool = False) -> dict:
+               write_probe: bool = False, date_ranges: bool = False,
+               name: str | None = None) -> dict:
     """Structure of a PostgreSQL source; with `write_probe`, whether the credential can write.
 
     The probe (048) attempts one harmless write inside a transaction that is always rolled back: a
@@ -34,7 +49,10 @@ def postgresql(settings: dict, secrets: dict, app: Settings,
     range that cannot be read (permission, timeout, an unaggregatable type) is skipped: a structure
     read never fails because one column could not be summarised.
     """
-    with _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30) as conn:
+    with source_slots.turn(_slot_key(name, settings),
+                           source_slots.limit_of(_PermitSource("postgresql", settings))), \
+            _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30,
+                        integration="describe") as conn:
         tables_query = (
             "SELECT n.nspname, c.relname, c.relkind, greatest(c.reltuples, 0)::bigint "
             "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
@@ -90,7 +108,7 @@ def postgresql(settings: dict, secrets: dict, app: Settings,
                     "foreign_keys": fks.get((schema, table), []), "columns": table_columns})
     report = {"kind": "postgresql", "tables": out, "truncated": len(tables) > MAX_TABLES}
     if write_probe:
-        report["write_allowed"] = _write_probe(settings, secrets, app)
+        report["write_allowed"] = _write_probe(settings, secrets, app, name)
     return report
 
 
@@ -119,9 +137,13 @@ def _date_ranges(conn, tables, cols: dict[tuple, list]) -> dict[tuple, dict[str,
     return out
 
 
-def _write_probe(settings: dict, secrets: dict, app: Settings) -> bool:
+def _write_probe(settings: dict, secrets: dict, app: Settings,
+                 name: str | None = None) -> bool:
     """True when the credential managed to write. The table is never created: always rolled back."""
-    with _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30) as conn:
+    with source_slots.turn(_slot_key(name, settings),
+                           source_slots.limit_of(_PermitSource("postgresql", settings))), \
+            _pg_connect(settings, secrets, app, timezone="UTC", time_limit_s=30,
+                        integration="describe") as conn:
         conn.autocommit = False
         try:
             with conn.cursor() as cur:
@@ -252,11 +274,11 @@ def soap_operations(settings: dict, secrets: dict, app: Settings) -> dict:
 
 def describe(kind: str, settings: dict, secrets: dict, app: Settings,
              path: str | None = None, write_probe: bool = False,
-             date_ranges: bool = False) -> dict:
+             date_ranges: bool = False, name: str | None = None) -> dict:
     try:
         if kind == "postgresql":
             return postgresql(settings, secrets, app, write_probe=write_probe,
-                              date_ranges=date_ranges)
+                              date_ranges=date_ranges, name=name)
         if kind == "rest":
             return rest_shape(settings, secrets, app, path)
         if kind == "soap":

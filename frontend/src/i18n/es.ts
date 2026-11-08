@@ -395,6 +395,10 @@ export const es = {
       latency: (ms: number) => `Respondió en ${ms} ms`,
       details: "Detalles",
       serverVersion: "Versión del servidor",
+      // Feature 060: the origin's own ceiling and how full it is, from the test connection.
+      maxConnections: "Conexiones máximas del origen",
+      clients: "Clientes ahora",
+      noPermission: "Sin permiso para verlo",
       status: "Estado HTTP",
       bytes: "Tamaño leído",
       services: "Servicios y operaciones",
@@ -656,6 +660,7 @@ export const es = {
     integration_resumed: "Integración reanudada",
     integration_schedule_changed: "Programación de integración cambiada",
     integration_run_stopped: "Ejecución de integración detenida",
+    integration_busy: "Fuente sin conexiones libres durante una ejecución",
     appearance_updated: "Paleta de la instalación actualizada",
     theme_uploaded: "Tema agregado",
     theme_replaced: "Tema reemplazado",
@@ -1238,6 +1243,19 @@ export const es = {
       failed: "Falló",
       skipped: "Omitida",
       running: "En curso",
+      busy: "La fuente no admite más conexiones ahora",
+    },
+    // Feature 060: a full origin is a pause the product waits out, so it is explained, not blamed.
+    busy: {
+      attempts: (n: number, wait: string) =>
+        n === 1 ? `1 intento, ${wait}` : `${n} intentos, ${wait}`,
+      whatToDo: "Qué hacer",
+      ceiling: (n: number) =>
+        n === 1 ? "1 conexión simultánea en la fuente" : `${n} conexiones simultáneas en la fuente`,
+      quietHour: (hour: number) =>
+        `El origen estuvo lleno a esta hora: prueba a las ${String(hour).padStart(2, "0")}:00.`,
+      busyToday: (n: number) =>
+        n === 1 ? "1 carga omitida hoy por la fuente" : `${n} cargas omitidas hoy por la fuente`,
     },
   },
   projects: {

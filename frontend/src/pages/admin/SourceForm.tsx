@@ -520,6 +520,9 @@ export function SourceForm() {
           {Object.keys(details).length ? (
             <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
               {details.server_version ? (<div><dt className="text-ink-soft">{T.serverVersion}</dt><dd className="break-words font-medium">{String(details.server_version)}</dd></div>) : null}
+              {details.max_connections != null ? (<div><dt className="text-ink-soft">{T.maxConnections}</dt><dd className="font-medium">{String(details.max_connections)}</dd></div>) : null}
+              {details.clients != null ? (<div><dt className="text-ink-soft">{T.clients}</dt><dd className="font-medium">{String(details.clients)}</dd></div>) : null}
+              {details.clients_visible === false ? (<div><dt className="text-ink-soft">{T.clients}</dt><dd className="font-medium">{T.noPermission}</dd></div>) : null}
               {details.status != null ? (<div><dt className="text-ink-soft">{T.status}</dt><dd className="font-medium">{String(details.status)} {String(details.content_type ?? "")}</dd></div>) : null}
               {details.bytes != null ? (<div><dt className="text-ink-soft">{T.bytes}</dt><dd className="font-medium">{String(details.bytes)} B</dd></div>) : null}
             </dl>

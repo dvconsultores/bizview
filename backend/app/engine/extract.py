@@ -141,6 +141,55 @@ class ExtractTimeout(ExtractError):
     """The origin did not answer in time."""
 
 
+# Feature 060: the origin refused the connection itself because it has no free slot. The SQLSTATEs
+# are the ones PostgreSQL and its poolers answer with; `AUTH_WORDS` above is the precedent for
+# matching the wording too, since a pooler in front may answer before PostgreSQL speaks.
+BUSY_SQLSTATES = frozenset({
+    "53300",   # too_many_connections
+    "53200",   # out_of_memory
+    "57P03",   # cannot_connect_now (starting up, recovering)
+    "08001",   # sqlclient_unable_to_establish_sqlconnection
+    "08006",   # connection_failure
+})
+BUSY_WORDS = (
+    "too many clients", "demasiados clientes", "demasiados clientes conectados",
+    "trop de clients", "zu viele clients", "troppi client", "demasiados clientes ligados",
+    "no more connections allowed", "server_login_retry",
+    "remaining connection slots are reserved",
+)
+#: PostgreSQL's NAMEDATALEN - 1: `application_name` is cut here by the server without an error.
+APP_NAME_MAX = 63
+#: Feature 060: a connect that cannot complete in this long is a failure, not a wait.
+CONNECT_TIMEOUT_S = 10
+IDLE_OPTIONS = ("-c idle_in_transaction_session_timeout=30000 -c idle_session_timeout=60000")
+
+
+class SourceBusy(ExtractError):
+    """The origin has no free connection slot (feature 060): retried inside the run, never red.
+
+    `sqlstate` is the origin's own code when it gave one; `detail` is the first line of its message
+    with no host and no credential.
+    """
+
+    def __init__(self, sqlstate: str | None, detail: str) -> None:
+        self.sqlstate = sqlstate
+        self.detail = detail
+        super().__init__(detail)
+
+
+def busy_of(error: BaseException) -> SourceBusy | None:
+    """`SourceBusy` when the origin refused the connection for lack of slots, else None."""
+    if not isinstance(error, psycopg.Error):
+        return None
+    sqlstate = getattr(error, "sqlstate", None)
+    if sqlstate in BUSY_SQLSTATES:
+        return SourceBusy(sqlstate, _first_line(error))
+    text = str(error).lower()
+    if any(word in text for word in BUSY_WORDS):
+        return SourceBusy(sqlstate, _first_line(error))
+    return None
+
+
 TIMEZONE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_+\-]*(/[A-Za-z0-9_+\-]+){0,2}")
 
 
@@ -186,8 +235,15 @@ def to_psycopg(query: str) -> str:
     return "".join(out).rstrip().rstrip(";")
 
 
+def app_name(integration: str | None) -> str:
+    """`bizview-engine:<id>`: what the origin's `pg_stat_activity` shows to its DBA (feature 060)."""
+    name = f"bizview-engine:{integration}" if integration else "bizview-engine"
+    return name[:APP_NAME_MAX]
+
+
 def _pg_connect(settings: dict, secrets: dict, app: Settings, *, timezone: str,
-                time_limit_s: int, connect_timeout_s: int | None = None) -> psycopg.Connection:
+                time_limit_s: int, connect_timeout_s: int | None = CONNECT_TIMEOUT_S,
+                integration: str | None = None) -> psycopg.Connection:
     check_timezone(timezone)
     if profile.sslmode_problem(settings.get("sslmode") or "require", app):
         raise ExtractError("la fuente requiere TLS en el perfil de seguridad actual")
@@ -196,19 +252,57 @@ def _pg_connect(settings: dict, secrets: dict, app: Settings, *, timezone: str,
         if connect_timeout_s is not None:
             current = int(kwargs.get("connect_timeout") or connect_timeout_s)
             kwargs["connect_timeout"] = max(1, min(current, connect_timeout_s))
-        kwargs["options"] = (f"-c default_transaction_read_only=on "
-                             f"-c statement_timeout={time_limit_s * 1000} -c TimeZone={timezone}")
-        kwargs["application_name"] = "bizview-engine"
-        return psycopg.connect(**kwargs)
+        base = (f"-c default_transaction_read_only=on "
+                f"-c statement_timeout={time_limit_s * 1000} -c TimeZone={timezone}")
+        kwargs["application_name"] = app_name(integration)
+        kwargs["options"] = f"{base} {IDLE_OPTIONS}"
+        try:
+            return psycopg.connect(**kwargs)
+        except psycopg.errors.InvalidParameterValue as e:
+            # A server older than 14 does not know `idle_session_timeout`: the session options are
+            # a courtesy, the read is the job. Same tolerance `BULK_SESSION` already has.
+            if "idle" not in str(e).lower():
+                raise _busy_or_error(e) from None
+            kwargs["options"] = base
+            try:
+                return psycopg.connect(**kwargs)
+            except psycopg.Error as retry_error:
+                raise _busy_or_error(retry_error) from None
+        except psycopg.Error as e:
+            raise _busy_or_error(e) from None
+
+
+@contextmanager
+def _origin(conn: psycopg.Connection | None, settings: dict, secrets: dict, app: Settings, *,
+            timezone: str, time_limit_s: int,
+            integration: str | None = None) -> Iterator[psycopg.Connection]:
+    """The run's connection when it passed one (feat. 060: one session per run), else a new one."""
+    if conn is not None:
+        yield conn
+        return
+    with _pg_connect(settings, secrets, app, timezone=timezone, time_limit_s=time_limit_s,
+                     integration=integration) as opened:
+        yield opened
+
+
+def _busy_or_error(error: Exception) -> ExtractError:
+    """A slot refusal becomes `SourceBusy`; anything else keeps today's `ExtractError`."""
+    busy = busy_of(error)
+    return busy if busy is not None else ExtractError(M("extract.failed", detail=_first_line(error)))
 
 
 def pg_rows(settings: dict, secrets: dict, app: Settings, query: str, params: dict, *,
             timezone: str, time_limit_s: int,
-            cancel: Cancel | None = None) -> Iterator[tuple[list[str], list[tuple]]]:
-    """Stream `(columns, rows)` batches of the extraction query."""
+            cancel: Cancel | None = None, conn: psycopg.Connection | None = None,
+            integration: str | None = None) -> Iterator[tuple[list[str], list[tuple]]]:
+    """Stream `(columns, rows)` batches of the extraction query.
+
+    Feature 060: `conn` is a connection the run already holds and reuses across its datasets;
+    without it one is opened and closed here, as before.
+    """
     q = to_psycopg(query)
-    with _pg_connect(settings, secrets, app, timezone=timezone,
-                     time_limit_s=time_limit_s) as conn, _tracked(cancel, conn), \
+    with _origin(conn, settings, secrets, app, timezone=timezone, time_limit_s=time_limit_s,
+                 integration=integration) as conn, _tracked(cancel, conn), \
             conn.cursor(name="bizview_extract") as cur:
         cur.itersize = BATCH_ROWS
         cur.execute(q, params)
@@ -264,14 +358,16 @@ def pg_copy(settings: dict, secrets: dict, app: Settings, query: str, params: di
             columns: list[str], timezone: str, time_limit_s: int, deadline: float,
             write: Callable[[bytes], None],
             check: Callable[[], None] | None = None,
-            cancel: Cancel | None = None) -> int:
+            cancel: Cancel | None = None,
+            conn: psycopg.Connection | None = None,
+            integration: str | None = None) -> int:
     """Stream `COPY (query) TO STDOUT (FORMAT text)` block by block into `write` (feature 008,
     contracts/engine.md); returns the number of blocks written. No row becomes a Python value.
     `check` is called every block (before copying it) to allow a run to be stopped."""
     q = to_psycopg(query)
     blocks = 0
-    with _pg_connect(settings, secrets, app, timezone=timezone,
-                     time_limit_s=time_limit_s) as conn, _tracked(cancel, conn):
+    with _origin(conn, settings, secrets, app, timezone=timezone, time_limit_s=time_limit_s,
+                 integration=integration) as conn, _tracked(cancel, conn):
         for stmt in BULK_SESSION:          # deterministic text output (research R4)
             try:
                 conn.execute(stmt)
@@ -322,9 +418,10 @@ def pg_copy(settings: dict, secrets: dict, app: Settings, query: str, params: di
 
 def pg_all(settings: dict, secrets: dict, app: Settings, query: str, params: dict, *,
            timezone: str, time_limit_s: int, limit: int = 100_000,
-           cancel: Cancel | None = None) -> tuple[list[str], list]:
-    with _pg_connect(settings, secrets, app, timezone=timezone,
-                     time_limit_s=time_limit_s) as conn, _tracked(cancel, conn):
+           cancel: Cancel | None = None, conn: psycopg.Connection | None = None,
+           integration: str | None = None) -> tuple[list[str], list]:
+    with _origin(conn, settings, secrets, app, timezone=timezone, time_limit_s=time_limit_s,
+                 integration=integration) as conn, _tracked(cancel, conn):
         cur = conn.execute(to_psycopg(query), params)
         rows = cur.fetchmany(limit + 1)
         if len(rows) > limit:

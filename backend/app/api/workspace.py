@@ -18,7 +18,7 @@ from app import errors
 from app.auth.deps import Auth, client_ip, recent_reauth, require_superuser
 from app.config import get_settings
 from app.db import DB
-from app.engine import runner, schedule
+from app.engine import busy, runner, schedule, source_slots
 from app.i18n import M, render_stored
 from app.models import (
     AppUser,
@@ -77,7 +77,9 @@ def run_json(r: IntegrationRun) -> dict:
                         c.get("key"), c.get("params"))} for c in (r.checks or [])],
             "message": render_stored(r.message, r.message_key, r.message_params),
             "stop_requested_at": r.stop_requested_at,
-            "rollups": r.rollups or {}}
+            "rollups": r.rollups or {},
+            # Feature 060: what the origin's slot refusal did to this run ({} for every other run).
+            "busy": r.busy or {}}
 
 
 def _time_str(value: time | None) -> str | None:
@@ -122,6 +124,12 @@ def control_json(definition: dict, control: IntegrationControl | None, tz: str) 
     }
 
 
+def _busy_hint(db: Session, integration_id: str, source: DataSource | None, tz: str) -> dict:
+    """Feature 060: how often the origin was full for this integration, and when it is not."""
+    hint = busy.hint(db, integration_id, tz=tz)
+    return {**hint, "ceiling": source_slots.limit_of(source) if source is not None else 1}
+
+
 @router.get("/integrations")
 def list_integrations(_: AppUser = Depends(require_superuser), db: Session = DB):
     version = service.active_for_reads(db)
@@ -151,6 +159,7 @@ def list_integrations(_: AppUser = Depends(require_superuser), db: Session = DB)
         ctl = control_json(d, controls.get(iid), tz)
         items.append({
             "id": iid, "source": d["source"], "schedule": d["schedule"],
+            "busy": _busy_hint(db, iid, src, tz),
             "datasets": sorted(d["datasets"]), "spec": d.get("spec"),
             "paused": src is None or not src.enabled,
             "last_run": run_json(last) if last else None, "last_success_at": last_ok,

@@ -174,7 +174,8 @@ def describe_source(name: str, request: Request, path: str | None = None,
     audit.record(db, "source_described", actor_id=user.id, ip=client_ip(request),
                  detail={"source": src.name, "key_id": token.id if token else None})
     try:
-        return describer.describe(src.kind, src.settings, secrets, get_settings(), path)
+        return describer.describe(src.kind, src.settings, secrets, get_settings(), path,
+                                  name=src.name)
     except ExtractError as e:
         raise ApiError(502, "source_error", _safe_message(e, secrets)) from None
     except Exception as e:

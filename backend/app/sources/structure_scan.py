@@ -47,7 +47,7 @@ def scan(db: Session, source: DataSource, app: Settings, *, run_samples: bool = 
     secrets = _secrets(source)
     if source.kind == "postgresql":
         structure = describer.describe(source.kind, source.settings, secrets, app,
-                                       date_ranges=True)
+                                       date_ranges=True, name=source.name)
         out["tables"] = structure.get("tables") or []
         out["truncated"] = bool(structure.get("truncated"))
         out["relations"] = _foreign_key_relations(out["tables"])

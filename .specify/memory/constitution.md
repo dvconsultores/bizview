@@ -1,4 +1,23 @@
 <!--
+Sync Impact Report (amendment 2026-11-07, feature 060)
+- Version change: 3.3.0 → 3.3.1 (PATCH: one bullet of principle II made complete. No principle added,
+  removed or redefined.)
+- Modified principles:
+  - II. Backend as ETL, Direct Reads by Exception: the bullet that already says origin reads are
+    read-only and must not harm the origin now also says how: BizView never holds an origin
+    connection slot it does not need. One session per origin at a time, reused across the datasets of
+    a run, closed when the run ends, bounded to a short connect timeout and short idle timeouts, named
+    after the integration it serves, and never more simultaneous sessions on one source than that
+    source declares. A source that refuses the connection because it has no free slot is a pause, not
+    a failure.
+- Added constraints: none.
+- Removed constraints: none.
+- Trigger: owner brief of 2026-11-07 (feature 060) — a production hourly run of `ventas-medicalvet`
+  failed with SQLSTATE 53300 ("too many clients") because the ERP that owns the origin had taken
+  every slot, and the product reported it as a defect of its own.
+- Templates: not modified.
+-->
+<!--
 Sync Impact Report (amendment 2026-11-04, feature 054)
 - Version change: 3.2.3 → 3.3.0 (MINOR: principle V materially expanded — no principle removed or
   redefined incompatibly, so not MAJOR. 054's brief assumed "no constitution change"; the amendment
@@ -378,6 +397,13 @@ without value.
 - Origin connections MUST be defined in the product's data-source catalogue (PostgreSQL, SOAP,
   REST in this version), managed by the super user, with credentials encrypted — never in a
   connection-string setting.
+- A connection slot at the origin is a shared resource the product does not own: BizView MUST NOT
+  hold one it does not need and MUST NOT take more than the source declares. One origin session at a
+  time per run, reused across the datasets of that run, closed when it ends, bounded to a short
+  connect timeout and short idle timeouts, named after the integration it serves, and never more
+  simultaneous sessions on one source than its `max_connections` setting says — the same ceiling for
+  runs, structure scans, `describe` and direct reads. An origin that refuses the connection because
+  it has no free slot is a pause to wait out, never a defect of the product.
 
 Rationale: another system depends on the origin database; the dashboard is a read-only consumer
 and must not put it at risk.
@@ -598,4 +624,4 @@ source code. The license does not grant use of the product name.
   the constitution amended first.
 - Reviews MUST verify compliance with the Constraints and Quality Gates above.
 
-**Version**: 3.3.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-04
+**Version**: 3.3.1 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-11-07

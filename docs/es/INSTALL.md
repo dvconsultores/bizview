@@ -348,6 +348,39 @@ reportes dedicado mantenido por el proceso externo, aplica allí los permisos y 
 `ds_*` fuera de los reportes directos. Pon `DIRECT_BI_ROLE=bizview_direct` en `.env` y reinicia la
 aplicación.
 
+### Orígenes con pocas conexiones
+
+La base de datos de origen es de otro sistema (un ERP, casi siempre), y ese sistema se queda primero
+con su `max_connections`. Cuando no queda ningún cupo, PostgreSQL rechaza la **conexión** de BizView
+—no se ejecuta ninguna consulta ni se lee ninguna fila— y la integración termina en ámbar con **«La
+fuente no admite más conexiones ahora»**, después de esperar y reintentar por su cuenta
+(`SOURCE_CONNECT_RETRIES`, 4 intentos por defecto, `SOURCE_CONNECT_BACKOFF_S`, 15 s por defecto →
+15 s, 45 s, 2 min, 5 min). Los datos y su hora de «Datos actualizados» no cambian; la siguiente
+ejecución programada vuelve a intentarlo.
+
+BizView es deliberadamente pequeño: una sesión por fuente por defecto (dos en Supabase), reutilizada
+entre los datasets de una ejecución, cerrada al terminar, nombrada `bizview-engine:<integración>` en
+el `pg_stat_activity` del origen y limitada a 10 s para conectar, 30 s inactiva dentro de una
+transacción y 60 s inactiva. **Conexiones simultáneas**, en la página de la fuente, sube el techo
+(1–20) cuando el origen puede permitírselo; el techo es por proceso de la instalación, así que con
+varias réplicas de la API cada una tiene el suyo (las ejecuciones sí quedan acotadas con exactitud,
+mediante un bloqueo en la base de datos del producto).
+
+Cuatro remedios, en el orden en que suelen funcionar:
+
+1. **Un pooler** delante del origen (PgBouncer, pooling por transacción). BizView habla PostgreSQL
+   normal, así que no cambia nada por su lado.
+2. **Subir `max_connections`** con el proveedor dueño del origen.
+3. **Leer de una réplica**, apuntando la fuente a ella.
+4. **Mover la programación** a una hora tranquila (la página de la integración sugiere la hora más
+   libre que ha observado), alargar la ventana en lugar de correr cada hora, o `materialize: daily`
+   en los reportes que no necesitan una cifra viva.
+
+`ALTER ROLE bizview CONNECTION LIMIT 2` **no** reserva cupos: un límite de conexiones solo acota,
+nunca garantiza. Si el mensaje nombra el host de BizView en lugar del del origen, lo que se agotó fue
+la base de datos del producto: sube `DB_POOL_SIZE` / `DB_POOL_OVERFLOW` y revisa
+`docker compose logs backend`.
+
 ## 6. Proyectos
 
 Las integraciones (ETL) y los reportes son **specs**, y viven en **proyectos BI**: una carpeta por

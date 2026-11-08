@@ -46,6 +46,8 @@ AUDIT_KINDS = (
     # feature 013
     "integration_paused", "integration_resumed", "integration_schedule_changed",
     "integration_run_stopped",
+    # 060: one event per streak of busy runs, written when the operators were told.
+    "integration_busy",
     # feature 018
     "share_link_created", "share_link_revoked", "sharing_toggled",
     "email_settings_updated", "email_test_sent", "email_sent",
@@ -105,7 +107,9 @@ AUDIT_KINDS_ALLOWED: tuple[str, ...] = AUDIT_KINDS + HISTORICAL_AUDIT_KINDS
 DIRECT_OUTCOMES = ("ok", "timeout", "unreachable", "busy", "structure_changed", "not_allowed",
                    "product_table", "error")
 RUN_KINDS = ("incremental", "full", "manual_incremental", "manual_full")
-RUN_STATUSES = ("running", "succeeded", "failed", "skipped", "stopped")
+#: Feature 060: `skipped_busy` is the origin having no free connection slot after every retry — a
+#: pause the product waits out, not a defect, and the only "failure" that is shown amber.
+RUN_STATUSES = ("running", "succeeded", "failed", "skipped", "stopped", "skipped_busy")
 VERSION_STATES = ("active", "previous", "archived")
 SOURCE_KINDS = ("postgresql", "soap", "rest", "supabase")
 DASHBOARD_STATUSES = ("available", "coming_soon", "hidden")
@@ -438,6 +442,9 @@ class IntegrationRun(Base):
     rows: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     checks: Mapped[list] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     rollups: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Feature 060: the origin's slot refusal — `{sqlstate, attempts, waited_s, detail}`; `{}` when
+    # the run never saw one.
+    busy: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     message: Mapped[str | None] = mapped_column(Text)
     message_key: Mapped[str | None] = mapped_column(Text)
     message_params: Mapped[dict | None] = mapped_column(JSONB)

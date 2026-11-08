@@ -25,7 +25,7 @@ import queue
 import threading
 import time
 from collections.abc import Callable
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, closing, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from app.ai import redact
 from app.config import Settings, get_settings
 from app.db import get_engine, get_sessionmaker, lock_key
-from app.engine import datasets, extract, rollup, transform
+from app.engine import busy, datasets, extract, rollup, source_slots, transform
 from app.engine.extract import ExtractError
 from app.i18n import M, t, to_stored
 from app.images import cache as images_cache
@@ -123,7 +123,9 @@ def _copy_bulk(pg: psycopg.Connection, staging: str, columns: list[str], *,
                source: DataSource, secrets: dict, app: Settings, query: str, params: dict,
                tz: str, time_left: int, deadline: float,
                check: Callable[[], None],
-               cancel: extract.Cancel | None = None) -> int:
+               cancel: extract.Cancel | None = None,
+               origin: psycopg.Connection | None = None,
+               integration: str | None = None) -> int:
     """Feature 008: pipe the origin's COPY output into the typed staging table; returns rows.
     The destination COPY opens on the first block, so a refusal before any data leaves the
     runner's transaction usable for the fallback."""
@@ -144,7 +146,8 @@ def _copy_bulk(pg: psycopg.Connection, staging: str, columns: list[str], *,
 
             extract.pg_copy(source.settings, secrets, app, query, params, columns=columns,
                             timezone=tz, time_limit_s=time_left, deadline=deadline,
-                            write=write, check=check, cancel=cancel)
+                            write=write, check=check, cancel=cancel,
+                            conn=origin, integration=integration)
     except psycopg.errors.DataError as e:   # raised on write or when the COPY ends
         raise ExtractError(M("run.contract", detail=_first_line(e))) from None
     return cur.rowcount if opened else 0
@@ -153,12 +156,15 @@ def _copy_bulk(pg: psycopg.Connection, staging: str, columns: list[str], *,
 def _extract_rows(pg: psycopg.Connection, plan: Plan, staging: str, *, source: DataSource,
                   secrets: dict, app: Settings, query: str, params: dict, deadline: float,
                   tz: str, check: Callable[[], None],
-                  cancel: extract.Cancel | None = None) -> None:
+                  cancel: extract.Cancel | None = None,
+                  origin: psycopg.Connection | None = None,
+                  integration: str | None = None) -> None:
     """Row path (feature 005): fallback for origins that refuse COPY (query) TO STDOUT."""
     columns = list(plan.ds["columns"])
     time_left = max(1, int(deadline - time.monotonic()))
     for got, rows in extract.pg_rows(source.settings, secrets, app, query, params,
-                                     timezone=tz, time_limit_s=time_left, cancel=cancel):
+                                     timezone=tz, time_limit_s=time_left, cancel=cancel,
+                                     conn=origin, integration=integration):
         mismatch = extract.columns_mismatch(got, columns)
         if mismatch:
             raise mismatch
@@ -174,7 +180,8 @@ def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: d
              files: dict, source: DataSource, secrets: dict, app: Settings, deadline: float,
              tz: str, check: Callable[[], None],
              cancel: extract.Cancel | None = None,
-             spill_label: str | None = None) -> None:
+             spill_label: str | None = None,
+             origin: psycopg.Connection | None = None) -> None:
     ds, columns = plan.ds, list(plan.ds["columns"])
     params = {"window_start": plan.start, "window_end": plan.end}
     time_left = max(1, int(deadline - time.monotonic()))
@@ -183,7 +190,8 @@ def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: d
         _extract_transformed(pg, plan, staging, compiled, files=files, source=source,
                              secrets=secrets, app=app, params=params, time_left=time_left,
                              deadline=deadline, tz=tz, check=check, cancel=cancel,
-                             spill_label=spill_label)
+                             spill_label=spill_label, origin=origin,
+                             integration=integration["id"])
         return
     ext = ds["extract"]
     if "query" in ext:
@@ -195,13 +203,14 @@ def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: d
             plan.extracted = _copy_bulk(pg, staging, columns, source=source, secrets=secrets,
                                         app=app, query=query, params=params, tz=tz,
                                         time_left=time_left, deadline=deadline, check=check,
-                                        cancel=cancel)
+                                        cancel=cancel, origin=origin,
+                                        integration=integration["id"])
         except extract.BulkUnsupported as e:
             plan.path, plan.fallback = "rows", e.reason
             log.info("%s: extracción por filas (%s)", plan.name, e.reason)
             _extract_rows(pg, plan, staging, source=source, secrets=secrets, app=app,
                           query=query, params=params, deadline=deadline, tz=tz, check=check,
-                          cancel=cancel)
+                          cancel=cancel, origin=origin, integration=integration["id"])
     else:
         request = yaml.safe_load(files[ext["request"]])
         fn = {"rest": extract.rest_rows, "soap": extract.soap_rows,
@@ -281,7 +290,9 @@ def _extract_transformed(pg: psycopg.Connection, plan: Plan, staging: str,
                          params: dict, time_left: int, deadline: float,
                          tz: str, check: Callable[[], None],
                          cancel: extract.Cancel | None = None,
-                         spill_label: str | None = None) -> None:
+                         spill_label: str | None = None,
+                         origin: psycopg.Connection | None = None,
+                         integration: str | None = None) -> None:
     ds = plan.ds
     columns = list(ds["columns"])
     plan.path = "rows+polars"
@@ -316,7 +327,7 @@ def _extract_transformed(pg: psycopg.Connection, plan: Plan, staging: str,
                             columns=compiled.input_columns, timezone=tz,
                             time_limit_s=time_left,
                             deadline=deadline, write=splitter.write, check=check,
-                            cancel=cancel,
+                            cancel=cancel, conn=origin, integration=integration,
                         )
                     except extract.BulkUnsupported as e:
                         plan.path, plan.fallback = "rows+polars", e.reason
@@ -332,6 +343,7 @@ def _extract_transformed(pg: psycopg.Connection, plan: Plan, staging: str,
                         for got, rows in extract.pg_rows(
                             source.settings, secrets, app, query, params,
                             timezone=tz, time_limit_s=time_left, cancel=cancel,
+                            conn=origin, integration=integration,
                         ):
                             mismatch = extract.columns_mismatch(got, compiled.input_columns)
                             if mismatch:
@@ -383,7 +395,9 @@ def _check(plan: Plan, kind: str, ok: bool, detail: "M | str") -> None:
 def _run_checks(pg: psycopg.Connection, plan: Plan, staging: str, *, files: dict,
                 source: DataSource, secrets: dict, app: Settings, tz: str,
                 deadline: float, stop_check: Callable[[], None],
-                cancel: extract.Cancel | None = None) -> None:
+                cancel: extract.Cancel | None = None,
+                origin: psycopg.Connection | None = None,
+                integration: str | None = None) -> None:
     ds = plan.ds
     for col, c in ds["columns"].items():
         ident = sql.Identifier(col)
@@ -427,12 +441,15 @@ def _run_checks(pg: psycopg.Connection, plan: Plan, staging: str, *, files: dict
         elif check["type"] == "reconcile":
             stop_check()
             _reconcile(pg, plan, staging, check, files=files, source=source, secrets=secrets,
-                       app=app, tz=tz, deadline=deadline, cancel=cancel)
+                       app=app, tz=tz, deadline=deadline, cancel=cancel, origin=origin,
+                       integration=integration)
 
 
 def _reconcile(pg: psycopg.Connection, plan: Plan, staging: str, check: dict, *, files: dict,
                source: DataSource, secrets: dict, app: Settings, tz: str,
-               deadline: float, cancel: extract.Cancel | None = None) -> None:
+               deadline: float, cancel: extract.Cancel | None = None,
+               origin: psycopg.Connection | None = None,
+               integration: str | None = None) -> None:
     """Origin totals (the check's query) vs the extracted rows, grouped by the first column."""
     if source.kind != "postgresql":
         _check(plan, "reconcile", False, M("run.check.reconcile_needs_postgres"))
@@ -443,7 +460,7 @@ def _reconcile(pg: psycopg.Connection, plan: Plan, staging: str, check: dict, *,
     cols, rows = extract.pg_all(source.settings, secrets, app, files[check["query"]], params,
                                 timezone=tz,
                                 time_limit_s=max(1, int(deadline - time.monotonic())),
-                                cancel=cancel)
+                                cancel=cancel, conn=origin, integration=integration)
     if any(c not in cols for c in check["compare"]):
         _check(plan, "reconcile", False, M("run.check.reconcile_columns",
                                                    columns=", ".join(check['compare'])))
@@ -528,6 +545,63 @@ def _redactor(secrets: dict) -> Callable[[str], str]:
                 text = redact(text, value, limit=10_000)
         return redact(text, None, limit=500)
     return redact_text
+
+
+def _origin_retries(app: Settings) -> tuple[int, float]:
+    return max(1, int(app.source_connect_retries)), float(app.source_connect_backoff_s)
+
+
+def _open_origin(source: DataSource, secrets: dict, app: Settings, *, integration_id: str,
+                 tz: str, deadline: float, check: Callable[[], None],
+                 wait: Callable[..., bool] = busy.wait) -> tuple[psycopg.Connection, dict]:
+    """The run's one origin connection, retried while the origin has no free slot (feature 060).
+
+    The delays come from `busy.delays`; `check` (the run's stop flag) and `deadline` cut a wait short.
+    Returns the connection and the retry record (`{}` when the first attempt worked); raises
+    `OriginBusy` with the record of what happened when every attempt was refused.
+    """
+    attempts, base = _origin_retries(app)
+    delays = busy.delays(attempts, base)
+    waited = 0.0
+    last: extract.SourceBusy | None = None
+    for attempt in range(1, attempts + 1):
+        if attempt > 1:
+            pause = delays[attempt - 2]
+            if not wait(pause, check=check, deadline=deadline):
+                raise OriginBusy(_busy_record(last, attempt - 1, waited))
+            waited += pause
+        try:
+            conn = extract._pg_connect(source.settings, secrets, app, timezone=tz,
+                                       time_limit_s=max(1, int(deadline - time.monotonic())),
+                                       integration=integration_id)
+            return conn, _busy_record(last, attempt, waited) if last is not None else {}
+        except extract.SourceBusy as e:
+            last = e
+            log.info("%s: the origin has no free slot (attempt %s/%s, %s)",
+                     integration_id, attempt, attempts, e.sqlstate or "sin SQLSTATE")
+    raise OriginBusy(_busy_record(last, attempts, waited))
+
+
+def wait_words(seconds: float) -> str:
+    """`45 s` / `7 min`: the only part of the message that is not a catalogue entry."""
+    if seconds < 60:
+        return f"{int(round(seconds))} s"
+    return f"{int(round(seconds / 60))} min"
+
+
+def _busy_record(error: extract.SourceBusy | None, attempts: int, waited: float) -> dict:
+    detail = (error.detail if error is not None else "") or ""
+    return {"sqlstate": error.sqlstate if error is not None else None,
+            "attempts": attempts, "waited_s": int(round(waited)),
+            "detail": detail[:300]}
+
+
+class OriginBusy(Exception):
+    """Every retry against a full origin failed (feature 060): the run ends `skipped_busy`."""
+
+    def __init__(self, record: dict) -> None:
+        super().__init__(str(record.get("detail") or ""))
+        self.record = record
 
 
 class RunStopped(Exception):
@@ -635,8 +709,11 @@ def _rows_entry(p: Plan) -> dict:
 
 def _finish(db: Session, run: IntegrationRun, status: str,
             message: "M | str | None", plans: list[Plan],
-            redact: Callable[[str], str] | None = None) -> None:
+            redact: Callable[[str], str] | None = None,
+            busy_record: dict | None = None) -> None:
     run.status, run.finished_at = status, datetime.now(UTC)
+    if busy_record:
+        run.busy = busy_record
     run.message, run.message_key, run.message_params = to_stored(message, redact)
     run.rows = {p.name: _rows_entry(p) for p in plans}
     run.checks = [c for p in plans for c in p.checks]
@@ -689,7 +766,7 @@ def run_integration(integration: dict, files: dict[str, str], *, version_id: int
             db.add(run)
             db.commit()
             return _run(db, run, integration, files, app=app, tz=tz, tz_name=tz_name,
-                        now=now, deadline=deadline, kind=kind)
+                        now=now, deadline=deadline, kind=kind, lock_pg=pg_lock)
         finally:
             pg_lock.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
                             (_lock_key(iid),))
@@ -698,7 +775,7 @@ def run_integration(integration: dict, files: dict[str, str], *, version_id: int
 
 def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, app: Settings,
          tz: ZoneInfo, tz_name: str, now: datetime, deadline: float,
-         kind: str) -> IntegrationRun:
+         kind: str, lock_pg: psycopg.Connection | None = None) -> IntegrationRun:
     iid = integration["id"]
     source = db.scalar(select(DataSource).where(
         DataSource.name.ilike(integration["source"].strip())))
@@ -722,11 +799,29 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
             cap = rollup.new_capture(iid, rollup.active_definitions(db, run.version_id, iid))
         except Exception as e:      # a broken definition must never break the run itself
             log.warning("rollup definitions of %s unavailable: %s", iid, type(e).__name__)
-        with get_engine().connect() as conn:
+        # The ceiling of this source (feature 060): while another run, describe or direct read owns
+        # the lane, the run says so instead of looking stuck.
+        if not source_slots.free(source.name.lower(), source_slots.limit_of(source)):
+            set_message(run, M("run.busy_waiting"))
+            db.commit()
+        with get_engine().connect() as conn, source_slots.turn(
+                source.name.lower(), source_slots.limit_of(source), deadline=deadline,
+                check=stop, pg=lock_pg), ExitStack() as origin_stack:
             pg = conn.connection.driver_connection
             try:
                 with _watchdog(stop, cancel), cancel.track(pg):
                     pg.execute(sql.SQL("SET LOCAL TimeZone = {}").format(sql.Literal(tz_name)))
+                    # Feature 060: one origin session for the whole run, reused across its datasets,
+                    # opened with the busy retry; other kinds read over HTTP and hold none.
+                    origin = None
+                    if source.kind == "postgresql":
+                        origin, retries = _open_origin(source, secrets, app, integration_id=iid,
+                                                       tz=tz_name, deadline=deadline, check=stop)
+                        if retries:      # a slow hour stays explained on a successful run too
+                            run.busy = retries
+                            db.commit()
+                        origin_stack.enter_context(closing(origin))
+                        origin_stack.enter_context(cancel.track(origin))
                     for name, ds in integration["datasets"].items():
                         stop()
                         state = datasets.ensure_table(pg, iid, name, ds)
@@ -739,11 +834,12 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
                         _extract(pg, plan, staging, integration=integration, files=files,
                                  source=source, secrets=secrets, app=app, deadline=deadline,
                                  tz=tz_name, check=stop, cancel=cancel,
-                                 spill_label=str(run.id))
+                                 spill_label=str(run.id), origin=origin)
                         stop()
                         _run_checks(pg, plan, staging, files=files, source=source,
                                     secrets=secrets, app=app, tz=tz_name, deadline=deadline,
-                                    stop_check=stop, cancel=cancel)
+                                    stop_check=stop, cancel=cancel, origin=origin,
+                                    integration=iid)
                     failed = [c for p in plans for c in p.checks if not c["ok"]]
                     if failed:
                         pg.rollback()
@@ -768,6 +864,27 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
             except BaseException:
                 pg.rollback()
                 raise
+    except OriginBusy as e:
+        log.info("integration %s run %s: the origin has no free slot (%s attempts)",
+                 iid, run.id, e.record.get("attempts"))
+        db.rollback()
+        _finish(db, run, "skipped_busy",
+                M("run.busy", attempts=e.record["attempts"],
+                  wait=wait_words(e.record["waited_s"]),
+                  detail=e.record.get("detail") or ""), plans,
+                redact=_redactor(secrets), busy_record=e.record)
+        busy.notify_if_due(db, run, iid)
+        return run
+    except extract.SourceBusy as e:
+        # A busy origin outside the PostgreSQL session path: same meaning, same state.
+        log.info("integration %s run %s: the origin has no free slot", iid, run.id)
+        db.rollback()
+        record = _busy_record(e, 1, 0.0)
+        _finish(db, run, "skipped_busy",
+                M("run.busy", attempts=1, wait=wait_words(0), detail=record["detail"] or ""),
+                plans, redact=_redactor(secrets), busy_record=record)
+        busy.notify_if_due(db, run, iid)
+        return run
     except RunStopped as e:
         log.info("integration %s run %s stopped", iid, run.id)
         db.rollback()

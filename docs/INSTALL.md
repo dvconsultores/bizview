@@ -337,6 +337,37 @@ such a recreation. For a stable setup, create a dedicated reporting schema maint
 the external process, apply the grants there, and keep `ds_*` schemas out of direct
 reports. Set `DIRECT_BI_ROLE=bizview_direct` in `.env` and restart the application.
 
+### Origins with few connection slots
+
+An origin database belongs to another system (an ERP, usually), and that system takes its
+`max_connections` first. When it has no slot left, PostgreSQL refuses BizView's *connection* — no
+query runs and no row is read — and the integration ends amber with **"The source has no free
+connection slots"** after waiting and retrying on its own (`SOURCE_CONNECT_RETRIES`, default 4
+attempts, `SOURCE_CONNECT_BACKOFF_S`, default 15 s → 15 s, 45 s, 2 min, 5 min). The data and its
+"Datos actualizados" time are untouched; the next scheduled run tries again.
+
+BizView is deliberately small: one session per source by default (two for Supabase), reused across
+the datasets of a run, closed when the run ends, named `bizview-engine:<integration>` in the origin's
+`pg_stat_activity`, and bounded to 10 s to connect, 30 s idle inside a transaction and 60 s idle.
+**Conexiones simultáneas** on the source page raises the ceiling (1–20) when the origin can spare it;
+the ceiling is per installation process, so with several API replicas each has its own (runs are
+still bounded exactly, through a lock on the product's database).
+
+Four remedies, in the order they usually work:
+
+1. **A pooler** in front of the origin (PgBouncer, transaction pooling). BizView speaks plain
+   PostgreSQL, so nothing changes on its side.
+2. **Raise `max_connections`** with the vendor that owns the origin.
+3. **Read a replica**, and point the source at it.
+4. **Move the schedule** off-peak (the integration page suggests the quietest hour it has observed),
+   widen the window instead of running hourly, or `materialize: daily` the reports that do not need
+   a live figure.
+
+`ALTER ROLE bizview CONNECTION LIMIT 2` does **not** reserve slots — a connection limit only caps;
+it never guarantees. If the message names BizView's own host instead of the origin's, the product's
+database ran out of connections: raise `DB_POOL_SIZE` / `DB_POOL_OVERFLOW` and read
+`docker compose logs backend`.
+
 ## 6. Projects
 
 Integrations (ETL) and reports are **specs**, and they live in **BI projects**: one folder per

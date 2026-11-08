@@ -56,6 +56,13 @@ def _classify(error: Exception) -> str:
     return "unreachable"
 
 
+def is_busy(error: BaseException) -> bool:
+    """A slot refusal, imported here: `extract` imports this module, so it cannot import back."""
+    from app.engine.extract import busy_of
+
+    return busy_of(error) is not None
+
+
 def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
     if profile.sslmode_problem(settings.get("sslmode") or "require", app):
         return TestResult(False, profile.NOT_ALLOWED)
@@ -65,6 +72,11 @@ def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
             conn = psycopg.connect(**kwargs)
     except BlockedAddress as e:
         return fail("blocked_address", str(e.reason))
+    except psycopg.OperationalError as e:
+        # Feature 060: an origin with no free slot is its own condition, not "unreachable".
+        if is_busy(e):
+            return TestResult(False, "busy", details={"sqlstate": getattr(e, "sqlstate", None)})
+        return fail(_classify(e), str(e).splitlines()[0] if str(e) else "", secrets)
     except psycopg.Error as e:
         return fail(_classify(e), str(e).splitlines()[0] if str(e) else "", secrets)
     warnings: list[str] = []
@@ -81,11 +93,31 @@ def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
             ssl_used = conn.execute(
                 "select coalesce((select ssl from pg_stat_ssl where pid = pg_backend_pid()),"
                 " false)").fetchone()[0]
+            capacity = _capacity(conn)
     except psycopg.Error as e:
         return fail("error", str(e).splitlines()[0], secrets)
     if superuser:
         warnings.append("superuser_account")
     elif can_write:
         warnings.append("not_read_only")
-    return TestResult(True, warnings=warnings,
-                      details={"server_version": version.split(",")[0], "tls": bool(ssl_used)})
+    # Feature 060: the origin's own ceiling and how many clients it already has — the two numbers
+    # an operator needs to tell "the origin is full" from "my credential is wrong". A role that
+    # cannot read the activity list is a normal case, not an error.
+    details: dict = {"server_version": version.split(",")[0], "tls": bool(ssl_used)}
+    details.update(capacity)
+    return TestResult(True, warnings=warnings, details=details)
+
+
+def _capacity(conn: psycopg.Connection) -> dict:
+    """`max_connections` and the current client count, when the role may read them."""
+    try:
+        maximum = conn.execute(
+            "select setting::int from pg_settings where name = 'max_connections'").fetchone()
+        clients = conn.execute("select count(*) from pg_stat_activity").fetchone()
+    except psycopg.Error:
+        return {"clients_visible": False}
+    return {
+        "max_connections": int(maximum[0]) if maximum else None,
+        "clients": int(clients[0]) if clients else None,
+        "clients_visible": True,
+    }

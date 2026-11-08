@@ -20,6 +20,8 @@ MESSAGES = {
     "not_allowed_in_profile": "La configuración no está permitida en el perfil de seguridad "
                               "actual (se requiere HTTPS/TLS).",
     "invalid_response": "La fuente respondió de forma inesperada.",
+    # Feature 060: the origin has no free connection slot — a wait, not a defect.
+    "busy": "La fuente no admite más conexiones ahora.",
     "error": "Error al conectar con la fuente.",
 }
 WARNINGS = {

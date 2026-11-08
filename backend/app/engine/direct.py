@@ -318,22 +318,11 @@ SLOT_POLL_SECONDS = 0.1
 DOWN_SECONDS = 30.0
 LOG_RETENTION_DAYS = 7
 
-_semaphores: dict[tuple[str, int], threading.BoundedSemaphore] = {}
-_sem_lock = threading.Lock()
 _down_until: dict[str, float] = {}
 _down_lock = threading.Lock()
 _permits: contextvars.ContextVar[frozenset[str]] = contextvars.ContextVar(
     "direct_permits", default=frozenset()
 )
-
-
-def _semaphore(key: str, n: int) -> threading.BoundedSemaphore:
-    with _sem_lock:
-        sem = _semaphores.get((key, n))
-        if sem is None:
-            sem = threading.BoundedSemaphore(n)
-            _semaphores[(key, n)] = sem
-        return sem
 
 
 def _mark_down(key: str) -> None:
@@ -434,39 +423,58 @@ def _map_error(e: Exception, src: DirectSource, timeout_seconds: int) -> DirectE
 # Per process, BI connections used by direct reads are at most 3 per held permit
 # (sf lock + slot lock + query connection) = 3 x direct_report_concurrency x sources;
 # waiters hold none.
+def _lane(src: "DirectSource") -> int:
+    """Direct reads share the source's ceiling with runs, describe and structure generation.
+
+    Feature 060: the source's `max_connections` wins; without one, a declared source keeps the
+    concurrency its BI-ready declaration names (048).
+    """
+    from app.engine import source_slots
+
+    return source_slots.limit_of(src, direct=True)
+
+
 @contextmanager
-def _permit(key: str, deadline: float):
+def _permit(src: "DirectSource", deadline: float):
     """Take the source permit before any BI connection is opened, so a request waiting for a
     source holds no pooled connection.
 
     Nested `_slot` calls in the same context reuse the permit: Python's
     BoundedSemaphore is not reentrant, so check the contextvar first.
     """
+    key = src.key
     if key in _permits.get():
         yield
         return
-    sem = _semaphore(key, get_settings().direct_report_concurrency)
-    wait = max(0.0, deadline - time.monotonic())
-    if not sem.acquire(timeout=wait):
-        raise DirectError("busy")
+    from app.engine import source_slots
+    turn = source_slots.turn(key, _lane(src), deadline=deadline)
+    try:
+        turn.__enter__()
+    except TimeoutError:
+        raise DirectError("busy") from None
     token = _permits.set(_permits.get() | {key})
     try:
         yield
     finally:
         _permits.reset(token)
-        sem.release()
+        turn.__exit__(None, None, None)
 
 
 @contextmanager
 def _slot(src: DirectSource, deadline: float):
-    """Limit direct sessions per source: local semaphore + cross-process advisory slot."""
-    n = get_settings().direct_report_concurrency
-    own = src.key not in _permits.get()
-    sem = _semaphore(src.key, n)
-    if own:
-        wait = max(0.0, deadline - time.monotonic())
-        if not sem.acquire(timeout=wait):
-            raise DirectError("busy")
+    """Limit direct sessions per source: local semaphore + cross-process advisory slot.
+
+    Feature 060: the lane is the source's ceiling, the same one a run of that source waits for.
+    """
+    n = _lane(src)
+    turn = None
+    if src.key not in _permits.get():
+        from app.engine import source_slots
+        turn = source_slots.turn(src.key, n, deadline=deadline)
+        try:
+            turn.__enter__()
+        except TimeoutError:
+            raise DirectError("busy") from None
 
     conn = None
     pg = None
@@ -519,8 +527,8 @@ def _slot(src: DirectSource, deadline: float):
     finally:
         if conn is not None:
             conn.close()
-        if own:
-            sem.release()
+        if turn is not None:
+            turn.__exit__(None, None, None)
 
 
 @contextmanager
@@ -1402,12 +1410,11 @@ def _failure(db, ctx, key: str, e: DirectError, started: float) -> dict:
 
 def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine) -> dict:
     spec = ctx.direct
-    src_key = resolve(spec.source).key
     conn = None
     pg = None
     held = False
     lk = lock_key("direct-sf", ctx.report_id, key, version)
-    with _permit(src_key, deadline):
+    with _permit(resolve(spec.source), deadline):
         try:
             try:
                 conn = get_engine().connect()

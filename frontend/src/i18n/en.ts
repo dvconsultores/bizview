@@ -414,6 +414,9 @@ export const en: Catalogue = {
       latency: (ms: number) => `Responded in ${ms} ms`,
       details: "Details",
       serverVersion: "Server version",
+      maxConnections: "Origin's maximum connections",
+      clients: "Clients now",
+      noPermission: "No permission to see it",
       status: "HTTP status",
       bytes: "Bytes read",
       services: "Services and operations",
@@ -675,6 +678,7 @@ export const en: Catalogue = {
     integration_resumed: "Integration resumed",
     integration_schedule_changed: "Integration schedule changed",
     integration_run_stopped: "Integration run stopped",
+    integration_busy: "Source had no free connection slots during a run",
     appearance_updated: "Installation palette updated",
     theme_uploaded: "Theme added",
     theme_replaced: "Theme replaced",
@@ -1255,6 +1259,20 @@ export const en: Catalogue = {
       failed: "Failed",
       skipped: "Skipped",
       running: "Running",
+      busy: "The source has no free connection slots",
+    },
+    busy: {
+      attempts: (n: number, wait: string) =>
+        n === 1 ? `1 attempt, ${wait}` : `${n} attempts, ${wait}`,
+      whatToDo: "What to do",
+      ceiling: (n: number) =>
+        n === 1 ? "1 simultaneous connection on the source"
+          : `${n} simultaneous connections on the source`,
+      quietHour: (hour: number) =>
+        `The origin was full at this hour: try ${String(hour).padStart(2, "0")}:00.`,
+      busyToday: (n: number) =>
+        n === 1 ? "1 load skipped today because of the source"
+          : `${n} loads skipped today because of the source`,
     },
   },
   projects: {

@@ -121,6 +121,11 @@ class Settings(BaseSettings):
         default_factory=lambda: os.path.join(tempfile.gettempdir(), "bizview-transform"))
     # daily rollups (feature 005 amendment): time limit of a build outside a run (worker job)
     rollup_timeout_seconds: int = Field(default=1800, ge=1)
+    # Feature 060: an origin that refuses the connection because it has no free slots is waited
+    # out inside the run — attempts counted in total (1 = never retry) and the base of the
+    # exponential backoff (15 s → 15 s, 45 s, 2 min, 5 min for four attempts).
+    source_connect_retries: int = Field(default=4, ge=1, le=10)
+    source_connect_backoff_s: int = Field(default=15, ge=1, le=600)
 
     # Reports read the active workspace version from memory for this long (one round trip less
     # per request on a remote database); applies and rollbacks in this process clear it at once.

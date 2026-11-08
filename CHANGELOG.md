@@ -22,6 +22,29 @@ All notable changes to this project are documented here. The format follows
   apply refuses a name with no list, naming it. Every send keeps one status per address under
   **Envíos**, and **Reenviar los fallidos** queues only what failed.
 
+### Added
+
+- **A source declares how many sessions BizView may hold on it (feature 060)**. The origin's
+  `max_connections` is shared with the application that owns it, so BizView stops being a greedy
+  neighbour: **Conexiones simultáneas** on the source page (1–20, default 1 for a PostgreSQL origin
+  and 2 for Supabase) bounds every reader of that source — scheduled runs, manual runs, `describe`,
+  structure generation and direct reports — through one permit per source, held across threads and,
+  for runs, across processes with a lock on the product's own database. A run holds **one** origin
+  session, reused across the datasets of its integration instead of one per dataset, connects within
+  10 s, gives up its slot after 30 s idle inside a transaction or 60 s idle where the server knows
+  those settings, and names itself `bizview-engine:<integration>` in the origin's session list so a
+  DBA can attribute it. A run waiting for its turn says «Esperando turno en la fuente». **Probar
+  conexión** now also reports the origin's maximum connections and its current client count when the
+  credential may read them, and says "sin permiso para verlo" when it may not.
+- **A help topic for the operator who finds an amber run (feature 060)**: «La fuente no admite más
+  conexiones» / "The source has no free connection slots", in both languages, linked from the run
+  and matched by a section in `docs/INSTALL.md` (and its Spanish twin) — whose limit it is, the two
+  queries that show who holds the slots, why `ALTER ROLE … CONNECTION LIMIT` does not reserve
+  anything, the four remedies (a pooler, raising the limit with the vendor, reading a replica, moving
+  the schedule off-peak) and how to tell it apart from BizView's own database running out of
+  connections. The integration page suggests the quietest hour it has observed once an integration
+  accumulates three busy runs in a day.
+
 ### Changed
 
 - **The product no longer limits how much mail an installation sends (feature 058)**. The ceiling of
@@ -148,6 +171,23 @@ All notable changes to this project are documented here. The format follows
   closing back to the card that opened it.
 
 ### Fixed
+
+- **A full origin pauses the run instead of failing it (feature 060)**. An hourly run of
+  `ventas-medicalvet` failed with `FATAL: lo siento, ya tenemos demasiados clientes` (SQLSTATE
+  `53300`): the ERP that owns the origin had taken every connection slot, PostgreSQL refused
+  BizView's *connection* before a single row was read, and the product reported a healthy hour as a
+  defect — the same red badge as a broken query, the next attempt only on the next cron tick, and no
+  word about whose limit it was. A connection-slot refusal (`53300`, `53200`, `57P03`, `08001`,
+  `08006`, and the pooler wordings that stand for them) is now its own condition: the run waits and
+  retries inside itself with a jittered exponential backoff (`SOURCE_CONNECT_RETRIES`, default 4
+  attempts; `SOURCE_CONNECT_BACKOFF_S`, default 15 s → 15 s, 45 s, 2 min, 5 min), a stop request or
+  the integration's own time limit interrupts the wait, and only when every attempt is refused does
+  the run end `skipped_busy` — amber, "La fuente no admite más conexiones ahora", with the SQLSTATE,
+  the attempts and the wait in `integration_run.busy`, and the origin's own words redacted of host
+  and credential. Nothing is written: the datasets keep their rows and the reports keep their
+  "Datos actualizados" time, and the next tick simply tries again. Three consecutive busy runs send
+  one Telegram notice to the superusers who linked the bot (never one per tick), recorded as
+  `integration_busy`; a run that is not busy closes the streak.
 
 - **The sign-in page fits a phone, and the language switch stopped covering the product name
   (feature 059)**. On a 393 × 851 Android screen the `Español | English` toggle floated over the

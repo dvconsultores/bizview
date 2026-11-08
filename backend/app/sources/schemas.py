@@ -36,6 +36,13 @@ def _t(**kw) -> F:
     return F(**kw)
 
 
+def _max_connections(default: int) -> F:
+    """Feature 060: how many origin sessions BizView may hold at once on this source."""
+    return F("max_connections", "Conexiones simultáneas", "integer", default=default,
+             min=1, max=20,
+             help="Cuántas conexiones puede abrir BizView a la vez en esta fuente")
+
+
 PG = (
     F("host", "Servidor", "string", required=True, help="Nombre o IP del servidor PostgreSQL"),
     F("port", "Puerto", "integer", default=5432, min=1, max=65535),
@@ -47,6 +54,7 @@ PG = (
       help="verify-full comprueba el certificado del servidor"),
     F("ca_certificate", "Certificado de la CA (PEM)", "pem", show_if={"sslmode": ["verify-full"]}),
     _t(**TIMEOUT),
+    _max_connections(1),
 )
 USER_AUTH = ["basic", "wsse_username_token"]
 SOAP = (
@@ -102,6 +110,7 @@ SUPABASE = (
     F("service_key", "Clave de servicio (SUPABASE_SERVICE_KEY)", "string", required=True,
       secret=True, help="Se guarda cifrada y no se vuelve a mostrar. BizView solo lee."),
     _t(**TIMEOUT),
+    _max_connections(2),
 )
 KINDS = {
     "postgresql": {"label": "PostgreSQL", "fields": PG},

@@ -265,7 +265,7 @@ def _store_declaration(db: Session, actor: AppUser, src: DataSource, data: dict,
         raise validation({e.field: "invalid"}, e.message) from None
     if declaration.get("enabled"):
         probe = describer.describe("postgresql", src.settings, secrets_of(src), app,
-                                   write_probe=True)
+                                   write_probe=True, name=src.name)
         allowed = bool(probe.get("write_allowed"))
         declaration["verified_at"] = bi_ready.now()
         declaration["verified_ok"] = not allowed

@@ -60,7 +60,7 @@ def build(db: Session, source: DataSource, app: Settings, *, path: str | None = 
 
     secrets = service.secrets_of(source)
     structure = describer.describe(source.kind, source.settings, secrets, app, path,
-                                   date_ranges=True)
+                                   date_ranges=True, name=source.name)
     saved = list(db.scalars(select(SourceSampleRequest)
                             .where(SourceSampleRequest.source_id == source.id)
                             .order_by(func.lower(SourceSampleRequest.name))))

@@ -795,10 +795,18 @@ export interface RollupOutcome {
   error?: string;
 }
 
+/** Feature 060: what a full origin did to a run (`{}` when it never saw one). */
+export interface RunBusy {
+  sqlstate?: string | null;
+  attempts?: number;
+  waited_s?: number;
+  detail?: string | null;
+}
+
 export interface IntegrationRun {
   id: number;
   kind: "incremental" | "full" | "manual_incremental" | "manual_full";
-  status: "running" | "succeeded" | "failed" | "skipped" | "stopped";
+  status: "running" | "succeeded" | "failed" | "skipped" | "stopped" | "skipped_busy";
   started_at: string;
   finished_at: string | null;
   rows: Record<string, IntegrationRunDataset>;
@@ -806,6 +814,7 @@ export interface IntegrationRun {
   message: string | null;
   stop_requested_at?: string | null;
   rollups?: Record<string, RollupOutcome>;
+  busy?: RunBusy;
 }
 
 export interface IntegrationControl {
@@ -835,6 +844,8 @@ export type IntegrationControlUpdate = {
 export interface Integration {
   id: string;
   source: string;
+  /** Feature 060: how often the origin was full for this integration, and when it is quiet. */
+  busy?: { busy_today: number; quiet_hour: number | null; ceiling: number };
   schedule: string;
   datasets: string[];
   spec: string | null;

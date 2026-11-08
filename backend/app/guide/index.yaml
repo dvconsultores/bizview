@@ -583,6 +583,20 @@ topics:
       es: ["integraciones", "ejecutar ahora", "pausar", "frecuencia", "carga completa"]
       en: ["integrations", "run now", "pause", "frequency", "full load"]
     related: [fuentes, etl-y-transformaciones, reportes-directos]
+  - id: la-fuente-no-admite-mas-conexiones
+    section: datos
+    title: {es: "La fuente no admite más conexiones", en: "The source has no free connection slots"}
+    summary:
+      es: "Qué hacer cuando una carga termina en ámbar porque el origen se quedó sin conexiones: es su límite, no un defecto."
+      en: "What to do when a load ends amber because the origin ran out of connections: its limit, not a defect."
+    roles: [superuser]
+    routes: ["/admin/integraciones"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["demasiados clientes", "conexiones", "max_connections", "53300", "ámbar", "omitida por ocupado"]
+      en: ["too many clients", "connections", "max_connections", "53300", "amber", "skipped busy"]
+    related: [integraciones, fuentes, envios-programados]
   - id: etl-y-transformaciones
     section: datos
     title: {es: "ETL y transformaciones", en: "ETL and transformations"}
