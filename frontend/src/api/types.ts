@@ -148,12 +148,16 @@ export interface AITestResult {
 
 // --- feature 004: data sources and security -----------------------------------------------
 
-export type SourceKind = "postgresql" | "soap" | "rest" | "supabase";
+// Feature 061 adds the SQL engines and the two Google APIs; the API decides which of them a
+// given installation offers (a missing driver or an unset files folder removes one).
+export type SourceKind =
+  | "postgresql" | "soap" | "rest" | "supabase"
+  | "sqlite" | "mysql" | "mssql" | "bigquery" | "sheets";
 
 export interface FieldDef {
   name: string;
   label: string;
-  type: "string" | "integer" | "enum" | "url" | "pem" | "headers";
+  type: "string" | "integer" | "enum" | "url" | "pem" | "headers" | "files";
   required: boolean;
   secret: boolean;
   default: unknown;
@@ -164,7 +168,20 @@ export interface FieldDef {
   help: string;
 }
 
-export type SourceTypes = Record<SourceKind, { label: string; fields: FieldDef[]; http_allowed: boolean }>;
+export type SourceTypes = Record<SourceKind, {
+  label: string;
+  fields: FieldDef[];
+  http_allowed: boolean;
+  /** False when this installation cannot use the kind (driver or folder missing). */
+  available?: boolean;
+  reason?: string;
+}>;
+
+/** A file a SQLite source may read (feature 061): a name inside the installation's folder. */
+export interface SourceFile {
+  name: string;
+  size: number;
+}
 
 export interface HeaderDef {
   name: string;

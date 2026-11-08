@@ -18,6 +18,9 @@ from app.security.netguard import BlockedAddress, guarded_client, policy_from_se
 from app.sources.connectors.base import TestResult, fail, temp_pem
 from app.sources.connectors.rest import MAX_BYTES, _map_http_error, _verify
 
+kind = "soap"
+label = "sources.kind.soap"
+
 MAX_OPERATIONS = 200
 SAFE_XML = dict(strict=False, xml_huge_tree=False, forbid_dtd=True, forbid_entities=True,
                 forbid_external=True)
@@ -112,3 +115,26 @@ def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
         return fail("invalid_response", type(e).__name__, secrets)
     n_ops = sum(len(p["operations"]) for s in services for p in s["ports"])
     return TestResult(True, details={"services": services, "operations": n_ops})
+
+
+def describe(settings: dict, secrets: dict, app: Settings, *, path: str | None = None,
+             write_probe: bool = False, date_ranges: bool = False,
+             name: str | None = None) -> dict:
+    """Delegates to the WSDL reader (feature 005)."""
+    from app.sources import describe as structure
+
+    return structure.soap_operations(settings, secrets, app)
+
+
+def dialect_notes() -> dict:
+    return {"kind": "soap", "quote": "", "limit": "", "identifier_case": "sensitive",
+            "notes": "No SQL: operations, their input and output signatures from the WSDL."}
+
+
+def request_rows(settings: dict, secrets: dict, app: Settings, request: dict, params: dict,
+                 columns: list[str], *, time_limit_s: int, cancel=None):
+    """Delegates to the SOAP reader (feature 005)."""
+    from app.engine import extract
+
+    return extract.soap_rows(settings, secrets, app, request, params, columns,
+                             time_limit_s=time_limit_s, cancel=cancel)

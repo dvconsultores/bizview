@@ -1,5 +1,6 @@
 import { BackLink } from "../../components/BackLink";
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Database, DatabaseZap, Globe, Network, Plus, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Cloud, Database, DatabaseZap,
+  Globe, HardDrive, Network, Plus, Sheet, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, ApiError } from "../../api/client";
@@ -16,7 +17,10 @@ import { Spinner } from "../../components/Spinner";
 import { useT } from "../../i18n";
 import { formatDateTime } from "../../lib/format";
 
-export const KIND_ICONS: Record<SourceKind, typeof Database> = { postgresql: Database, soap: Network, rest: Globe, supabase: DatabaseZap };
+export const KIND_ICONS: Record<SourceKind, typeof Database> = {
+  postgresql: Database, soap: Network, rest: Globe, supabase: DatabaseZap,
+  sqlite: HardDrive, mysql: Database, mssql: Database, bigquery: Cloud, sheets: Sheet,
+};
 
 
 

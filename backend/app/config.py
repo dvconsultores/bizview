@@ -146,6 +146,9 @@ class Settings(BaseSettings):
     site_address: str = ":80"
     admin_allowed_networks: str = ""        # comma-separated CIDRs; empty = no restriction
     sources_allow_private_networks: bool = True
+    # Feature 061: the only folder a SQLite source may read from. Unset means the SQLite kind is
+    # not offered at all (the operator has mounted no export folder).
+    sources_files_dir: str | None = None
     login_rate_limit: int = Field(default=20, ge=1, le=10_000)
     login_rate_window_minutes: int = Field(default=15, ge=1, le=1440)
 

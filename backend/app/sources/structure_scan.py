@@ -24,6 +24,7 @@ from app.config import Settings
 from app.models import DataSource, SourceSampleRequest
 from app.sources import describe as describer
 from app.sources import samples as sample_service
+from app.sources.connectors import registry
 
 #: Endpoints tried when a source may publish its own description. First one that answers wins.
 OPENAPI_PATHS = ("openapi.json", "swagger.json", "v1/openapi.json")
@@ -45,20 +46,26 @@ def scan(db: Session, source: DataSource, app: Settings, *, run_samples: bool = 
                  "truncated": False, "tables": [], "endpoints": [], "relations": [],
                  "operations": [], "openapi": None}
     secrets = _secrets(source)
-    if source.kind == "postgresql":
+    if registry.is_sql(source.kind):
         structure = describer.describe(source.kind, source.settings, secrets, app,
                                        date_ranges=True, name=source.name)
         out["tables"] = structure.get("tables") or []
         out["truncated"] = bool(structure.get("truncated"))
         out["relations"] = _foreign_key_relations(out["tables"])
         return out
-    if source.kind == "soap":
+    if source.kind == registry.SOAP:
         structure = describer.describe(source.kind, source.settings, secrets, app)
         out["operations"] = [
             {"service": service.get("name"), "port": port.get("name"), **operation}
             for service in structure.get("services") or []
             for port in service.get("ports") or []
             for operation in port.get("operations") or []]
+        return out
+
+    if registry.capabilities(source.kind).tables:      # Google Sheets: a worksheet is a table
+        structure = describer.describe(source.kind, source.settings, secrets, app)
+        out["tables"] = structure.get("tables") or []
+        out["truncated"] = bool(structure.get("truncated"))
         return out
 
     settings, http_secrets = sample_service.rest_of(source, secrets)

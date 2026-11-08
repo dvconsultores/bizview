@@ -429,6 +429,53 @@ def pg_all(settings: dict, secrets: dict, app: Settings, query: str, params: dic
         return [d.name for d in cur.description or []], rows
 
 
+# --- other SQL kinds (feature 061) ---------------------------------------------------------------
+
+def sql_rows(kind: str, settings: dict, secrets: dict, app: Settings, query: str, params: dict, *,
+             timezone: str, time_limit_s: int,
+             check: Callable[[], None] | None = None,
+             integration: str | None = None) -> Iterator[tuple[list[str], list[tuple]]]:
+    """Stream `(columns, rows)` batches from any SQL kind through its connector.
+
+    PostgreSQL has its own COPY path (`pg_copy`); every other SQL engine streams DB-API rows in
+    batches, which is what `connectors.sql.rows` does for all of them at once. The statement is
+    refused here, before it reaches the origin, when it is not a read (spec FR-011).
+    """
+    from app.sources.connectors import registry
+    from app.sources.connectors import sql as sqlbase
+
+    mod = registry.module(kind)
+    try:
+        with mod.session(settings, secrets, app, timezone=timezone, time_limit_s=time_limit_s,
+                         integration=integration) as conn:
+            yield from mod.rows(conn, query, params, check=check)
+    except sqlbase.ReadOnlyRefused:
+        raise ExtractError(M("run.read_only_source")) from None
+    except ExtractError:
+        raise
+    except Exception as e:
+        detail = _first_line(e)
+        if getattr(mod, "is_busy", None) is not None and mod.is_busy(e):
+            raise SourceBusy(None, detail) from None
+        raise ExtractError(M("extract.failed", detail=detail)) from None
+
+
+def sql_all(kind: str, settings: dict, secrets: dict, app: Settings, query: str, params: dict, *,
+            timezone: str, time_limit_s: int, limit: int = 100_000,
+            check: Callable[[], None] | None = None,
+            integration: str | None = None) -> tuple[list[str], list]:
+    """Every row of a small read (reconciliation), from any SQL kind."""
+    columns: list[str] = []
+    rows: list = []
+    for got, batch in sql_rows(kind, settings, secrets, app, query, params, timezone=timezone,
+                               time_limit_s=time_limit_s, check=check, integration=integration):
+        columns = got or columns
+        rows.extend(batch)
+        if len(rows) > limit:
+            raise ExtractError(M("extract.reconcile_too_many", limit=limit))
+    return columns, rows
+
+
 # --- JSON paths ----------------------------------------------------------------------------------
 
 _PATH_PART = re.compile(r"([^.\[\]]+)|\[(\d+)\]")

@@ -33,6 +33,7 @@ from app.errors import ApiError
 from app.i18n import M
 from app.models import DataSource
 from app.sources import structure_scan
+from app.sources.connectors import registry
 
 log = logging.getLogger("app.structure_ai")
 
@@ -264,7 +265,7 @@ def _known(scan: dict) -> dict:
     for table in scan.get("tables") or []:
         key = str(table.get("name"))
         tables[key] = {"columns": {str(c.get("name")).lower() for c in table.get("columns") or []},
-                       "kind": "postgresql"}
+                       "kind": scan.get("kind")}
         if table.get("schema"):
             tables.setdefault(f"{table['schema']}.{key}", tables[key])
     for endpoint in scan.get("endpoints") or []:
@@ -306,7 +307,7 @@ def _field_ok(name: str, field: dict, table: dict | None, scan: dict) -> bool:
     that joins the two."""
     if table is None:
         return False
-    if table.get("kind") in ("postgresql", "openapi"):
+    if table.get("kind") and table.get("kind") != "rest":
         return name.lower() in table["columns"]
     path = str(field.get("path") or "")
     if not path.startswith("$"):
@@ -335,7 +336,7 @@ def _relation_ok(relation: dict, by_id: dict[str, set[str]]) -> bool:
 
 def generate(db: Session, source: DataSource, app: Settings) -> dict:
     """Scan → enrich → verify → save, returning the pack. Raises the typed error of a failed run."""
-    if source.kind == "soap":
+    if source.kind == registry.SOAP:
         raise ApiError(422, "validation", M("sourceStructure.ai_unsupported"),
                        fields={"kind": "unsupported"})
     if app.ai_structure_tokens <= 0:

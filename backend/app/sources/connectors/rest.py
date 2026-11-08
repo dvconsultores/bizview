@@ -11,6 +11,9 @@ from app.security.netguard import BlockedAddress, guarded_client, policy_from_se
 from app.sources.connectors.base import TestResult, fail
 from app.sources.schemas import header_secret_key
 
+kind = "rest"
+label = "sources.kind.rest"
+
 MAX_BYTES = 1_000_000
 
 
@@ -120,3 +123,27 @@ def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
     if status >= 400:
         return TestResult(False, "invalid_response", details=details)
     return TestResult(True, details=details)
+
+
+def describe(settings: dict, secrets: dict, app: Settings, *, path: str | None = None,
+             write_probe: bool = False, date_ranges: bool = False,
+             name: str | None = None) -> dict:
+    """Delegates to the REST shape reader (feature 005)."""
+    from app.sources import describe as structure
+
+    return structure.rest_shape(settings, secrets, app, path)
+
+
+def dialect_notes() -> dict:
+    return {"kind": "rest", "quote": "", "limit": "", "identifier_case": "sensitive",
+            "notes": "No SQL: paths, query parameters and JSON field names as the API "
+                     "returns them."}
+
+
+def request_rows(settings: dict, secrets: dict, app: Settings, request: dict, params: dict,
+                 columns: list[str], *, time_limit_s: int, cancel=None):
+    """Delegates to the REST reader (feature 005)."""
+    from app.engine import extract
+
+    return extract.rest_rows(settings, secrets, app, request, params, columns,
+                             time_limit_s=time_limit_s, cancel=cancel)

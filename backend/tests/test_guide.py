@@ -34,8 +34,8 @@ def test_index_loads_with_valid_ids_sections_and_related(loaded):
     # 049 added `importar-un-proyecto`; 052 added the three structure topics; 053 added
     # `parametros-y-filtros-del-reporte`; 054 added `ingreso-con-google`; 057b added
     # `como-se-dibuja-un-tablero`; 058 added `listas-de-correo` and `corregir-envio-de-correo`;
-    # 060 added `la-fuente-no-admite-mas-conexiones`.
-    assert len(ids) == len(set(ids)) == 68
+    # 060 added `la-fuente-no-admite-mas-conexiones`; 061 added `otros-tipos-de-fuente`.
+    assert len(ids) == len(set(ids)) == 69
     sections = {section.id for section in loaded.sections}
     for topic in loaded.topics:
         assert guide.TOPIC_ID.match(topic.id), topic.id

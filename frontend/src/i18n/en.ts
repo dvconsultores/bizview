@@ -410,6 +410,12 @@ export const en: Catalogue = {
       deleted: "Source deleted",
       imported: "Source imported from DATABASE_URL_ORIGIN. Review it, test it, and save; then remove that variable from the .env file.",
       httpsOnly: "This installation uses the internet profile: only encrypted connections (HTTPS/TLS) are allowed.",
+      // Feature 061: a kind this installation cannot use, and the file picker of a SQLite source.
+      kindUnavailable: "Not available in this installation",
+      pickFile: "Choose a file",
+      noFiles: "The installation's sources folder has no files.",
+      browseFiles: "List files",
+      fileSize: (kb: number) => `${kb} KB`,
       ok: "Connection successful",
       latency: (ms: number) => `Responded in ${ms} ms`,
       details: "Details",

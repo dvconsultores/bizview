@@ -391,6 +391,12 @@ export const es = {
       deleted: "Fuente eliminada",
       imported: "Fuente importada desde DATABASE_URL_ORIGIN. Revísala, pruébala y guarda; luego elimina esa variable del archivo .env.",
       httpsOnly: "Esta instalación usa el perfil internet: solo se permiten conexiones cifradas (HTTPS/TLS).",
+      // Feature 061: a kind this installation cannot use, and the file picker of a SQLite source.
+      kindUnavailable: "No disponible en esta instalación",
+      pickFile: "Elige un archivo",
+      noFiles: "No hay archivos en la carpeta de fuentes de la instalación.",
+      browseFiles: "Ver archivos",
+      fileSize: (kb: number) => `${kb} KB`,
       ok: "Conexión correcta",
       latency: (ms: number) => `Respondió en ${ms} ms`,
       details: "Detalles",

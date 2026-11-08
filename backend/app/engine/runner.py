@@ -176,6 +176,55 @@ def _extract_rows(pg: psycopg.Connection, plan: Plan, staging: str, *, source: D
         check()
 
 
+def _sql_kind(source: DataSource) -> str | None:
+    """The kind, when an integration query is SQL this origin can run (feature 061)."""
+    from app.sources.connectors import registry
+
+    return source.kind if registry.is_sql(source.kind) else None
+
+
+def _native_copy(source: DataSource) -> bool:
+    """Only PostgreSQL can pipe `COPY (query) TO STDOUT`; the other SQL kinds stream rows."""
+    from app.sources.connectors import registry
+
+    return registry.has_native_copy(source.kind)
+
+
+def _request_rows(kind: str):
+    """The kind's HTTP reader, when it reads its data with a request instead of a query."""
+    from app.sources.connectors import registry
+
+    return registry.request_rows(kind)
+
+
+def _extract_sql_rows(pg: psycopg.Connection, plan: Plan, staging: str, *, kind: str,
+                      source: DataSource, secrets: dict, app: Settings, query: str,
+                      params: dict, deadline: float, tz: str, check: Callable[[], None],
+                      cancel: extract.Cancel | None = None,
+                      integration: str | None = None) -> None:
+    """Row path for every SQL kind that is not PostgreSQL (feature 061).
+
+    The connector streams DB-API batches and this writes them into the staging table as text,
+    where PostgreSQL parses each value for the contract type — exactly what the PostgreSQL row
+    path does when COPY is unavailable.
+    """
+    columns = list(plan.ds["columns"])
+    time_left = max(1, int(deadline - time.monotonic()))
+    plan.path = "rows"
+    for got, rows in extract.sql_rows(kind, source.settings, secrets, app, query, params,
+                                      timezone=tz, time_limit_s=time_left, check=check,
+                                      integration=integration):
+        mismatch = extract.columns_mismatch(got, columns)
+        if mismatch:
+            raise mismatch
+        frame = _text_frame(rows, got)
+        _copy(pg, staging, columns, frame)
+        plan.extracted += frame.height
+        if time.monotonic() > deadline:
+            raise ExtractError(M("run.timeout"))
+        check()
+
+
 def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: dict,
              files: dict, source: DataSource, secrets: dict, app: Settings, deadline: float,
              tz: str, check: Callable[[], None],
@@ -195,9 +244,15 @@ def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: d
         return
     ext = ds["extract"]
     if "query" in ext:
-        if source.kind != "postgresql":
-            raise ExtractError(M("run.sql_needs_postgres"))
+        sql_kind = _sql_kind(source)
+        if sql_kind is None:
+            raise ExtractError(M("run.sql_needs_sql"))
         query = files[ext["query"]]
+        if sql_kind != "postgresql":
+            _extract_sql_rows(pg, plan, staging, kind=sql_kind, source=source, secrets=secrets,
+                              app=app, query=query, params=params, deadline=deadline, tz=tz,
+                              check=check, cancel=cancel, integration=integration["id"])
+            return
         plan.path = "copy"
         try:
             plan.extracted = _copy_bulk(pg, staging, columns, source=source, secrets=secrets,
@@ -213,8 +268,7 @@ def _extract(pg: psycopg.Connection, plan: Plan, staging: str, *, integration: d
                           cancel=cancel, origin=origin, integration=integration["id"])
     else:
         request = yaml.safe_load(files[ext["request"]])
-        fn = {"rest": extract.rest_rows, "soap": extract.soap_rows,
-              "supabase": extract.supabase_rows}.get(source.kind)
+        fn = _request_rows(source.kind)
         if fn is None:
             raise ExtractError(M("run.request_needs_http"))
         for rows in fn(source.settings, secrets, app, request, params, columns,
@@ -312,9 +366,24 @@ def _extract_transformed(pg: psycopg.Connection, plan: Plan, staging: str,
             sink = make_sink(dest)
             try:
                 ext = ds["extract"]
-                if "query" in ext:
-                    if source.kind != "postgresql":
-                        raise ExtractError(M("run.sql_needs_postgres"))
+                sql_kind = _sql_kind(source)
+                if "query" in ext and sql_kind is None:
+                    raise ExtractError(M("run.sql_needs_sql"))
+                if "query" in ext and sql_kind != "postgresql":
+                    query = files[ext["query"]]
+                    for got, rows in extract.sql_rows(
+                        sql_kind, source.settings, secrets, app, query, params,
+                        timezone=tz, time_limit_s=time_left, check=check,
+                        integration=integration["id"],
+                    ):
+                        mismatch = extract.columns_mismatch(got, compiled.input_columns)
+                        if mismatch:
+                            raise mismatch
+                        sink.add(_text_frame(rows, got), escaped=False)
+                        if time.monotonic() > deadline:
+                            raise ExtractError(M("run.timeout"))
+                        check()
+                elif "query" in ext:
                     query = files[ext["query"]]
                     plan.path = "copy+polars"
                     splitter = transform.CopyTextSplitter(
@@ -357,8 +426,7 @@ def _extract_transformed(pg: psycopg.Connection, plan: Plan, staging: str,
                         splitter.close()
                 else:
                     request = yaml.safe_load(files[ext["request"]])
-                    fn = {"rest": extract.rest_rows, "soap": extract.soap_rows,
-                          "supabase": extract.supabase_rows}.get(source.kind)
+                    fn = _request_rows(source.kind)
                     if fn is None:
                         raise ExtractError(
                             M("run.request_needs_http")
@@ -451,16 +519,22 @@ def _reconcile(pg: psycopg.Connection, plan: Plan, staging: str, check: dict, *,
                origin: psycopg.Connection | None = None,
                integration: str | None = None) -> None:
     """Origin totals (the check's query) vs the extracted rows, grouped by the first column."""
-    if source.kind != "postgresql":
-        _check(plan, "reconcile", False, M("run.check.reconcile_needs_postgres"))
+    sql_kind = _sql_kind(source)
+    if sql_kind is None:
+        _check(plan, "reconcile", False, M("run.check.reconcile_needs_sql"))
         return
     key, values = check["compare"][0], check["compare"][1:]
     tolerance = float(check.get("tolerance", 0.01))
     params = {"window_start": plan.start, "window_end": plan.end}
-    cols, rows = extract.pg_all(source.settings, secrets, app, files[check["query"]], params,
-                                timezone=tz,
-                                time_limit_s=max(1, int(deadline - time.monotonic())),
-                                cancel=cancel, conn=origin, integration=integration)
+    time_left = max(1, int(deadline - time.monotonic()))
+    if _native_copy(source):
+        cols, rows = extract.pg_all(source.settings, secrets, app, files[check["query"]], params,
+                                    timezone=tz, time_limit_s=time_left,
+                                    cancel=cancel, conn=origin, integration=integration)
+    else:
+        cols, rows = extract.sql_all(sql_kind, source.settings, secrets, app,
+                                     files[check["query"]], params, timezone=tz,
+                                     time_limit_s=time_left, integration=integration)
     if any(c not in cols for c in check["compare"]):
         _check(plan, "reconcile", False, M("run.check.reconcile_columns",
                                                    columns=", ".join(check['compare'])))
@@ -814,7 +888,7 @@ def _run(db: Session, run: IntegrationRun, integration: dict, files: dict, *, ap
                     # Feature 060: one origin session for the whole run, reused across its datasets,
                     # opened with the busy retry; other kinds read over HTTP and hold none.
                     origin = None
-                    if source.kind == "postgresql":
+                    if _native_copy(source):
                         origin, retries = _open_origin(source, secrets, app, integration_id=iid,
                                                        tz=tz_name, deadline=deadline, check=stop)
                         if retries:      # a slow hour stays explained on a successful run too

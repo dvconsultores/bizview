@@ -45,7 +45,8 @@ def faked_describe(monkeypatch):
     """The describe the source page would run, without an origin."""
     seen = {}
 
-    def fake(kind, settings, secrets, app, path=None, write_probe=False, date_ranges=False):
+    def fake(kind, settings, secrets, app, path=None, write_probe=False, date_ranges=False,
+             name=None):
         seen["kind"], seen["path"], seen["date_ranges"] = kind, path, date_ranges
         return STRUCTURE
 

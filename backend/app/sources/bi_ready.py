@@ -237,17 +237,20 @@ def select_source_rows():
     from sqlalchemy import select
 
     from app.models import DataSource
+    from app.sources.connectors import registry
 
-    return select(DataSource).where(DataSource.kind == "postgresql")
+    return select(DataSource).where(DataSource.kind == registry.POSTGRESQL)
 
 
 def service_ok(src: Any, app: Any) -> tuple[bool, str]:
     """The proof, for a saved source: its stored settings and decrypted secret."""
     from app.sources import describe as describer
     from app.sources import service
+    from app.sources.connectors import registry
 
     def describe(source: Any, write_probe: bool = False) -> dict:
-        return describer.describe("postgresql", source.settings, service.secrets_of(source), app,
+        return describer.describe(registry.POSTGRESQL, source.settings,
+                                  service.secrets_of(source), app,
                                   write_probe=write_probe, name=source.name)
 
     return prove_read_only(src, describe, app)

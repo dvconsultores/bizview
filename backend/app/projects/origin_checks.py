@@ -28,6 +28,7 @@ from app.projects.personal import (
     personal_kind,
     shape_personal,
 )
+from app.sources.connectors import registry
 from app.sources.service import by_name, secrets_of
 
 
@@ -306,13 +307,15 @@ def _transform_summary(
 
 def _run_check_sql(source, secrets: dict, app, text: str,
                    columns_expected: list[str] | None) -> dict:
-    if source.kind != "postgresql":
-        return {"ok": False, "error": "Las consultas SQL solo se comprueban en fuentes PostgreSQL.",
+    if not registry.is_sql(source.kind):
+        return {"ok": False, "error": "Las consultas SQL solo se comprueban en fuentes SQL.",
                 "columns": [], "missing": [], "extra": []}
     problems = sqlsafety.check_query(text)
     if problems:
         return {"ok": False, "error": "consulta no permitida: " + "; ".join(
             p.message for p in problems[:3]), "columns": [], "missing": [], "extra": []}
+    if source.kind != registry.POSTGRESQL:
+        return _probe_sql(source, secrets, app, text, columns_expected)
     q = extract.to_psycopg(text)
     wrapped = f"SELECT * FROM (\n{q}\n) AS q LIMIT 0"
     params_names = sqlsafety.query_params(text)
@@ -476,16 +479,39 @@ def _shape_result(request: dict, first, columns_expected: list[str] | None) -> d
     }
 
 
+def _probe_sql(source, secrets: dict, app, text: str,
+               columns_expected: list[str] | None) -> dict:
+    """Run the query once with `LIMIT 0` on a kind that is not PostgreSQL (feature 061).
+
+    Same question as the PostgreSQL probe — does it parse, and which columns does it return — with
+    whatever the driver says about the types. A driver error is reported as it came."""
+    params = {"window_start": datetime.now(UTC) - timedelta(days=CHECK_WINDOW_DAYS),
+              "window_end": datetime.now(UTC)}
+    timeout = max(1, math.ceil(app.origin_check_timeout_seconds))
+    wrapped = f"SELECT * FROM (\n{text}\n) AS q LIMIT 0"
+    try:
+        columns, _rows = extract.sql_all(source.kind, source.settings, secrets, app, wrapped,
+                                        params, timezone="UTC", time_limit_s=timeout)
+    except Exception as e:
+        detail = str(e).splitlines()[0][:200] if str(e) else type(e).__name__
+        return {"ok": False, "error": detail, "columns": [], "missing": [], "extra": []}
+    out = [{"name": name, "type": ""} for name in columns]
+    expected = list(columns_expected or [])
+    return {"ok": True, "error": None, "columns": out,
+            "missing": [c for c in expected if c not in columns],
+            "extra": [c for c in columns if c not in expected]}
+
+
 def _run_check_request(source, secrets: dict, app, text: str,
                        columns_expected: list[str] | None) -> dict:
     shape = {"ok": False, "error": None, "records": 0, "fields": [], "missing": [],
              "missing_columns": [], "keys": [], "timestamp_units": {}, "unit_mismatch": []}
-    if source.kind == "soap":
+    if source.kind == registry.SOAP:
         return {**shape, "ok": True,
                 "skipped": "no comprobable (fuente SOAP)",
                 "note": ("Las peticiones SOAP no se comprueban; "
                          "se validarán al ejecutar la integración.")}
-    if source.kind not in ("rest", "supabase"):
+    if registry.request_rows(source.kind) is None or not source.settings.get("base_url"):
         return {**shape, "error": "Las peticiones solo se comprueban en fuentes REST o Supabase."}
     try:
         request = yaml.safe_load(text)
@@ -509,7 +535,7 @@ def _run_check_request(source, secrets: dict, app, text: str,
             extra[str(page.get("param") or "page")] = 1
         elif page.get("type") == "offset":
             extra[str(page.get("param") or "offset")] = 0
-        if not page.get("size_param") and source.kind == "supabase":
+        if not page.get("size_param") and source.kind == registry.SUPABASE:
             extra["limit"] = 1
     end = datetime.now(UTC)
     start = end - timedelta(days=CHECK_WINDOW_DAYS)
@@ -517,7 +543,7 @@ def _run_check_request(source, secrets: dict, app, text: str,
     timeout = max(1, math.ceil(app.origin_check_timeout_seconds))
 
     def _fetch(req: dict, req_params: dict) -> tuple[Any, dict]:
-        if source.kind == "supabase":
+        if source.kind == registry.SUPABASE:
             return extract.supabase_once(
                 source.settings, secrets, app, req, req_params, extra_params=extra,
                 time_limit_s=timeout,

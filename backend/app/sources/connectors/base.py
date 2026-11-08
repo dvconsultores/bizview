@@ -22,6 +22,8 @@ MESSAGES = {
     "invalid_response": "La fuente respondió de forma inesperada.",
     # Feature 060: the origin has no free connection slot — a wait, not a defect.
     "busy": "La fuente no admite más conexiones ahora.",
+    # Feature 061: the driver refused the read-only session (or the file is not readable).
+    "not_read_only": "La fuente no permite abrirla de solo lectura.",
     "error": "Error al conectar con la fuente.",
 }
 WARNINGS = {

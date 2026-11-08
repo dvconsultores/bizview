@@ -7,6 +7,9 @@ from app.security import profile
 from app.security.netguard import BlockedAddress, policy_from_settings, resolve_checked
 from app.sources.connectors.base import TestResult, fail, temp_pem
 
+kind = "postgresql"
+label = "sources.kind.postgresql"
+
 
 def connect_kwargs(settings: dict, secrets: dict, app: Settings, ca_path: str | None) -> dict:
     ip = resolve_checked(settings["host"], int(settings.get("port") or 5432),
@@ -121,3 +124,19 @@ def _capacity(conn: psycopg.Connection) -> dict:
         "clients": int(clients[0]) if clients else None,
         "clients_visible": True,
     }
+
+
+def describe(settings: dict, secrets: dict, app: Settings, *, path: str | None = None,
+             write_probe: bool = False, date_ranges: bool = False,
+             name: str | None = None) -> dict:
+    """Delegates to the PostgreSQL structure reader (feature 005/048/052)."""
+    from app.sources import describe as structure
+
+    return structure.postgresql(settings, secrets, app, write_probe=write_probe,
+                                date_ranges=date_ranges, name=name)
+
+
+def dialect_notes() -> dict:
+    return {"kind": "postgresql", "quote": '"', "limit": "LIMIT", "identifier_case": "sensitive",
+            "notes": 'Double-quote identifiers; LIMIT n; dates: CAST(col AS date), date_trunc, '
+                     'CURRENT_DATE, :window_start / :window_end parameters.'}

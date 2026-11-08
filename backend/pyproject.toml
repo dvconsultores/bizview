@@ -24,6 +24,22 @@ dependencies = [
     "reportlab>=4.2",
 ]
 
+# Feature 061: the drivers of the extra source kinds. The published image installs the `sources`
+# extra (all of them); an image built without one lists that kind as unavailable with the reason,
+# never a 500. `sqlite3` is the standard library, so SQLite has no extra.
+[project.optional-dependencies]
+mysql = ["PyMySQL>=1.1"]
+mssql = ["pymssql>=2.3"]
+bigquery = ["google-cloud-bigquery>=3.25"]
+sheets = ["google-api-python-client>=2.140", "google-auth>=2.34"]
+sources = [
+    "PyMySQL>=1.1",
+    "pymssql>=2.3",
+    "google-cloud-bigquery>=3.25",
+    "google-api-python-client>=2.140",
+    "google-auth>=2.34",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
@@ -57,3 +73,19 @@ ignore = ["B008"]  # FastAPI dependencies are declared as argument defaults
 "scripts/bench_rollup.py" = ["E402"]  # DB_SCHEMA (the throwaway schema) is set before settings
 "app/i18n/es.py" = ["E501"]  # message catalogues hold whole sentences
 "app/i18n/en.py" = ["E501"]  # message catalogues hold whole sentences
+
+[tool.deptry]
+# Feature 061: the Google SDK packages declare submodules of a shared `google` namespace, so the
+# module name deptry reads (`google`, `googleapiclient`) is not the package name. Without the map
+# the gate reports both DEP001 (imported, "undeclared") and DEP002 (declared, "unused") for the
+# same three packages.
+[tool.deptry.package_module_name_map]
+google-api-python-client = ["googleapiclient"]
+
+# `google.cloud.bigquery` and `google.oauth2.service_account` are submodules of a namespace two
+# packages share, and deptry only sees the top-level module (`google`), so it cannot tell which
+# package an import belongs to: both are named here instead. They stay declared in the `bigquery`
+# and `sheets` extras, which is what the image installs.
+[tool.deptry.per_rule_ignores]
+DEP001 = ["google"]
+DEP002 = ["google-cloud-bigquery", "google-auth"]

@@ -9,6 +9,9 @@ from app.sources.connectors import rest
 from app.sources.connectors.base import TestResult
 from app.sources.schemas import header_secret_key
 
+kind = "supabase"
+label = "sources.kind.supabase"
+
 API_PATH = "/rest/v1/"
 
 
@@ -32,3 +35,26 @@ def rest_secrets(secrets: dict) -> dict:
 
 def test(settings: dict, secrets: dict, app: Settings) -> TestResult:
     return rest.test(rest_settings(settings), rest_secrets(secrets), app)
+
+
+def describe(settings: dict, secrets: dict, app: Settings, *, path: str | None = None,
+             write_probe: bool = False, date_ranges: bool = False,
+             name: str | None = None) -> dict:
+    """Delegates to the PostgREST shape reader (feature 016)."""
+    from app.sources import describe as structure
+
+    return structure.supabase(settings, secrets, app, path)
+
+
+def dialect_notes() -> dict:
+    return {"kind": "supabase", "quote": "", "limit": "", "identifier_case": "sensitive",
+            "notes": "No SQL: PostgREST paths and JSON field names."}
+
+
+def request_rows(settings: dict, secrets: dict, app: Settings, request: dict, params: dict,
+                 columns: list[str], *, time_limit_s: int, cancel=None):
+    """Delegates to the PostgREST reader (feature 016)."""
+    from app.engine import extract
+
+    return extract.supabase_rows(settings, secrets, app, request, params, columns,
+                                 time_limit_s=time_limit_s, cancel=cancel)

@@ -29,7 +29,9 @@ WORKDIR /app/backend
 COPY cli /app/cli
 COPY pack /app/pack
 COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --no-dev --no-install-project --frozen
+# The published image installs every source driver (feature 061); an image built without the
+# extra lists that kind as unavailable with the reason instead of failing.
+RUN uv sync --no-dev --no-install-project --frozen --extra sources
 
 COPY backend/ ./
 RUN useradd --system --uid 10001 app && chmod +x entrypoint.sh \

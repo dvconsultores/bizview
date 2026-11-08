@@ -111,7 +111,10 @@ RUN_KINDS = ("incremental", "full", "manual_incremental", "manual_full")
 #: pause the product waits out, not a defect, and the only "failure" that is shown amber.
 RUN_STATUSES = ("running", "succeeded", "failed", "skipped", "stopped", "skipped_busy")
 VERSION_STATES = ("active", "previous", "archived")
-SOURCE_KINDS = ("postgresql", "soap", "rest", "supabase")
+#: Feature 061 adds the SQL engines and the two Google APIs; `connectors/registry.py` is the list
+#: the product reads at run time, and this tuple only mirrors it for the database constraint.
+SOURCE_KINDS = ("postgresql", "soap", "rest", "supabase", "sqlite", "mysql", "mssql", "bigquery",
+                "sheets")
 DASHBOARD_STATUSES = ("available", "coming_soon", "hidden")
 ROLES = ("admin", "user")
 #: Feature 054: how the account was created — Google provisioning writes `google` and no password.

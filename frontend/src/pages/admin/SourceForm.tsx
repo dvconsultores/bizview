@@ -1,10 +1,11 @@
-import { AlertTriangle, Clock, Plus, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, Clock, Database, Plus, Trash2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { api, ApiError } from "../../api/client";
 import type {
-  BiReadyDeclaration, DataSource, FieldDef, HeaderDef, SourceKind, SourceTest, SourceTypes,
+  BiReadyDeclaration, DataSource, FieldDef, HeaderDef, SourceFile, SourceKind, SourceTest,
+  SourceTypes,
 } from "../../api/types";
 import { Alert } from "../../components/Alert";
 import { Breadcrumbs } from "../../components/Breadcrumbs";
@@ -103,6 +104,8 @@ export function SourceForm() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<SourceTest | null>(null);
+  // Feature 061: the files a SQLite source may point at, loaded once the kind is known.
+  const [files, setFiles] = useState<SourceFile[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -151,6 +154,17 @@ export function SourceForm() {
       navigate("/admin/fuentes", { replace: true });
     }
   }, [deleted, location.state, navigate]);
+
+  useEffect(() => {
+    if (kind !== "sqlite" || files !== null) return;
+    let cancelled = false;
+    api.get<{ items: SourceFile[] }>("/api/sources/files")
+      .then((r) => !cancelled && setFiles(r.items))
+      .catch(() => !cancelled && setFiles([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [kind, files]);
 
   const fields = useMemo(() => (types ? types[kind].fields : []), [types, kind]);
   const shown = fields.filter((f) => visible(f, values, fields));
@@ -296,6 +310,24 @@ export function SourceForm() {
         </Select>
       );
     }
+    if (f.type === "files") {
+      const list = files ?? [];
+      return (
+        <div key={f.name} className="space-y-2">
+          <Select id={`f-${f.name}`} label={f.label} required={f.required} error={err}
+            hint={f.help || undefined} value={String(values[f.name] ?? "")}
+            onChange={(e) => setValue(f.name, e.target.value)}>
+            <option value="">{T.pickFile}</option>
+            {list.map((file) => (
+              <option key={file.name} value={file.name}>
+                {`${file.name} · ${T.fileSize(Math.max(1, Math.round(file.size / 1024)))}`}
+              </option>
+            ))}
+          </Select>
+          {list.length === 0 ? <p className="text-sm text-ink-soft">{T.noFiles}</p> : null}
+        </div>
+      );
+    }
     if (f.type === "pem") {
       return (
         <PemField
@@ -404,17 +436,26 @@ export function SourceForm() {
             <legend className="mb-1.5 text-sm font-semibold text-ink-2">{T.kind}</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {(Object.keys(types) as SourceKind[]).map((k) => {
-                const Icon = KIND_ICONS[k];
+                const Icon = KIND_ICONS[k] ?? Database;
                 const selected = kind === k;
+                const missing = types[k].available === false;
                 return (
-                  <label key={k} className={`flex min-h-tap cursor-pointer items-center rounded-xl border p-3 focus-within:ring-2 focus-within:ring-accent-line-strong ${
-                    selected ? "border-primary bg-accent-soft ring-1 ring-primary" : "border-line-strong bg-surface hover:border-accent-line-strong"}`}>
-                    <input type="radio" name="kind" value={k} checked={selected} className="sr-only"
+                  <label key={k} className={`flex min-h-tap items-center rounded-xl border p-3 focus-within:ring-2 focus-within:ring-accent-line-strong ${
+                    missing ? "cursor-not-allowed border-line-strong bg-surface opacity-60"
+                      : `cursor-pointer ${selected ? "border-primary bg-accent-soft ring-1 ring-primary" : "border-line-strong bg-surface hover:border-accent-line-strong"}`}`}>
+                    <input type="radio" name="kind" value={k} checked={selected} disabled={missing} className="sr-only"
                       onChange={() => { setKind(k); setValues(defaultsFor(types[k].fields)); setSecrets({}); setHeaders([]);
                                  setBiReady({ enabled: false, schemas: [], objects: [] });
                                  touch(); }} />
                     <Icon className={`mr-2 h-5 w-5 ${selected ? "text-accent" : "text-ink-soft"}`} aria-hidden />
-                    <span className="font-medium text-ink">{types[k].label}</span>
+                    <span className="min-w-0">
+                      <span className="block font-medium text-ink">{types[k].label}</span>
+                      {missing ? (
+                        <span className="block text-xs text-ink-soft">
+                          {T.kindUnavailable}{types[k].reason ? ` · ${types[k].reason}` : ""}
+                        </span>
+                      ) : null}
+                    </span>
                   </label>
                 );
               })}

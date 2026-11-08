@@ -20,7 +20,7 @@ TIMEOUT = {"name": "timeout_seconds", "label": "Tiempo máximo (s)", "type": "in
 class F:
     name: str
     label: str
-    type: str                     # string | integer | enum | url | pem | headers
+    type: str                     # string | integer | enum | url | pem | headers | files
     required: bool = False
     secret: bool = False
     default: Any = None
@@ -112,13 +112,92 @@ SUPABASE = (
     _t(**TIMEOUT),
     _max_connections(2),
 )
+# SQLite (feature 061): a file the customer's export job drops in a mounted folder. The picker
+# only offers files under `SOURCES_FILES_DIR`; the value is checked again when the source is
+# saved (schemas._check_sqlite_path).
+SQLITE = (
+    F("path", "Archivo", "files", required=True,
+      help="Un archivo dentro de la carpeta de fuentes de la instalación"),
+    _t(**TIMEOUT),
+    _max_connections(1),
+)
+
+# MySQL / MariaDB: session read-only, MAX_EXECUTION_TIME and the time zone, all set at connect.
+MYSQL = (
+    F("host", "Servidor", "string", required=True),
+    F("port", "Puerto", "integer", default=3306, min=1, max=65535),
+    F("database", "Base de datos", "string", required=True),
+    F("username", "Usuario", "string", required=True,
+      help="Use un usuario de solo lectura (GRANT SELECT)"),
+    F("password", "Contraseña", "string", required=True, secret=True),
+    F("sslmode", "Cifrado (TLS)", "enum", default="require",
+      options=("require", "verify-full", "prefer", "disable"), private_only=("prefer", "disable"),
+      help="verify-full comprueba el certificado del servidor"),
+    F("ca_certificate", "Certificado de la CA (PEM)", "pem", show_if={"sslmode": ["verify-full"]}),
+    _t(**TIMEOUT),
+    _max_connections(1),
+)
+
+# SQL Server: no session read-only, so the credential verdict and the statement rules carry it.
+MSSQL = (
+    F("host", "Servidor", "string", required=True),
+    F("port", "Puerto", "integer", default=1433, min=1, max=65535),
+    F("database", "Base de datos", "string", required=True),
+    F("username", "Usuario", "string", required=True,
+      help="Use un inicio de sesión con db_datareader"),
+    F("password", "Contraseña", "string", required=True, secret=True),
+    F("encrypt", "Cifrado", "enum", default="yes", options=("yes", "optional"),
+      private_only=("optional",)),
+    F("ca_certificate", "Certificado de la CA (PEM)", "pem"),
+    _t(**TIMEOUT),
+    _max_connections(1),
+)
+
+# BigQuery: a service account, the datasets it may see, and a cost ceiling per query.
+BIGQUERY = (
+    F("project", "Proyecto", "string", required=True),
+    F("location", "Ubicación", "string", default="EU"),
+    F("service_account", "Cuenta de servicio (JSON)", "string", required=True, secret=True,
+      help="Se guarda cifrada; solo se lee el correo para mostrarlo"),
+    F("datasets", "Conjuntos de datos permitidos", "string",
+      help="Separados por comas; vacío significa todos los visibles"),
+    F("max_bytes_billed", "Máximo de bytes facturados por consulta", "integer",
+      default=1_000_000_000, min=10_000_000, max=10_000_000_000),
+    _t(**TIMEOUT),
+    _max_connections(2),
+)
+
+# Google Sheets: one worksheet is one table; the first row is the header.
+SHEETS = (
+    F("url", "Enlace de la hoja", "url", required=True),
+    F("service_account", "Cuenta de servicio (JSON)", "string", required=True, secret=True,
+      help="Comparte la hoja con ese correo; se muestra al guardar"),
+    F("header_row", "Fila de encabezados", "integer", default=1, min=1, max=100),
+    F("sample_rows", "Filas para inferir tipos", "integer", default=200, min=10, max=5000),
+    _t(**TIMEOUT),
+    _max_connections(2),
+)
+
+FIELDS: dict[str, tuple] = {
+    "postgresql": PG, "soap": SOAP, "rest": REST, "supabase": SUPABASE,
+    "sqlite": SQLITE, "mysql": MYSQL, "mssql": MSSQL, "bigquery": BIGQUERY, "sheets": SHEETS,
+}
+
 KINDS = {
     "postgresql": {"label": "PostgreSQL", "fields": PG},
     "soap": {"label": "SOAP (SAP y otros)", "fields": SOAP},
     "rest": {"label": "API REST", "fields": REST},
     "supabase": {"label": "Supabase", "fields": SUPABASE},
+    "sqlite": {"label": "SQLite (archivo)", "fields": SQLITE},
+    "mysql": {"label": "MySQL / MariaDB", "fields": MYSQL},
+    "mssql": {"label": "SQL Server", "fields": MSSQL},
+    "bigquery": {"label": "Google BigQuery", "fields": BIGQUERY},
+    "sheets": {"label": "Google Sheets", "fields": SHEETS},
 }
 HOST_FIELDS = {"host"}
+#: Kinds whose `host`/`port` is dialled directly (feature 061 adds the SQL ones).
+HOST_FIELDS_KINDS = {"postgresql", "mysql", "mssql"}
+DEFAULT_PORTS = {"postgresql": 5432, "mysql": 3306, "mssql": 1433}
 URL_FIELDS = {"wsdl_url", "base_url", "token_url", "url"}
 FORBIDDEN_HEADERS = {"host", "content-length", "transfer-encoding", "connection", "cookie"}
 HEADER_NAME = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,100}$")
@@ -128,10 +207,20 @@ def header_secret_key(name: str) -> str:
     return f"header:{name.lower()}"
 
 
+def _registry():
+    """The kind registry, imported lazily: its `fields` closure imports this module in turn."""
+    from app.sources.connectors import registry
+
+    return registry
+
+
 def types_for(settings: Settings) -> dict:
     """Field definitions for the forms; options not allowed by the profile are removed."""
     out = {}
     for kind, spec in KINDS.items():
+        reason = _registry().available(kind, settings)
+        if reason == "sources.unavailable.folder":
+            continue        # SQLite only exists where a folder of origin files is mounted
         fields = []
         for f in spec["fields"]:
             d = asdict(f)
@@ -146,7 +235,9 @@ def types_for(settings: Settings) -> dict:
             d["help"] = t(f"sources.{kind}.{f.name}.help") if f.help else ""
             fields.append(d)
         out[kind] = {"label": t(f"sources.kind.{kind}"), "fields": fields,
-                     "http_allowed": settings.http_allowed}
+                     "http_allowed": settings.http_allowed,
+                     "available": reason is None,
+                     "reason": t(reason) if reason else ""}
     return out
 
 
@@ -230,7 +321,7 @@ def validate(kind: str, settings_in: dict, secrets_in: dict, existing_secrets: d
         elif f.type == "headers":
             values[f.name] = _headers(val, secrets, errors)
     # Headers: secret values live with the secrets; drop secrets of removed headers.
-    if kind == "rest":
+    if kind == _registry().REST:
         keep = {header_secret_key(h["name"]) for h in values.get("headers", []) if h["secret"]}
         for k in [k for k in secrets if k.startswith("header:") and k not in keep]:
             secrets.pop(k)
@@ -242,7 +333,19 @@ def validate(kind: str, settings_in: dict, secrets_in: dict, existing_secrets: d
         errors[f"secrets.{k}"] = "unknown"
     if check_addresses and not errors:
         _check_destinations(kind, values, app, errors)
+    if not errors and kind == _registry().SQLITE:
+        _check_sqlite_path(values, app, errors)
     return Result(values, secrets, errors)
+
+
+def _check_sqlite_path(values: dict, app: Settings, errors: dict) -> None:
+    """A path outside `SOURCES_FILES_DIR` (or a symlink escaping it) cannot be saved (SC-007)."""
+    from app.sources.connectors import sqlite as sqlite_kind
+
+    try:
+        sqlite_kind.resolve(str(values.get("path") or ""), app)
+    except ValueError as e:
+        errors["settings.path"] = f"sources.sqlite.{e.args[0]}"
 
 
 def _headers(val, secrets: dict, errors: dict) -> list[dict]:
@@ -278,8 +381,9 @@ def _check_destinations(kind: str, values: dict, app: Settings, errors: dict) ->
     from urllib.parse import urlsplit
     policy = Policy(allow_private=app.sources_allow_private_networks)
     targets = []
-    if kind == "postgresql":
-        targets.append(("settings.host", values.get("host"), values.get("port") or 5432))
+    if kind in HOST_FIELDS_KINDS:
+        targets.append(("settings.host", values.get("host"),
+                        values.get("port") or DEFAULT_PORTS.get(kind, 5432)))
     for name in URL_FIELDS:
         if values.get(name):
             u = urlsplit(values[name])

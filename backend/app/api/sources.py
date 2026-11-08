@@ -64,6 +64,17 @@ def types(_: AppUser = Depends(require_superuser)):
     return schemas.types_for(get_settings())
 
 
+@router.get("/files")
+def files(_: AppUser = Depends(require_superuser)):
+    """The files a SQLite source may point at (feature 061): names and sizes, never a path.
+
+    Only what is inside `SOURCES_FILES_DIR`, with an extension the connector accepts; the folder
+    itself is never revealed — the operator knows where it mounted it."""
+    from app.sources.connectors import sqlite as sqlite_kind
+
+    return {"items": sqlite_kind.list_files(get_settings())}
+
+
 @router.get("")
 def list_sources(_: AppUser = Depends(require_superuser), db: Session = DB):
     return {"items": [service.to_json(s) for s in service.list_all(db)]}

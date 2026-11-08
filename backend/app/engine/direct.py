@@ -49,6 +49,7 @@ from app.i18n import t
 from app.models import DIRECT_OUTCOMES, Base, DataSource, DirectReadLog, ReportCache
 from app.security.netguard import BlockedAddress
 from app.sources import service as sources_service
+from app.sources.connectors import registry
 from app.sources.describe import MAX_COLUMNS, MAX_TABLES
 
 log = logging.getLogger("app.direct")
@@ -282,7 +283,7 @@ def resolve(name: str) -> DirectSource:
         try:
             with get_read_sessionmaker()() as db:
                 src = sources_service.by_name(db, low)
-                if src is None or src.kind != "postgresql" or not src.enabled \
+                if src is None or src.kind != registry.POSTGRESQL or not src.enabled \
                         or not src.direct_reports:
                     refused = True
                     raise DirectError("not_allowed")
@@ -1568,7 +1569,7 @@ def validation_context(db, app=None) -> wsv.DirectContext:
             "kind": src.kind,
             "enabled": bool(src.enabled),
             "direct": bool(src.direct_reports),
-            "bi": src.kind == "postgresql"
+            "bi": src.kind == registry.POSTGRESQL
             and is_bi_database(dict(src.settings or {})),
         }
 

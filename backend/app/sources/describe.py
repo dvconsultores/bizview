@@ -275,16 +275,13 @@ def soap_operations(settings: dict, secrets: dict, app: Settings) -> dict:
 def describe(kind: str, settings: dict, secrets: dict, app: Settings,
              path: str | None = None, write_probe: bool = False,
              date_ranges: bool = False, name: str | None = None) -> dict:
+    """The structure of any kind; which module answers is the registry's business (feature 061)."""
+    from app.sources.connectors import registry
+
+    if kind not in registry.BY_KIND:
+        raise ExtractError("tipo de fuente no soportado")
     try:
-        if kind == "postgresql":
-            return postgresql(settings, secrets, app, write_probe=write_probe,
-                              date_ranges=date_ranges, name=name)
-        if kind == "rest":
-            return rest_shape(settings, secrets, app, path)
-        if kind == "soap":
-            return soap_operations(settings, secrets, app)
-        if kind == "supabase":
-            return supabase(settings, secrets, app, path)
+        return registry.describe(kind, settings, secrets, app, path=path,
+                                 write_probe=write_probe, date_ranges=date_ranges, name=name)
     except httpx.HTTPError as e:
         raise ExtractError(f"error de red: {type(e).__name__}") from None
-    raise ExtractError("tipo de fuente no soportado")

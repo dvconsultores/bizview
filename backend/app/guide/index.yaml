@@ -555,6 +555,20 @@ topics:
       es: ["supabase", "service key", "vista", "rest/v1"]
       en: ["supabase", "service key", "view", "rest/v1"]
     related: [fuentes, etl-y-transformaciones, integraciones]
+  - id: otros-tipos-de-fuente
+    section: datos
+    title: {es: "MySQL, SQL Server, SQLite, BigQuery y Google Sheets", en: "MySQL, SQL Server, SQLite, BigQuery and Google Sheets"}
+    summary:
+      es: "Los otros tipos de fuente: qué credencial de solo lectura necesita cada uno, cómo se prueba y qué límite tiene."
+      en: "The other kinds of source: which read-only credential each one needs, how it is tested and what its limit is."
+    roles: [superuser]
+    routes: ["/admin/fuentes/nueva"]
+    tiles: ["/admin/fuentes"]
+    commands: []
+    aliases:
+      es: ["mysql", "mariadb", "sql server", "sqlite", "bigquery", "google sheets", "hoja de calculo"]
+      en: ["mysql", "mariadb", "sql server", "sqlite", "bigquery", "google sheets", "spreadsheet"]
+    related: [fuentes, estructura-de-una-fuente, la-fuente-no-admite-mas-conexiones]
   - id: reportes-directos
     section: datos
     title: {es: "Reportes directos", en: "Direct reports"}

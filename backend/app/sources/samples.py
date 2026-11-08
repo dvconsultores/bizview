@@ -42,7 +42,7 @@ def clean_params(params: dict | None) -> dict[str, str]:
 
 def rest_of(source, secrets: dict) -> tuple[dict, dict]:
     """The base URL settings and secrets a REST-shaped read uses (Supabase borrows its own)."""
-    if source.kind == "rest":
+    if source.settings.get("base_url"):      # the source already carries its own REST address
         return source.settings, secrets
     return (supabase_connector.rest_settings(source.settings),
             supabase_connector.rest_secrets(secrets))

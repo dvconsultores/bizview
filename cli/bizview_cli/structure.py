@@ -166,7 +166,7 @@ def _flag_key(table: dict, column: str) -> str:
 def _apply_personal(structure: dict, flags: dict[str, bool]) -> dict:
     """Stamp `personal` on every column: the override when there is one, the heuristic otherwise."""
     out = copy.deepcopy(structure)
-    if out.get("kind") != "postgresql":
+    if out.get("kind") not in SQL_KINDS:
         return out
     for table in out.get("tables") or []:
         for column in table.get("columns") or []:
@@ -215,9 +215,20 @@ def _params(sample: dict) -> str:
     return ", ".join(f"`{_cell(k)}={_cell(v)}`" for k, v in list(params.items())[:20])
 
 
-def _postgresql_lines(body: dict, out: list[str]) -> None:
-    out.append("## PostgreSQL")
+#: The dialects whose structure is tables and columns (feature 061 adds five). The renderer is one:
+#: what differs between them is the heading, the default schema and the dialect notes.
+SQL_KINDS = ("postgresql", "mysql", "mssql", "sqlite", "bigquery", "sheets")
+SQL_HEADINGS = {"postgresql": "PostgreSQL", "mysql": "MySQL / MariaDB", "mssql": "SQL Server",
+                "sqlite": "SQLite", "bigquery": "Google BigQuery", "sheets": "Google Sheets"}
+
+
+def _sql_lines(body: dict, out: list[str], kind: str) -> None:
+    out.append(f"## {SQL_HEADINGS.get(kind, kind)}")
     out.append("")
+    dialect = body.get("dialect") or {}
+    if dialect.get("notes"):
+        out.append(f"Dialecto: {_cell(dialect['notes'])}")
+        out.append("")
     schemas: dict[str, list] = {}
     for table in body.get("tables") or []:
         schemas.setdefault(str(table.get("schema") or "public"), []).append(table)
@@ -338,8 +349,8 @@ def structure_markdown(pack: dict) -> str:
            f"Tipo: {header.get('kind')} · Zona horaria de los datos: "
            f"{header.get('timezone') or 'UTC'} · Notas: {notes}", ""]
     kind = body.get("kind")
-    if kind == "postgresql":
-        _postgresql_lines(body, out)
+    if kind in SQL_KINDS:
+        _sql_lines(body, out, kind)
     elif kind in ("rest", "supabase"):
         _rest_lines(body, out)
     elif kind == "soap":
@@ -412,8 +423,8 @@ def enriched_markdown(doc: dict) -> str:
     if kind == "soap":
         out.append("## SOAP")
         out.append("")
-    elif kind == "postgresql":
-        out.append("## PostgreSQL")
+    elif kind in SQL_KINDS:
+        out.append(f"## {SQL_HEADINGS.get(kind, kind)}")
         out.append("")
     else:
         out.append("## REST")
