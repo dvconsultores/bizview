@@ -215,7 +215,8 @@ All notable changes to this project are documented here. The format follows
   rows instead of selects. Tablet keeps the bottom sheet at 85 % and the desktop keeps its 360 px side
   sheet. Opening pushes one history entry, so the phone's back button closes the sheet, **Limpiar**
   restores the report's defaults, and a downward drag only dismisses when it starts outside the
-  scrolling body. Live apply keeps its 250 ms debounce.
+  scrolling body, and the body keeps 24 px (32 px from 640 px) under its last control so the footer
+  never looks like it is cutting the content off. Live apply keeps its 250 ms debounce.
 - **A KPI fills the width its author gave it, and cards in a row share a height (feature 056)**. A
   `layout.web` `kpi` component rendered through `KpiGrid`, whose `<ul>` kept its `grid-cols-2
   lg:grid-cols-4` even for a single metric: a `span: 6` card drew a ~200 px card at the left of its

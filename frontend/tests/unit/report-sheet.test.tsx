@@ -123,6 +123,9 @@ describe("ReportSheet", () => {
     const panel = sheet();
     const body = panel.querySelector('[role="tabpanel"], .overflow-y-auto') as HTMLElement;
     expect(body.className).toContain("[scroll-padding-bottom:5rem]");
+    // Room under the last control: the footer must not look like it is cutting the content off.
+    expect(body.className).toContain("pb-6");
+    expect(body.className).toContain("sm:pb-8");
     const footer = panel.lastElementChild as HTMLElement;
     expect(footer.className).toContain("sticky");
     expect(footer.className).toContain("env(safe-area-inset-bottom)");

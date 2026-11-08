@@ -220,7 +220,8 @@ export function ReportSheet({
         role={selected !== null ? "tabpanel" : undefined}
         aria-labelledby={selected !== null ? tabId(selected) : undefined}
         tabIndex={selected !== null ? 0 : undefined}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 outline-none [scroll-padding-bottom:5rem] sm:py-4"
+        /* Room under the last control: the footer must not look like it is cutting the content. */
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 outline-none [scroll-padding-bottom:5rem] sm:pb-8 sm:pt-4"
       >
         {children}
       </div>
