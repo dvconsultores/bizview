@@ -15,6 +15,7 @@ Revises: 0054_mail_lists
 Create Date: 2026-11-07
 """
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0055_source_connection_limits"
@@ -57,9 +58,8 @@ KINDS_0054 = (
     "source_sample_deleted", "source_sample_run", "source_chat_asked", "source_chat_cleared",
     "source_structure_generated", "google_settings_updated", "google_rule_created",
     "google_rule_updated", "google_rule_deleted", "google_user_provisioned", "google_rule_applied",
-    "project_reimported", "project_reverted"
-"starter_downloaded""mail_list_created", "mail_list_updated", "mail_list_deleted",
-              "mail_send_resent")
+    "project_reimported", "project_reverted", "starter_downloaded", "mail_list_created",
+    "mail_list_updated", "mail_list_deleted", "mail_send_resent")
 
 #: What 0055 adds: the event written when a streak of busy runs was reported.
 KINDS_0055 = (*KINDS_0054, "integration_busy")
