@@ -6,6 +6,7 @@ import { useT } from "../../i18n";
 import { errorText } from "../../lib/sharing";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
+import { Breadcrumbs } from "../../components/Breadcrumbs";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
@@ -84,6 +85,15 @@ export function Lists({ admin = false }: { admin?: boolean }) {
 
   return (
     <div className="pb-16 sm:pb-0">
+      {/* Feature 061: the same back control every other page of the app carries. */}
+      <Breadcrumbs
+        back={admin ? "/admin" : "/"}
+        items={
+          admin
+            ? [{ label: t.nav.admin, to: "/admin" }, { label: t.mailLists.adminTitle }]
+            : [{ label: t.mailLists.title }]
+        }
+      />
       <PageHeader
         title={admin ? t.mailLists.adminTitle : t.mailLists.title}
         subtitle={admin ? t.mailLists.adminSubtitle : t.mailLists.subtitle}

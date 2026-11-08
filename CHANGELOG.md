@@ -172,6 +172,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The navigation tells you where you are and how to get back (feature 061)**. The four counters on
+  Inicio were dead numbers; each one is now a link to the menu option it counts (Tableros, Usuarios,
+  Fuentes de datos, Integraciones). "Mis listas" left the sidebar — lists live in **Administración →
+  Listas de correo**, which now carries the same **Volver** and breadcrumb as every other page — and
+  the send dialog's "no lists yet" hint points at where they are created instead of at a menu entry
+  that no longer exists. **Apariencia** links to the guide (*Crear un tema con tu IA*) that explains
+  the file a theme is, and **Proyectos** shows **Volver** to Administración when it was opened from
+  its tile, while the sidebar entry still opens it without a back button.
+
 - **A full origin pauses the run instead of failing it (feature 060)**. An hourly run of
   `ventas-medicalvet` failed with `FATAL: lo siento, ya tenemos demasiados clientes` (SQLSTATE
   `53300`): the ERP that owns the origin had taken every connection slot, PostgreSQL refused

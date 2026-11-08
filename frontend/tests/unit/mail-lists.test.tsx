@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -303,10 +304,21 @@ describe("the lists page", () => {
       return { items: [listFixture], can_share: false, max_members: 1000 };
     });
     await act(async () => {
-      root.render(<Lists />);
+      root.render(<MemoryRouter><Lists /></MemoryRouter>);
     });
     await flush();
   }
+
+  it("carries the standard back control to Administración (061)", async () => {
+    vi.mocked(api.get).mockResolvedValue({ items: [], can_share: true, max_members: 1000 });
+    await act(async () => {
+      root.render(<MemoryRouter><Lists admin /></MemoryRouter>);
+    });
+    await act(async () => { await Promise.resolve(); });
+    const back = container.querySelector<HTMLAnchorElement>('a[href="/admin"]');
+    expect(back).not.toBeNull();
+    expect(back!.textContent).toContain(t.common.back);
+  });
 
   it("renders the members and pauses one through the API", async () => {
     vi.mocked(api.post).mockResolvedValue({
@@ -349,7 +361,7 @@ describe("the lists page", () => {
       max_members: 1000,
     });
     await act(async () => {
-      root.render(<Lists />);
+      root.render(<MemoryRouter><Lists /></MemoryRouter>);
     });
     await flush();
 

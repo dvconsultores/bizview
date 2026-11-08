@@ -3,6 +3,8 @@ import { Link } from "react-router";
 
 export interface HubCardProps {
   to: string;
+  /** Router state for the destination (a tile saying where it was opened from). */
+  state?: unknown;
   title: string;
   description?: ReactNode;
   icon?: ReactNode;
@@ -13,6 +15,7 @@ export interface HubCardProps {
 
 export function HubCard({
   to,
+  state,
   title,
   description,
   icon,
@@ -25,6 +28,7 @@ export function HubCard({
   return (
     <Link
       to={to}
+      state={state}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       className={`group flex h-full min-h-tap flex-col rounded-card border border-line bg-surface p-6 transition-colors transition-shadow hover:border-line-accent hover:shadow-raised ${className}`}

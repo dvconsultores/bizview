@@ -59,9 +59,31 @@ describe("Inicio", () => {
     expect(container.querySelector("section")?.textContent).toContain("Estos son los tableros disponibles para ti.");
     expect(container.textContent).toContain("2 disponibles");
     expect(container.textContent).not.toContain("Fuentes de datos");   // admin counters: admins only
-    expect(container.querySelector('a[href="/tableros"]')?.textContent).toContain("Ver todos los tableros");
+    // The counter is pressable and leads to the same place as the "Ver todos" link (feature 061).
+    const toDashboards = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href="/tableros"]'));
+    expect(toDashboards.map((a) => a.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Ver todos los tableros")]),
+    );
+    expect(toDashboards[0].textContent).toContain("Tableros");
     expect(container.querySelector('a[href="/r/ventas"]')).toBeNull();   // the list lives in Tableros
     expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes each counter open the menu option it counts (061)", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: 7, full_name: "Ana Pérez", role: "admin", is_superuser: true },
+    } as any);
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      if (path === "/api/admin/overview") {
+        return { users: 4, active_users: 3, sources: 2, connected_sources: 1,
+                 integrations: 5, failed_integrations: 0 };
+      }
+      return { items: [] };
+    });
+    await render();
+    const hrefs = Array.from(container.querySelectorAll<HTMLAnchorElement>("[data-testid='stat-tile-link']"))
+      .map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/tableros", "/admin/usuarios", "/admin/fuentes", "/admin/integraciones"]);
   });
 
   it("shows favorites and recently opened dashboards that are still available", async () => {
@@ -82,7 +104,8 @@ describe("Inicio", () => {
     await render();
     expect(container.textContent).toContain("Aún no tienes tableros asignados");
     expect(container.textContent).toContain("0 disponibles");
-    expect(container.querySelector('a[href="/tableros"]')).toBeNull();
+    // The counter still opens Tableros; only the "Ver todos" link belongs to a non-empty list.
+    expect(container.textContent).not.toContain("Ver todos los tableros");
   });
 
   it("tells a super user what creates the first dashboard instead of sending them to an admin", async () => {

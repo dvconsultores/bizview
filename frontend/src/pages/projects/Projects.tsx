@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { ChevronRight, Download, FolderKanban, GitBranch, Image as ImageIcon, Package, Search, Upload, X } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { importProjectZip, projectsApi } from "../../api/projects";
@@ -13,6 +13,7 @@ import type {
 import { RevisionDiff } from "../../components/projects/RevisionDiff";
 import { StarterPanel } from "../../components/projects/StarterPanel";
 import { Alert } from "../../components/Alert";
+import { BackLink } from "../../components/BackLink";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -34,6 +35,9 @@ const inputClass = "min-h-tap w-full rounded-card border border-line bg-surface 
 export function Projects() {
   const t = useT();
   const navigate = useNavigate();
+  // Feature 061: arriving from Administración leaves a way back to it; the sidebar entry does not.
+  const location = useLocation();
+  const fromAdmin = (location.state as { from?: string } | null)?.from === "/admin";
   const [items, setItems] = useState<ProjectSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +145,7 @@ export function Projects() {
 
   return (
     <div className="space-y-5">
+      {fromAdmin ? <BackLink to="/admin" /> : null}
       <PageHeader
         title={t.projects.title}
         subtitle={t.projects.subtitle}

@@ -1618,7 +1618,7 @@ export const en: Catalogue = {
       /** Feature 058: lists, pasted addresses and the live counter. */
       lists: "Mailing lists",
       noLists: "There are no mailing lists yet.",
-      noListsHint: "Create one in My lists and it will show up here.",
+      noListsHint: "Create a personal one in Mailing lists, or save a send's recipients as a list, and it will show up here.",
       listChip: (name: string, count: number) => `📋 ${name} · ${count}`,
       removeList: (name: string) => `Remove the list ${name}`,
       addList: (name: string) => `Add the list ${name}`,
@@ -1856,6 +1856,7 @@ export const en: Catalogue = {
   appearance: {
     title: "Appearance",
     subtitle: "This installation's themes. Anyone can write one outside Bizview and upload it here.",
+    writeWithAi: "Create a theme with your AI",
     current: "in use",
     inUse: "In use",
     saved: "Theme saved.",

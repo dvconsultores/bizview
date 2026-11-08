@@ -4,6 +4,7 @@ import { api, ApiError } from "../../api/client";
 import type { ThemeLibrary, ThemeOrigin, ThemeRow } from "../../api/types";
 import { Alert } from "../../components/Alert";
 import { Badge } from "../../components/Badge";
+import { Link } from "react-router";
 import { BackLink } from "../../components/BackLink";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -297,6 +298,17 @@ export function Appearance() {
     <div className={PAGE_STACK}>
       <BackLink to="/admin" />
       <PageHeader title={t.appearance.title} subtitle={t.appearance.subtitle} />
+      {/* Feature 061: the guide explains the file a theme is, so a person can ask their own AI for
+          one instead of starting from an empty YAML. */}
+      <p className="-mt-2 text-sm">
+        <Link
+          to="/ayuda?tema=temas"
+          className="inline-flex min-h-tap items-center gap-1.5 font-semibold text-accent hover:underline"
+        >
+          {t.appearance.writeWithAi}
+          <span aria-hidden>→</span>
+        </Link>
+      </p>
 
       {error ? <Alert tone="error">{error}</Alert> : null}
 

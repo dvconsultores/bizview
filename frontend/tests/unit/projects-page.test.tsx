@@ -53,6 +53,22 @@ afterEach(async () => {
   container.remove();
 });
 
+async function openFrom(state: { from?: string } | null) {
+  // A fresh root per entry: MemoryRouter only reads `initialEntries` when it mounts.
+  await act(async () => root.unmount());
+  container.remove();
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root.render(
+    <MemoryRouter initialEntries={[{ pathname: "/proyectos", state }]}>
+      <Routes>
+        <Route path="/proyectos" element={<Projects />} />
+      </Routes>
+    </MemoryRouter>,
+  ));
+}
+
 function Where() {
   const location = useLocation();
   return <p data-testid="where">{location.pathname + location.search}</p>;
@@ -83,6 +99,17 @@ async function chooseZip() {
 }
 
 describe("Projects page", () => {
+  it("offers the way back only when it was opened from Administración (061)", async () => {
+    await openFrom({ from: "/admin" });
+    const back = container.querySelector<HTMLAnchorElement>('a[href="/admin"]');
+    expect(back).not.toBeNull();
+    expect(back!.textContent).toContain(t.common.back);
+
+    await openFrom(null);
+    // Reached from the sidebar there is nothing to go back to: the entry is not "inside" admin.
+    expect(container.querySelector('a[href="/admin"]')).toBeNull();
+  });
+
   it("previews the diff and then imports the zip (055)", async () => {
     const diff = {
       added: ["reports/cripto/report.yaml"], changed: [], removed: [],

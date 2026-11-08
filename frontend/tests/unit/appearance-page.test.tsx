@@ -105,6 +105,13 @@ describe("Appearance library", () => {
     expect(text).toContain(t.appearance.version.replace("{version}", "2"));
   });
 
+  it("links to the guide that explains how to write a theme with your own AI (061)", async () => {
+    await render();
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/ayuda?tema=temas"]');
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toContain(t.appearance.writeWithAi);
+  });
+
   it("fills the page container with a responsive grid (050, evidence 1 and 2)", async () => {
     await render();
     // The defect: the library sat in a 56 rem column with a fixed two-column grid, so a wide screen

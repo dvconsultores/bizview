@@ -32,7 +32,8 @@ const EMPTY: Stats = {
 };
 
 /** Counters on the home page: dashboards for everyone; users for administrators; data sources
- * and integrations for the super user (each tile hides itself if its data cannot be read). */
+ * and integrations for the super user (each tile hides itself if its data cannot be read). Each
+ * one is pressable and opens the menu option it counts. */
 export function OverviewTiles({ dashboards }: { dashboards: Dashboard[] | null }) {
   const t = useT();
   const { user } = useAuth();
@@ -67,6 +68,7 @@ export function OverviewTiles({ dashboards }: { dashboards: Dashboard[] | null }
         value={dashboards === null ? "—" : dashboards.length}
         icon={<LayoutDashboard className="h-5 w-5" aria-hidden />}
         footnote={available === undefined ? undefined : t.home.availableCount(available)}
+        to="/tableros"
       />
       {isAdmin && stats.users !== "error" ? (
         <StatTile
@@ -74,6 +76,7 @@ export function OverviewTiles({ dashboards }: { dashboards: Dashboard[] | null }
           value={value(stats.users)}
           icon={<Users className="h-5 w-5" aria-hidden />}
           footnote={known(stats.activeUsers) ? t.home.activeCount(stats.activeUsers) : undefined}
+          to="/admin/usuarios"
         />
       ) : null}
       {isSuperuser && stats.sources !== "error" ? (
@@ -82,6 +85,7 @@ export function OverviewTiles({ dashboards }: { dashboards: Dashboard[] | null }
           value={value(stats.sources)}
           icon={<Database className="h-5 w-5" aria-hidden />}
           footnote={known(stats.connectedSources) ? t.home.connectedCount(stats.connectedSources) : undefined}
+          to="/admin/fuentes"
         />
       ) : null}
       {isSuperuser && stats.integrations !== "error" ? (
@@ -92,6 +96,7 @@ export function OverviewTiles({ dashboards }: { dashboards: Dashboard[] | null }
           footnote={known(stats.failedIntegrations)
             ? (stats.failedIntegrations > 0 ? t.home.failuresCount(stats.failedIntegrations) : t.home.noFailures)
             : undefined}
+          to="/admin/integraciones"
         />
       ) : null}
     </div>

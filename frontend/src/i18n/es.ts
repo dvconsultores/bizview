@@ -1604,7 +1604,7 @@ export const es = {
       /** Feature 058: lists, pasted addresses and the live counter. */
       lists: "Listas de correo",
       noLists: "Aún no hay listas de correo.",
-      noListsHint: "Crea una en Mis listas y aparecerá aquí.",
+      noListsHint: "Crea una personal en Listas de correo, o guarda los destinatarios de un envío como lista, y aparecerá aquí.",
       listChip: (name: string, count: number) => `📋 ${name} · ${count}`,
       removeList: (name: string) => `Quitar la lista ${name}`,
       addList: (name: string) => `Agregar la lista ${name}`,
@@ -1842,6 +1842,7 @@ export const es = {
   appearance: {
     title: "Apariencia",
     subtitle: "Los temas de esta instalación. Cualquiera puede escribir uno fuera de Bizview y subirlo aquí.",
+    writeWithAi: "Crear un tema con tu IA",
     current: "en uso",
     inUse: "En uso",
     saved: "Tema guardado.",

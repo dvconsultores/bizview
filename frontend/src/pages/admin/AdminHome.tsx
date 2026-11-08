@@ -22,6 +22,7 @@ export function AdminHome() {
           <li key={to}>
             <HubCard
               to={to}
+              state={{ from: "/admin" }}
               title={title(t)}
               description={text(t)}
               icon={<Icon className="h-5 w-5" aria-hidden />}
