@@ -117,8 +117,13 @@ then the wiring, the docs and the gates.
 - [X] T027 `tests/test_source_kinds.py`: 46 tests over the registry, the five kinds, the read-only
       rule, the ceilings and the form.
 - [X] T028 `tests/test_connectors.py`, `tests/test_sources_api.py`, `tests/test_source_structure.py`,
-      `tests/test_guide*.py`, `tests/unit/source-*.test.tsx`: green (SC-001 for the four existing
-      kinds).
+      `tests/test_starter_api.py` (14), `tests/test_guide*.py`, the frontend's 782 unit tests and
+      `scripts/gates/all.sh`: green (SC-001 for the four existing kinds).
+      Five tests in `tests/test_bi_ready_declaration.py`, two in `tests/test_source_structure_ai.py`
+      and one in `tests/test_bulk_extract.py` fail **on `HEAD` too** — their fakes for
+      `describe()` do not accept the `date_ranges`/`name` arguments the dispatcher already passed
+      before this feature (proven by stashing the work and running them). Left untouched: they are
+      not this feature's defect.
 - [ ] T029 Live verification against a real MySQL 8, SQL Server 2022, a BigQuery sandbox project and
       a shared Google Sheet — the quickstart, not CI. **Not run here**: no container runtime or
       sandbox credentials in this environment.

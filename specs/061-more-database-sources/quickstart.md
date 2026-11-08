@@ -84,3 +84,11 @@ running the test again gives `unreachable`, not a 500.
   fakes at the SDK boundary and through a real SQLite file, which is where this kind's logic lives.
 - `make check`'s full backend suite takes hours against the remote BI database; the suites listed in
   §1 are the ones this feature can change, and they are green.
+
+## Known failures that are not this feature's
+
+Five tests of `tests/test_bi_ready_declaration.py`, two of `tests/test_source_structure_ai.py` and
+one of `tests/test_bulk_extract.py` fail with this working tree stashed, i.e. on `HEAD`: their
+fakes replace `describe()` with a lambda that does not accept `date_ranges`/`name`, which the
+dispatcher already passed before this feature (`TypeError: … unexpected keyword argument`). They are
+listed here so a reviewer does not attribute them to 061.
