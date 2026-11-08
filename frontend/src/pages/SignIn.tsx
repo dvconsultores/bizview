@@ -199,9 +199,16 @@ export function SignIn() {
                 <span className="px-3 text-sm text-ink-soft">{t.signIn.or}</span>
                 <span className="h-px flex-1 bg-line" />
               </div>
-              {/* Feature 059: two providers share one row on a phone (icon + short label); a single
-                  enabled provider takes the whole width. */}
-              <div className={google_auth && telegram_sign_in ? "grid grid-cols-2 gap-2" : "space-y-3"}>
+              {/* Feature 059: two providers share one row on a phone (icon + short label); from
+                  640 px up each takes its own row, so "Continuar con Google" stays on one line.
+                  A single enabled provider takes the whole width. */}
+              <div
+                className={
+                  google_auth && telegram_sign_in
+                    ? "grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3"
+                    : "space-y-3"
+                }
+              >
                 {google_auth ? (
                   <GoogleSignInButton
                     compact={google_auth && telegram_sign_in}

@@ -173,6 +173,8 @@ describe("sign-in on a phone", () => {
     expect(telegram.querySelector(".sm\\:hidden")?.textContent).toBe(es.telegram.signInShort);
     const row = google.parentElement as HTMLElement;
     expect(row.className).toContain("grid-cols-2");
+    // …and one per row from 640 px up, where the full label must stay on a single line.
+    expect(row.className).toContain("sm:grid-cols-1");
     expect(row.contains(telegram)).toBe(true);
   });
 

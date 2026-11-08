@@ -199,10 +199,11 @@ All notable changes to this project are documented here. The format follows
   the header with 16 px gutters and no negative margin, the heading is 20 px and the helper text
   14 px, inputs are 44 px with the password eye as a 44 px target, `Ingresar` is 48 px and full width,
   and the two providers share one row with their short labels (`Google`, `Telegram`) while keeping
-  the full sentence as the accessible name — a single enabled provider takes the whole width. The
-  email field declares `autocomplete="email"` (it said `username`), the page keeps
+  the full sentence as the accessible name, while from 640 px up each takes its own row so
+  "Continuar con Google" never wraps to a second line — a single enabled provider takes the whole
+  width. The email field declares `autocomplete="email"` (it said `username`), the page keeps
   `scroll-padding-bottom` so a focused field and the button stay in view, and failures are reported
-  inside the card instead of a banner that pushes the form down. From 640 px up nothing changed.
+  inside the card instead of a banner that pushes the form down.
 - **The Filtros | Parámetros sheet uses the whole screen on a phone (feature 059)**. It opened at
   72 % height behind a drag handle, so the top quarter showed the greyed dashboard and was useless,
   every control repeated its section title (`PERÍODO` above `Período`, `COMPARAR CON` above
