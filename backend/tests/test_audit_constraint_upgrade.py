@@ -164,10 +164,15 @@ def test_five_thousand_five_five_s_broken_constraint_is_repaired_at_head():
     as it shipped and then upgrades to head: `0056` must accept the kinds the product writes — and
     the history a database already holds, including the removed agent's `assistant_*` rows, which
     is why building that CHECK from `AUDIT_KINDS` alone made an installation with history fail.
+
+    The constraint also carries one kind no list in the code knows (`kind_from_a_rolled_back_build`,
+    with a row behind it): the rebuild must keep it, because a constraint on audit history may only
+    ever grow. That is the assertion the frozen list alone cannot make.
     """
+    unknown = "kind_from_a_rolled_back_build"
     broken = (
         "kind IN ('login_ok', 'assistant_run_applied', 'project_reverted', "
-        "'mail_list_created', 'integration_busy')"
+        f"'mail_list_created', 'integration_busy', '{unknown}')"
     )
     try:
         _reset_and_build("0055_source_connection_limits")
@@ -176,7 +181,7 @@ def test_five_thousand_five_five_s_broken_constraint_is_repaired_at_head():
             c.execute(text(f"ALTER TABLE audit_event DROP CONSTRAINT {AUDIT_CHECK}"))
             c.execute(text(
                 f"ALTER TABLE audit_event ADD CONSTRAINT {AUDIT_CHECK} CHECK ({broken})"))
-        _seed({"assistant_run_applied": 2, "login_ok": 1})
+        _seed({"assistant_run_applied": 2, "login_ok": 1, unknown: 1})
 
         # As it shipped: a kind the product writes is refused.
         with pytest.raises(IntegrityError):
@@ -191,13 +196,16 @@ def test_five_thousand_five_five_s_broken_constraint_is_repaired_at_head():
         assert set(HISTORICAL_AUDIT_KINDS) <= after, "the upgrade dropped history it must keep"
         assert {"starter_downloaded", "mail_list_created", "mail_list_updated",
                 "mail_list_deleted", "mail_send_resent"} <= after
+        # Grow-only: the kind only this database knew survives, with the row that carries it.
+        assert unknown in after, "the rebuild narrowed the constraint to its frozen list"
+        assert [r[1] for r in _rows()].count(unknown) == 1
 
         # The repaired constraint still refuses a kind nobody knows, and the rows are untouched.
         with pytest.raises(IntegrityError):
             with get_engine().begin() as c:
                 c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
                 c.execute(text("INSERT INTO audit_event (kind) VALUES ('kind_from_the_future')"))
-        assert len(_rows()) == 3
+        assert len(_rows()) == 4
     finally:
         _leave_at_head()
 
