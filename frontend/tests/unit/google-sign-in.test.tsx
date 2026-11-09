@@ -170,7 +170,7 @@ describe("Google sign-in on the credential step", () => {
       // type=button, so it never submits the password form it sits beside.
       expect(button!.getAttribute("type")).toBe("button");
       expect(button!.textContent).toContain("Google");
-      expect(button!.className).toContain("min-h-tap");
+      expect(button!.className).toContain("min-h-[48px]");
       expect(button!.disabled).toBe(false);
 
       await act(async () => button!.click());

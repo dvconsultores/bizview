@@ -52,7 +52,6 @@ export const es = {
   },
   google: {
     signIn: "Continuar con Google",
-    signInShort: "Google",
     errors: {
       // Every refusal reads the same; the real reason lives in the audit log (feature 054).
       failed: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
@@ -213,7 +212,6 @@ export const es = {
   },
   telegram: {
     signIn: "Ingresar con Telegram",
-    signInShort: "Telegram",
     openTelegram: "Abrir Telegram",
     instructions: "En Telegram, toca Iniciar y elige este código:",
     countdown: (m: number, ss: string) => `Vence en ${m}:${ss}`,

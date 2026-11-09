@@ -199,20 +199,12 @@ export function SignIn() {
                 <span className="px-3 text-sm text-ink-soft">{t.signIn.or}</span>
                 <span className="h-px flex-1 bg-line" />
               </div>
-              {/* Feature 059: two providers share one row on a phone (icon + short label); from
-                  640 px up each takes its own row, so "Continuar con Google" stays on one line.
-                  A single enabled provider takes the whole width. */}
-              <div
-                className={
-                  google_auth && telegram_sign_in
-                    ? "grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3"
-                    : "space-y-3"
-                }
-              >
+              {/* Feature 062: one provider per row, full width, at every size. 059 had put the two
+                  side by side on a phone to save vertical room, and the owner reversed it: a
+                  shorter label is not worth two buttons a thumb apart. */}
+              <div className="space-y-3">
                 {google_auth ? (
                   <GoogleSignInButton
-                    compact={google_auth && telegram_sign_in}
-                    label={google_auth && telegram_sign_in ? t.google.signInShort : undefined}
                     onClick={() => {
                       setFormError(null);
                       // A normal navigation: the endpoint sets the state cookie and 302s to Google.
@@ -221,19 +213,11 @@ export function SignIn() {
                   />
                 ) : null}
                 {telegram_sign_in ? (
-                  <Button variant="secondary" block
-                    className={google_auth ? "gap-2 px-2 text-sm sm:gap-3 sm:px-4 sm:text-base" : "gap-3 px-4"}
+                  <Button variant="secondary" block className="gap-3 px-4"
                     icon={<Send className="h-5 w-5 shrink-0" aria-hidden />}
                     aria-label={t.telegram.signIn}
                     onClick={() => { setFormError(null); setStep("telegram"); }}>
-                    {google_auth ? (
-                      <>
-                        <span className="max-sm:hidden">{t.telegram.signIn}</span>
-                        <span className="sm:hidden">{t.telegram.signInShort}</span>
-                      </>
-                    ) : (
-                      t.telegram.signIn
-                    )}
+                    {t.telegram.signIn}
                   </Button>
                 ) : null}
               </div>

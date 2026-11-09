@@ -117,3 +117,22 @@ US1 (T005–T010): the sign-in page on one screen. US2 follows, then the shell.
 - **T016/T019** the files are `tests/unit/report-sheet-phone.test.tsx`, `tests/unit/sign-in-phone.test.tsx`
   and `tests/unit/app-shell-phone.test.tsx`; **T022** is the ES/EN guide topic
   `parametros-y-filtros-del-reporte`.
+
+## Finished by feature 062 (2026-11-09)
+
+The owner's evidence on a 360 × 780 Android phone showed two items of this feature still failing on
+screen, although their tests were green. Both are closed here; the record is in
+`specs/062-mobile-fixes-round-2/`.
+
+- [x] **T003 revisited — the footer's height is measured, not guessed.** T003 asked for "a sticky
+  footer that reports its height through a CSS variable so the body can reserve
+  `calc(var(--sheet-footer) + env(safe-area-inset-bottom))`". What shipped was a 24 px padding
+  constant on the body (`pb-6`), and the footer is ~70 px tall, so on a 780 px phone the last control
+  ended under it. `ReportSheet` now measures the footer with a `ResizeObserver`
+  (`[data-sheet-footer]`) and the body reserves that height plus a 16 px gutter (feature 062, US2).
+  Measured at 360 × 780 and 393 × 851 in `frontend/tests/e2e/mobile-fixes.spec.ts`.
+- [x] **T006 revisited — one provider per row.** T006 chose "providers in one row (icon + short label)
+  when both are enabled". The owner reversed that decision on 2026-11-09: two abbreviation-labelled
+  buttons a thumb apart are harder to tell apart than two full-width rows. `SignIn` is now always
+  `space-y-3`, one 48 px button per provider with the full sentence, and `GoogleSignInButton` lost its
+  `compact` variant (feature 062, US1). The 059 e2e case was rewritten to the new decision.

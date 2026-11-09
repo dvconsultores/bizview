@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Five defects a 360 px phone exposed (feature 062)**. All five had been marked done by an earlier
+  feature, and all five were found by measuring rather than by reading classes:
+  **the sign-in providers** are one full-width 48 px row each again, at every width — 059 had put
+  Google and Telegram side by side with abbreviated labels on a phone, and the owner reversed it;
+  **the filters sheet** reserves its footer's *measured* height instead of a 24 px constant, so the
+  last control can be scrolled clear of a ~70 px bar (059's own T003 asked for exactly this);
+  **a maximized card's title** is the card's own words — component title, the view's title, a KPI's
+  metric label, a text's first words, the report's title — and never `Ampliar «k_ventas»`, the
+  component id 056b fell back to; the header is a two-row grid (title + 44 px actions, then the
+  period/filter chips) so a long title stays on one line instead of printing one letter per line;
+  **the pie/donut** draws with the width its card measured instead of a hard-coded 240 px, and stops
+  reading `window.innerHeight` when maximized, so a phone shows a ring at all (200 px in the card,
+  300 px maximized) with the legend under it; and **the source form's actions** scroll with the form
+  instead of floating 80 px above the bottom on a blurred bar that covered the fields it saves, in
+  the order **Guardar**, **Probar conexión**, **Eliminar fuente**. A grep gate refuses
+  `sticky bottom-20` and `writing-mode` in `frontend/src` so the two patterns cannot return.
+
 ### Added
 
 - **Five more kinds of data source (feature 061)**. A customer's ERP on MySQL or SQL Server, a

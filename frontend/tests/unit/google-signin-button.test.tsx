@@ -68,7 +68,9 @@ describe("GoogleSignInButton", () => {
 
   it("is a 44 px touch target with the mark at the left", async () => {
     const button = await render("light");
-    expect(button.className).toContain("min-h-tap");
+    // Feature 062: 48 px, in px units — the app's root is 15 px on a phone, so a rem height
+    // would have measured 45. Still a real touch target (≥ 44), which is the point.
+    expect(button.className).toContain("min-h-[48px]");
     const first = button.firstElementChild;
     expect(first?.tagName.toLowerCase()).toBe("svg");
   });

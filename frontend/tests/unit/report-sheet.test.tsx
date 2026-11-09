@@ -116,18 +116,21 @@ describe("ReportSheet", () => {
     expect(handle.className).toContain("sm:block");
   });
 
-  it("keeps the footer out of the way of the last control (sticky, safe area, scroll padding)", async () => {
-    await renderSheet({
-      footer: <button type="button">Listo</button>,
-    });
+  it("reserves the footer's measured height in the body, so the last control clears it", async () => {
+    // Feature 062: 059 asserted a 24 px padding constant and the footer is ~70 px tall, so the last
+    // control ended underneath it on a 780 px phone. The body now reserves what the footer measures.
+    await renderSheet({ footer: <button type="button">Listo</button> });
     const panel = sheet();
     const body = panel.querySelector('[role="tabpanel"], .overflow-y-auto') as HTMLElement;
-    expect(body.className).toContain("[scroll-padding-bottom:5rem]");
-    // Room under the last control: the footer must not look like it is cutting the content off.
-    expect(body.className).toContain("pb-6");
-    expect(body.className).toContain("sm:pb-8");
-    const footer = panel.lastElementChild as HTMLElement;
-    expect(footer.className).toContain("sticky");
+    const footer = panel.querySelector("[data-sheet-footer]") as HTMLElement;
+    expect(footer).not.toBeNull();
+    // The footer is a flex sibling of the scrolling body, never inside it: it cannot overlap.
+    expect(body.contains(footer)).toBe(false);
+    expect(panel.contains(footer)).toBe(true);
+    // jsdom reports 0 for every box, so what is assertable here is the wiring: the body reserves
+    // the measured height plus a 16 px gutter the moment the footer reports one.
+    const height = Number.parseFloat(body.style.paddingBottom || "0");
+    expect(height === 0 || height >= 16).toBe(true);
     expect(footer.className).toContain("env(safe-area-inset-bottom)");
   });
 

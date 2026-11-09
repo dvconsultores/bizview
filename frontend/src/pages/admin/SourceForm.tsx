@@ -586,17 +586,23 @@ export function SourceForm() {
         </Card>
       ) : null}
 
-      <div className="sticky bottom-20 z-10 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0">
-        {source && dirty ? <p className="mb-2 flex items-center text-xs text-ink-soft"><AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden />{T.unsavedTest}</p> : null}
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end">
-          {source ? (
-            <Button variant="ghost" className="mt-2 text-danger hover:bg-danger-soft sm:mr-auto sm:mt-0" icon={<Trash2 className="h-5 w-5" aria-hidden />}
-              onClick={() => { setDeleteError(null); setConfirmDelete(true); }}>{T.delete}</Button>
-          ) : null}
-          <Button variant="secondary" className="mt-2 sm:mr-2 sm:mt-0" icon={<Zap className="h-5 w-5" aria-hidden />} loading={testing} onClick={runTest}>
+      {/* Feature 062: the actions scroll with the form. Until 062 this floated 20 units above the
+          bottom (the tab bar's old height) on a translucent blur bar, which on a phone covered the
+          fields it was meant to save. Static also means the block cannot hide the last control; the
+          bottom padding keeps it clear of the tab bar and of the phone's home indicator. */}
+      <div data-source-actions=""
+        className="mt-2 border-t border-line pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {source && dirty ? <p className="mb-3 flex items-center text-xs text-ink-soft"><AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden />{T.unsavedTest}</p> : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <Button loading={saving} disabled={!!source && !dirty} onClick={save}>{T.save}</Button>
+          <Button variant="secondary" icon={<Zap className="h-5 w-5" aria-hidden />} loading={testing} onClick={runTest}>
             {testing ? T.testing : T.test}
           </Button>
-          <Button loading={saving} disabled={!!source && !dirty} onClick={save}>{T.save}</Button>
+          {source ? (
+            <Button variant="ghost" className="text-danger hover:bg-danger-soft sm:ml-6"
+              icon={<Trash2 className="h-5 w-5" aria-hidden />}
+              onClick={() => { setDeleteError(null); setConfirmDelete(true); }}>{T.delete}</Button>
+          ) : null}
         </div>
       </div>
 

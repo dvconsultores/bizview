@@ -98,3 +98,19 @@ labels. The dialog is right; the card was never told it was maximised.
       mark, per FR-006 (partial)
 - [x] T028 Print a value at each mark (`labels` on `line`/`area`) where it fits, or amend the
       requirement to the last point if per-mark figures prove unreadable, per FR-007 (partial)
+
+## Convergence (feature 062, 2026-11-09)
+
+- [x] The maximized dialog's title. 056b's FR-008 asserted "one `<h2>` carrying the card's title";
+  the fallback behind it was `t.layout.maximize(id)` — `Ampliar «k_ventas»`, the component id from
+  `report.yaml`, and the header was a single `flex-wrap` row that a phone squeezed into one letter
+  per line. Feature 062 replaced the resolution with `cardTitle()`
+  (`frontend/src/lib/cardTitle.ts`: component title → view title → KPI metric label → first words of
+  a text → report title, never the id) and the header with a two-row grid, actions `shrink-0`. The
+  geometry is proved in `frontend/tests/e2e/mobile-fixes.spec.ts` (title ≥ 55 % of the header, one
+  line, 44 px actions, chips on their own row at 360 px) and the resolution in
+  `frontend/tests/unit/card-title.test.ts`. The 056b geometry of the dialog itself (the card filling
+  it) is unchanged and still green in `layout-maximized.spec.ts`.
+- [x] The pie/donut of FR-006 was never sized by the dialog: `PieChart` hard-coded 240 px and read
+  `window.innerHeight` when maximized, so a phone clipped the ring to nothing. It now draws with the
+  width `ChartCard` measures (feature 062, US4).

@@ -153,7 +153,10 @@ describe("sign-in on a phone", () => {
     expect(email.className).toContain("max-sm:min-h-tap");
   });
 
-  it("puts both providers side by side with short labels, and each keeps its full name", async () => {
+  it("stacks both providers, one full-width button per row, with the full labels", async () => {
+    // Feature 062: 059 had put the two side by side on a phone with short labels; the owner reversed
+    // it, and the test is the record of the decision. Two buttons a thumb apart with abbreviated
+    // names are harder to tell apart than two rows of one.
     branding.google_auth = true;
     branding.telegram_sign_in = true;
     await render();
@@ -163,19 +166,18 @@ describe("sign-in on a phone", () => {
     )!;
     expect(google).not.toBeNull();
     expect(telegram).toBeDefined();
-    // The short label is the phone one; the full sentence is hidden from 640 px up and stays as the
-    // accessible name, so a screen reader hears the same thing at every width.
-    expect(google.textContent).toContain(es.google.signInShort);
-    expect(google.textContent).toContain(es.google.signIn);
-    expect(google.querySelector(".max-sm\\:hidden")?.textContent).toBe(es.google.signIn);
-    expect(google.querySelector(".sm\\:hidden")?.textContent).toBe(es.google.signInShort);
-    expect(google.getAttribute("aria-label")).toBe(es.google.signIn);
-    expect(telegram.querySelector(".sm\\:hidden")?.textContent).toBe(es.telegram.signInShort);
     const row = google.parentElement as HTMLElement;
-    expect(row.className).toContain("grid-cols-2");
-    // …and one per row from 640 px up, where the full label must stay on a single line.
-    expect(row.className).toContain("sm:grid-cols-1");
+    expect(row.className).not.toContain("grid");
+    expect(row.className).toContain("space-y-3");
     expect(row.contains(telegram)).toBe(true);
+    // The full sentence at every width, and 48 px of target for a thumb.
+    expect(google.textContent).toBe(es.google.signIn);
+    expect(telegram.textContent).toBe(es.telegram.signIn);
+    for (const button of [google, telegram]) {
+      expect(button.className).toContain("w-full");
+      // 48 px, in px units (`min-h-tap` is 44 and would be the floor, not the intent).
+      expect(button.className).toMatch(/min-h-\[48px\]|min-h-tap/);
+    }
   });
 
   it("gives a lone provider the whole width", async () => {

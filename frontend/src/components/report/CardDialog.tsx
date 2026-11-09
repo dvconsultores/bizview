@@ -87,56 +87,69 @@ export function CardDialog({
       <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId}
            data-card-dialog=""
            className="flex h-full w-full max-w-[92rem] flex-col overflow-hidden bg-surface sm:rounded-card sm:shadow-raised">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold text-ink [overflow-wrap:anywhere]">
-              {title}
-            </h2>
-            {period || comparison || (filters && filters.length > 0) ? (
-              <ul className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted"
-                  data-dialog-meta="">
-                {period ? (
-                  <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{period}</li>
-                ) : null}
-                {comparison ? (
-                  <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{comparison}</li>
-                ) : null}
-                {(filters ?? []).map((chip) => (
-                  <li key={chip} className="rounded-full border border-line px-2 py-0.5 [overflow-wrap:anywhere]">
-                    {chip}
-                  </li>
-                ))}
-              </ul>
+        {/* Feature 062: two rows, so a long title cannot wrap and the chips cannot push the
+            actions off the line. 056b had one `flex-wrap` row: the five buttons alone are wider than
+            a 360 px header, so the title was squeezed to a few characters and
+            `[overflow-wrap:anywhere]` printed it one letter per line. */}
+        <div
+          data-card-dialog-header=""
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3"
+        >
+          <h2 id={titleId} title={title} className="min-w-0 truncate text-lg font-semibold text-ink">
+            {title}
+          </h2>
+          <div className="flex shrink-0 items-center gap-1">
+            {onPrevious ? (
+              <button type="button" onClick={onPrevious} aria-label={t.layout.previousCard}
+                      className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
+                <ArrowLeft className="h-5 w-5" aria-hidden />
+              </button>
             ) : null}
+            {onNext ? (
+              <button type="button" onClick={onNext} aria-label={t.layout.nextCard}
+                      className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
+                <ArrowRight className="h-5 w-5" aria-hidden />
+              </button>
+            ) : null}
+            {onDownloadCsv ? (
+              <button type="button" onClick={onDownloadCsv} aria-label={t.reportParams.downloadCsv}
+                      data-card-dialog-action="csv"
+                      className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-ink-2 hover:bg-subtle">
+                <Download className="h-5 w-5 shrink-0" aria-hidden />
+                {/* Icons only under 480 px: five buttons with labels do not fit a phone header. */}
+                <span className="max-[480px]:hidden">{t.reportParams.downloadCsv}</span>
+              </button>
+            ) : null}
+            {onDownloadPng ? (
+              <button type="button" onClick={onDownloadPng} aria-label={t.layout.downloadPng}
+                      data-card-dialog-action="png"
+                      className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-ink-2 hover:bg-subtle">
+                <ImageIcon className="h-5 w-5 shrink-0" aria-hidden />
+                <span className="max-[480px]:hidden">{t.layout.downloadPng}</span>
+              </button>
+            ) : null}
+            <button ref={closeRef} type="button" onClick={onClose} aria-label={t.layout.closeMaximized}
+                    data-card-dialog-action="close"
+                    className="inline-flex min-h-tap min-w-tap shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
+              <X className="h-5 w-5" aria-hidden />
+            </button>
           </div>
-          {onPrevious ? (
-            <button type="button" onClick={onPrevious} aria-label={t.layout.previousCard}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
-              <ArrowLeft className="h-5 w-5" aria-hidden />
-            </button>
+          {period || comparison || (filters && filters.length > 0) ? (
+            <ul className="col-span-full flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-ink-muted"
+                data-dialog-meta="">
+              {period ? (
+                <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{period}</li>
+              ) : null}
+              {comparison ? (
+                <li className="rounded-full bg-subtle px-2 py-0.5 font-medium text-ink-2">{comparison}</li>
+              ) : null}
+              {(filters ?? []).map((chip) => (
+                <li key={chip} className="max-w-full truncate rounded-full border border-line px-2 py-0.5">
+                  {chip}
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {onNext ? (
-            <button type="button" onClick={onNext} aria-label={t.layout.nextCard}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
-              <ArrowRight className="h-5 w-5" aria-hidden />
-            </button>
-          ) : null}
-          {onDownloadCsv ? (
-            <button type="button" onClick={onDownloadCsv}
-                    className="inline-flex min-h-tap items-center gap-1.5 rounded-btn px-3 text-sm font-semibold text-ink-2 hover:bg-subtle">
-              <Download className="h-4 w-4" aria-hidden />{t.reportParams.downloadCsv}
-            </button>
-          ) : null}
-          {onDownloadPng ? (
-            <button type="button" onClick={onDownloadPng}
-                    className="inline-flex min-h-tap items-center gap-1.5 rounded-btn px-3 text-sm font-semibold text-ink-2 hover:bg-subtle">
-              <ImageIcon className="h-4 w-4" aria-hidden />{t.layout.downloadPng}
-            </button>
-          ) : null}
-          <button ref={closeRef} type="button" onClick={onClose} aria-label={t.layout.closeMaximized}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">
-            <X className="h-5 w-5" aria-hidden />
-          </button>
         </div>
         <div data-card-dialog-body="" className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">{children}</div>
         {caption ? (

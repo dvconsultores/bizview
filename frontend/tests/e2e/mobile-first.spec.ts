@@ -95,10 +95,14 @@ test.describe("sign-in on a phone", () => {
     expect(toggleBox.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height - 1);
   });
 
-  test("puts both providers side by side and the password eye in a 44 px target", async ({ page }) => {
+  test("keeps the password eye in a 44 px target and the submit at 48 px", async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto("/ingresar");
     await settled(page);
+    // Feature 062 changed the providers to one per row, and that is proved in
+    // `frontend/tests/unit/sign-in-phone.test.tsx`: this installation configures no Google or
+    // Telegram credentials, so `/ingresar` renders neither button and a geometric case here would
+    // assert nothing.
     const size = await page.evaluate(() => {
       const rect = (selector: string) => {
         const element = document.querySelector<HTMLElement>(selector);

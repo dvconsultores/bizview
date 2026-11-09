@@ -12,6 +12,7 @@ import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
 import { ReportViews, SingleView, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import { cardTitle } from "../lib/cardTitle";
 import { CardDialog } from "../components/report/CardDialog";
 import { LayoutRenderer } from "../components/report/LayoutRenderer";
 import { downloadCardPng } from "../lib/cardPng";
@@ -812,12 +813,6 @@ export function ReportView() {
   );
 }
 
-/** Feature 056: what the full-screen header says — a layout component's title, or a view's. */
-function maximizedTitle(def: ReportDefinition, id: string, t: ReturnType<typeof useT>): string {
-  const component = (def.layout?.web?.components ?? []).find((entry) => entry.id === id);
-  return (component ? localized(component, "title") : undefined) ?? t.layout.maximize(id);
-}
-
 /** The view a maximised card draws, whichever kind of card it is. */
 function maximizedView(id: string, data: ReportData, def: ReportDefinition) {
   if (id.startsWith(VIEW_CARD_PREFIX)) return data.views[Number(id.slice(VIEW_CARD_PREFIX.length))];
@@ -860,7 +855,7 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
   const title = byView
     ? (view && "title" in view ? localized(view as { title?: string }, "title") : undefined)
       ?? t.reportParams.detailTitle
-    : maximizedTitle(def, id, t);
+    : (cardTitle(def, id, view as { title?: string } | undefined) ?? t.reportParams.detailTitle);
 
   // Feature 056b: moving between cards replaces the history entry, so Back closes the dialog
   // instead of stepping through it.

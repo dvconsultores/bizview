@@ -3,7 +3,9 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
@@ -55,6 +57,11 @@ export function ReportSheet({
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  // Feature 062: the footer's real height, not a guess. 059 asked for this ("a sticky footer that
+  // reports its height through a variable") and shipped a 24 px constant instead, so on a 780 px
+  // phone the last control ended under the bar.
+  const [footerHeight, setFooterHeight] = useState(0);
   const openerRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<number | null>(null);
   const titleId = useId();
@@ -135,6 +142,18 @@ export function ReportSheet({
       document.removeEventListener("mousedown", onPointerDown);
     };
   }, [open, close]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const footer = footerRef.current;
+    if (!footer) return;
+    const measure = () => setFooterHeight(Math.ceil(footer.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;   // a test environment without one
+    const observer = new ResizeObserver(measure);
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, [open, footer, tabs]);
 
   if (!open) return null;
 
@@ -220,12 +239,18 @@ export function ReportSheet({
         role={selected !== null ? "tabpanel" : undefined}
         aria-labelledby={selected !== null ? tabId(selected) : undefined}
         tabIndex={selected !== null ? 0 : undefined}
-        /* Room under the last control: the footer must not look like it is cutting the content. */
-        className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 outline-none [scroll-padding-bottom:5rem] sm:pb-8 sm:pt-4"
+        /* Feature 062: the body reserves the footer's measured height (plus a gutter), so the last
+            control can be scrolled fully clear of it at any viewport height. */
+        style={{ paddingBottom: footerHeight ? `${footerHeight + 16}px` : undefined }}
+        className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 outline-none [scroll-padding-bottom:5rem] sm:pt-4"
       >
         {children}
       </div>
-      <div className="sticky bottom-0 shrink-0 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <div
+        ref={footerRef}
+        data-sheet-footer=""
+        className="shrink-0 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3"
+      >
         {footer ?? (
           <button
             type="button"

@@ -11,6 +11,7 @@ import type {
 } from "../../api/types";
 import { Maximize2 } from "lucide-react";
 import { formatBucket } from "../../lib/numbers";
+import { cardTitle } from "../../lib/cardTitle";
 import { localized } from "../../lib/labels";
 import { useT } from "../../i18n";
 import { DataTable } from "./DataTable";
@@ -115,8 +116,8 @@ export function LayoutRenderer({
             <button
               type="button"
               onClick={() => onMaximize(component.id)}
-              aria-label={t.layout.maximize(localized(component, "title") ?? component.id)}
-              title={t.layout.maximize(localized(component, "title") ?? component.id)}
+              aria-label={t.layout.maximize(cardTitle(def, component.id) ?? component.type)}
+              title={t.layout.maximize(cardTitle(def, component.id) ?? component.type)}
               data-maximize={component.id}
               className={`absolute top-1 z-10 inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-faint opacity-80 transition-opacity hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus group-hover/cell:opacity-100 ${component.type === "table" ? "right-12" : "right-1"}`}
             >

@@ -32,6 +32,10 @@ interface Slice {
 }
 
 const SIZE = 240;
+/** The tallest ring the card draws: reserved before the first measure so nothing jumps into place. */
+const RING_FLOOR = 240;
+/** Before the first measurement: wide enough for the max ring, so nothing reflows when it lands. */
+const FALLBACK_WIDTH = 320;
 const GAP_DEG = 1;
 
 function point(cx: number, cy: number, radius: number, degrees: number): [number, number] {
@@ -120,14 +124,19 @@ export function PieChart({
 
   return (
     <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}
-               maximized={maximized}>
-      {() => {
+               maximized={maximized} minHeight={maximized ? undefined : RING_FLOOR}>
+      {(width, height) => {
         if (total <= 0) return <p className="text-sm text-ink-muted">{emptyText}</p>;
-        // Feature 056b: the ring grows with the dialog — 60 vh at most, 520 px — and the legend
-        // keeps its own column beside it.
+        // Feature 062: the ring is the container's, never a constant and never `window`. In a card it
+        // is 240 px at most; maximized it grows with the dialog's body but stops at 60 vh and
+        // 520 px so a tall tablet does not get a ring taller than the legend can sit beside. A card
+        // narrower than 240 px used to overflow here and the card clipped it — "no ring at all".
+        const box = width > 0 ? width : FALLBACK_WIDTH;
+        // The dialog's body is already padded, so the maximized ring may take the whole measured
+        // width; the card keeps a 32 px gutter so the ring never touches its border.
         const size = maximized
-          ? Math.min(520, Math.max(280, Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.6)))
-          : SIZE;
+          ? Math.min(Math.max(200, box), Math.round((height > 0 ? height : box) * 0.6), 520)
+          : Math.min(SIZE, Math.max(120, box - 32));
         const radius = size / 2 - 4;
         const inner = donut ? radius * 0.55 : 0;
         let angle = 0;
