@@ -35,11 +35,13 @@ All notable changes to this project are documented here. The format follows
 
 - **The public site the product never had (feature 032)**. It lives in its own private repository,
   `dvconsultores/bizview-site`, because prices and contacts are not part of the AGPL product; what is
-  here is the feature's spec. Two pre-rendered documents —
-  `/` in Spanish and `/en/` in English — one stylesheet and **no JavaScript at all**: the language
-  switch is a link, the FAQ is `<details>`, dark mode is a `prefers-color-scheme` block over the same
-  tokens, so the CSP can say `script-src 'none'` and the page is finished markup when the first byte
-  arrives (~240 kB, no web font). It says what the product is *today*: authoring happens outside
+  here is the feature's spec. Two pre-rendered React documents —
+  `/` in Spanish and `/en/` in English — in Tailwind, one stylesheet, and one deferred bundle that
+  hydrates them: the page is finished markup when the first byte arrives, and the bundle then makes
+  the **language switch instant** (no reload, `<html lang>`, title, canonical and URL move together,
+  a stored choice is remembered and a first visit in another language corrects itself), with the
+  switch still a plain link and the FAQ still `<details>` when no script runs (~155 kB over the wire,
+  81 kB of it gzip for React, no web font, CSP `script-src 'self'`). It says what the product is *today*: authoring happens outside
   BizView with any AI, the starter zip goes in and the project zip comes back, no chat and no AI key
   to run it — the copy list is grounded in this file, never in the removed agent. Every sentence,
   price, link and flag lives in `content/{es,en}.json`, so a copy change is a commit and no code

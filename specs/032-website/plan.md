@@ -8,22 +8,30 @@ own `docs/DEPLOY.md` holds the operations. Every path below is relative to that 
 
 ## Summary
 
-A marketing site that looks like the product and is finished markup: two pre-rendered documents
-(`/` in Spanish, `/en/` in English), one stylesheet, no JavaScript at all. The language switch is a
-link, the FAQ is `<details>`, and dark mode arrives through `prefers-color-scheme` with the product's
-own tokens — the page renders correctly before any byte of script would have run, because there is
-none. All copy, prices, links and flags live in `content/{es,en}.json`, validated against one schema,
-so a text change is a commit and no code change (SC-005).
+A marketing site that looks like the product: two pre-rendered React documents (`/` in Spanish,
+`/en/` in English) in Tailwind, one stylesheet, and one deferred bundle that hydrates them. The page
+is finished markup before any script runs — a crawler, a social card and a browser with JavaScript
+off see everything — and the bundle then takes over: the language switch swaps the copy in place, a
+first visit in another language lands on the right locale by itself, and the choice is remembered.
+All copy, prices, links and flags live in `content/{es,en}.json`, validated against one schema, so a
+text change is a commit and no code change (SC-005).
 
 ## Technical Context
 
 **Stack**: React 19 + Vite 8 + Tailwind 3.4 (the product's own `tailwind.config.js`), TypeScript,
 `vitest` for the contract tests, Playwright only for the optional OG-card script.
 
-**Rendering**: `vite build` for the hashed stylesheet, `src/prerender.tsx` renders both routes with
-`renderToStaticMarkup`, `scripts/prerender.mjs` writes `dist/index.html` and `dist/en/index.html`
-over the template and deletes the JavaScript chunk. `sitemap.xml` and `robots.txt` are written last;
-a non-production `VERCEL_ENV` gets `Disallow: /`.
+**Rendering**: `vite build` for the hashed stylesheet and the hydration bundle, `src/prerender.tsx`
+renders both routes with `renderToString` (so the browser can hydrate byte for byte),
+`scripts/prerender.mjs` writes `dist/index.html` and `dist/en/index.html` over the template, which
+keeps the module script Vite injected. `sitemap.xml` and `robots.txt` are written last; a
+non-production `VERCEL_ENV` gets `Disallow: /`.
+
+**Behaviour, after hydration**: `src/i18n.ts` holds the locale — `detectLocale` over
+`navigator.languages`, `storedLocale`/`rememberLocale` over `localStorage`, and `applyLocale`, which
+moves `<html lang>`, the title, the description, the canonical and the URL together. `App` keeps the
+locale in state and the header's switch is a link whose click is intercepted, so it still navigates
+when the bundle does not run.
 
 **Tokens**: `scripts/sync-tokens.mjs` extracts the `:root` and dark-theme blocks from
 `frontend/src/index.css` into `src/tokens.css`, and `tailwind.config.js` imports the product's
@@ -44,7 +52,8 @@ what `vercel.json` publishes.
 | Documents | 2 × ~48 kB of HTML |
 | Stylesheet | 26 kB, one file, no code splitting |
 | Social cards | 2 × ~43 kB PNG |
-| Total | ~240 kB, no JavaScript, no web font, one round trip (SC-003: ≤ 1.5 MB) |
+| Bundle | 266 kB raw, 81 kB gzip, deferred, no requests of its own |
+| Total | ~155 kB over the wire, no web font (SC-003: ≤ 1.5 MB) |
 
 ## Constitution Check
 
@@ -121,14 +130,10 @@ requirements, never with their marks, and the sentence around them says "la IA q
 | FR-008, the ≤ 30 s clip | Needs the demo and a recording | T034 |
 | `DEMO_URL` | Same | T033; the content file points at the installation today |
 
-**One deliberate deviation.** US1/AC1 says an English browser gets English automatically. Doing that
-without a server means a script that reads `navigator.language` and rewrites the URL — which would
-undo D5 (a finished document, `script-src 'none'`) and introduce a redirect loop unless the language
-switch carries an exception. The site keeps the no-JavaScript property and defaults to Spanish, with
-the switch one tap away in the header and both documents linked by `hreflang`; a visitor on a
-non-Spanish browser lands on `/` and reads the "EN" button. If the owner prefers auto-detection, it is
-one inline script on both documents plus a `sha256` hash in the CSP — recorded as T037 and not taken
-here.
+**Language detection** is US1/AC1 as written, and it is what D5 now allows: `navigator.languages`
+order is honoured (`es-*` → Spanish, otherwise English), the correction is a `replaceState`, not a
+redirect, so there is no loop and the back button does not fight it, and a stored choice wins over the
+browser's preference.
 
 ## Structure
 

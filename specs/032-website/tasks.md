@@ -25,8 +25,9 @@ already carries what it needs.
 
 ## Phase 2 — US1: understand BizView on a phone (P1)
 
-- [X] T007 `src/sections.tsx` `Header`: brand, four in-page links from lg up, language switch with
-  `hreflang`, "Obtenerlo" call to action that fits a 360 px header (US1/AC1)
+- [X] T007 `src/sections.tsx` `Header`: brand, four in-page links from lg up, language switch — a
+  link with `hreflang` whose click is intercepted once the bundle runs — and an "Obtenerlo" call to
+  action that fits a 360 px header (US1/AC1)
 - [X] T008 `src/sections.tsx` `Hero`: eyebrow, headline, one sentence, **Ver demo** + **Instalar
   gratis**, and the counter row below the shot on phones so headline, actions and shot fit 375×667 (US1/AC2, SC-002)
 - [X] T009 `src/components/PhonePreview.tsx`: the demo dashboard drawn with the tokens — status bar,
@@ -63,8 +64,12 @@ already carries what it needs.
 
 - [X] T019 `src/sections.tsx` `Features` (12 items), `Sources` (7 kinds + ERP chips), `Audience`,
   `Faq` (8 questions with native `<details>`), `Closing`, `Footer` (FR-005)
-- [X] T020 Language switch is a link, the FAQ is `<details>`, dark mode is a media query: the page
-  needs no JavaScript (FR-001, FR-009, D5)
+- [X] T020 The page is pre-rendered *and* hydrated: `renderToString` + `hydrateRoot`, the switch swaps
+  the tree in place, and with the bundle blocked the switch is still a link, the FAQ still
+  `<details>` and dark mode still a media query (FR-001, FR-009, D5)
+- [X] T020a `src/i18n.ts`: `detectLocale` over `navigator.languages`, the choice in `localStorage`,
+  and `applyLocale` moving `<html lang>`, title, description, canonical and URL together (US1/AC1,
+  D5)
 - [X] T021 `src/content.ts`: typed accessors, translated anchors (`#como-funciona` ↔ `#how-it-works`),
   `home()` per locale, `fileLabel` (FR-003, FR-004)
 - [X] T022 `content/private.json` is git-ignored and the strict build refuses a placeholder price or
@@ -76,17 +81,17 @@ already carries what it needs.
   `noindex` on any non-production `VERCEL_ENV` (FR-001, FR-010, FR-012)
 - [X] T024 `scripts/og.mjs` and `public/og/{es,en}.png`: the 1200×630 cards, drawn from the content
   file with the product's accent (FR-010, D7)
-- [X] T025 `tests/`: content parity and empties, tokens drift, the document contract (no module
-  script, one `<h1>`, canonical, hreflang, JSON-LD), copy lint over the components, contact links
-  (FR-004, SC-001, SC-004, SC-006)
+- [X] T025 `tests/`: content parity and empties, tokens drift, the document contract (markup before
+  any script, one `<h1>`, canonical, hreflang, JSON-LD), the locale store and detection (jsdom), copy
+  lint over the components, contact links — 30 tests (FR-004, SC-001, SC-004, SC-006)
 - [X] T026 `docs/DEPLOY.md`: Vercel project, environment variables, the Cloudflare → Vercel
   DNS table, verification commands, rollback, and the move to `bizview-site` (FR-019, FR-020)
 - [X] T027 Root `README.md` / `README.es.md` point at `getbizview.com` instead of a domain the
   product does not own (FR-013)
 - [X] T028 Measured at 375×667 and 360×780: no horizontal overflow, headline + both actions + whole
   phone shot inside the first screen, in both languages (SC-002)
-- [X] T029 `npm test` 21 passed, `npm run typecheck` clean, `npm run build:preview` 240 kB with no
-  JavaScript, `npm run build` refuses to run without `content/private.json` and publishes the prices
+- [X] T029 `npm test` 30 passed, `npm run typecheck` clean, `npm run build:preview` ~155 kB over the wire
+  with a deferred 81 kB bundle, `npm run build` refuses to run without `content/private.json` and publishes the prices
   when it is present (SC-003, SC-004) — re-run from a clean clone of `bizview-site`, where the tokens
   arrive through `PRODUCT_DIR`/`PRODUCT_THEME_TAG` instead of the sibling folder
 - [X] T029a `vitest` scoped to `tests/**`: a product checkout inside `.product/` turned 4 test files
@@ -113,6 +118,3 @@ already carries what it needs.
 - [ ] T035 **owner** Lighthouse mobile ≥ 90 in the four categories on the deployed URLs, both
   languages, both themes (FR-009, SC-001)
 - [ ] T036 **owner** Re-run `npm run og` and commit when the headline or the subtitle changes (D7)
-- [ ] T037 **owner decision** Optionally add language auto-detection on `/` (one inline script +
-  a CSP hash, plan's deviation note) if a non-Spanish visitor landing on Spanish copy turns out to
-  matter more than `script-src 'none'`
