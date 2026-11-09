@@ -12,7 +12,7 @@ contrato publicado, y el producto las valida, las importa, las ejecuta cada día
 resultado. El producto no escribe nada por su cuenta, y ningún modelo genera código que el servidor
 ejecute.
 
-[Instalar](#instalación-docker-compose) · [Producto alojado](https://bizview.com) · [Conectar mi ERP](docs/AUTHORING.md)
+[Instalar](#instalación-docker-compose) · [Sitio web](https://getbizview.com) · [Conectar mi ERP](docs/AUTHORING.md)
 
 ## Instalación (Docker Compose)
 

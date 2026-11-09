@@ -12,7 +12,7 @@ in the project editor, or with whatever AI you prefer — against a published co
 product validates them, imports them, runs them every day and shares the result. The product never
 authors, and no model ever produces code the server executes.
 
-[Install](#install-docker-compose) · [Hosted product](https://bizview.com) · [Connect my ERP](docs/AUTHORING.md)
+[Install](#install-docker-compose) · [Website](https://getbizview.com) · [Connect my ERP](docs/AUTHORING.md)
 
 ## Install (Docker Compose)
 

@@ -33,6 +33,30 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The public site the product never had (feature 032)**. It lives in its own private repository,
+  `dvconsultores/bizview-site`, because prices and contacts are not part of the AGPL product; what is
+  here is the feature's spec. Two pre-rendered documents —
+  `/` in Spanish and `/en/` in English — one stylesheet and **no JavaScript at all**: the language
+  switch is a link, the FAQ is `<details>`, dark mode is a `prefers-color-scheme` block over the same
+  tokens, so the CSP can say `script-src 'none'` and the page is finished markup when the first byte
+  arrives (~240 kB, no web font). It says what the product is *today*: authoring happens outside
+  BizView with any AI, the starter zip goes in and the project zip comes back, no chat and no AI key
+  to run it — the copy list is grounded in this file, never in the removed agent. Every sentence,
+  price, link and flag lives in `content/{es,en}.json`, so a copy change is a commit and no code
+  change; **prices and contact details are not in this repository**, they are the git-ignored
+  `content/private.json` overlay and the production build refuses to publish while any of them is
+  missing. The design tokens are extracted from `frontend/src/index.css` by
+  `scripts/sync-tokens.mjs` (with a drift test), and the hero's phone is **drawn** from the tokens
+  rather than photographed, because the demo installation it should show does not exist yet —
+  `media.useMockups` flips it to a real screenshot when it does. Contact actions are WhatsApp deep
+  links whose message is already written in the visitor's language, with `mailto:` beside them. 21
+  contract tests cover content parity, token drift, the document contract (one `<h1>`, canonical,
+  `hreflang`, JSON-LD), the copy lint and the contact links; at 375×667 the headline, both actions and
+  the whole phone shot fit the first screen with no horizontal overflow. `vercel.json` carries the
+  build, the redirects, the security headers and the cache policy, and the site's `docs/DEPLOY.md` the
+  Vercel project, the environment variables, the exact Cloudflare → Vercel DNS table, the launch
+  checks, the rollback and the move to the private `bizview-site` repository that the spec asks for.
+  The root README now links to `getbizview.com` instead of a domain the product does not own.
 - **Five more kinds of data source (feature 061)**. A customer's ERP on MySQL or SQL Server, a
   desktop system exported to a `.sqlite` file, a consultant's data in BigQuery and a business's
   prices in a Google Sheet could not be read until now. Each of the five behaves exactly like a
