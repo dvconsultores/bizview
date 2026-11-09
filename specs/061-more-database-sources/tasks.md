@@ -87,7 +87,11 @@ then the wiring, the docs and the gates.
 
 - [X] T018 `alembic/versions/0056_more_source_kinds.py` widens `ck_data_source_kind` to the nine
       values and refuses to downgrade while a new kind exists; `models.SOURCE_KINDS` mirrors it.
-      *Verified by* the suite's migrations run.
+      It also repairs the `audit_event` CHECK 0055 left short, from a **frozen** list of every kind
+      a database may *hold* (union with what the live constraint already accepts), because a
+      migration may not import `app.models` and `AUDIT_KINDS` is only what may be *written*.
+      *Verified by* `tests/test_audit_constraint_upgrade.py` (6 tests, one of them rebuilding the
+      constraint as 0055 shipped it and upgrading to head).
 - [X] T019 `schemas.py`: the five field tuples, `FIELDS`, `KINDS`, per-kind default ports in
       `_check_destinations`, and `types_for` gaining `available`/`reason` (with SQLite omitted when
       no folder is configured). *Verified by* `::test_a_kind_without_a_folder_is_not_offered`,
@@ -117,8 +121,9 @@ then the wiring, the docs and the gates.
 - [X] T027 `tests/test_source_kinds.py`: 46 tests over the registry, the five kinds, the read-only
       rule, the ceilings and the form.
 - [X] T028 `tests/test_connectors.py`, `tests/test_sources_api.py`, `tests/test_source_structure.py`,
-      `tests/test_starter_api.py` (14), `tests/test_guide*.py`, the frontend's 782 unit tests and
-      `scripts/gates/all.sh`: green (SC-001 for the four existing kinds).
+      `tests/test_starter_api.py` (14), `tests/test_audit_constraint_upgrade.py` (6),
+      `tests/test_guide*.py`, the frontend's 782 unit tests and `scripts/gates/all.sh`: green
+      (SC-001 for the four existing kinds).
       Five tests in `tests/test_bi_ready_declaration.py`, two in `tests/test_source_structure_ai.py`
       and one in `tests/test_bulk_extract.py` fail **on `HEAD` too** — their fakes for
       `describe()` do not accept the `date_ranges`/`name` arguments the dispatcher already passed

@@ -26,6 +26,12 @@ All notable changes to this project are documented here. The format follows
 - **`SOURCES_FILES_DIR`**, the only folder a SQLite source may read from; when it is unset the kind
   is not offered at all, and a path outside it (a `..`, a symlink escaping it, the product's own
   database) cannot be saved.
+- **The upgrade repairs the audit constraint 0055 left short.** Two literals of 0055's frozen list
+  ran together, so the CHECK it created forbade `starter_downloaded`, the three `mail_list_*` kinds
+  and `mail_send_resent`: a starter-pack download and every mailing-list action failed on the audit
+  insert. `0056_more_source_kinds` rebuilds that constraint from every kind a database may hold —
+  including the removed agent's `assistant_*` rows — and only ever grows it, so an installation that
+  failed this upgrade before now completes it.
 - **`docs/INSTALL.md` and its Spanish pair gain one section per kind**: the minimum privilege, the
   exact `GRANT`/`CREATE LOGIN` to paste, TLS, and the mounted folder for SQLite — plus a help topic
   «MySQL, SQL Server, SQLite, BigQuery y Google Sheets» in both languages.

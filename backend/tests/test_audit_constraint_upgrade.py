@@ -19,6 +19,8 @@ from app.db import get_engine
 from app.models import AUDIT_KINDS, AUDIT_KINDS_ALLOWED, HISTORICAL_AUDIT_KINDS
 from tests.conftest import TEST_SCHEMA, alembic_cfg, drop_test_schema, sql
 
+AUDIT_CHECK = "ck_audit_event_ck_audit_event_kind"
+
 # The kinds and counts the affected installation had (read-only inspection, 2026-11-01).
 AFFECTED = {
     "assistant_attachment_deleted": 2, "assistant_attachment_uploaded": 12,
@@ -145,6 +147,57 @@ def test_an_empty_database_upgrades():
         command.upgrade(alembic_cfg(), "head")
         assert sql("SELECT count(*) FROM audit_event") == [(0,)]
         assert sql("SELECT version_num FROM alembic_version") != []
+    finally:
+        _leave_at_head()
+
+
+def test_five_thousand_five_five_s_broken_constraint_is_repaired_at_head():
+    """`0056` heals a database that upgraded while 0055 shipped a broken audit CHECK.
+
+    The defect: two literals of 0055's frozen copy ran together (`"project_reverted"` + newline +
+    `"starter_downloaded""mail_list_created"`), so Python concatenated three names into one and the
+    constraint 0055 created forbade `starter_downloaded`, the three `mail_list_*` kinds and
+    `mail_send_resent`. A starter download, a mailing list and every mailing-list send therefore
+    died on the audit insert.
+
+    0055 is repaired in place for fresh installations, so this test rebuilds the constraint exactly
+    as it shipped and then upgrades to head: `0056` must accept the kinds the product writes — and
+    the history a database already holds, including the removed agent's `assistant_*` rows, which
+    is why building that CHECK from `AUDIT_KINDS` alone made an installation with history fail.
+    """
+    broken = (
+        "kind IN ('login_ok', 'assistant_run_applied', 'project_reverted', "
+        "'mail_list_created', 'integration_busy')"
+    )
+    try:
+        _reset_and_build("0055_source_connection_limits")
+        with get_engine().begin() as c:
+            c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+            c.execute(text(f"ALTER TABLE audit_event DROP CONSTRAINT {AUDIT_CHECK}"))
+            c.execute(text(
+                f"ALTER TABLE audit_event ADD CONSTRAINT {AUDIT_CHECK} CHECK ({broken})"))
+        _seed({"assistant_run_applied": 2, "login_ok": 1})
+
+        # As it shipped: a kind the product writes is refused.
+        with pytest.raises(IntegrityError):
+            with get_engine().begin() as c:
+                c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+                c.execute(text("INSERT INTO audit_event (kind) VALUES ('starter_downloaded')"))
+
+        command.upgrade(alembic_cfg(), "head")
+
+        after = _kinds_in(_constraint())
+        assert set(AUDIT_KINDS) <= after, "a kind the product writes is still refused after 0056"
+        assert set(HISTORICAL_AUDIT_KINDS) <= after, "the upgrade dropped history it must keep"
+        assert {"starter_downloaded", "mail_list_created", "mail_list_updated",
+                "mail_list_deleted", "mail_send_resent"} <= after
+
+        # The repaired constraint still refuses a kind nobody knows, and the rows are untouched.
+        with pytest.raises(IntegrityError):
+            with get_engine().begin() as c:
+                c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+                c.execute(text("INSERT INTO audit_event (kind) VALUES ('kind_from_the_future')"))
+        assert len(_rows()) == 3
     finally:
         _leave_at_head()
 
