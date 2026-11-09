@@ -81,3 +81,13 @@ Two findings the measurements produced beyond the brief, both recorded in [resea
 - **R8**: "the title is ≥ 60 % of the header" cannot hold at 360 px with five 44 px targets (328 px
   header, ~140 px of actions). The requirement is implemented as its measurable intent — more than
   half the header, one line, never stacked — and the arithmetic is in the contract.
+
+## Follow-up (owner, 2026-11-09): "parameters and filter in mobile need a little bit more wide"
+
+- [x] T020 [US2] The sheet's body gutter is 12 px on phones (16 from 640 px), and the period row's
+  column floor is 130 px instead of 160, per FR-005 (partial). Two measurements caused the complaint:
+  the 16 px gutter left 328 px at 360 px, and `minmax(160px,1fr)` needs 332 px for two columns plus
+  the 12 px gap — so **Período and Comparar con stacked**, and every control read as narrow. Now the
+  pair shares the row from 320 px (as 059 promised) and each control is ≥ 150 px wide at 360 px.
+  *Verified by* `tests/e2e/mobile-fixes.spec.ts` ("uses the whole width", measuring the computed
+  gutter and both boxes) and `tests/unit/report-sheet-phone.test.tsx`.

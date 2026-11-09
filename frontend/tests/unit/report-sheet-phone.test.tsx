@@ -101,10 +101,12 @@ describe("the Parámetros tab on a phone", () => {
     }
   });
 
-  it("puts the period and the comparison on one row when two 160 px columns fit", async () => {
+  it("puts the period and the comparison on one row from 320 px", async () => {
+    // Feature 062: the threshold was 160 px, which needed 332 px for two columns plus the gap — more
+    // than a 360 px phone has after its gutter, so the pair stacked and every control looked narrow.
     await renderPanel();
     const row = ancestorWith(field(t.reportParams.period), "max-sm:grid-cols-[repeat");
-    expect(row.className).toContain("max-sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]");
+    expect(row.className).toContain("max-sm:grid-cols-[repeat(auto-fit,minmax(130px,1fr))]");
     // Both controls live in that row.
     expect(row.contains(field(t.reportParams.compare))).toBe(true);
   });

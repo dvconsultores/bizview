@@ -24,6 +24,9 @@ All notable changes to this project are documented here. The format follows
   instead of floating 80 px above the bottom on a blurred bar that covered the fields it saves, in
   the order **Guardar**, **Probar conexión**, **Eliminar fuente**. A grep gate refuses
   `sticky bottom-20` and `writing-mode` in `frontend/src` so the two patterns cannot return.
+  The sheet's controls are also **wider on a phone**: the body's gutter is 12 px instead of 16, and
+  **Período** and **Comparar con** share their row again — the 160 px column floor needed 332 px,
+  three more than a 360 px phone has, so the pair had been stacking.
 
 ### Added
 

@@ -242,7 +242,7 @@ export function ReportSheet({
         /* Feature 062: the body reserves the footer's measured height (plus a gutter), so the last
             control can be scrolled fully clear of it at any viewport height. */
         style={{ paddingBottom: footerHeight ? `${footerHeight + 16}px` : undefined }}
-        className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 outline-none [scroll-padding-bottom:5rem] sm:pt-4"
+        className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 outline-none [scroll-padding-bottom:5rem] sm:px-4 sm:pt-4"
       >
         {children}
       </div>

@@ -223,8 +223,11 @@ export function ParamsForm({
     >
       <div className="space-y-4 max-sm:space-y-3">
         {/* Feature 059: one label per control, 12 px apart on phones; the period and the comparison
-            share a row whenever two 160 px columns fit (below that they stack). */}
-        <div className="max-sm:grid max-sm:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] max-sm:gap-3">
+            share a row whenever two columns fit, which 059 put at 320 px of viewport.
+            Feature 062: the threshold was 160 px, so on a 360 px phone (328 px of content) the two
+            columns needed 332 and stacked — the owner's "needs a little more width". At 130 px the
+            pair shares the row from 320 px, which is exactly what 059 promised. */}
+        <div className="max-sm:grid max-sm:grid-cols-[repeat(auto-fit,minmax(130px,1fr))] max-sm:gap-3">
           {section !== "filters" && (
             <div className="space-y-4 max-sm:order-1 max-sm:space-y-0">
               {heading(t.reportParams.periodSection)}

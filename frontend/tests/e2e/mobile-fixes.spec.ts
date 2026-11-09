@@ -96,6 +96,50 @@ test.describe("the filters sheet on a phone (US2)", () => {
     });
   }
 
+  test("uses the whole width: Período and Comparar con share the row at 360 px", async ({ page }) => {
+    // The owner: "parameters and filter in mobile need a little bit more wide". Two causes, both
+    // geometric: the body's 16 px gutter left 328 px, and the grid's 160 px minimum needed 332 for
+    // two columns, so the pair stacked at 360 px and every control read as narrow.
+    await page.setViewportSize(PHONES[0]);
+    await openReport(page);
+    await page.getByRole("button", { name: /^Parámetros/ }).click();
+    await expect(page.getByTestId("report-sheet")).toBeVisible();
+    await settled(page);
+
+    const measured = await page.evaluate(() => {
+      const dialog = document.querySelector<HTMLElement>('[data-testid="report-sheet"]')!;
+      const body = dialog.querySelector<HTMLElement>('[role="tabpanel"]')!;
+      const box = (label: string) => {
+        const field = [...body.querySelectorAll<HTMLElement>("label")]
+          .find((element) => (element.textContent ?? "").trim() === label);
+        if (!field) return null;
+        const control = field.parentElement ?? field;
+        const rect = control.getBoundingClientRect();
+        return { top: Math.round(rect.top), left: Math.round(rect.left),
+                 width: Math.round(rect.width), bottom: Math.round(rect.bottom) };
+      };
+      return {
+        period: box("Período"),
+        compare: box("Comparar con"),
+        bodyPadding: parseFloat(getComputedStyle(body).paddingLeft),
+        bodyWidth: Math.round(body.getBoundingClientRect().width),
+        scrollWidth: Math.round(body.scrollWidth),
+      };
+    });
+    expect(measured.period, "the period control must be in the sheet").not.toBeNull();
+    expect(measured.compare, "the comparison control must be in the sheet").not.toBeNull();
+    // A 12 px gutter, not 16: the controls gain 8 px of width.
+    expect(measured.bodyPadding).toBeLessThanOrEqual(12);
+    // They share the row (059's promise from 320 px), and each is at least 150 px wide.
+    expect(measured.period!.top).toBe(measured.compare!.top);
+    expect(measured.compare!.left).toBeGreaterThan(measured.period!.left + measured.period!.width - 1);
+    for (const control of [measured.period!, measured.compare!]) {
+      expect(control.width, "a control is never narrower than 150 px").toBeGreaterThanOrEqual(150);
+    }
+    // And nothing overflows the sheet horizontally.
+    expect(measured.scrollWidth).toBeLessThanOrEqual(measured.bodyWidth + 1);
+  });
+
   test("closes with the phone's back button and leaves focus on the opener", async ({ page }) => {
     await page.setViewportSize(PHONES[0]);
     await openReport(page);
