@@ -70,7 +70,7 @@ describe("the breadcrumb", () => {
 });
 
 describe("the report actions row", () => {
-  it("stacks its icon over the label in a 72 px button under 420 px", async () => {
+  it("stacks its icon over the label and shares the row under 420 px", async () => {
     const { ReportActions } = await import("../../src/components/report/ReportActions");
     await render(
       <ReportActions
@@ -82,12 +82,15 @@ describe("the report actions row", () => {
     );
     const row = container.querySelector('[data-testid="report-actions"]') as HTMLElement;
     expect(row.className).toContain("flex-wrap");
+    // Feature 062: three fixed pills left a third of the row empty on a phone, so below 420 px the
+    // controls grow to share it instead of hugging the left edge.
+    expect(row.className).toContain("max-[420px]:flex-nowrap");
     const buttons = Array.from(row.querySelectorAll("button")).filter((b) =>
       b.className.includes("max-[420px]:flex-col"),
     );
     expect(buttons.length).toBeGreaterThanOrEqual(2);
     for (const button of buttons) {
-      expect(button.className).toContain("max-[420px]:w-[72px]");
+      expect(button.className).toContain("max-[420px]:flex-1");
       expect(button.className).toContain("max-[420px]:text-[11px]");
       // The accessible name is still the full label, so the short form is only visual.
       expect(button.getAttribute("aria-label")).toBeTruthy();

@@ -154,6 +154,40 @@ test.describe("the filters sheet on a phone (US2)", () => {
   });
 });
 
+test.describe("the report's control row (US2, owner follow-up)", () => {
+  test("fills the phone's width instead of hugging the left edge", async ({ page }) => {
+    // The owner's screenshot: Filtros, Parámetros and "⋯" were three small pills on the left and a
+    // third of the row was empty right where the next control would be.
+    await page.setViewportSize(PHONES[0]);
+    await openReport(page);
+    const row = page.getByTestId("report-actions");
+    await expect(row).toBeVisible();
+    const measured = await page.evaluate(() => {
+      const element = document.querySelector<HTMLElement>('[data-testid="report-actions"]')!;
+      const buttons = [...element.querySelectorAll<HTMLElement>("button")];
+      return {
+        rowWidth: Math.round(element.getBoundingClientRect().width),
+        rowLeft: Math.round(element.getBoundingClientRect().left),
+        right: Math.round(element.getBoundingClientRect().right),
+        pageRight: Math.round(document.querySelector("main")!.getBoundingClientRect().right),
+        buttons: buttons.map((button) => ({
+          label: (button.getAttribute("aria-label") ?? "").slice(0, 20),
+          width: Math.round(button.getBoundingClientRect().width),
+          height: Math.round(button.getBoundingClientRect().height),
+        })),
+      };
+    });
+    expect(measured.buttons.length).toBeGreaterThanOrEqual(3);
+    // Every control is a 44 px target, and together they reach the page's right edge (within the
+    // 16 px gutter), instead of stopping at 203 px of a 336 px row.
+    for (const button of measured.buttons) {
+      expect(button.height, `${button.label} keeps its 44 px`).toBeGreaterThanOrEqual(44);
+      expect(button.width, `${button.label} shares the row`).toBeGreaterThanOrEqual(80);
+    }
+    expect(measured.rowWidth).toBeGreaterThanOrEqual(measured.pageRight - measured.rowLeft - 20);
+  });
+});
+
 test.describe("the maximized card's header (US3)", () => {
   test("titles a KPI with its metric's label on one line, never the component id", async ({ page }) => {
     await page.setViewportSize(PHONES[0]);

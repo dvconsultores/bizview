@@ -74,11 +74,17 @@ export function ReportActions({
   }, [open]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="report-actions">
+    /* Feature 062: on a phone the controls share the row instead of hugging the left edge. Below
+       420 px they were three pills of 72 + 72 + 44 = 203 px inside 336 px, so a third of the row was
+       empty right where a reader looks for the next control. */
+    <div
+      className="flex flex-wrap items-center gap-2 max-[420px]:w-full max-[420px]:flex-nowrap"
+      data-testid="report-actions"
+    >
       <span data-sheet-opener className="contents">
         <Button
           variant="secondary"
-          className="max-[420px]:w-[72px] max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
+          className="max-[420px]:flex-1 max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
           icon={<SlidersHorizontal className="h-5 w-5" aria-hidden />}
           onClick={onOpenFilters}
           aria-label={t.reportActions.filters(activeFilters)}
@@ -89,7 +95,7 @@ export function ReportActions({
       <span data-sheet-opener className="contents">
         <Button
           variant="secondary"
-          className="max-[420px]:w-[72px] max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
+          className="max-[420px]:flex-1 max-[420px]:flex-col max-[420px]:gap-1 max-[420px]:px-1 max-[420px]:py-1.5 max-[420px]:text-[11px] max-[420px]:leading-none"
           icon={<SlidersHorizontal className="h-5 w-5" aria-hidden />}
           onClick={onOpenParams}
           aria-label={t.reportActions.params}
@@ -117,14 +123,17 @@ export function ReportActions({
       </div>
       ) : null}
 
-      <div className={collapsed.length > 0 ? "relative" : "hidden"} ref={menuRef}>
+      <div
+        className={`${collapsed.length > 0 ? "relative" : "hidden"} max-[420px]:flex-1`}
+        ref={menuRef}
+      >
         <button
           ref={triggerRef}
           type="button"
           aria-label={t.reportActions.more}
           aria-haspopup="menu"
           aria-expanded={open}
-          className={iconButtonClass()}
+          className={`${iconButtonClass("neutral", "max-[420px]:w-full max-[420px]:shrink")}`}
           onClick={() => setOpen((value) => !value)}
         >
           <MoreHorizontal className="h-5 w-5" aria-hidden />

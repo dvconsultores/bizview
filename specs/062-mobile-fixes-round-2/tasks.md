@@ -91,3 +91,13 @@ Two findings the measurements produced beyond the brief, both recorded in [resea
   pair shares the row from 320 px (as 059 promised) and each control is ≥ 150 px wide at 360 px.
   *Verified by* `tests/e2e/mobile-fixes.spec.ts` ("uses the whole width", measuring the computed
   gutter and both boxes) and `tests/unit/report-sheet-phone.test.tsx`.
+
+## Follow-up 2 (owner, 2026-11-09): the report's own control row
+
+- [x] T021 [US2] The **Filtros · Parámetros · ⋯** row fills the phone's width. Below 420 px the row was
+  a content-sized flex item — 203 px of a 336 px line — so the three controls hugged the left edge and
+  a third of the row was empty. It is now `w-full max-[420px]:flex-nowrap` with each control `flex-1`
+  (the menu trigger `w-full`), which gives three equal ~106 px targets and keeps every one ≥ 44 px
+  tall. *Verified by* `tests/e2e/mobile-fixes.spec.ts` ("fills the phone's width instead of hugging the
+  left edge": each control ≥ 80 px wide, ≥ 44 px tall, row reaching the page's right edge) and
+  `tests/unit/app-shell-phone.test.tsx`.

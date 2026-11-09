@@ -26,7 +26,10 @@ All notable changes to this project are documented here. The format follows
   `sticky bottom-20` and `writing-mode` in `frontend/src` so the two patterns cannot return.
   The sheet's controls are also **wider on a phone**: the body's gutter is 12 px instead of 16, and
   **Período** and **Comparar con** share their row again — the 160 px column floor needed 332 px,
-  three more than a 360 px phone has, so the pair had been stacking.
+  three more than a 360 px phone has, so the pair had been stacking. The report's own row of
+  **Filtros · Parámetros · ⋯** fills the line too: it was a content-sized flex item of 203 px inside
+  336 px, so the three controls hugged the left edge and left a third of the row empty; they now share
+  it as three equal targets.
 
 ### Added
 
