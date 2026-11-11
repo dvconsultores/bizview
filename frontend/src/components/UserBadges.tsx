@@ -1,4 +1,4 @@
-import { Ban, Check, KeyRound, Lock, Shield, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Ban, Check, Globe, KeyRound, Lock, Send, Shield, ShieldCheck, User as UserIcon } from "lucide-react";
 import type { User } from "../api/types";
 import { useT } from "../i18n";
 import { isLocked } from "../lib/format";
@@ -21,10 +21,20 @@ export function StatusBadges({ user }: { user: User }) {
     badges.push(<Badge key="inactive" tone="gray" icon={<Ban className={ICON} aria-hidden />}>{t.status.inactive}</Badge>);
   } else {
     const locked = isLocked(user.locked_until);
+    const passwordless = !user.has_password;
     if (locked) badges.push(<Badge key="locked" tone="red" icon={<Lock className={ICON} aria-hidden />}>{t.status.locked}</Badge>);
-    if (user.must_change_password)
+    if (passwordless) {
+      // Convergence 054b: an account without a password signs in with Google or Telegram only.
+      const telegram = user.auth_provider === "telegram";
+      badges.push(
+        <Badge key="provider" tone="blue" icon={telegram ? <Send className={ICON} aria-hidden /> : <Globe className={ICON} aria-hidden />}>
+          {telegram ? t.status.onlyTelegram : t.status.onlyGoogle}
+        </Badge>,
+      );
+    } else if (user.must_change_password) {
       badges.push(<Badge key="temp" tone="amber" icon={<KeyRound className={ICON} aria-hidden />}>{t.status.temporary}</Badge>);
-    if (!locked && !user.must_change_password)
+    }
+    if (!locked && !passwordless && !user.must_change_password)
       badges.push(<Badge key="active" tone="green" icon={<Check className={ICON} aria-hidden />}>{t.status.active}</Badge>);
   }
   return (

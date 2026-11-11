@@ -13,7 +13,9 @@ import { Input } from "../../components/Input";
 import { PageHeader } from "../../components/PageHeader";
 import { PasswordRules } from "../../components/PasswordRules";
 import { RoleTiles } from "../../components/RoleTiles";
+import { Switch } from "../../components/Switch";
 import { View } from "../../components/View";
+import { useBranding } from "../../config/BrandingContext";
 import { useT } from "../../i18n";
 import { generatePassword, passwordProblem } from "../../lib/password";
 
@@ -23,6 +25,8 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export function UserForm() {
   const t = useT();
   const { user: me } = useAuth();
+  const { google_auth, telegram_sign_in } = useBranding();
+  const providersEnabled = google_auth || telegram_sign_in;
   const navigate = useNavigate();
   const location = useLocation();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -30,13 +34,20 @@ export function UserForm() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("user");
   const [pw, setPw] = useState(() => generatePassword());
+  const [passwordless, setPasswordless] = useState(providersEnabled);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [created, setCreated] = useState<{ user: User; password: string } | null>(null);
+  const [created, setCreated] = useState<{ user: User; password: string | null } | null>(null);
   const [goToId, setGoToId] = useState<User["id"] | null>(null);
 
   useEffect(() => nameRef.current?.focus(), []);
+
+  // Convergence 054b: with Google or Telegram available the default is an account without a
+  // password; the config may arrive after the form mounts, so the default follows it once.
+  useEffect(() => {
+    if (providersEnabled) setPasswordless(true);
+  }, [providersEnabled]);
 
   useEffect(() => {
     if (goToId !== null && !((location.state as { view?: string[] } | null)?.view?.length)) {
@@ -51,9 +62,11 @@ export function UserForm() {
     if (!fullName.trim()) found.full_name = t.common.required;
     if (!email.trim()) found.email = t.common.required;
     else if (!EMAIL_RE.test(email.trim())) found.email = t.admin.userPages.invalidEmail;
-    const problem = passwordProblem(pw, email);
-    if (!pw) found.temporary_password = t.common.required;
-    else if (problem) found.temporary_password = t.password.problems[problem];
+    if (!passwordless) {
+      const problem = passwordProblem(pw, email);
+      if (!pw) found.temporary_password = t.common.required;
+      else if (problem) found.temporary_password = t.password.problems[problem];
+    }
     setErrors(found);
     if (found.full_name || found.email || found.temporary_password) return;
 
@@ -64,9 +77,9 @@ export function UserForm() {
         email: email.trim(),
         full_name: fullName.trim(),
         role,
-        temporary_password: pw,
+        temporary_password: passwordless ? null : pw,
       });
-      setCreated({ user, password: pw });
+      setCreated({ user, password: passwordless ? null : pw });
     } catch (err) {
       if (!(err instanceof ApiError) || err.code === "network") {
         setFormError(t.errors.network);
@@ -94,6 +107,7 @@ export function UserForm() {
     setEmail("");
     setRole("user");
     setPw(generatePassword());
+    setPasswordless(providersEnabled);
     setErrors({});
     window.setTimeout(() => nameRef.current?.focus(), 0);
   };
@@ -144,33 +158,44 @@ export function UserForm() {
             adminDisabled={!me?.is_superuser}
             hint={me?.is_superuser ? undefined : t.admin.onlySuperAdmins}
           />
-          <div className="space-y-2">
-            <Input
-              label={t.admin.tempPassword}
-              type="text"
-              required
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              value={pw}
-              onChange={(e) => setPw(e.target.value)}
-              error={errors.temporary_password}
-              hint={t.admin.tempPasswordHint}
-              trailing={
-                <button
-                  type="button"
-                  onClick={() => setPw(generatePassword())}
-                  className="inline-flex min-h-tap items-center rounded-lg px-3 text-sm font-semibold text-accent-strong hover:bg-accent-soft"
-                >
-                  <Wand2 className="mr-1 h-4 w-4" aria-hidden />
-                  {t.admin.generate}
-                </button>
-              }
-              className="[&_input]:pr-32 [&_input]:font-mono"
-            />
-            <PasswordRules password={pw} email={email} />
-          </div>
+          {providersEnabled ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-field px-4 py-3">
+              <div className="min-w-0">
+                <span className="block text-sm font-semibold text-ink-2">{t.admin.noPassword}</span>
+                <span className="block text-xs text-ink-soft">{t.admin.noPasswordHint}</span>
+              </div>
+              <Switch checked={passwordless} onChange={setPasswordless} label={t.admin.noPassword} />
+            </div>
+          ) : null}
+          {!passwordless ? (
+            <div className="space-y-2">
+              <Input
+                label={t.admin.tempPassword}
+                type="text"
+                required
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                error={errors.temporary_password}
+                hint={t.admin.tempPasswordHint}
+                trailing={
+                  <button
+                    type="button"
+                    onClick={() => setPw(generatePassword())}
+                    className="inline-flex min-h-tap items-center rounded-lg px-3 text-sm font-semibold text-accent-strong hover:bg-accent-soft"
+                  >
+                    <Wand2 className="mr-1 h-4 w-4" aria-hidden />
+                    {t.admin.generate}
+                  </button>
+                }
+                className="[&_input]:pr-32 [&_input]:font-mono"
+              />
+              <PasswordRules password={pw} email={email} />
+            </div>
+          ) : null}
           <Button type="submit" loading={submitting} className="w-full sm:w-auto">
             {t.admin.create}
           </Button>
@@ -193,9 +218,15 @@ export function UserForm() {
         {created ? (
           <div className="space-y-3">
             <p className="break-all font-semibold text-ink">{created.user.email}</p>
-            <SecretBox value={created.password} />
-            <CopyButton text={created.password} />
-            <p className="text-sm text-ink-soft">{t.admin.tempPasswordHint}</p>
+            {created.password ? (
+              <>
+                <SecretBox value={created.password} />
+                <CopyButton text={created.password} />
+                <p className="text-sm text-ink-soft">{t.admin.tempPasswordHint}</p>
+              </>
+            ) : (
+              <p className="text-sm text-ink-soft">{t.admin.noPasswordCreated}</p>
+            )}
           </div>
         ) : null}
       </View>

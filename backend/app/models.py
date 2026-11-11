@@ -28,8 +28,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 AUDIT_KINDS = (
     "login_ok", "login_failed", "login_locked", "logout",
-    "user_created", "user_updated", "user_deactivated", "user_reactivated", "role_changed",
-    "password_changed", "password_reset",
+    "user_created", "user_created_without_password", "user_updated", "user_deactivated",
+    "user_reactivated", "role_changed", "password_changed", "password_reset",
     "dashboard_granted", "dashboard_revoked",
     "superuser_created", "superuser_promoted", "superuser_recovered",
     # feature 004
@@ -118,7 +118,11 @@ SOURCE_KINDS = ("postgresql", "soap", "rest", "supabase", "sqlite", "mysql", "ms
 DASHBOARD_STATUSES = ("available", "coming_soon", "hidden")
 ROLES = ("admin", "user")
 #: Feature 054: how the account was created — Google provisioning writes `google` and no password.
-AUTH_PROVIDERS = ("password", "google")
+#: Convergence 054b adds `telegram` for an account an administrator creates for Telegram only.
+AUTH_PROVIDERS = ("password", "google", "telegram")
+#: Convergence 054b: the credential a session was opened with. The forced password change is
+#: evaluated only for `password`: a Google or Telegram sign-in has nothing to change.
+SESSION_CREDENTIALS = ("password", "google", "telegram")
 #: Feature 054: how a Google account obtains a role and dashboards.
 GOOGLE_CONDITIONS = ("domain", "email", "group")     # `group` waits for a Workspace service account
 GOOGLE_ACCESS_MODES = ("none", "all_public", "list")
@@ -212,6 +216,9 @@ class AppUser(Base):
 
 class UserSession(Base):
     __tablename__ = "user_session"
+    __table_args__ = (
+        CheckConstraint(_in("credential", SESSION_CREDENTIALS), name="credential"),
+    )
 
     id_hash: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -222,6 +229,9 @@ class UserSession(Base):
     user_agent: Mapped[str | None] = mapped_column(Text)
     ip: Mapped[str | None] = mapped_column(INET)
     mfa_pending: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # Convergence 054b: how this session signed in. A Google/Telegram session skips the forced
+    # password change; the account's flag stays until a password sign-in asks for it.
+    credential: Mapped[str] = mapped_column(Text, server_default=text("'password'"))
     reauth_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

@@ -14,6 +14,9 @@ export interface User {
   is_superuser: boolean;
   is_active: boolean;
   must_change_password: boolean;
+  /** Convergence 054b: false for an account created for Google/Telegram without a password. */
+  has_password: boolean;
+  auth_provider?: "password" | "google" | "telegram";
   locked_until: string | null;
   last_login_at: string | null;
   created_at: string;

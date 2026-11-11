@@ -76,18 +76,26 @@ def refuse_inactive_or_locked(db: Session, user, ip: str | None, *, method: str)
         raise ApiError(401, "invalid_credentials", M("auth.account_disabled"))
 
 
+def _credential(method: str) -> str:
+    """The session records the credential, not the endpoint name (convergence 054b)."""
+    return method if method in ("google", "telegram") else "password"
+
+
 def finish_sign_in(db: Session, user, request: Request, response: Response, ip: str | None,
                    *, method: str = "password") -> dict:
     """Shared by every sign-in method once the credential is proven: two-step or session."""
+    credential = _credential(method)
     if mfa.enabled(user):
         # Credential accepted; the session only allows the second-factor step for 5 minutes.
-        raw = sessions.create(db, user, request.headers.get("user-agent"), ip, mfa_pending=True)
+        raw = sessions.create(db, user, request.headers.get("user-agent"), ip,
+                              mfa_pending=True, credential=credential)
         sessions.set_cookie(response, raw)
         return {"mfa_required": True}
     if profile.mfa_required_for(user.role, get_settings()):
         # The profile demands a second factor this account has not enrolled yet (a superuser
         # `reset_mfa`, or a never-enrolled admin). The session may only enrol it, never act.
-        raw = sessions.create(db, user, request.headers.get("user-agent"), ip, mfa_pending=True)
+        raw = sessions.create(db, user, request.headers.get("user-agent"), ip,
+                              mfa_pending=True, credential=credential)
         sessions.set_cookie(response, raw)
         return {"mfa_required": True, "mfa_enrollment_required": True}
     return _complete_login(db, user, request, response, ip, method=method)
@@ -95,14 +103,16 @@ def finish_sign_in(db: Session, user, request: Request, response: Response, ip: 
 
 def _complete_login(db: Session, user, request: Request, response: Response,
                     ip: str | None, *, method: str = "password") -> dict:
+    credential = _credential(method)
     user.failed_attempts = 0
     user.locked_until = None
     user.last_login_at = users.now()
-    raw = sessions.create(db, user, request.headers.get("user-agent"), ip)
+    raw = sessions.create(db, user, request.headers.get("user-agent"), ip, credential=credential)
     audit.record(db, "login_ok", actor_id=user.id, target_id=user.id, ip=ip,
                  detail={"method": method} if method != "password" else None)
     sessions.set_cookie(response, raw)
-    return {"user": user_json(user)}
+    return {"user": user_json(user, password_change_required=(
+        user.must_change_password and credential == "password"))}
 
 
 @router.post("/mfa")
@@ -126,8 +136,9 @@ def second_factor(body: MfaIn, request: Request, response: Response,
         _fail(db, ip)
         raise lock or INVALID_CODE
     # Replace the pending session with a fresh one (no session fixation across the two steps).
+    method = auth.session.credential
     db.delete(auth.session)
-    return _complete_login(db, user, request, response, ip)
+    return _complete_login(db, user, request, response, ip, method=method)
 
 
 @router.post("/reauth", status_code=204)

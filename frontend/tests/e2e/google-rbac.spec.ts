@@ -137,6 +137,48 @@ test("a foreign domain is refused with the generic message and the reason stays 
   expect(refused.items.some((e) => e.detail?.reason === "domain_not_allowed")).toBe(true);
 });
 
+test("an administrator creates a Google-only user and the granted dashboards are there", async ({ page }, info) => {
+  const email = `solo-${info.project.name}-${Date.now()}@empresa.com`;
+  await signIn(page);
+  await page.goto("/admin/usuarios/nuevo");
+
+  await page.getByLabel("Nombre completo").fill("Cuenta Google");
+  await page.getByLabel("Correo electrónico").fill(email);
+  // Convergence 054b: Google is enabled, so no password is the default, and the temporary
+  // password field is not offered.
+  const noPassword = page.getByRole("switch", { name: "Sin contraseña (solo Google / Telegram)" });
+  await expect(noPassword).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByLabel("Contraseña temporal")).toHaveCount(0);
+  await page.getByRole("button", { name: "Crear usuario" }).click();
+
+  const created = page.getByRole("region", { name: "Usuario creado." });
+  await expect(created).toContainText("No se creó contraseña");
+  await created.getByRole("button", { name: "Ver usuario" }).click();
+  await expect(page.getByText("Solo Google")).toBeVisible();
+  await expect(page.getByText("Clave temporal")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/admin\/usuarios\/\d+$/);
+  const id = Number(page.url().split("/").pop());
+
+  // Grant one dashboard through the existing access endpoint.
+  const detail = (await (await page.request.get(`/api/admin/users/${id}`)).json()) as {
+    dashboards: { code: string; name: string; status: string }[];
+  };
+  const granted = detail.dashboards.find((d) => d.status === "available");
+  expect(granted).toBeTruthy();
+  const put = await page.request.put(`/api/admin/users/${id}/dashboards`, {
+    headers: FETCH,
+    data: { codes: [granted!.code] },
+  });
+  expect(put.ok(), await put.text()).toBeTruthy();
+
+  // From now on the account signs in with Google and lands in the app, not on /cambiar-clave.
+  await page.context().clearCookies();
+  await signInWithGoogle(page, email);
+  await expect(page).not.toHaveURL(/ingresar|cambiar-clave/);
+  await page.goto("/tableros");
+  await expect(page.getByRole("link", { name: granted!.name }).first()).toBeVisible();
+});
+
 test("the Seguridad card edits the domains and the rules, and the sheet is accessible", async ({ page }) => {
   await signIn(page);
   await page.goto("/admin/seguridad");

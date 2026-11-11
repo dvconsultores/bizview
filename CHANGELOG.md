@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The temporary-password step no longer follows the person, only the credential (convergence
+  054b)**. An account an administrator created with a temporary password was sent to
+  `/cambiar-clave` even after **Continuar con Google**: the gate read `must_change_password`, not
+  how the session had signed in. The session now records `password`, `google` or `telegram`, and
+  the forced change applies only to a password sign-in — the flag stays on the account, so the
+  change is still required the next time the password is used. The user form gains **Sin contraseña
+  (solo Google / Telegram)**, the default when either provider is enabled and shown as the **Solo
+  Google** / **Solo Telegram** badge instead of **Clave temporal**; the password form refuses such
+  an account with the generic message until an administrator adds a password, and the creation is
+  audited as `user_created_without_password` (a skipped step is not an event). Auto-provisioned
+  Google users keep `must_change_password=false`.
+
 - **Five defects a 360 px phone exposed (feature 062)**. All five had been marked done by an earlier
   feature, and all five were found by measuring rather than by reading classes:
   **the sign-in providers** are one full-width 48 px row each again, at every width — 059 had put

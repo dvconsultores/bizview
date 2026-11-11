@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import passwords, sessions
+from app.config import get_settings
 from app.errors import ApiError, forbidden, validation
 from app.i18n import M
 from app.models import AppUser
@@ -106,8 +107,21 @@ def list_users(db: Session, q: str | None, role: str | None, status: str | None,
     return list(rows), total
 
 
+def _passwordless_provider(db: Session) -> str:
+    """Convergence 054b: which provider a password-less account may use. Google first (it is
+    the primary control), Telegram when only its bot is available; refusing when neither is,
+    because the account would have no way in."""
+    if get_settings().google_enabled_effective:
+        return "google"
+    from app.telegram import service as telegram_service
+
+    if telegram_service.is_available(telegram_service.settings_row(db)):
+        return "telegram"
+    raise validation({"temporary_password": "required"}, M("users.password_required"))
+
+
 def create(db: Session, actor: AppUser, *, email: str, full_name: str, role: str,
-           temporary_password: str, ip: str | None) -> AppUser:
+           temporary_password: str | None, ip: str | None) -> AppUser:
     email = passwords.normalise_email(email)
     if not EMAIL_RE.match(email) or len(email) > 254:
         raise validation({"email": "invalid"}, M("users.invalid_email"))
@@ -116,17 +130,23 @@ def create(db: Session, actor: AppUser, *, email: str, full_name: str, role: str
         raise validation({"full_name": "invalid"}, M("users.invalid_full_name"))
     if role == "admin" and not actor.is_superuser:
         raise forbidden(M("users.only_superuser_creates_admins"))
-    check_new_password(temporary_password, email)
+    if temporary_password is not None:
+        check_new_password(temporary_password, email)
     if by_email(db, email):
         raise ApiError(409, "conflict", M("users.email_exists"))
+    provider = _passwordless_provider(db) if temporary_password is None else "password"
     user = AppUser(email=email, full_name=full_name, role=role, created_by=actor.id,
-                   password_hash=passwords.hash_password(temporary_password),
-                   must_change_password=True, is_superuser=False, is_active=True,
-                   failed_attempts=0)
+                   password_hash=(None if temporary_password is None
+                                  else passwords.hash_password(temporary_password)),
+                   auth_provider=provider,
+                   must_change_password=temporary_password is not None,
+                   is_superuser=False, is_active=True, failed_attempts=0)
     db.add(user)
     db.flush()
-    audit.record(db, "user_created", actor_id=actor.id, target_id=user.id, ip=ip,
-                 detail={"email": email, "role": role})
+    audit.record(db, "user_created" if temporary_password is not None
+                 else "user_created_without_password",
+                 actor_id=actor.id, target_id=user.id, ip=ip,
+                 detail={"email": email, "role": role, "auth_provider": provider})
     return user
 
 

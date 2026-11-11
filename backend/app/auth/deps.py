@@ -18,6 +18,12 @@ class Auth:
     user: AppUser
     session: UserSession
 
+    @property
+    def password_change_required(self) -> bool:
+        """Convergence 054b: only a password sign-in owes the change. A Google or Telegram
+        session has nothing to change; the account keeps its flag for the password path."""
+        return self.user.must_change_password and self.session.credential == "password"
+
 
 def client_ip(request: Request) -> str | None:
     """Client address for audit and limits. Uvicorn runs with --proxy-headers behind Caddy, which
@@ -80,7 +86,7 @@ def recent_reauth_or_enrollment(auth: Auth = Depends(self_service_auth)) -> Auth
 
 
 def current_auth(auth: Auth = Depends(auth_allow_temporary)) -> Auth:
-    if auth.user.must_change_password:
+    if auth.password_change_required:
         raise ApiError(403, "password_change_required",
                        M("auth.password_change_required"))
     return auth

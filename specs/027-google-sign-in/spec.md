@@ -33,11 +33,11 @@ Google is an **additional** identity for users who already exist. It does not cr
 - **Password sign-in never disappears.** Even with Google enabled, `/api/auth/login` behaves as it
   does now, so an installation cannot lock itself out of its own superuser through a Google outage,
   a deleted OAuth client, or a mistyped client secret.
-- **A Google-sign-in user still holds a password.** An invited user completes the existing forced
-  password change on first sign-in (the product already routes a `must_change_password` session to
-  `/cambiar-clave`), so Google is an alternative route into an account that also has a break-glass
-  credential. Verified against the code while planning: `POST /api/me/password` is reachable for
-  such a session through `self_service_auth`, so the user is never trapped.
+- **A Google-sign-in user may still hold a password.** An invited user with a password keeps it as a
+  break-glass credential, but the forced change follows the credential that was used (convergence
+  054b): a Google session skips `/cambiar-clave` and the flag stays, so a later password sign-in
+  requires the change. An account created for Google (provisioned, or by an administrator without a
+  password) has no password at all until an administrator sets one.
 - **The second factor is not bypassed.** Google proves *who* someone is; it does not satisfy the
   `internet` profile's two-step requirement for administrators. Both methods end in the same
   `finish_sign_in()`, so an admin still presents a TOTP code (or enrols one).

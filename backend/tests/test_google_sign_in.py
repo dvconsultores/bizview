@@ -365,9 +365,9 @@ def test_internet_admin_without_mfa_may_only_enroll(admin, google_on, monkeypatc
     assert c.get("/api/admin/users").status_code == 401
 
 
-# --- the forced password change is not bypassed (architect) -----------------------------------
+# --- the forced change follows the credential (convergence 054b) -------------------------------
 
-def test_must_change_password_survives_google_sign_in(google_on, monkeypatch):
+def test_a_google_session_skips_the_temporary_password_step(google_on, monkeypatch):
     invited = make_user("invited@example.com", must_change=True)
     install_token(monkeypatch, claims(invited.email))
     c = browser()
@@ -375,20 +375,29 @@ def test_must_change_password_survives_google_sign_in(google_on, monkeypatch):
 
     me = c.get("/api/me")
     assert me.status_code == 200
-    assert me.json()["must_change_password"] is True
-    r = c.get("/api/reports/ventas/data")
-    assert r.status_code == 403
-    assert r.json()["error"]["code"] == "password_change_required"
+    assert me.json()["must_change_password"] is False
+    assert c.get("/api/reports/ventas/data").status_code not in (401, 403)
 
-    # Linking: the forced change is untouched by linking an identity.
+    # The account keeps the flag: a password sign-in still owes the change.
     assert sql("SELECT must_change_password FROM app_user WHERE id = :i",
                i=invited.id)[0][0] is True
     assert sql("SELECT count(*) FROM google_link WHERE user_id = :i",
                i=invited.id)[0][0] == 1
+    kinds = [k for (k,) in sql("SELECT kind FROM audit_event")]
+    assert "password_change_skipped_provider" not in kinds
 
-    changed = c.post("/api/me/password", json={"current_password": PASSWORD,
-                                               "new_password": "Otra-clave-larga-7"})
+    pw = TestClient(app, headers={"X-Requested-With": "fetch"})
+    r = pw.post("/api/auth/login", json={"email": invited.email, "password": PASSWORD})
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["must_change_password"] is True
+    assert pw.get("/api/me").json()["must_change_password"] is True
+    blocked = pw.get("/api/reports/ventas/data")
+    assert blocked.status_code == 403
+    assert blocked.json()["error"]["code"] == "password_change_required"
+
+    changed = pw.post("/api/me/password", json={"current_password": PASSWORD,
+                                                "new_password": "Otra-clave-larga-7"})
     assert changed.status_code == 204, changed.text
-    assert c.get("/api/me").json()["must_change_password"] is False
-    assert c.get("/api/reports/ventas/data").status_code not in (401, 403)
+    assert pw.get("/api/me").json()["must_change_password"] is False
+    assert pw.get("/api/reports/ventas/data").status_code not in (401, 403)
 

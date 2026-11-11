@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/me")
 @router.get("")
 def me(auth: Auth = Depends(self_service_auth), db: Session = DB):
     user = auth.user
-    return {**user_json(user),
+    return {**user_json(user, password_change_required=auth.password_change_required),
             "mfa_required": profile.mfa_required_for(user.role, get_settings()),
             "reauth_valid_until": sessions.reauth_valid_until(auth.session),
             "recovery_codes_left": mfa.recovery_codes_left(db, user) if mfa.enabled(user) else 0,

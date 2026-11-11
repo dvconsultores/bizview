@@ -83,6 +83,20 @@ def sign_in_with_google(monkeypatch, payload: dict) -> httpx.Response | TestClie
     return c.get(f"/api/auth/google/callback?code=fake&state={state}")
 
 
+def google_session(monkeypatch, payload: dict) -> TestClient:
+    """The same flow, keeping the client so the session it opened can be inspected."""
+    fake_exchange(monkeypatch, payload)
+    c = browser()
+    from urllib.parse import urlsplit
+
+    start = c.get("/api/auth/google/start")
+    assert start.status_code == 302, start.text
+    state = parse_qs(urlsplit(start.headers["location"]).query)["state"][0]
+    landed = c.get(f"/api/auth/google/callback?code=fake&state={state}")
+    assert landed.headers["location"] == "/", landed.headers["location"]
+    return c
+
+
 # --- Settings: the card writes what the callback reads ---------------------------------------
 
 def test_domains_come_from_env_until_the_card_saves(superuser, google_on, monkeypatch):
@@ -226,11 +240,12 @@ def test_auto_provision_creates_one_user_with_the_defaults(superuser, google_on,
     assert first.status_code in (302, 307), first.text
     assert first.headers["location"] == "/"
 
-    rows = sql("select id, email, role, auth_provider, password_hash, is_active "
-               "from app_user where email = 'persona@example.org'")
+    rows = sql("select id, email, role, auth_provider, password_hash, is_active, "
+               "must_change_password from app_user where email = 'persona@example.org'")
     assert len(rows) == 1
-    user_id, _email, role, provider, password_hash, active = rows[0]
-    assert (role, provider, password_hash, active) == ("user", "google", None, True)
+    user_id, _email, role, provider, password_hash, active, must_change = rows[0]
+    assert (role, provider, password_hash, active, must_change) == \
+        ("user", "google", None, True, False)
     granted = sql("select dashboard.code from dashboard_access join dashboard "
                   "on dashboard.id = dashboard_access.dashboard_id where user_id = :u",
                   u=user_id)
@@ -286,6 +301,45 @@ def test_a_provisioned_account_cannot_use_the_password_form(superuser, google_on
     detail = sql("select detail from audit_event where kind = 'login_failed' "
                  "and detail ? 'no_credential'")
     assert detail
+
+
+def test_an_admin_creates_an_account_for_google_only(superuser, google_on, monkeypatch):
+    """Convergence 054b: no password, no temporary flag, Google works and the form is refused."""
+    c = signed_in("root@example.com")
+    made = c.post("/api/admin/users", json={
+        "email": "google.only@example.org", "full_name": "Solo Google", "role": "user"})
+    assert made.status_code == 201, made.text
+    body = made.json()
+    assert (body["has_password"], body["auth_provider"], body["must_change_password"]) == \
+        (False, "google", False)
+    assert sql("select password_hash, must_change_password, auth_provider from app_user "
+               "where email = 'google.only@example.org'") == [(None, False, "google")]
+    assert "user_created_without_password" in [
+        k for (k,) in sql("select kind from audit_event")]
+
+    attempt = TestClient(app, headers={"X-Requested-With": "fetch"}).post(
+        "/api/auth/login", json={"email": "google.only@example.org", "password": "cualquiera"})
+    assert attempt.status_code == 401
+    assert attempt.json()["error"]["code"] == "invalid_credentials"
+
+    signed = google_session(monkeypatch, identity(email="google.only@example.org"))
+    me = signed.get("/api/me")
+    assert me.status_code == 200
+    assert me.json()["has_password"] is False
+    assert me.json()["must_change_password"] is False
+
+    # The administrator can add a password later: from then on the temporary flag rules apply.
+    user_id = sql("select id from app_user where email = 'google.only@example.org'")[0][0]
+    reset = c.post(f"/api/admin/users/{user_id}/password",
+                   json={"temporary_password": "Temporal-pass-91"})
+    assert reset.status_code == 204, reset.text
+    pw = TestClient(app, headers={"X-Requested-With": "fetch"}).post(
+        "/api/auth/login", json={"email": "google.only@example.org",
+                                 "password": "Temporal-pass-91"})
+    assert pw.status_code == 200
+    assert pw.json()["user"]["must_change_password"] is True
+    again = google_session(monkeypatch, identity(email="google.only@example.org"))
+    assert again.get("/api/me").json()["must_change_password"] is False
 
 
 def test_an_admin_gives_a_provisioned_account_its_password(superuser, google_on, monkeypatch):

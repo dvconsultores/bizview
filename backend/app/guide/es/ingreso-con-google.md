@@ -35,6 +35,8 @@ con el rol **Superusuario**, en Administración → Seguridad → **Ingreso con 
   regla solo lo cambia si activas «aplicar reglas también a usuarios existentes», y cada cambio
   queda en la auditoría.
 - El botón y estos ajustes solo existen cuando la instalación tiene el ingreso con Google activo.
+- Una cuenta con contraseña temporal que entra con Google no tiene que cambiarla: el cambio se
+  pide solo al entrar con correo y contraseña.
 
 ## Problemas frecuentes
 

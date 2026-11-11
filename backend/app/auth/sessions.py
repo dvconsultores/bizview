@@ -27,9 +27,10 @@ def now() -> datetime:
 
 
 def create(db: Session, user: AppUser, user_agent: str | None, ip: str | None, *,
-           mfa_pending: bool = False) -> str:
+           mfa_pending: bool = False, credential: str = "password") -> str:
     raw = secrets.token_urlsafe(32)
     db.add(UserSession(id_hash=_hash(raw), user_id=user.id, mfa_pending=mfa_pending,
+                       credential=credential,
                        user_agent=(user_agent or "")[:300] or None, ip=ip))
     db.flush()
     return raw

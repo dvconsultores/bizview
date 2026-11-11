@@ -2,194 +2,270 @@
 
 **Feature Branch**: `032-website`
 
-**Created**: 2026-10-13
+**Created**: 2026-10-13 · **Revised**: 2026-11-07 (aligned with the product as shipped through 057; hosting on Vercel behind Cloudflare DNS)
 
 **Status**: Draft
 
 **Input**: Owner, 2026-10-13: "build the web, same look and feel of the app, English and Spanish; I
-will deploy a demo page with a demo dashboard". A single-page marketing site for BizView that looks
-like the product (feature-010 visual system), is available in Spanish and English, presents the three
-ways to get BizView (install free, hosted, consulting/integration), links to the public repository and
-to a live demo installation, and converts through WhatsApp and email. Static: no backend, no accounts.
+will deploy a demo page with a demo dashboard". Owner, 2026-11-06: "update it based on all app
+features". A single-page marketing site for BizView that looks like the product (050 design system,
+047/051 themes), is available in Spanish and English, shows what the product does today — dashboards
+authored outside the app with the AI you already use and imported as one zip — presents the three
+ways to get BizView (install free, hosted, consulting/integration), links to the public repository,
+the docs and a live demo, and converts through WhatsApp and email. Static: no backend, no accounts.
 
-**Depends on**: the public repository being published; a demo installation (seeded data, read-only
-demo user) deployed separately — the site only links to it. The "Funciona con Claude" section depends
-on 016 and is hidden until it ships.
+**Depends on**: the public repository (published); a demo installation (seeded data, read-only
+demo user) deployed separately — the site only links to it; the published
+`bizview-starter-template.zip` (057) to offer as a direct download.
 
 **Repository**: the site lives in its own private repository (`bizview-site`), not in the public
-product repository. It carries prices, contact details and marketing copy, which are not part of the
-product; AGPL covers the product and its modifications, not a site that links to it. The product
-repository stays public and unchanged, so no constitution amendment is needed.
+product repository. It carries prices, contact details and marketing copy; AGPL covers the product,
+not a site that links to it. No constitution amendment is needed.
+
+## What the product is today (the site must say this, nothing older)
+
+- **Authoring happens outside Bizview** with any AI — ChatGPT, Claude, DeepSeek, Gemini, Copilot,
+  Claude Code — or by hand: Bizview hands you a starter zip (prompt, request template, your source's
+  structure, schemas, a working skeleton), your AI returns one project zip, Bizview validates,
+  imports, runs and renders it. There is **no chat inside the product** (045) and **no AI key is
+  needed** to run it (constitution VIII). AI inside Bizview is optional and used for one thing:
+  describing a source's structure ("Generar estructura con IA", 048/052) — never for reading rows.
+- **Spec-driven**: every integration and report ships with its spec, plan and tasks; nothing runs
+  without them (constitution IX). Projects are isolated (037), re-imported as revisions (055), with
+  import allowances (049) and validation identical to the CLI (`bizview validate`).
+- **Sources**: PostgreSQL (incl. Supabase), REST and SOAP, read-only, credentials never leave the
+  installation; the structure pack carries no credentials, hosts or row values.
+- **Dashboards**: mobile first; periods and comparison (previous period / previous year); filters;
+  KPIs with delta and sparkline; bar, line, area, pie, donut, table, trend, ranking; visual
+  components gauge, share, index and asset tiles with images (044); declarative web and PDF
+  layouts (026); hover values and full-screen cards (056); themes per installation and per report,
+  light/dark (047/051); auto-refresh (015); PDF and CSV export; `materialize: daily` for heavy
+  sources.
+- **Sharing**: expiring links, send by email with PDF, scheduled deliveries (018), mailing lists
+  and any-address recipients (058 when shipped); Telegram sign-in (007) and Google sign-in with role
+  rules (027/054); roles user / admin / superuser; 2FA; audit; security profiles private/internet.
+- **Operations**: Docker Compose, two images, Watchtower upgrades, Caddy TLS; `bizview.yml`;
+  health and version endpoints; i18n ES/EN across app, help and docs (022, 057b); in-app help.
+- **Open source**: AGPL-3.0, source link on every page of the app (003).
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Understand BizView in 30 seconds on a phone (Priority: P1) 🎯
 
-A business owner lands from X on their phone. In the first screen they see what BizView is (their
-ERP's sales on their phone), a phone screenshot of a real dashboard, and a short clip of the chat
-building a report. They can switch to English with one tap.
+A business owner lands from X or LinkedIn on their phone. In the first screen they see what BizView
+is (their ERP's numbers on their phone, built with the AI they already use), a phone-frame screenshot
+of a real dashboard (the demo's "Ventas por marca": KPI row, bars, donut), and the primary actions.
+They can switch to English with one tap.
 
-**Why this priority**: the site exists to turn X traffic into installs and conversations.
-
-**Independent Test**: Lighthouse mobile ≥ 90 in performance and accessibility; the hero, the
-screenshot and the primary action are visible at 375×667 without scrolling.
+**Independent Test**: Lighthouse mobile ≥ 90 in performance and accessibility; hero, screenshot and
+primary action visible at 375×667 without scrolling.
 
 **Acceptance Scenarios**:
 
-1. **Given** a visitor with a Spanish browser, **When** the page loads, **Then** it is in Spanish, with
-   an "EN" switch; an English browser gets English with an "ES" switch; the choice is kept in the URL
-   (`/` and `/en/`) so links can be shared in either language.
-2. **Given** the hero, **When** it renders, **Then** it shows the headline, one sentence, a phone-frame
-   screenshot of the dashboard, and two actions: "Ver demo" and "Instalar gratis".
-3. **Given** the chat clip, **When** it is in view, **Then** it plays muted, loops, has a poster image,
-   and weighs under 2 MB; reduced-motion users get the poster only.
+1. **Given** a Spanish browser, **When** the page loads, **Then** it is in Spanish with an "EN"
+   switch; English browsers get English with "ES"; the choice is in the URL (`/`, `/en/`).
+2. **Given** the hero, **Then** it shows the headline ("Tus indicadores, claros y a mano" — the same
+   line as the app's sign-in), one sentence ("Describe el tablero a tu IA, importa el zip, míralo
+   en el teléfono"), the phone-frame screenshot and two actions: **Ver demo** and **Instalar gratis**.
+3. **Given** the clip, **When** in view, **Then** it plays muted and looped with a poster, ≤ 2 MB,
+   ≤ 30 s, and shows the real flow: fill `REQUEST.md` → paste into an AI → zip → *Importar proyecto*
+   → *Aplicar* → dashboard on a phone. Reduced-motion users get the poster.
 
 ---
 
-### User Story 2 - Choose how to get BizView (Priority: P1)
+### User Story 2 - See how it is made (Priority: P1)
 
-The visitor sees three options side by side on desktop, stacked on phones: install it yourself
-(free, open source), have Global DV host it (monthly price), or have Global DV connect it to their
-ERP (consulting). Each has one action.
+A section "Cómo funciona" with five steps and one screenshot each: **1 Conecta tu fuente** (read-only,
+credentials stay home) · **2 Descarga el paquete inicial** (what the zip contains, in one line) ·
+**3 Dale el paquete a tu IA** (logos of ChatGPT, Claude, DeepSeek, Gemini, Copilot as text labels, not
+trademarks) · **4 Importa el zip** (validation report, revisions) · **5 Míralo y compártelo**
+(phone, PDF, email, link). A secondary action downloads `bizview-starter-template.zip` from the
+public repository release.
 
 **Acceptance Scenarios**:
 
-1. **Given** "Instálalo gratis", **When** pressed, **Then** it opens the repository README section with
-   the install commands (and the "Deploy on Railway" button when available).
-2. **Given** "Nosotros lo alojamos", **When** pressed, **Then** it opens WhatsApp with a prefilled
-   message in the visitor's language ("Hola, quiero BizView alojado"); the price shown comes from the
-   content file, not from code.
-3. **Given** "Lo conectamos a tu ERP", **When** pressed, **Then** it opens WhatsApp with a prefilled
-   message that asks which ERP they use.
-4. **Given** a desktop visitor without WhatsApp, **When** they press any contact action, **Then** an
-   email link is offered next to it.
+1. **Given** step 2, **When** "Descargar plantilla" is pressed, **Then** it downloads the latest
+   release asset from the product repository (URL in the content file).
+2. **Given** step 3, **Then** no AI vendor is presented as required; the copy says "la IA que ya usas".
 
 ---
 
-### User Story 3 - Trust: open source, private, isolated (Priority: P2)
+### User Story 3 - Choose how to get BizView (Priority: P1)
 
-A cautious IT person wants to know where the data goes. A section states: AGPL-3.0 license with a
-link to the source, each customer in its own installation and database, origin databases read-only,
-AI optional with a local-model option, and (when 016 ships) "works with Claude".
+Three options side by side on desktop, stacked on phones: **Instálalo gratis** (open source, Docker
+Compose, your server), **Nosotros lo alojamos** (monthly price per installation, from the content
+file), **Lo conectamos a tu ERP** (consulting: structure, authoring, first dashboards, training).
+Each has one action.
 
 **Acceptance Scenarios**:
 
-1. **Given** the trust section, **Then** every claim links to the file in the repository that backs it
-   (license, constitution, security profile docs).
-2. **Given** the feature flag `claudeConnector` is off, **Then** the "Funciona con Claude" block is not
-   rendered at all (not hidden with CSS).
+1. **Given** "Instálalo gratis", **Then** it opens the README install section (`docker compose -f
+   bizview.yml up -d`).
+2. **Given** "Nosotros lo alojamos" or "Lo conectamos", **Then** WhatsApp opens with a prefilled
+   message in the visitor's language; the second asks which ERP and which source kind
+   (PostgreSQL / REST / SOAP).
+3. **Given** a desktop visitor, **Then** an email link is offered next to every WhatsApp action.
 
 ---
 
-### User Story 4 - See it working (Priority: P2)
+### User Story 4 - Trust: open, private, isolated (Priority: P2)
 
-The visitor presses "Ver demo" and lands on the demo installation already signed in as a read-only
-demo user, on the sales dashboard with seeded data. From the demo's top bar a "Volver al sitio" link
-returns to the site.
+"Abierto y privado": AGPL-3.0 with source link; one installation and database per customer; origin
+databases read-only; no AI key required and AI never reads your rows; structure packs without
+credentials or data; personal-data columns excluded by default and declared when used; roles, 2FA,
+audit, security profiles; sign-in with Google or Telegram. Each claim links to the file that backs
+it (license, constitution, `docs/INSTALL.md` security section, 048/052 spec).
 
 **Acceptance Scenarios**:
 
-1. **Given** "Ver demo", **When** pressed, **Then** it opens `DEMO_URL` from the content file in a new
-   tab, with `?lang=` matching the site language.
-2. **Given** the demo is down, **Then** the site is unaffected (no runtime dependency); the link just
-   fails on the demo side.
+1. **Given** the trust section, **Then** every claim has a repository link and the links resolve
+   (checked at build).
+2. **Given** the content flag `claudeConnector`, **Then** the old "Funciona con Claude" block is
+   removed from the content schema; the section says "Funciona con la IA que ya usas".
 
 ---
 
-### User Story 5 - Maintain it without touching code (Priority: P2)
+### User Story 5 - See it working (Priority: P2)
 
-The owner edits texts, prices, the ERP list, screenshots and links in content files, in both
-languages, and the site rebuilds in CI.
+"Ver demo" opens the demo installation already signed in as a read-only demo user on "Ventas por
+marca" (seeded generic data), with the Filtros/Parámetros sheet, PDF download and the full-screen
+card available; a "Volver al sitio" link returns.
 
 **Acceptance Scenarios**:
 
-1. **Given** `content/es.json` and `content/en.json`, **When** a key is missing in one language,
-   **Then** the build fails naming the key.
-2. **Given** a change on `main` of `bizview-site`, **Then** GitHub Actions builds and publishes the
-   static output; the product repository is not involved.
+1. **Given** "Ver demo", **Then** it opens `DEMO_URL` from the content file in a new tab with
+   `?lang=` matching the site language.
+2. **Given** the demo is down, **Then** the site is unaffected.
+
+---
+
+### User Story 6 - Maintain it without touching code (Priority: P2)
+
+Texts, prices, the ERP list, the feature list, screenshots and links live in `content/es.json` and
+`content/en.json`; the site rebuilds in CI; a missing key in one language fails the build.
 
 ### Edge Cases
 
-- Visitors on 2G/3G: total page weight under 1.5 MB excluding the clip; images in AVIF/WebP with
-  width-based `srcset`; the clip loads lazily.
-- No JavaScript: all content and links work; only the language auto-detect and the clip autoplay
-  need JS.
-- Very long ERP names and English/Spanish length differences: layouts tested at 375px in both
-  languages.
-- Dark mode: follows the system like the app (feature-010 tokens); screenshots are provided in both
-  themes or shown in a neutral frame.
-- Social preview: Open Graph and Twitter card images per language, 1200×630, generated at build.
+- 2G/3G: page ≤ 1.5 MB without the clip; AVIF/WebP with `srcset`; clip lazy.
+- No JavaScript: content and links work; only language auto-detect and the clip need JS.
+- Long ERP names and ES/EN length differences tested at 375 px in both languages.
+- Dark mode follows the system with the product tokens; screenshots provided in both themes.
+- Social preview: Open Graph and Twitter images per language, 1200×630, generated at build.
 - Legal: footer links to the license, privacy notice and the Global DV company page; no cookie
-  banner because no cookies are set (analytics is cookieless).
+  banner (cookieless analytics).
 
 ## Requirements *(mandatory)*
 
 ### Structure and stack
-- **FR-001**: The site lives in the private repository `bizview-site` and is built with the same
-  frontend stack as the product (React 19, Vite, Tailwind) as static HTML (pre-rendered), with no
-  runtime API, no forms, no accounts.
-- **FR-002**: It MUST reuse the product's visual system: the Tailwind theme and tokens (colors, type
-  scale, radius, spacing, light/dark), the same icon set (Lucide) and the same button and card
-  styles, so a visitor who opens the demo sees the same product. The theme file is NOT copied: the
-  site build fetches `frontend/src/theme.*` from the public product repository at a pinned release
-  tag (`PRODUCT_THEME_TAG` in the site config) and fails if the fetch or the tag is missing. Updating
-  the look is a tag bump, so a product redesign never breaks the site on the day it ships.
-- **FR-003**: Routes: `/` (es) and `/en/`; `hreflang` and canonical tags for both; the language switch
-  keeps the section (`#precios` ↔ `#pricing` mapped).
+- **FR-001**: Private repository `bizview-site`, same frontend stack as the product (React, Vite,
+  Tailwind), pre-rendered static HTML, no runtime API, no forms, no accounts.
+- **FR-002**: Visual system from the product: the design tokens of 050 (`docs/DESIGN-SYSTEM.md`)
+  and the default theme of 047/051, Lucide icons, the same button and card styles. The tokens are
+  fetched at build from the public repository at a pinned release tag (`PRODUCT_THEME_TAG`); the
+  build fails if the tag is missing.
+- **FR-003**: Routes `/` (es) and `/en/`; `hreflang` and canonical; section anchors mapped between
+  languages (`#como-funciona` ↔ `#how-it-works`, `#precios` ↔ `#pricing`).
 
 ### Content
-- **FR-004**: All copy, prices, ERP list, links (repo, demo, WhatsApp number, email, X profile) and
-  feature flags live in `content/{es,en}.json`; the build validates both files against one schema
-  and fails on missing keys.
-- **FR-005**: Sections in order: hero; chat clip; "Cómo lo obtienes" (three options); supported
-  sources (PostgreSQL, REST, SOAP, plus the ERP templates list); "Abierto y privado" trust section;
-  "Funciona con Claude" (flag); FAQ (6–8 questions); footer.
-- **FR-006**: Contact actions are WhatsApp deep links (`wa.me`) with prefilled messages per language
-  and option, plus `mailto:` alternatives.
+- **FR-004**: All copy, prices, ERP list, feature list, links (repo, docs, releases asset, demo,
+  WhatsApp, email, X, LinkedIn) and flags live in `content/{es,en}.json`, validated against one
+  schema; missing keys fail the build; zero hard-coded strings (lint).
+- **FR-005**: Sections in order: hero · clip · **Cómo funciona** (5 steps) · **Qué incluye**
+  (feature grid: mobile-first dashboards, visual components, themes, PDF/CSV, periods and
+  comparison, sharing and email, sign-in options, revisions, validation = CLI, help ES/EN) ·
+  **Fuentes** (PostgreSQL/Supabase, REST, SOAP + ERP templates list) · **Cómo lo obtienes** (3
+  options) · **Abierto y privado** · **Para quién** (owner on the phone / IT that wants control /
+  consultants who author for clients) · FAQ (8 questions, including "¿Necesito una clave de IA?"
+  → no; "¿Qué IA puedo usar?" → any; "¿Ve la IA mis datos?" → only the structure you give it;
+  "¿Puedo editar en la app?" → yes, the editor and re-import; "¿Cómo actualizo?" → Watchtower) ·
+  footer.
+- **FR-006**: Contact actions are WhatsApp deep links with prefilled messages per language and
+  option, plus `mailto:`.
 
 ### Media
-- **FR-007**: Hero screenshot and section images come from the demo installation (generic seeded
-  data; constitution VII: no customer names). Phone frame rendered in CSS, not baked into images.
-- **FR-008**: The chat clip is an MP4 (H.264) + WebM, ≤ 2 MB, muted, looped, lazy, with poster; max
-  30 s.
+- **FR-007**: Screenshots come from the demo installation (generic seeded data; constitution: no
+  customer names), both themes, phone frame in CSS. Required set: sign-in (Google + Telegram
+  buttons), home tiles, "Ventas por marca" on a phone, full-screen card, Parámetros sheet, Proyectos
+  with the import validation report, Fuentes structure screen, PDF page.
+- **FR-008**: The clip is MP4 + WebM, ≤ 2 MB, muted, looped, lazy, poster, ≤ 30 s, showing the
+  five-step flow of US2.
 
 ### Performance, accessibility, SEO
-- **FR-009**: Lighthouse mobile ≥ 90 on performance, accessibility, best practices, SEO; WCAG AA
-  contrast on both themes; keyboard-reachable actions; `prefers-reduced-motion` respected.
-- **FR-010**: Per-language `<title>`, meta description, Open Graph and Twitter cards, `sitemap.xml`,
-  `robots.txt`, JSON-LD `SoftwareApplication`.
-- **FR-011**: Cookieless analytics (Plausible or Umami script, configurable in content; none when
-  the key is empty).
+- **FR-009**: Lighthouse mobile ≥ 90 in all four categories; WCAG AA; keyboard; reduced motion.
+- **FR-010**: Per-language title, description, Open Graph, Twitter cards, `sitemap.xml`,
+  `robots.txt`, JSON-LD `SoftwareApplication` (license AGPL-3.0, free price for self-hosted).
+- **FR-011**: Cookieless analytics (Plausible/Umami), none when the key is empty.
 
 ### Delivery
-- **FR-012**: GitHub Actions workflow in `bizview-site` builds and publishes the static output
-  (GitHub Pages or Railway static service, chosen in the plan); custom domain with HTTPS.
-- **FR-013**: The README of the public product repository MUST show the same hero (screenshot, one
-  line, install commands) and link to the site, so GitHub visitors get the same first impression.
-  The README is the only marketing content that lives in the public repository.
-- **FR-014**: What stays public vs private: the product repository holds backend, worker, frontend,
-  cli, deploy, docs, the workspace template, free templates and the generic demo seed data; the
-  private repository holds the site, Railway provisioning scripts, paid templates and anything with
-  prices, contacts or customer specifics.
+- **FR-012**: The site is hosted on **Vercel** as a static project connected to the private
+  `bizview-site` repository: every push to `main` deploys production, every pull request gets a
+  preview URL. Build command `npm run build`, output `dist/`, Node version pinned in
+  `package.json` `engines`. No serverless functions, no edge middleware (the site is static).
+- **FR-012a**: Build-time secrets and settings (`PRODUCT_THEME_TAG`, `DEMO_URL`, the analytics key)
+  are Vercel environment variables, not committed; the build fails when `PRODUCT_THEME_TAG` is
+  missing, as FR-002 requires.
+- **FR-012b**: Vercel project settings: framework preset Vite; clean URLs on; trailing slash
+  consistent with FR-003 (`/` and `/en/`); `vercel.json` carries the security headers
+  (`Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Permissions-Policy`) and long cache headers for hashed assets.
+### Domain and DNS (Cloudflare → Vercel)
+- **FR-015**: Vercel serves `getbizview.com` (canonical) and `www.getbizview.com` (301 to the apex).
+  Both are added as domains of the Vercel project; Vercel issues and renews the TLS certificates.
+- **FR-016**: DNS stays in Cloudflare. Records:
+  - `getbizview.com` — `A` → Vercel's apex IP (`76.76.21.21`, or the value Vercel's domain screen
+    shows at setup time), **DNS only (grey cloud)**.
+  - `www` — `CNAME` → `cname.vercel-dns.com`, **DNS only (grey cloud)**.
+  - `bi` — unchanged: the existing record to the Contabo installation (Caddy issues its own TLS
+    there); this spec never edits it.
+  - Existing `MX`, `TXT` (SPF/DKIM/DMARC) and verification records are kept.
+- **FR-017**: Cloudflare proxy (orange cloud) is **off** for the two Vercel records. Reason: Vercel
+  validates the domain and issues certificates against the origin; with the proxy on, SSL mode must
+  be "Full (strict)" and Vercel's challenge can fail, and the site ends with two CDNs in front of a
+  static page. If the owner later wants Cloudflare in front (WAF, analytics), it is turned on only
+  with SSL/TLS mode **Full (strict)** and "Always Use HTTPS", and documented as a change.
+- **FR-018**: No Cloudflare Page Rule or Redirect Rule is needed for the apex: Vercel serves it
+  directly. The only redirect is `www` → apex, done in Vercel (project domain setting), not in
+  Cloudflare, so there is one source of truth. If a legacy host previously served `getbizview.com`
+  (GitHub Pages or other), its records are removed in the same change.
+- **FR-019**: `docs/DEPLOY.md` in `bizview-site` records the Vercel project, the environment
+  variables, the exact DNS table (host · type · value · proxy status), the owner of the Cloudflare
+  zone and of the Vercel team, and the rollback procedure (promote the previous deployment in
+  Vercel; DNS does not change on rollback).
+- **FR-020**: Verification at launch: `dig getbizview.com A`, `dig www.getbizview.com CNAME`,
+  `curl -I https://getbizview.com` (200, Vercel headers, HSTS), `curl -I https://www.getbizview.com`
+  (301 → apex), `curl -I https://bi.getbizview.com` (still the Contabo installation, unchanged),
+  and the site in both languages from a phone on mobile data.
+
+- **FR-013**: The public README keeps the same hero (screenshot, one line, install commands) and
+  links to the site; the README is the only marketing content in the public repository (046).
+- **FR-014**: Public vs private: product repository = backend, worker, frontend, cli, deploy, docs,
+  starter pack and template zip, demo seed; private = site, hosting scripts, paid templates,
+  prices, contacts.
 
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: Lighthouse mobile ≥ 90 in all four categories, both languages, both themes.
-- **SC-002**: First screen (hero with screenshot and actions) visible without scrolling at 375×667.
-- **SC-003**: Page weight ≤ 1.5 MB without the clip, ≤ 3.5 MB with it, on first load.
-- **SC-004**: 100% of content keys present in both languages (build gate); 0 hard-coded strings in
-  components (lint rule).
-- **SC-005**: A content change (price, ERP added) reaches production with one commit and no code
-  change.
-- **SC-006**: Visual check: side-by-side screenshots of the site and the product share tokens
-  (colors, type, radius) — asserted by the build fetching the product's theme file at the pinned tag,
-  and reviewed once in both themes.
+- **SC-002**: Hero with screenshot and actions visible without scrolling at 375×667.
+- **SC-003**: Page weight ≤ 1.5 MB without the clip, ≤ 3.5 MB with it.
+- **SC-004**: 100 % of content keys in both languages (gate); 0 hard-coded strings (lint).
+- **SC-005**: A content change reaches production with one commit and no code change.
+- **SC-006**: Site and product share tokens at the pinned tag; reviewed once in both themes.
+- **SC-007**: No sentence on the site describes a feature the product does not ship (checklist
+  against CHANGELOG at release: the "What the product is today" list above is the source).
+- **SC-008**: `https://getbizview.com` and `https://www.getbizview.com` resolve to the Vercel
+  deployment with valid TLS (www redirects 301 to the apex); `https://bi.getbizview.com` still
+  serves the Contabo installation; a push to `main` is live in under five minutes; a pull request
+  produces a preview URL.
+- **SC-009**: `docs/DEPLOY.md` matches the live Cloudflare zone and Vercel project (reviewed at
+  launch and on every DNS change).
 
 ## Assumptions
 
-- The demo installation is a normal BizView install with `SECURITY_PROFILE=internet`, seeded generic
-  data, a read-only "demo" role and auto sign-in by link; it is specified separately (026-demo) and the
-  site only needs its URL.
-- Pricing for the hosted option is a single monthly figure per installation for now; tiers can be
-  added to the content file later without a code change.
-- Domain and analytics account exist before launch; both are configuration.
+- The demo installation is a normal BizView install with `SECURITY_PROFILE=internet`, seeded
+  generic data (the Ventas por marca shape with invented brands and names), a read-only demo role
+  and auto sign-in by link; specified separately; the site only needs its URL.
+- Hosted pricing is one monthly figure per installation; tiers can be added in content later.
+- Domain and analytics account exist before launch.
+- `getbizview.com` is registered and its DNS is managed in **Cloudflare**; `bi.getbizview.com`
+  already points to the production BizView installation on **Contabo** and is not touched by this
+  spec.

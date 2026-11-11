@@ -22,7 +22,8 @@ class CreateUserIn(BaseModel):
     email: str = Field(max_length=300)
     full_name: str = Field(max_length=200)
     role: Role = "user"
-    temporary_password: str = Field(max_length=256)
+    # Convergence 054b: None creates an account for Google/Telegram with no password.
+    temporary_password: str | None = Field(default=None, max_length=256)
 
 
 class UpdateUserIn(BaseModel):
@@ -67,7 +68,10 @@ class GrantsIn(BaseModel):
     codes: list[str] = Field(max_length=100)
 
 
-def user_json(u: AppUser) -> dict:
+def user_json(u: AppUser, *, password_change_required: bool | None = None) -> dict:
+    """The account as JSON. `password_change_required` is the *session's* answer (convergence
+    054b): a Google/Telegram session skips the forced change even though the flag is still set;
+    the admin listings and the badges keep reading the account's own value."""
     return {
         "id": u.id,
         "email": u.email,
@@ -75,7 +79,10 @@ def user_json(u: AppUser) -> dict:
         "role": u.role,
         "is_superuser": u.is_superuser,
         "is_active": u.is_active,
-        "must_change_password": u.must_change_password,
+        "must_change_password": (u.must_change_password if password_change_required is None
+                                 else password_change_required),
+        "has_password": u.password_hash is not None,
+        "auth_provider": u.auth_provider,
         "locked_until": u.locked_until,
         "last_login_at": u.last_login_at,
         "created_at": u.created_at,

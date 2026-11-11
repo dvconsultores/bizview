@@ -50,6 +50,14 @@ def test_duplicate_email_any_case_conflicts(admin, user):
     assert r.status_code == 409
 
 
+def test_creating_without_a_password_needs_a_provider(admin):
+    r = signed_in(admin.email).post("/api/admin/users", json={
+        "email": "solo@example.com", "full_name": "Solo", "role": "user"})
+    assert r.status_code == 422
+    assert r.json()["error"]["fields"] == {"temporary_password": "required"}
+    assert sql("SELECT count(*) FROM app_user WHERE email = 'solo@example.com'")[0][0] == 0
+
+
 @pytest.mark.parametrize("payload,field", [
     ({"email": "not-an-email"}, "email"),
     ({"full_name": "   "}, "full_name"),

@@ -181,6 +181,7 @@ test.describe("views instead of modals", () => {
     const email = `${unique}-created@example.com`;
     await page.getByLabel("Nombre completo").fill(fullName);
     await page.getByLabel("Correo electrónico").fill(email);
+    await page.getByRole("switch", { name: "Sin contraseña (solo Google / Telegram)" }).click();
     const tempPassword = await page.getByLabel("Contraseña temporal").inputValue();
     await page.getByRole("button", { name: "Crear usuario" }).click();
 

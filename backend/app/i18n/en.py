@@ -48,6 +48,7 @@ MESSAGES: dict[str, str] = {
     "users.invalid_email": "Enter a valid email address.",
     "users.invalid_full_name": "Enter a name from 1 to 120 characters.",
     "users.email_exists": "A user with that email already exists.",
+    "users.password_required": "Enter a password, or enable Google or Telegram to create the account without one.",
     "password.current_incorrect": "The current password is incorrect.",
     "password.too_short": "The password must be at least {n} characters long.",
     "password.too_long": "The password must not exceed {n} characters.",

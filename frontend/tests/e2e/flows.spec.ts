@@ -100,6 +100,9 @@ test("create a user, forced password change, grant and revoke access", async ({ 
   await check(page);
   await page.getByLabel("Nombre completo").fill(name);
   await page.getByLabel("Correo electrónico").fill(email);
+  // Google is enabled in this installation, so a password-less account is the default; this test
+  // is about the temporary password, so it asks for one explicitly.
+  await page.getByRole("switch", { name: "Sin contraseña (solo Google / Telegram)" }).click();
   const temp = await page.getByLabel("Contraseña temporal").inputValue();
   expect(temp).toHaveLength(14);
   await page.getByRole("button", { name: "Crear usuario" }).click();

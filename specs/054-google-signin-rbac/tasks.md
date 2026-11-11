@@ -137,3 +137,51 @@ Feature 059 changed the layout of `/ingresar` below 640 px and the two-provider 
 - [x] C059-5 `frontend/tests/unit/sign-in-phone.test.tsx` and the `sign-in on a phone` cases of
       `frontend/tests/e2e/mobile-first.spec.ts` pin the layout; the 054 tests
       (`google-sign-in.test.tsx`, `google-signin-button.test.tsx`, `e2e/google-rbac.spec.ts`) still pass.
+
+## Convergence 054b — the temporary-password step is for password sign-in only (2026-11-10)
+
+Production evidence: an account created by an administrator with a temporary password signs in with
+**Continuar con Google** and is sent to `/cambiar-clave`, although it will never use a password. The
+step belongs to the credential that was used, not to the person: Google and Telegram sign-ins skip
+it, the account keeps `must_change_password` until a password sign-in happens, and a user created
+for Google/Telegram needs no password at all.
+
+- [x] T035 Add `user_session.credential` (`password` | `google` | `telegram`, default `password`) in
+      `backend/app/models.py` and a migration (after 0056) that also widens `app_user.auth_provider`
+      to `telegram`; `sessions.create` records it per sign-in (missing)
+- [x] T036 Evaluate the gate by credential in `backend/app/auth/deps.py` and `backend/app/api/me.py`:
+      `must_change_password` answers `true` only for a password session, so `/api/me` and every
+      `current_auth` route let a Google/Telegram session through while the column stays `true`
+      (contradicts)
+- [x] T037 Thread the method through `finish_sign_in` and the second-factor completion
+      (`backend/app/api/auth.py`) so an MFA-pending Google/Telegram session resumes with its own
+      credential, and the `login_ok` audit keeps the real method (partial)
+- [x] T038 `backend/app/api/schemas.py` + `backend/app/services/users.py`: `POST /api/admin/users`
+      accepts no `temporary_password` (no hash, `must_change_password=false`, `auth_provider` the
+      enabled provider) and audits `user_created_without_password`; a password-less account cannot
+      be created when neither Google nor Telegram is available (missing)
+- [x] T039 `backend/app/models.py` + the 054b migration: add `user_created_without_password` to
+      `AUDIT_KINDS` and the `audit_event` CHECK, preserving every historical kind; do not add a
+      `password_change_skipped_provider` event — a skipped step is nothing that happened (missing)
+- [x] T040 `frontend/src/pages/admin/UserForm.tsx`: the «Sin contraseña (solo Google / Telegram)»
+      option, checked by default when Google or Telegram is enabled, hides the temporary password
+      and rules, and posts no password; the created view explains how the account signs in (missing)
+- [x] T041 `frontend/src/components/UserBadges.tsx` + `frontend/src/api/types.ts`: a password-less
+      account shows «Solo Google» / «Solo Telegram» instead of «Clave temporal» / «Activo»
+      (missing)
+- [x] T042 `backend/app/api/schemas.py`: `user_json` exposes `has_password` and `auth_provider` so
+      the badges and the admin form can tell a password-less account from a temporary one (missing)
+- [x] T043 `frontend/src/i18n/{es,en}.ts` + `frontend/src/i18n` audit labels: the option, the badges,
+      the created-view sentence and the new audit kind in both languages (missing)
+- [x] T044 `backend/tests/test_google_sign_in.py`, `test_telegram.py`, `test_admin_matrix.py`:
+      temporary password + Google/Telegram lands without the change screen; the same account by
+      password still requires it; create without password → generic password refusal, Google works,
+      `has_password=false`; no `password_change_skipped_provider` event (missing)
+- [x] T045 `frontend/tests/e2e/google-rbac.spec.ts`: the administrator creates a Google-only user in
+      the form, grants dashboards, and the user signs in with Google and sees them (missing)
+- [x] T046 Correct the superseded statements in `specs/007-telegram-sign-in/spec.md` (US5, FR-009)
+      and `specs/027-google-sign-in/spec.md` (the password bullet): the forced change follows the
+      credential, so Google/Telegram skip it and the flag stays for the password path (contradicts)
+- [x] T047 `backend/app/guide/{es,en}/ingreso-con-google.md`: one line saying a temporary-password
+      account that signs in with Google does not have to change it; `CHANGELOG.md` under Unreleased
+      (missing)

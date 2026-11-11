@@ -449,7 +449,31 @@ def test_temporary_password_user(superuser, fake):
     press_code(fake, match_code)
     r = c.get("/api/auth/telegram/status")
     assert r.json()["status"] == "signed_in"
-    assert r.json()["user"]["must_change_password"] is True
+    # Convergence 054b: the Telegram session has nothing to change; the flag stays for the
+    # password path.
+    assert r.json()["user"]["must_change_password"] is False
+    assert c.get("/api/me").json()["must_change_password"] is False
+    assert sql("SELECT must_change_password FROM app_user WHERE id = :u",
+               u=temp.id)[0][0] is True
+
+    pw = signed_in(temp.email)
+    assert pw.get("/api/me").json()["must_change_password"] is True
+    assert pw.get("/api/dashboards").json()["error"]["code"] == "password_change_required"
+    assert "password_change_skipped_provider" not in [
+        k for (k,) in sql("SELECT kind FROM audit_event")]
+
+
+def test_an_admin_creates_an_account_for_telegram_only(superuser, fake):
+    """Convergence 054b: with only Telegram available the password-less account is its user."""
+    setup_bot(superuser, fake)
+    r = signed_in(superuser.email).post("/api/admin/users", json={
+        "email": "solo.tg@example.com", "full_name": "Solo Telegram", "role": "user"})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert (body["has_password"], body["auth_provider"], body["must_change_password"]) == \
+        (False, "telegram", False)
+    assert "user_created_without_password" in [
+        k for (k,) in sql("SELECT kind FROM audit_event")]
 
 
 def test_replay_and_binding(user, superuser, fake):

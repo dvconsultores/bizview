@@ -34,6 +34,8 @@ Anyone whose Google address belongs to an allowed domain. The policy is configur
 - **Linking by email**: an existing user is recognised by email and keeps its role. A rule only
   changes it when you turn on "apply rules to existing users too", and every change is audited.
 - The button and these settings only exist when the installation has Google sign-in enabled.
+- An account with a temporary password that signs in with Google does not have to change it: the
+  change is asked only when signing in with email and password.
 
 ## Common problems
 

@@ -151,8 +151,9 @@ Texts, prices, the ERP list, the feature list, screenshots and links live in `co
 - Long ERP names and ES/EN length differences tested at 375 px in both languages.
 - Dark mode follows the system with the product tokens; screenshots provided in both themes.
 - Social preview: Open Graph and Twitter images per language, 1200×630, generated at build.
-- Legal: footer links to the license, privacy notice and the Global DV company page; no cookie
-  banner (cookieless analytics).
+- Legal: footer links to the license and to the public **Privacidad** and **Términos** pages
+  (`/privacidad/`, `/terminos/`, and `/en/privacy/`, `/en/terms/`); no cookie banner (cookieless
+  analytics).
 
 ## Requirements *(mandatory)*
 
@@ -163,8 +164,9 @@ Texts, prices, the ERP list, the feature list, screenshots and links live in `co
   and the default theme of 047/051, Lucide icons, the same button and card styles. The tokens are
   fetched at build from the public repository at a pinned release tag (`PRODUCT_THEME_TAG`); the
   build fails if the tag is missing.
-- **FR-003**: Routes `/` (es) and `/en/`; `hreflang` and canonical; section anchors mapped between
-  languages (`#como-funciona` ↔ `#how-it-works`, `#precios` ↔ `#pricing`).
+- **FR-003**: Routes `/` (es), `/en/` (en), `/privacidad/` + `/en/privacy/` and `/terminos/` +
+  `/en/terms/`; `hreflang` and canonical; section anchors mapped between languages
+  (`#como-funciona` ↔ `#how-it-works`, `#precios` ↔ `#pricing`).
 
 ### Content
 - **FR-004**: All copy, prices, ERP list, feature list, links (repo, docs, releases asset, demo,
@@ -195,6 +197,11 @@ Texts, prices, the ERP list, the feature list, screenshots and links live in `co
 - **FR-010**: Per-language title, description, Open Graph, Twitter cards, `sitemap.xml`,
   `robots.txt`, JSON-LD `SoftwareApplication` (license AGPL-3.0, free price for self-hosted).
 - **FR-011**: Cookieless analytics (Plausible/Umami), none when the key is empty.
+- **FR-011a**: Public privacy-policy and terms-of-service pages, in both languages, linked from the
+  footer and listed in `sitemap.xml`, so Google's OAuth consent screen can be verified for external
+  users. They are static documents (no hydration bundle), name the data controller, the Google
+  scopes and data use, retention, sharing, user rights and a contact address, and carry their
+  update date.
 
 ### Delivery
 - **FR-012**: The site is hosted on **Vercel** as a static project connected to the private

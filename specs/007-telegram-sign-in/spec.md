@@ -105,7 +105,8 @@ administrator on the `internet` profile.
    an administrator without two-step sign-in is sent to set it up first, exactly as with a
    password.
 5. **Given** a user whose account has a temporary password, **When** they sign in with
-   Telegram, **Then** they are still sent to change their password before anything else.
+   Telegram, **Then** they enter without the change-password screen (convergence 054b); the flag
+   stays and the change is required when they sign in with the password.
 6. **Given** an approval that was already used, or one older than the allowed time, **When**
    it is presented again, **Then** it is refused.
 
@@ -151,9 +152,10 @@ administrator on the `internet` profile.
 - **FR-008**: The sign-in screen MUST offer "Ingresar con Telegram" when enabled; a successful
   approval for a linked, active, unlocked user MUST start a normal session.
 - **FR-009**: Telegram sign-in MUST apply every rule of password sign-in: deactivated and locked
-  accounts refused, per-address throttling (Telegram failures count with password failures),
-  temporary-password redirect, and on the `internet` profile two-step sign-in (and its forced
-  enrolment) for administrators.
+  accounts refused, per-address throttling (Telegram failures count with password failures), and
+  on the `internet` profile two-step sign-in (and its forced enrolment) for administrators. The
+  temporary-password redirect follows the credential (convergence 054b): a Telegram session skips
+  it and the account's flag stays for the password path.
 - **FR-010**: Each approval MUST be single-use, bound to the sign-in or link request that
   started it, and valid for at most 5 minutes; forged, replayed, or expired approvals MUST be
   refused.
