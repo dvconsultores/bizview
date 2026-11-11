@@ -36,6 +36,8 @@ check "image cache folder" '[[ -d "$D/image-cache" ]]'
 check "watchtower scoped by label" 'grep -q "bizview-watchtower" "$D/bizview.yml" && grep -q "WATCHTOWER_LABEL_ENABLE" "$D/bizview.yml" && [[ $(grep -c "watchtower.enable" "$D/bizview.yml") == 3 ]]'
 # Engine 29+ rejects the API 1.25 client of containrrr/watchtower:1.7.1, so updates silently stop.
 check "watchtower speaks the current Docker API" 'grep -q "image: nickfedor/watchtower:1.24.0" "$D/bizview.yml" && ! grep -q "image: containrrr/watchtower" "$D/bizview.yml"'
+# caddy depends_on backend and rolling restarts reject dependency chains, which aborts every update.
+check "watchtower does not ask for rolling restarts" '! grep -qE "^ *WATCHTOWER_ROLLING_RESTART:" "$D/bizview.yml"'
 # Only the backend writes project folders; the worker does not mount them since 045 removed the
 # previews it used to run there.
 check "projects mounted read-write in the backend" \

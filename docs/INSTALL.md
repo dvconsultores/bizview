@@ -722,8 +722,10 @@ restore a backup taken before that upgrade.
 
 The stack also runs **`watchtower`** (container `bizview-watchtower`): every
 `WATCHTOWER_POLL_INTERVAL` seconds (default 300) it pulls a newer image of the tag in
-`BIZVIEW_VERSION` and recreates only the containers of this installation, one service at a time,
-so the site stays up. It is scoped by label and never touches other stacks on the host. Two
+`BIZVIEW_VERSION` and recreates only the containers of this installation, stopping dependents first
+and starting dependencies first. The site is unavailable for a few seconds during an update. It is
+scoped by label and never touches other stacks on the host. Rolling restarts are **not** enabled:
+`caddy` depends on `backend`, and Watchtower refuses rolling restarts across a dependency chain. Two
 consequences:
 
 - with `BIZVIEW_VERSION=latest`, a publish updates the installation by itself — the commands

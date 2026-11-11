@@ -749,8 +749,11 @@ adelante, actualiza al release que la migró, o restaura un respaldo tomado ante
 
 El stack también ejecuta **`watchtower`** (contenedor `bizview-watchtower`): cada
 `WATCHTOWER_POLL_INTERVAL` segundos (300 por defecto) descarga una imagen más nueva de la etiqueta de
-`BIZVIEW_VERSION` y recrea solo los contenedores de esta instalación, un servicio a la vez, para que el
-sitio siga en pie. Está acotado por etiqueta y nunca toca otros stacks del host. Dos consecuencias:
+`BIZVIEW_VERSION` y recrea solo los contenedores de esta instalación, parando primero a los
+dependientes y arrancando primero a las dependencias. El sitio queda no disponible unos segundos
+durante una actualización. Está acotado por etiqueta y nunca toca otros stacks del host. Los reinicios
+progresivos **no** están activados: `caddy` depende de `backend`, y Watchtower rechaza los reinicios
+progresivos a través de una cadena de dependencias. Dos consecuencias:
 
 - con `BIZVIEW_VERSION=latest`, una publicación actualiza la instalación por sí sola: los comandos de
   arriba solo hacen falta entonces para fijar una versión;

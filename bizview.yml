@@ -98,7 +98,8 @@ services:
     environment:
       WATCHTOWER_LABEL_ENABLE: "true"            # only the labelled services, never the whole host
       WATCHTOWER_CLEANUP: "true"                 # delete the superseded image after a swap
-      WATCHTOWER_ROLLING_RESTART: "true"         # one at a time, so the site stays up
+      # No WATCHTOWER_ROLLING_RESTART: caddy depends_on backend, and rolling restarts refuse
+      # dependencies. The default order stops caddy first and starts the backend before it.
       WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-300}
       TZ: ${TIMEZONE:-UTC}
     volumes:

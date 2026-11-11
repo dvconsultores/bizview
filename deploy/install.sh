@@ -413,7 +413,8 @@ services:
     environment:
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_ROLLING_RESTART: "true"
+      # No WATCHTOWER_ROLLING_RESTART: caddy depends_on backend, and rolling restarts refuse
+      # dependencies. The default order stops caddy first and starts the backend before it.
       WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-300}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -11,10 +11,13 @@ All notable changes to this project are documented here. The format follows
 - **Watchtower stopped updating installations on Docker Engine 29+**. `containrrr/watchtower:1.7.1`
   still speaks Docker API 1.25, which Engine 29 rejects (`Minimum supported API version is 1.40`), so
   the container exited with `client version 1.25 is too old` and a published `:latest` never reached
-  the server. The stack now
-  runs the maintained `nickfedor/watchtower:1.24.0`; `docs/INSTALL.md` explains the one-line change for
+  the server. The stack now runs the maintained `nickfedor/watchtower:1.24.0`; `docs/INSTALL.md`
+  explains the one-line change for
   existing installations and the `up -d --no-deps --force-recreate watchtower` that applies it, since
   Watchtower does not update itself.
+  The update also drops `WATCHTOWER_ROLLING_RESTART`: `caddy` depends on `backend`, and the maintained
+  Watchtower refuses rolling restarts across a dependency chain, which aborted every session. Its
+  default order stops the dependent first and starts the dependency first.
 
 - **An existing «Clave temporal» account can become Google/Telegram-only**. The user detail page
   now has **Quitar contraseña**: it removes the hash and the forced change, closes the account's
