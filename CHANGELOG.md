@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The worker's daily snapshot and BI-ready re-check never ran**. Housekeeping passed the
+  `get_sessionmaker` getter where the jobs expected the session factory, so both failed at startup
+  with `'sessionmaker' object does not support the context manager protocol`; `materialize: daily`
+  reports kept yesterday's figures and credentials were never re-proved. The worker now passes
+  `get_sessionmaker()`.
+
 - **Watchtower stopped updating installations on Docker Engine 29+**. `containrrr/watchtower:1.7.1`
   still speaks Docker API 1.25, which Engine 29 rejects (`Minimum supported API version is 1.40`), so
   the container exited with `client version 1.25 is too old` and a published `:latest` never reached
