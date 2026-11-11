@@ -61,8 +61,8 @@ def public_config():
             "logo_url": s.logo_url, "version": s.version, "source_url": s.source_url,
             "license": LICENSE, "ai_enabled": s.ai_enabled, "default_locale": s.default_locale,
             "footer_credit": s.footer_credit,
-            "legal_privacy_url": s.legal_privacy_url,
-            "legal_terms_url": s.legal_terms_url,
+            "legal_privacy_url": s.legal_privacy_url_effective,
+            "legal_terms_url": s.legal_terms_url_effective,
             "google_auth": s.google_enabled_effective,
             **_telegram_config(),
             **_palette_config()}

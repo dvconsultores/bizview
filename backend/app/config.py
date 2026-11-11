@@ -29,6 +29,18 @@ def _file_version() -> str:
         return "dev"
 
 
+# The vendor's own installations (the demo and any *.getbizview.com deployment) show the vendor's
+# legal pages without extra configuration. A customer's domain gets nothing until it sets its own
+# URLs, so the product never presents Global DV as the controller of their data.
+OFFICIAL_LEGAL_DOMAIN = "getbizview.com"
+OFFICIAL_PRIVACY_URL = "https://www.getbizview.com/privacidad/"
+OFFICIAL_TERMS_URL = "https://www.getbizview.com/terminos/"
+
+
+def _official_legal_host(host: str) -> bool:
+    return host == OFFICIAL_LEGAL_DOMAIN or host.endswith("." + OFFICIAL_LEGAL_DOMAIN)
+
+
 class Settings(BaseSettings):
     # Tests set BIZVIEW_NO_ENV_FILE so a developer's .env (a larger budget, a real provider) cannot
     # leak into them; deployments never set it.
@@ -493,6 +505,24 @@ class Settings(BaseSettings):
         if self.site_is_domain:
             return f"https://{host}/api/auth/google/callback"
         return f"http://localhost{host}/api/auth/google/callback"
+
+    @property
+    def legal_privacy_url_effective(self) -> str | None:
+        if self.legal_privacy_url:
+            return self.legal_privacy_url
+        host = self.site_address.strip().lower()
+        if _official_legal_host(host):
+            return OFFICIAL_PRIVACY_URL
+        return None
+
+    @property
+    def legal_terms_url_effective(self) -> str | None:
+        if self.legal_terms_url:
+            return self.legal_terms_url
+        host = self.site_address.strip().lower()
+        if _official_legal_host(host):
+            return OFFICIAL_TERMS_URL
+        return None
 
     @property
     def google_domains(self) -> list[str]:

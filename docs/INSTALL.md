@@ -195,7 +195,7 @@ super user; later starts only apply new migrations.
 | `SUPER_USER_EMAIL`, `SUPER_USER_PASSWORD` | used only to create the super user on first start, and by the recovery command |
 | `PRODUCT_NAME`, `ORGANIZATION_NAME`, `LOGO_URL` | names shown to users; the logo ships in the `bizview-web` image, and `LOGO_URL` points at another one |
 | `FOOTER_CREDIT` | who publishes this installation, shown after the license in every footer (default `GlobalDV`) |
-| `LEGAL_PRIVACY_URL`, `LEGAL_TERMS_URL` | absolute URLs of the installation operator's privacy policy and terms of service. They appear in the app footer and in every public shared dashboard; Google's OAuth consent screen asks for them. Empty hides them. |
+| `LEGAL_PRIVACY_URL`, `LEGAL_TERMS_URL` | absolute URLs of the installation operator's privacy policy and terms of service. They appear in the app footer and in every public shared dashboard; Google's OAuth consent screen asks for them. Empty hides them, except on `*.getbizview.com`, which defaults to the vendor's pages. |
 | `SITE_ADDRESS` | `:80` for plain HTTP, or a domain for automatic HTTPS; a domain makes shared-dashboard links and links in emails use `https://<domain>/s/…` (see "Email and shared links") |
 | `HTTP_PORT`, `HTTPS_PORT` | published ports (see "When 80 and 443 already belong to another service") |
 | `CADDY_TLS` | `auto` (default), `internal` or `file`: where Caddy gets its certificate |

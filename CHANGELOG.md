@@ -48,8 +48,10 @@ All notable changes to this project are documented here. The format follows
 - **Legal pages in every footer, per installation**. `LEGAL_PRIVACY_URL` and `LEGAL_TERMS_URL`
   name the operator's public privacy policy and terms of service; when set they appear in the app
   footer and in every public shared dashboard, opening in a new tab, and are exposed in
-  `/api/config`. Empty keeps them out of a self-hosted installation. Google's OAuth consent screen
-  requires public URLs for both when an OAuth client is verified for external users.
+  `/api/config`. Empty keeps them out of a self-hosted installation, except on the vendor's own
+  `*.getbizview.com` deployments, which default to `getbizview.com/privacidad` and `/terminos`.
+  Google's OAuth consent screen requires public URLs for both when an OAuth client is verified for
+  external users.
 
 - **The public site the product never had (feature 032)**. It lives in its own private repository,
   `dvconsultores/bizview-site`, because prices and contacts are not part of the AGPL product; what is

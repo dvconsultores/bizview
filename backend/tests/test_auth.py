@@ -133,6 +133,38 @@ def test_public_config_carries_the_installations_legal_pages(monkeypatch):
     assert body["legal_terms_url"] == "https://example.com/terminos/"
 
 
+@pytest.mark.parametrize("host,privacy,terms", [
+    ("bi.getbizview.com", "https://www.getbizview.com/privacidad/",
+     "https://www.getbizview.com/terminos/"),
+    ("getbizview.com", "https://www.getbizview.com/privacidad/",
+     "https://www.getbizview.com/terminos/"),
+    ("bi.acme.test", None, None),
+    (":80", None, None),
+])
+def test_legal_pages_default_to_the_vendors_on_its_own_domains(
+        monkeypatch, host, privacy, terms):
+    from app.config import get_settings
+
+    s = get_settings()
+    monkeypatch.setattr(s, "site_address", host)
+    monkeypatch.setattr(s, "legal_privacy_url", None)
+    monkeypatch.setattr(s, "legal_terms_url", None)
+    body = client().get("/api/config").json()
+    assert (body["legal_privacy_url"], body["legal_terms_url"]) == (privacy, terms)
+
+
+def test_a_configured_legal_page_wins_over_the_vendor_default(monkeypatch):
+    from app.config import get_settings
+
+    s = get_settings()
+    monkeypatch.setattr(s, "site_address", "bi.getbizview.com")
+    monkeypatch.setattr(s, "legal_privacy_url", "https://acme.test/privacy")
+    monkeypatch.setattr(s, "legal_terms_url", None)
+    body = client().get("/api/config").json()
+    assert body["legal_privacy_url"] == "https://acme.test/privacy"
+    assert body["legal_terms_url"] == "https://www.getbizview.com/terminos/"
+
+
 def test_legal_urls_must_be_absolute_http_addresses():
     from pydantic import ValidationError
 
