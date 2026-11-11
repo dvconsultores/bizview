@@ -9,8 +9,9 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - **Watchtower stopped updating installations on Docker Engine 29+**. `containrrr/watchtower:1.7.1`
-  still speaks Docker API 1.25, and Engine 29 raised the minimum to 1.44, so the container exited with
-  `client version 1.25 is too old` and a published `:latest` never reached the server. The stack now
+  still speaks Docker API 1.25, which Engine 29 rejects (`Minimum supported API version is 1.40`), so
+  the container exited with `client version 1.25 is too old` and a published `:latest` never reached
+  the server. The stack now
   runs the maintained `nickfedor/watchtower:1.24.0`; `docs/INSTALL.md` explains the one-line change for
   existing installations and the `up -d --no-deps --force-recreate watchtower` that applies it, since
   Watchtower does not update itself.

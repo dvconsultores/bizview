@@ -750,9 +750,9 @@ so the next poll can swap it back to whatever `:latest` holds. Publish with `dep
 Watchtower apply it) or build locally and keep Watchtower out of the way (a fixed version tag, or
 delete the service while developing).
 
-Watchtower has to speak the host's Docker API. Engine 29 raised its minimum to API 1.44, and
-`containrrr/watchtower:1.7.1` still speaks 1.25, so it exits with `client version 1.25 is too old`
-and no image is ever updated. The stack now runs `nickfedor/watchtower:1.24.0`, the maintained fork
+Watchtower has to speak the host's Docker API. Engine 29 no longer accepts the API 1.25 client of
+`containrrr/watchtower:1.7.1` (the daemon answers `Minimum supported API version is 1.40`), so every
+poll fails with `client version 1.25 is too old` and no image is ever updated. The stack now runs `nickfedor/watchtower:1.24.0`, the maintained fork
 with the newer client. An installation whose `bizview.yml` still names `containrrr` must change only
 that `image:` line and recreate the service once (it does not update itself):
 
