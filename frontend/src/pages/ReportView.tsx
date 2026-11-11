@@ -171,7 +171,8 @@ export function ReportView() {
   const openTable = useCallback((id: string) => {
     const next = new URLSearchParams(params);
     next.set("tabla", id);
-    setParams(next, { replace: true });
+    // A history entry, so Back closes the table like Esc.
+    setParams(next);
   }, [params, setParams]);
   const closeTable = useCallback(() => {
     const next = new URLSearchParams(params);

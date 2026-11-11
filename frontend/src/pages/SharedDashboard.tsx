@@ -91,7 +91,7 @@ export function SharedDashboard() {
   const openTable = (id: string) => {
     const next = new URLSearchParams(params);
     next.set("tabla", id);
-    setParams(next, { replace: true });
+    setParams(next);
   };
   const closeTable = () => {
     const next = new URLSearchParams(params);
