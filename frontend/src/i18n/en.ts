@@ -846,6 +846,8 @@ export const en: Catalogue = {
   footer: {
     source: "Source code",
     version: (v: string) => `Version ${v}`,
+    privacy: "Privacy",
+    terms: "Terms",
   },
   update: {
     available: "A new version of the app is available. Reload to use it.",

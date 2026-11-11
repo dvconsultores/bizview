@@ -1,10 +1,19 @@
 import { useBranding } from "../config/BrandingContext";
 import { useT } from "../i18n";
+import { LegalLinks } from "./LegalLinks";
 
 /** Version, license, and the source-code link every user must be offered (AGPL-3.0 §13). */
 export function SourceFooter({ className = "" }: { className?: string }) {
   const t = useT();
-  const { product_name, version, source_url, license, footer_credit } = useBranding();
+  const {
+    product_name,
+    version,
+    source_url,
+    license,
+    footer_credit,
+    legal_privacy_url,
+    legal_terms_url,
+  } = useBranding();
   const licenseName = license.replace(/-or-later$/, "");
   return (
     <footer className={`text-center text-xs text-ink-soft ${className}`}>
@@ -21,6 +30,12 @@ export function SourceFooter({ className = "" }: { className?: string }) {
         <span>{licenseName}</span>
       )}
       {footer_credit ? <span> - {footer_credit}</span> : null}
+      {legal_privacy_url || legal_terms_url ? (
+        <>
+          <span> · </span>
+          <LegalLinks privacyUrl={legal_privacy_url} termsUrl={legal_terms_url} />
+        </>
+      ) : null}
     </footer>
   );
 }

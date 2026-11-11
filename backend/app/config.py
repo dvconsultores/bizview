@@ -189,6 +189,10 @@ class Settings(BaseSettings):
     logo_url: str | None = None
     # Who publishes the installation, shown after the license in the footer (feature 024 polish).
     footer_credit: str = "GlobalDV"
+    # Public legal pages of whoever operates this installation. Google's OAuth consent screen asks
+    # for them, and the footer shows them when set; empty keeps them out of a self-hosted install.
+    legal_privacy_url: str | None = Field(default=None, max_length=500)
+    legal_terms_url: str | None = Field(default=None, max_length=500)
 
     cookie_secure: bool = True
     docs_enabled: bool = False
@@ -222,10 +226,23 @@ class Settings(BaseSettings):
     @field_validator("logo_url", "source_url", "ai_api_key", "ai_model", "ai_base_url",
                      "bizview_secret_key", "bizview_secret_key_previous", "database_url_origin",
                      "direct_bi_role", "google_client_id", "google_client_secret",
-                     "google_allowed_domains", "google_redirect_uri", mode="before")
+                     "google_allowed_domains", "google_redirect_uri", "legal_privacy_url",
+                     "legal_terms_url", mode="before")
     @classmethod
     def _empty_is_none(cls, v):
         return v or None
+
+    @field_validator("legal_privacy_url", "legal_terms_url")
+    @classmethod
+    def _public_http_url(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(v)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise ValueError("LEGAL_*_URL must be an absolute http(s) URL")
+        return v
 
     @field_validator("direct_bi_role")
     @classmethod

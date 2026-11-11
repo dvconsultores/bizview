@@ -12,6 +12,8 @@ export SUPER_USER_EMAIL=e2e-root@example.com SUPER_USER_PASSWORD=E2e-super-pass-
        EMAIL_ALLOWED_DOMAINS= SHARE_LINKS_ENABLED=false \
        GOOGLE_AUTH_ENABLED=true GOOGLE_CLIENT_ID=e2e-client.apps.googleusercontent.com \
        GOOGLE_CLIENT_SECRET=e2e-secret GOOGLE_ALLOWED_DOMAINS=empresa.com GOOGLE_REDIRECT_URI= \
+       LEGAL_PRIVACY_URL=https://www.getbizview.com/privacidad/ \
+       LEGAL_TERMS_URL=https://www.getbizview.com/terminos/ \
        DIRECT_REPORTS_BI=true DIRECT_BI_ROLE=
 # Feature 005: a generated workspace, applied and loaded once (tests.e2e_schema seed).
 WORKSPACE_PATH="$(mktemp -d)/workspace"

@@ -88,6 +88,9 @@ export interface PublicConfig {
   ai_enabled: boolean;
   /** Who publishes this installation (`FOOTER_CREDIT`): shown after the license in the footer. */
   footer_credit?: string;
+  /** The operator's public legal pages (`LEGAL_PRIVACY_URL`/`LEGAL_TERMS_URL`); null hides them. */
+  legal_privacy_url?: string | null;
+  legal_terms_url?: string | null;
   /** Feature 024: whether the configured model reads images (the composer shows the hint). */
   vision_enabled?: boolean;
   /** Feature 024: the limits the composer states and enforces before uploading. */

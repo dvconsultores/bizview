@@ -18,6 +18,7 @@ import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { Logo } from "../components/Logo";
+import { LegalLinks } from "../components/LegalLinks";
 import { useBranding } from "../config/BrandingContext";
 import { readViewerMode, reportMode } from "../theme/library";
 import type { ThemeMode } from "../theme/themes";
@@ -448,6 +449,17 @@ export function SharedDashboard() {
           />
         ) : null}
       </ReportSheet>
+
+      {branding.legal_privacy_url || branding.legal_terms_url ? (
+        <footer className="border-t border-line bg-surface">
+          <PageContainer className="py-4 text-center text-xs text-ink-soft">
+            <LegalLinks
+              privacyUrl={branding.legal_privacy_url}
+              termsUrl={branding.legal_terms_url}
+            />
+          </PageContainer>
+        </footer>
+      ) : null}
     </div>
   );
 }

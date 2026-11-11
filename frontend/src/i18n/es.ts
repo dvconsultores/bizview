@@ -834,6 +834,8 @@ export const es = {
   footer: {
     source: "Código fuente",
     version: (v: string) => `Versión ${v}`,
+    privacy: "Privacidad",
+    terms: "Términos",
   },
   update: {
     available: "Hay una versión nueva de la aplicación. Recarga para usarla.",

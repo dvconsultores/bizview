@@ -2,6 +2,8 @@
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
+
 from tests.conftest import PASSWORD, client, make_user, signed_in, sql
 
 
@@ -99,7 +101,11 @@ def test_api_responses_are_not_cached(user):
 def test_public_config_and_health():
     c = client()
     version = (Path(__file__).resolve().parents[2] / "VERSION").read_text().strip()
-    assert c.get("/api/health").json() == {"status": "ok", "version": version}
+    assert c.get("/api/health").json() == {
+        "status": "ok", "version": version,
+        "ai": {"configured": False, "provider": "none", "model": None,
+               "last_ok_at": None, "last_error_code": None, "last_error_at": None},
+    }
     assert c.get("/api/config").json() == {"product_name": "Panel de prueba",
                                            "organization_name": "Cliente Demo",
                                            "logo_url": None, "version": version,
@@ -107,12 +113,35 @@ def test_public_config_and_health():
                                            "ai_enabled": False, "telegram_sign_in": False,
                                            "telegram_bot": None, "default_locale": "es",
                                            "footer_credit": "GlobalDV",
-                                           "vision_enabled": False, "attachments_max_mb": 5,
-                                           "attachments_max_per_message": 4,
+                                           "legal_privacy_url": None, "legal_terms_url": None,
                                            "google_auth": False,
                                            "palette_preset": "impacto",
-                                           "palette_presets": ["impacto", "clasico", "monocromo",
-                                                               "contraste", "daltonico"]}
+                                           "palette_presets": ["impacto", "clasico", "elegante",
+                                                               "monocromo", "contraste",
+                                                               "daltonico"],
+                                           "theme_id": "impacto"}
+
+
+def test_public_config_carries_the_installations_legal_pages(monkeypatch):
+    from app.config import get_settings
+
+    s = get_settings()
+    monkeypatch.setattr(s, "legal_privacy_url", "https://example.com/privacidad/")
+    monkeypatch.setattr(s, "legal_terms_url", "https://example.com/terminos/")
+    body = client().get("/api/config").json()
+    assert body["legal_privacy_url"] == "https://example.com/privacidad/"
+    assert body["legal_terms_url"] == "https://example.com/terminos/"
+
+
+def test_legal_urls_must_be_absolute_http_addresses():
+    from pydantic import ValidationError
+
+    from app.config import Settings
+
+    for bad in ("privacidad", "/privacidad/", "javascript:alert(1)", "ftp://example.com/x"):
+        with pytest.raises(ValidationError):
+            Settings(legal_privacy_url=bad, database_url_bi="postgresql://x/y",
+                     _env_file=None)
 
 
 def test_health_names_the_commit_the_image_was_built_from(monkeypatch):

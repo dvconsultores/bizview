@@ -98,6 +98,15 @@ test(
     try {
       await publicPage.goto(`/s/${token}?${SELECTION}`);
       await expect(publicPage.getByRole("heading", { level: 1, name: "Ventas", exact: true })).toBeVisible();
+      // The installation's legal pages are public: a visitor who is not signed in can reach them.
+      await expect(publicPage.getByRole("link", { name: "Privacidad" })).toHaveAttribute(
+        "href",
+        "https://www.getbizview.com/privacidad/",
+      );
+      await expect(publicPage.getByRole("link", { name: "Términos" })).toHaveAttribute(
+        "href",
+        "https://www.getbizview.com/terminos/",
+      );
       await expect.poll(() => publicPage.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
 
       // The toggle next to the language switcher: instant, no reload, and it survives a reload.

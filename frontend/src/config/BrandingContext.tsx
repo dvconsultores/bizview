@@ -13,6 +13,8 @@ const DEFAULT: PublicConfig = {
   telegram_sign_in: false,
   telegram_bot: null,
   google_auth: false,
+  legal_privacy_url: null,
+  legal_terms_url: null,
 };
 const BrandingContext = createContext<PublicConfig>(DEFAULT);
 /** Feature 051: re-read the config so a change made here reaches every mounted page at once. */
