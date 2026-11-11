@@ -16,8 +16,8 @@ can already see.
 2. The dashboard filters. The card you pressed keeps all its values and highlights the chosen one;
    the others show only the filtered data.
 3. Press the same value again to remove the filter.
-4. Hold Ctrl (or Cmd on a Mac) while pressing another value of the same dimension to add it. A value
-   of another dimension adds a second filter.
+4. Press a value of another dimension and the previous filter is replaced. Hold Ctrl (or Cmd on a
+   Mac) to keep it: add values of the same dimension, or combine dimensions (AND).
 5. Filters appear as chips under the period line. **Clear** removes them all.
 
 ## Options

@@ -259,8 +259,8 @@ images:
 Any mark that stands for **one value of a dimension** filters the dashboard when pressed: a bar, a
 slice, a ranking row, a dimension cell in a table or an `asset` card. It is the same filter as the
 Filtros sheet (`filter.<dimension>=<value>`), so the URL, PDF/CSV and email keep it. Pressing the same
-value removes it; Ctrl/Cmd-click adds another value of the same dimension (`IN`); a value of another
-dimension adds a second filter (AND). "Others", totals and the trend are not clickable.
+value removes it; a value of another dimension replaces the previous cross-filter; Ctrl/Cmd-click
+adds another value of the same dimension (`IN`) or combines dimensions (AND). "Others", totals and the trend are not clickable.
 
 ```yaml
 interactions:

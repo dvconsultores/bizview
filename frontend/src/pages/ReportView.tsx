@@ -12,7 +12,7 @@ import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
 import { ReportViews, SingleView, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
-import type { CrossFilterState } from "../components/report/crossFilter";
+import { toggledCrossFilter, type CrossFilterState } from "../components/report/crossFilter";
 import { cardTitle } from "../lib/cardTitle";
 import { CardDialog } from "../components/report/CardDialog";
 import { LayoutRenderer } from "../components/report/LayoutRenderer";
@@ -494,19 +494,7 @@ export function ReportView() {
       enabled: def.interactions?.cross_filter !== false,
       filters: applied.filters,
       toggle: (dimension, value, additive) => {
-        const current = applied.filters[dimension] ?? [];
-        let values: string[];
-        if (additive) {
-          values = current.includes(value)
-            ? current.filter((entry) => entry !== value)
-            : [...current, value];
-        } else {
-          values = current.length === 1 && current[0] === value ? [] : [value];
-        }
-        const filters = { ...applied.filters };
-        if (values.length > 0) filters[dimension] = values;
-        else delete filters[dimension];
-        apply({ ...applied, filters });
+        apply({ ...applied, filters: toggledCrossFilter(applied.filters, dimension, value, additive) });
       },
     };
   }, [applied, apply, def]);

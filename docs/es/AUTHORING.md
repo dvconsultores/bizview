@@ -265,8 +265,8 @@ images:
 Cualquier marca que represente **un valor de una dimensión** filtra el tablero al pulsarla: barra,
 porción, fila de ranking, celda de una columna de dimensión o tarjeta de `asset`. El filtro es el
 mismo de la hoja Filtros (`filter.<dimension>=<valor>`), así que la URL, el PDF/CSV y el correo lo
-conservan. Pulsar el mismo valor lo quita; Ctrl/Cmd-clic añade otro valor de la misma dimensión
-(`IN`); un valor de otra dimensión añade un segundo filtro (AND). «Otros», los totales y la tendencia
+conservan. Pulsar el mismo valor lo quita; un valor de otra dimensión reemplaza el filtro anterior;
+Ctrl/Cmd-clic añade otro valor de la misma dimensión (`IN`) o combina dimensiones (AND). «Otros», los totales y la tendencia
 no se pulsan.
 
 ```yaml

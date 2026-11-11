@@ -17,8 +17,8 @@ puedes ver.
 2. El tablero se filtra. La tarjeta donde pulsaste conserva todos sus valores y resalta el elegido;
    las demás muestran solo lo filtrado.
 3. Pulsa el mismo valor otra vez para quitar el filtro.
-4. Mantén Ctrl (o Cmd en Mac) mientras pulsas otro valor de la misma dimensión para sumarlo. Si
-   pulsas una dimensión distinta, se añade un segundo filtro.
+4. Pulsa otro valor de otra dimensión y el filtro anterior se reemplaza. Mantén Ctrl (o Cmd en Mac)
+   para conservarlo: suma valores de la misma dimensión o combina dimensiones distintas (AND).
 5. Los filtros aparecen como chips bajo la línea del período. **Limpiar** los quita todos.
 
 ## Opciones

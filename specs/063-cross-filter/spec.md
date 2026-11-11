@@ -32,8 +32,9 @@ the request, the chip, the URL, the KPIs and the other seven views.
    removed.
 3. **Given** a filtered dashboard, **When** Ctrl/Cmd-click (or long-press) another mark of the same
    dimension, **Then** both values are selected (`IN`).
-4. **Given** a filter on `producto`, **When** a `cliente` mark is clicked, **Then** both filters apply
-   (AND).
+4. **Given** a filter on `producto`, **When** a `cliente` mark is clicked, **Then** the `producto`
+   filter is removed and the `cliente` one applies; Ctrl/Cmd-click keeps `producto` and adds
+   `cliente` (AND).
 5. **Given** a cross-filtered chart, **Then** the source chart keeps every value, the chosen mark is
    highlighted and the others dim; every other component shows filtered data.
 6. **Given** a keyboard user, **When** they Tab to a ranking row and press Enter/Space, **Then** the
@@ -72,8 +73,9 @@ filter id and receive 422.
 
 - **FR-001**: bar, pie, donut, ranking, table, asset, share and default-view cards MUST make every
   one-value mark clickable (pointer, Enter, Space) and MUST set a report filter.
-- **FR-002**: click toggles the value; Ctrl/Cmd-click (long-press on touch) adds it to the dimension's
-  `IN` selection; a value of another dimension adds a second AND filter.
+- **FR-002**: click replaces the cross-filter with the value's dimension (the previous dimension's
+  filter is removed); clicking the only selected value again removes it; Ctrl/Cmd-click (long-press
+  on touch) adds it to the dimension's `IN` selection and keeps the other dimensions (AND).
 - **FR-003**: the source chart MUST keep every value, highlight the selected mark(s) and dim the rest.
 - **FR-004**: a removable chip MUST appear under the meta line; multi-select reads
   `Producto: N seleccionados`; `Limpiar` clears all; the Filtros sheet reflects the same state.
