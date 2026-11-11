@@ -74,6 +74,9 @@ windowed dataset filters with `:window_start` and `:window_end` and declares bot
   default; `interactions: {cross_filter: false}` turns it off. On one component, `cross_filter:
   false` makes it inert and `ignore` keeps it on the company totals. If the display label is not
   unique, declare the dimension as `{label, sql, key}`: filter by `key`, show `sql`.
+- **View as table (064)**: every card offers its rows with search, sort, copy and CSV, and
+  `?tabla=<id>` opens that table. It is on by default; `interactions: {data_table: false}` turns it
+  off and `data_table: false` hides it on one component.
 - A direct report (no integration) declares `direct: {source, tables: {alias: schema.object}}`
   instead of `uses`, plus `date` and, when needed, `joins`. The short form of `tables` only works on
   a BI-ready source.

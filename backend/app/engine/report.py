@@ -45,6 +45,8 @@ log = logging.getLogger("app.engine.report")
 STATEMENT_TIMEOUT_MS = 15_000
 PARALLEL_VIEWS = 4          # well within the engine pool (DB_POOL_SIZE + overflow) per request
 MAX_FILTER_VALUES = 50
+# Feature 064: «Ver todas las filas» stops at 1,000 rows, whatever the payload cut was.
+FULL_VIEW_LIMIT = 1000
 FILTER_OPTIONS_LIMIT = 200
 
 
@@ -598,17 +600,21 @@ def _view_id(vdef: dict) -> dict:
 
 
 def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
-                 *, session=None) -> dict:
+                 *, session=None, full: bool = False) -> dict:
     mid, did = view["metric"], view["dimension"]
     render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
                                report_id=ctx.report_id)
-    limit = view.get("limit") or 10
+    limit = FULL_VIEW_LIMIT if full else (view.get("limit") or 10)
+    if full and ctx.direct is not None:
+        limit = min(limit, ctx.direct.max_rows)
     group = [("key", _dim(ctx, did))]
     keyed = bool(ctx.dimensions[did].get("key"))
     if keyed:
         group.append(("filter_key", _filter_expr(ctx, did)))
     rows = aggregate(ctx, [mid], sel.current, filters, tz, group=group, order_metric=mid,
-                     limit=limit, session=session)
+                     limit=limit + 1, session=session)
+    truncated = len(rows) > limit
+    rows = rows[:limit]
     prev = {}
     if sel.previous and rows:
         prev = {r["key"]: r[mid] for r in aggregate(
@@ -635,23 +641,25 @@ def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict
             "label": m["label"], **_en(m, "label"),
             "dimension_label": dim["label"],
             **{f"dimension_{k}": v for k, v in _en(dim, "label").items()},
-            "format": m.get("format", "number"), "items": items}
+            "format": m.get("format", "number"), "items": items, "truncated": truncated}
 
 
 def view_table(ctx: Context, view: dict, sel: periods.Selection, filters: dict, tz: str,
-               *, session=None) -> dict:
+               *, session=None, full: bool = False) -> dict:
     for mid in view["metrics"]:
         render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
                                    report_id=ctx.report_id)
     group = [(d, _dim(ctx, d)) for d in view["dimensions"]]
     keyed = [d for d in view["dimensions"] if ctx.dimensions[d].get("key")]
     group += [(f"__key_{d}", _filter_expr(ctx, d)) for d in keyed]
-    limit = view.get("limit") or 100
+    limit = FULL_VIEW_LIMIT if full else (view.get("limit") or 100)
     if ctx.direct is not None:
         limit = min(limit, ctx.direct.max_rows)
     rows = aggregate(ctx, view["metrics"], sel.current, filters, tz, group=group,
-                     order_metric=view["metrics"][0], limit=limit,
+                     order_metric=view["metrics"][0], limit=limit + 1,
                      session=session)
+    truncated = len(rows) > limit
+    rows = rows[:limit]
     columns = ([{"id": d, "label": ctx.dimensions[d]["label"],
                  **_en(ctx.dimensions[d], "label"), "kind": "dimension"}
                 for d in view["dimensions"]]
@@ -661,6 +669,7 @@ def view_table(ctx: Context, view: dict, sel: periods.Selection, filters: dict, 
     return {"type": "table", **_view_id(view), "title": view.get("title"),
             **_en(view, "title"),
             "columns": columns,
+            "truncated": truncated,
             "rows": [
                 {**{k: _json_key(v) if k in view["dimensions"] else v
                    for k, v in r.items() if not k.startswith("__key_")},
@@ -1189,9 +1198,11 @@ def _kpis_one_by_one(ctx: Context, view: dict, sel: periods.Selection, filters: 
 
 
 def _run_view(ctx: Context, vdef: dict, sel: periods.Selection, filters: dict, tz: str,
-              reference: str | None, *, session=None) -> dict:
+              reference: str | None, *, session=None, full: bool = False) -> dict:
     """One view, never the whole dashboard: a failure becomes that view's error card (FR-006)."""
     try:
+        if full and vdef["type"] in ("ranking", "table"):
+            return VIEWS[vdef["type"]](ctx, vdef, sel, filters, tz, session=session, full=True)
         return VIEWS[vdef["type"]](ctx, vdef, sel, filters, tz, session=session)
     except RenderError as exc:
         if (exc.code == render_errors.METRIC_ERROR and vdef["type"] == "kpis"
@@ -1259,17 +1270,18 @@ def _sort_facts(ctx: Context, vdefs: list[dict], views: list[dict], sel: periods
 
 
 def _run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str,
-               reference: str | None = None) -> list[dict]:
+               reference: str | None = None, full: bool = False) -> list[dict]:
     vdefs = [v for v in ctx.definition["views"] if v.get("type") in VIEWS]
     if ctx.direct is not None:
         with ctx.runner.session() as s:
-            views = [_run_view(ctx, v, sel, filters, tz, reference, session=s) for v in vdefs]
+            views = [_run_view(ctx, v, sel, filters, tz, reference, session=s, full=full)
+                     for v in vdefs]
             _sort_facts(ctx, vdefs, views, sel, filters, tz, session=s)
         _mark_empty(ctx, views, tz)
         return views
     with ThreadPoolExecutor(max_workers=min(PARALLEL_VIEWS, max(len(vdefs), 1))) as pool:
         views = list(pool.map(
-            lambda v: _run_view(ctx, v, sel, filters, tz, reference), vdefs))
+            lambda v: _run_view(ctx, v, sel, filters, tz, reference, full=full), vdefs))
     # A routed (rollup) payload that lost its table is not a dashboard with five cards: the raw
     # path is the answer, and `_raw_on_missing` handles it (feature 005 rollups, 038).
     if ctx.rollup is not None:
@@ -1324,7 +1336,7 @@ def cross_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str, *,
 
 
 def run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str, *,
-              reference: str | None = None) -> list[dict]:
+              reference: str | None = None, full: bool = False) -> list[dict]:
     """Views are independent: computed in parallel (each on its own pooled connection)."""
     reference = reference or render_reference()
-    return _raw_on_missing(ctx, lambda c: _run_views(c, sel, filters, tz, reference))
+    return _raw_on_missing(ctx, lambda c: _run_views(c, sel, filters, tz, reference, full))

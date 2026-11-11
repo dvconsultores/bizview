@@ -96,18 +96,22 @@ def _cached(db: Session, ctx: engine.Context, key: str, version: str, kind: str,
 
 def _data(db: Session, ctx: engine.Context, params: Iterable[tuple[str, str]]) -> dict:
     tz = get_settings().timezone
-    sel, filters = engine.selection(ctx, params, _today())
-    key = engine.selection_hash(sel, filters)
+    pairs = list(params)
+    # Feature 064: «Ver todas las filas» asks the same payload without the view's own cut. It is a
+    # different payload, so it gets a different cache key and never reuses the stored snapshot.
+    full = any(key == "full" and value in ("1", "true") for key, value in pairs)
+    sel, filters = engine.selection(ctx, pairs, _today())
+    key = engine.selection_hash(sel, filters) + (":full" if full else "")
     if ctx.direct is not None:
         # 048: a `materialize: daily` report reads the figures the worker stored, and says so.
-        if snapshot.is_daily(ctx.definition):
+        if not full and snapshot.is_daily(ctx.definition):
             stored = snapshot.latest(db, ctx.report_id, selection=sel.to_json(),
                                      filters=filters)
             if stored is not None:
                 payload = snapshot.labelled(stored["payload"], stored["day"])
                 fr = payload.get("freshness") or {}
                 return {**payload, "etag": f'"{fr.get("data_version")}-{key}-snap"'}
-        payload = direct.cached_data(db, ctx, sel, filters, key, tz)
+        payload = direct.cached_data(db, ctx, sel, filters, key, tz, full=full)
         fr = payload.get("freshness") or {}
         etag = (f'"{fr.get("data_version")}-{key}-stale"' if fr.get("stale")
                 else f'"{fr.get("data_version")}-{key}"')
@@ -121,7 +125,7 @@ def _data(db: Session, ctx: engine.Context, params: Iterable[tuple[str, str]]) -
             "selection": sel.to_json(), "filters": filters,
             "render_reference": reference,
             "freshness": {"updated_at": updated, "data_version": version},
-            "views": engine.run_views(routed, sel, filters, tz, reference=reference),
+            "views": engine.run_views(routed, sel, filters, tz, reference=reference, full=full),
             **engine.cross_views(routed, sel, filters, tz, reference=reference),
         }
 

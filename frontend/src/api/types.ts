@@ -278,7 +278,7 @@ export interface ReportDefinition {
   compare: { default: CompareMode; allowed: CompareMode[] };
   filters: string[];
   /** Feature 063: click-to-filter is on unless the report turns it off. */
-  interactions?: { cross_filter?: boolean };
+  interactions?: { cross_filter?: boolean; data_table?: boolean };
   pdf: boolean;
   /** Deprecated and ignored since 0.2.0: the narrative generator is gone. The key stays so
    *  a project written for an older installation still validates. */
@@ -394,6 +394,8 @@ export type ReportView =
       dimension_label_en?: string;
       format: MetricFormat;
       items: { key: string | number | null; filter?: string | number | null; value: number | null; share: number | null; previous: number | null; change: Change | null }[];
+      /** Feature 064: the view's `limit` cut the rows; «Ver todas las filas» can ask for the rest. */
+      truncated?: boolean;
     } & DerivedViewFacts)
   | ({
       type: "table";
@@ -407,6 +409,8 @@ export type ReportView =
         format?: MetricFormat;
       }[];
       rows: Record<string, string | number | null>[];
+      /** Feature 064: the view's `limit` cut the rows. */
+      truncated?: boolean;
     } & DerivedViewFacts);
 
 export interface Range {
@@ -505,6 +509,8 @@ export interface WebComponent {
   summary?: boolean;
   /** Feature 063: `false` makes this card inert; `ignore` keeps it out of cross-filtering. */
   cross_filter?: boolean | "ignore";
+  /** Feature 064: `false` hides «Ver como tabla» for this component. */
+  data_table?: boolean;
 
   // kpi
   metric?: string;

@@ -20,7 +20,7 @@ def test_each_role_sees_its_topics(superuser, admin, user):
     assert user_ids < admin_ids < super_ids
     # Every topic of the index is visible to the super user; the count moves when a feature
     # adds one (063 added `filtrar-haciendo-clic`).
-    assert len(super_ids) == 70
+    assert len(super_ids) == 71
 
 
 def test_hidden_or_unknown_topic_is_404(superuser, user):

@@ -294,3 +294,41 @@ def test_render_meta_omits_viewer_when_none():
     )
     lines = _pdf_lines(content)
     assert not any(line.startswith("Consultado por") for line in lines)
+
+
+def test_a_truncated_ranking_and_full_rows(monkeypatch):
+    """Feature 064: the payload says it was cut, and `full` lifts the view's own limit."""
+    ctx = SimpleNamespace(
+        metrics={"m": {"label": "Ventas", "format": "currency"}},
+        dimensions={"product": {"label": "Producto", "sql": "products.name"}},
+        report_id="r", direct=None, rollup=None, columns={"products": {"name": {"type": "text"}}},
+    )
+    selection = SimpleNamespace(current=None, previous=None)
+    calls = {"rows": 0}
+
+    def fake_aggregate(ctx, metrics, sel, filters, tz, *, group=None, order_metric=None,
+                       limit=None, session=None, keys=None):
+        if group:
+            calls["rows"] += 1
+            return [{"key": "A", "m": 50}, {"key": "B", "m": 30}, {"key": "C", "m": 20}][:limit]
+        return [{"m": 100}]
+
+    monkeypatch.setattr(engine, "aggregate", fake_aggregate)
+    view = engine.view_ranking(ctx, {"metric": "m", "dimension": "product", "limit": 2},
+                               selection, {}, "UTC")
+    assert [item["key"] for item in view["items"]] == ["A", "B"]
+    assert view["truncated"] is True
+
+    full = engine.view_ranking(ctx, {"metric": "m", "dimension": "product", "limit": 2},
+                               selection, {}, "UTC", full=True)
+    assert [item["key"] for item in full["items"]] == ["A", "B", "C"]
+    assert full["truncated"] is False
+
+
+def test_full_uses_its_own_cache_entry(applied):
+    normal = applied.get(f"/api/reports/ventas/data?{SELECTION}")
+    full = applied.get(f"/api/reports/ventas/data?{SELECTION}&full=1")
+    assert normal.status_code == full.status_code == 200
+    assert normal.headers["etag"] != full.headers["etag"]
+    assert all("truncated" in view for view in full.json()["views"]
+               if view.get("type") in ("ranking", "table"))

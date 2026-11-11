@@ -31,6 +31,8 @@ interface DataTableProps {
   maximized?: boolean;
   /** Feature 063: a dimension cell filters its dimension. */
   crossFilter?: CrossFilterState;
+  /** Feature 064: open the rows as a table. */
+  onViewAsTable?: () => void;
 }
 
 /** A cached-URL set's picture for one row: the column the set declares, never the key. */
@@ -80,8 +82,7 @@ export function DataTable({
   image,
   onMaximize,
   maximized = false,
-  crossFilter,
-}: DataTableProps) {
+  crossFilter, onViewAsTable }: DataTableProps) {
   const t = useT();
   const [page, setPage] = useState(0);
   const heading = title ?? localized(view, "title") ?? t.reportParams.detailTitle;
@@ -122,7 +123,7 @@ export function DataTable({
       {maximized ? null : (
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
           <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{heading}</h2>
-          {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
+          {view.rows.length > 0 ? <CardMenu title={heading} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} onViewAsTable={onViewAsTable} /> : null}
         </div>
       )}
       {/* Wide tables scroll inside the card, never the page. */}

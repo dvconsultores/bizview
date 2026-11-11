@@ -977,6 +977,23 @@ export const en: Catalogue = {
       changeColumn: "Change (%)",
     },
     detailTitle: "Details",
+    // Feature 064: a card's data as a table.
+    dataTable: {
+      action: "View as table",
+      title: (title: string) => `Data: ${title}`,
+      search: "Search the table",
+      rows: (n: number) => (n === 1 ? "1 row" : `${n} rows`),
+      noRows: "No rows match.",
+      copy: "Copy",
+      copied: "Copied",
+      fullRows: "View all rows",
+      chart: "Chart",
+      table: "Table",
+      metricColumn: "Metric",
+      valueColumn: "Value",
+      periodColumn: "Period",
+      totalColumn: "% of total",
+    },
   },
   // Feature 038: the card of a tile or block that could not render names the failing piece.
   report: {

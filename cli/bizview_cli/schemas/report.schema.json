@@ -720,6 +720,10 @@
         "cross_filter": {
           "description": "Filtrar al hacer clic en cualquier valor (por defecto true).",
           "type": "boolean"
+        },
+        "data_table": {
+          "description": "Ofrecer «Ver como tabla» en las tarjetas (por defecto true).",
+          "type": "boolean"
         }
       }
     }
@@ -1131,6 +1135,10 @@
               "const": "ignore"
             }
           ]
+        },
+        "data_table": {
+          "description": "false oculta «Ver como tabla» en este componente (por defecto true).",
+          "type": "boolean"
         }
       },
       "allOf": [

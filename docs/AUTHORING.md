@@ -287,6 +287,27 @@ dimensions:
   sheet offers.
 - An id that is not a dimension of the report is refused with 422.
 
+## See the data as a table (feature 064)
+
+Every data card offers **View as table**: the rows it already draws, with search, sorting, a row
+counter, **Copy** and **Download CSV**. The dialog is shareable as `?tabla=<component id>` and also
+opens from the table icon beside **Enlarge**, a double-click on the card or `T` on a focused card.
+A truncated ranking or table offers **View all rows** (up to 1,000, 50 per page).
+
+```yaml
+interactions:
+  data_table: true            # default; false hides the entry points for the whole report
+
+layout:
+  web:
+    components:
+      - {id: brands, type: bar, view: brands, category: brand}
+      - {id: internal, type: table, view: detail, data_table: false}
+```
+
+- `data_table: false` hides the menu item, the icon, the double-click and `T` for that component.
+- Share links keep the table; copy and CSV are hidden when the report disables export.
+
 ## 6. Validate
 
 ```bash

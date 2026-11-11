@@ -1409,7 +1409,7 @@ def _failure(db, ctx, key: str, e: DirectError, started: float) -> dict:
     raise api_error(e) from None
 
 
-def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine) -> dict:
+def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine, full=False) -> dict:
     spec = ctx.direct
     conn = None
     pg = None
@@ -1450,7 +1450,7 @@ def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine) -> dict:
             reference = engine.render_reference()
             token = _deadline_override.set(deadline)
             try:
-                views = engine.run_views(ctx, sel, filters, tz, reference=reference)
+                views = engine.run_views(ctx, sel, filters, tz, reference=reference, full=full)
             finally:
                 _deadline_override.reset(token)
             payload = jsonable_encoder({
@@ -1489,7 +1489,7 @@ def _lead(db, ctx, sel, filters, key, tz, version, deadline, engine) -> dict:
                 conn.close()
 
 
-def cached_data(db, ctx, sel, filters, key: str, tz: str) -> dict:
+def cached_data(db, ctx, sel, filters, key: str, tz: str, *, full: bool = False) -> dict:
     """Return direct report data with cooperative caching.
 
     Flow: permission → cache read → in-process single-flight → cross-process advisory lock
@@ -1528,7 +1528,7 @@ def cached_data(db, ctx, sel, filters, key: str, tz: str) -> dict:
     if existing is None:
         deadline = time.monotonic() + spec.timeout_seconds
         try:
-            result = _lead(db, ctx, sel, filters, key, tz, version, deadline, engine)
+            result = _lead(db, ctx, sel, filters, key, tz, version, deadline, engine, full)
             fut.set_result(result)
             return result
         except BaseException as e:

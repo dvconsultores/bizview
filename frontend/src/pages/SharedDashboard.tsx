@@ -13,7 +13,10 @@ import { ReportMetaLine } from "../components/report/ReportMetaLine";
 import { ReportParamsPanel } from "../components/report/ReportParamsPanel";
 import { ReportSheet } from "../components/report/ReportSheet";
 import { ReportArea } from "../components/report/ReportArea";
-import { ReportViews } from "../components/report/ReportViews";
+import { ReportViews, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import { CardDialog } from "../components/report/CardDialog";
+import { CardDataTable } from "../components/report/CardDataTable";
+import { componentView } from "../components/report/LayoutRenderer";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
@@ -24,6 +27,7 @@ import { readViewerMode, reportMode } from "../theme/library";
 import type { ThemeMode } from "../theme/themes";
 import { useT } from "../i18n";
 import { localized } from "../lib/labels";
+import { cardTitle } from "../lib/cardTitle";
 import { downloadPdf } from "../lib/download";
 import { formatDate } from "../lib/format";
 import { isStale, staleText } from "../lib/freshness";
@@ -55,12 +59,45 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ok"; shared: SharedDashboardData };
 
+/** Feature 064: the view, component and title behind a `?tabla=` id on a shared report. */
+function sharedTableEntry(id: string, data: ReportData, report: ReportDefinition) {
+  if (report.interactions?.data_table === false) return null;
+  if (id.startsWith(VIEW_CARD_PREFIX)) {
+    const view = data.views[Number(id.slice(VIEW_CARD_PREFIX.length))];
+    if (!view || view.error || view.empty) return null;
+    const title = ("title" in view && localized(view as { title?: string }, "title"))
+      || (view.type === "ranking" ? localized(view, "label") : undefined)
+      || localized(report, "title");
+    return { view, title };
+  }
+  const component = (report.layout?.web?.components ?? []).find((entry) => entry.id === id);
+  if (!component || component.data_table === false) return null;
+  const base = component.view ? data.views.find((view) => view.id === component.view) : undefined;
+  if (!base || base.error || base.empty) return null;
+  return {
+    view: componentView(component, base, data),
+    component,
+    title: cardTitle(report, id, base as { title?: string }) ?? localized(report, "title"),
+  };
+}
+
 /** Public, read-only view of one dashboard through an expiring share link (feature 018). */
 export function SharedDashboard() {
   const t = useT();
   const { token = "" } = useParams();
   const base = `/api/shared/${encodeURIComponent(token)}`;
   const [params, setParams] = useSearchParams();
+  const tableId = params.get("tabla");
+  const openTable = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tabla", id);
+    setParams(next, { replace: true });
+  };
+  const closeTable = () => {
+    const next = new URLSearchParams(params);
+    next.delete("tabla");
+    setParams(next, { replace: true });
+  };
   const branding = useBranding();
 
   const [sharedState, setSharedState] = useState<LoadState>({
@@ -226,6 +263,7 @@ export function SharedDashboard() {
   }, [base, report, query]);
 
   const fresh = data !== null && dataQuery === query;
+  const tableCard = tableId && data && report ? sharedTableEntry(tableId, data, report) : null;
 
   const handlePdf = async () => {
     if (!report || !query) return;
@@ -403,10 +441,37 @@ export function SharedDashboard() {
                 <span className="sr-only">{t.common.loading}</span>
               </div>
             )}
-            {data && <ReportViews data={data} def={report} />}
+            {data && <ReportViews data={data} def={report} onViewAsTable={openTable} />}
           </ReportArea>
         </div>
       </PageContainer>
+
+      {tableCard && data && report ? (
+        <CardDialog
+          open
+          title={t.reportParams.dataTable.title(tableCard.title)}
+          onClose={closeTable}
+          period={t.reportParams.periodLabels[data.selection.period] ?? data.selection.period}
+          comparison={data.selection.previous && data.selection.compare !== "none"
+            ? t.reportParams.compareLabels[data.selection.compare] : undefined}
+          filters={Object.entries(data.filters ?? {})
+            .flatMap(([field, values]) => values.map((value) => `${field}: ${value}`))}
+        >
+          <CardDataTable
+            view={tableCard.view}
+            options={{
+              component: tableCard.component,
+              def: report,
+              filters: data.filters,
+              trend: (metric) => data.views.find(
+                (view): view is Extract<ReportData["views"][number], { type: "trend" }> =>
+                  view.type === "trend" && view.metric === metric),
+            }}
+            currency={report.currency}
+            hideExport={!report.pdf}
+          />
+        </CardDialog>
+      ) : null}
 
       <ReportSheet
         open={panel !== null}

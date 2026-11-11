@@ -198,6 +198,15 @@ dimensión, para que el gráfico conserve todas sus marcas y resalte la elegida.
 `cross_filter: ignore` lee `ignore_views[view id]`. Una dimensión puede declarar `key: <sql>`; el
 filtro lo usa y la vista sigue mostrando `sql`.
 
+## Ver como tabla (feature 064)
+
+La tabla de una tarjeta se construye en el navegador con la vista que el payload ya trae; abrirla no
+hace ninguna petición. `?tabla=<id del componente>` la nombra, sola o junto a `ampliar`. **Ver todas
+las filas** pide la misma selección con `full=1`, que eleva el `limit` de ranking/tabla a 1.000 y
+marca `truncated` en las vistas, bajo una clave de caché propia (`<hash de selección>:full`). El
+modelo vive en [dataTable.ts](../../frontend/src/lib/dataTable.ts); el diálogo reutiliza `CardDialog`
+y su trampa de foco.
+
 ## 6. Frescura — cuándo cambian los números
 
 | Lo que ves | Qué pasó |

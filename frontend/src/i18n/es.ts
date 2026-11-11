@@ -965,6 +965,23 @@ export const es = {
       changeColumn: "Variación (%)",
     },
     detailTitle: "Detalle",
+    // Feature 064: los datos de una tarjeta como tabla.
+    dataTable: {
+      action: "Ver como tabla",
+      title: (title: string) => `Datos: ${title}`,
+      search: "Buscar en la tabla",
+      rows: (n: number) => (n === 1 ? "1 fila" : `${n} filas`),
+      noRows: "Ninguna fila coincide.",
+      copy: "Copiar",
+      copied: "Copiado",
+      fullRows: "Ver todas las filas",
+      chart: "Gráfico",
+      table: "Tabla",
+      metricColumn: "Métrica",
+      valueColumn: "Valor",
+      periodColumn: "Período",
+      totalColumn: "% del total",
+    },
   },
   // Feature 038: the card of a tile or block that could not render names the failing piece.
   report: {

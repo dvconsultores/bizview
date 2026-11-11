@@ -81,6 +81,24 @@ const donut: ReportView = {
   values: [60, 40],
 };
 
+describe("CardDialog table mode (feature 064)", () => {
+  it("offers the Gráfico | Tabla switch and reports the choice", () => {
+    const onModeChange = vi.fn();
+    mount(
+      <CardDialog open title="Ventas" onClose={vi.fn()} mode="chart" onModeChange={onModeChange}>
+        <p>gráfico</p>
+      </CardDialog>,
+    );
+    const group = container.querySelector('[role="group"]') as HTMLElement;
+    expect(group).not.toBeNull();
+    const table = Array.from(group.querySelectorAll("button"))
+      .find((button) => button.textContent === t.reportParams.dataTable.table) as HTMLButtonElement;
+    act(() => table.click());
+    expect(onModeChange).toHaveBeenCalledWith("table");
+    expect(table.getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
 describe("CardDialog header (feature 062)", () => {
   it("puts the title alone on the first row, with the actions beside it and the chips below", () => {
     mount(

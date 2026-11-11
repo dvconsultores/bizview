@@ -7,15 +7,18 @@ import type {
   EmailOptions,
   ReportData,
   ReportDefinition,
+  ReportView as ViewPayload,
+  WebComponent,
 } from "../api/types";
 import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
-import { ReportViews, SingleView, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import { ReportViews, SingleView, VIEW_CARD_PREFIX, sourceView } from "../components/report/ReportViews";
 import { toggledCrossFilter, type CrossFilterState } from "../components/report/crossFilter";
 import { cardTitle } from "../lib/cardTitle";
 import { CardDialog } from "../components/report/CardDialog";
-import { LayoutRenderer } from "../components/report/LayoutRenderer";
+import { LayoutRenderer, componentView } from "../components/report/LayoutRenderer";
+import { CardDataTable } from "../components/report/CardDataTable";
 import { downloadCardPng } from "../lib/cardPng";
 import type { LayoutParamsWiring } from "../components/report/LayoutBlocks";
 import { Spinner } from "../components/Spinner";
@@ -152,13 +155,36 @@ export function ReportView() {
   const maximize = useCallback((id: string, replace = false) => {
     const next = new URLSearchParams(params);
     next.set("ampliar", id);
+    // Feature 064: moving between cards keeps the table mode.
+    if (next.has("tabla")) next.set("tabla", id);
     setParams(next, { replace });
   }, [params, setParams]);
   const closeMaximized = useCallback(() => {
     const next = new URLSearchParams(params);
     next.delete("ampliar");
+    next.delete("tabla");
     setParams(next, { replace: true });
   }, [params, setParams]);
+
+  // Feature 064: `?tabla=<id>` opens a card's rows; with `?ampliar` it is the dialog's table mode.
+  const tableId = tv ? null : params.get("tabla");
+  const openTable = useCallback((id: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tabla", id);
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+  const closeTable = useCallback(() => {
+    const next = new URLSearchParams(params);
+    next.delete("tabla");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+  const setMaximizedMode = useCallback((mode: "chart" | "table") => {
+    if (!maximizedId) return;
+    const next = new URLSearchParams(params);
+    if (mode === "table") next.set("tabla", maximizedId);
+    else next.delete("tabla");
+    setParams(next, { replace: true });
+  }, [maximizedId, params, setParams]);
 
 
   // Feature 053: one sheet, two tabs. Both actions open it on their tab; pressing the tab that is
@@ -507,11 +533,28 @@ export function ReportView() {
           csvBase={kpiSize === "normal" ? csvBase : undefined}
           params={layoutParams}
           crossFilter={crossFilter}
-          onMaximize={maximize} />
+          onMaximize={maximize}
+          onViewAsTable={openTable} />
       );
     },
-    [data, def, csvBase, layoutParams, crossFilter, maximize],
+    [data, def, csvBase, layoutParams, crossFilter, maximize, openTable],
   );
+
+  // Feature 064: the table a `?tabla=` id names, and its uncut rows.
+  const tableCard = useMemo(
+    () => (tableId && !maximizedId && data && def ? tableEntry(tableId, data, def, crossFilter) : null),
+    [tableId, maximizedId, data, def, crossFilter],
+  );
+  const fetchFullView = useCallback(async (id: string): Promise<ViewPayload | null> => {
+    const q = queryRef.current;
+    if (q === null) return null;
+    const payload = await api.get<ReportData>(
+      `/api/reports/${encodeURIComponent(id)}/data${q}${q.includes("?") ? "&" : "?"}full=1`,
+    );
+    if (id.startsWith(VIEW_CARD_PREFIX)) return payload.views[Number(id.slice(VIEW_CARD_PREFIX.length))] ?? null;
+    const component = (def?.layout?.web?.components ?? []).find((entry) => entry.id === id);
+    return component?.view ? payload.views.find((view) => view.id === component.view) ?? null : null;
+  }, [id, def]);
 
   if (!def) {
     return (
@@ -722,7 +765,39 @@ export function ReportView() {
           crossFilter={crossFilter}
           onMaximize={maximize}
           onClose={closeMaximized}
+          tableOpen={tableId === maximizedId}
+          onToggleTable={setMaximizedMode}
+          fetchFull={fetchFullView}
         />
+      ) : null}
+
+      {/* Feature 064: the same table without a maximised card behind it. */}
+      {tableCard && tableId ? (
+        <CardDialog
+          open
+          title={t.reportParams.dataTable.title(tableCard.title)}
+          onClose={closeTable}
+          period={t.reportParams.periodLabels[data!.selection.period] ?? data!.selection.period}
+          comparison={data!.selection.previous && data!.selection.compare !== "none"
+            ? t.reportParams.compareLabels[data!.selection.compare] : undefined}
+          filters={Object.entries(data!.filters ?? {})
+            .flatMap(([field, values]) => values.map((value) => `${field}: ${value}`))}
+        >
+          <CardDataTable
+            view={tableCard.view}
+            options={{
+              component: tableCard.component,
+              def: def!,
+              filters: crossFilter?.filters,
+              trend: (metric) => data!.views.find(
+                (view): view is Extract<ViewPayload, { type: "trend" }> =>
+                  view.type === "trend" && view.metric === metric),
+            }}
+            currency={def!.currency}
+            crossFilter={crossFilter}
+            fetchFull={() => fetchFullView(tableId)}
+          />
+        </CardDialog>
       ) : null}
 
       <ReportSheet
@@ -840,6 +915,34 @@ function maximizedView(id: string, data: ReportData, def: ReportDefinition) {
   return component?.view ? data.views.find((view) => view.id === component.view) : undefined;
 }
 
+/** Feature 064: the view, component and title behind a `?tabla=` id. */
+function tableEntry(
+  id: string,
+  data: ReportData,
+  def: ReportDefinition,
+  crossFilter?: CrossFilterState,
+): { view: ViewPayload; component?: WebComponent; title: string } | null {
+  const t = liveT;
+  if (def.interactions?.data_table === false) return null;
+  if (id.startsWith(VIEW_CARD_PREFIX)) {
+    const view = data.views[Number(id.slice(VIEW_CARD_PREFIX.length))];
+    if (!view || view.error || view.empty) return null;
+    const title = ("title" in view && localized(view as { title?: string }, "title"))
+      || (view.type === "ranking" ? localized(view, "label") : undefined)
+      || t.reportParams.detailTitle;
+    return { view: sourceView(view, data, crossFilter), title };
+  }
+  const component = (def.layout?.web?.components ?? []).find((entry) => entry.id === id);
+  if (!component || component.data_table === false) return null;
+  const base = component.view ? data.views.find((view) => view.id === component.view) : undefined;
+  if (!base || base.error || base.empty) return null;
+  return {
+    view: componentView(component, base, data, crossFilter),
+    component,
+    title: cardTitle(def, id, base as { title?: string }) ?? t.reportParams.detailTitle,
+  };
+}
+
 /**
  * Feature 056: one card at the viewport's size.
  *
@@ -847,7 +950,8 @@ function maximizedView(id: string, data: ReportData, def: ReportDefinition) {
  * through `SingleView`), so a maximised card cannot show something the dashboard does not. The
  * arrows walk the dashboard's cards; the CSV is the view's own export; the PNG is the drawing.
  */
-function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize, onClose }: {
+function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize, onClose,
+                        tableOpen, onToggleTable, fetchFull }: {
   id: string;
   data: ReportData;
   def: ReportDefinition;
@@ -856,6 +960,9 @@ function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize
   crossFilter?: CrossFilterState;
   onMaximize: (id: string, replace?: boolean) => void;
   onClose: () => void;
+  tableOpen: boolean;
+  onToggleTable: (mode: "chart" | "table") => void;
+  fetchFull: (id: string) => Promise<ViewPayload | null>;
 }) {
   const t = useT();
   const frame = useRef<HTMLDivElement>(null);
@@ -872,6 +979,7 @@ function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize
         .map((entry) => entry.id);
   const position = cards.indexOf(id);
   const view = maximizedView(id, data, def);
+  const tablePayload = tableOpen ? tableEntry(id, data, def, crossFilter)?.view ?? view : view;
   const table = view ? viewCsvTable(view) : null;
   const title = byView
     ? (view && "title" in view ? localized(view as { title?: string }, "title") : undefined)
@@ -893,11 +1001,13 @@ function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize
       onPrevious={position > 0 ? () => go(-1) : undefined}
       onNext={position >= 0 && position < cards.length - 1 ? () => go(1) : undefined}
       onDownloadPng={() => downloadCardPng(frame.current, title)}
-      onDownloadCsv={table
+      onDownloadCsv={table && !tableOpen
         ? () => downloadCsv(
             csvBase ? csvFileName(`${csvBase}-${table.title}`) : csvFileName(table.title),
             toCsv(table.columns, table.rows))
         : undefined}
+      mode={tableOpen ? "table" : "chart"}
+      onModeChange={onToggleTable}
       period={t.reportParams.periodLabels[data.selection.period] ?? data.selection.period}
       comparison={data.selection.previous && data.selection.compare !== "none"
         ? t.reportParams.compareLabels[data.selection.compare] : undefined}
@@ -907,7 +1017,22 @@ function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize
       {/* Feature 056b: the frame is the height the chart measures, and the card is told it is the
           dialog's: one card across the whole width, no own title, no menu. */}
       <div ref={frame} className="flex h-full min-h-0 flex-col">
-        {byView ? (
+        {tableOpen && tablePayload ? (
+          <CardDataTable
+            view={tablePayload}
+            options={{
+              component,
+              def,
+              filters: crossFilter?.filters,
+              trend: (metric) => data.views.find(
+                (entry): entry is Extract<ViewPayload, { type: "trend" }> =>
+                  entry.type === "trend" && entry.metric === metric),
+            }}
+            currency={def.currency}
+            crossFilter={crossFilter}
+            fetchFull={() => fetchFull(id)}
+          />
+        ) : byView ? (
           <SingleView index={index} data={data} def={def} csvBase={csvBase} params={params}
                       crossFilter={crossFilter} />
         ) : def.layout?.web && component ? (

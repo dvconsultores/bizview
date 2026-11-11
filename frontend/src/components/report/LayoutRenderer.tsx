@@ -9,11 +9,14 @@ import type {
   WebLayout,
   LayoutProblem,
 } from "../../api/types";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, Table2 } from "lucide-react";
 import { formatBucket } from "../../lib/numbers";
 import { cardTitle } from "../../lib/cardTitle";
+import { csvFileName, downloadCsv, toCsv } from "../../lib/csv";
+import { viewDataTable } from "../../lib/dataTable";
 import { localized } from "../../lib/labels";
 import { useT } from "../../i18n";
+import { CardMenu } from "./CardMenu";
 import { DataTable } from "./DataTable";
 import { KpiGrid } from "./KpiGrid";
 import { FiltersBlock, SpacerBlock, TextBlock, type LayoutParamsWiring } from "./LayoutBlocks";
@@ -78,6 +81,8 @@ export interface LayoutRendererProps {
   crossFilter?: CrossFilterState;
   /** Feature 056: opens the card full screen; the screen owns `?ampliar=` so it can be shared. */
   onMaximize?: (id: string) => void;
+  /** Feature 064: opens the card's rows as a table; the screen owns `?tabla=`. */
+  onViewAsTable?: (id: string) => void;
   /** Feature 056b: the grid and its single cell stretch to the container (the dialog). */
   fill?: boolean;
   /** Feature 056b: the card is drawn inside the dialog: no own title, no menu, no chrome. */
@@ -94,6 +99,7 @@ export function LayoutRenderer({
   params,
   crossFilter,
   onMaximize,
+  onViewAsTable,
   fill = false,
   maximized = false,
 }: LayoutRendererProps) {
@@ -104,7 +110,24 @@ export function LayoutRenderer({
 
   return (
     <div className={`grid grid-cols-1 md:grid-cols-12 ${GUTTER[layout.gutter ?? "md"] ?? GUTTER.md}${fill ? " h-full min-h-0" : ""}`} data-testid="layout-grid">
-      {components.map((component, index) => (
+      {components.map((component, index) => {
+        const base = resolveView(component, data);
+        const shown = base ? componentView(component, base, data, crossFilter) : null;
+        const title = cardTitle(def, component.id) ?? component.type;
+        const model = shown ? viewDataTable(shown, { component, def, filters: crossFilter?.filters }) : null;
+        const tableAllowed = !!model && !maximized && def.interactions?.data_table !== false
+          && component.data_table !== false && !!onViewAsTable;
+        const ownMenu = component.type === "table";
+        const exportCsv = () => {
+          if (!model) return;
+          downloadCsv(csvFileName(model.title), toCsv(
+            model.columns.map((column) => ({ id: column.id, label: column.label })),
+            model.rows.map((row) => Object.fromEntries(
+              model.columns.map((column, i) => [column.id, row.values[i]]))),
+          ));
+        };
+        const openTable = tableAllowed ? () => onViewAsTable?.(component.id) : undefined;
+        return (
         <div
           key={`${component.id}-${index}`}
           className={`group/cell relative min-w-0 ${fill ? "h-full" : "h-full"} ${SPAN[clampSpan(component)]}${TILE_TYPES.has(component.type) && component.span === undefined ? " xl:col-span-3" : ""}`}
@@ -112,24 +135,54 @@ export function LayoutRenderer({
           data-layout-id={component.id}
           data-layout-type={component.type}
           data-layout-span={clampSpan(component)}
+          tabIndex={openTable ? -1 : undefined}
+          onDoubleClick={(event) => {
+            const target = event.target as Element;
+            if (target.closest('button, a, input, textarea, select, [role="button"]')) return;
+            openTable?.();
+          }}
+          onKeyDown={(event) => {
+            if (!openTable || (event.key !== "t" && event.key !== "T")) return;
+            const target = event.target as Element;
+            if (target.closest('input, textarea, select, [role="button"]')) return;
+            event.preventDefault();
+            openTable();
+          }}
         >
           <Component component={component} data={data} def={def} size={size} csvBase={csvBase}
                      params={params} crossFilter={crossFilter} maximized={maximized}
+                     onViewAsTable={tableAllowed ? openTable : undefined}
                      onMaximize={maximized ? undefined : onMaximize ? () => onMaximize(component.id) : undefined} />
-          {onMaximize && !maximized && MAXIMIZABLE.has(component.type) ? (
-            <button
-              type="button"
-              onClick={() => onMaximize(component.id)}
-              aria-label={t.layout.maximize(cardTitle(def, component.id) ?? component.type)}
-              title={t.layout.maximize(cardTitle(def, component.id) ?? component.type)}
-              data-maximize={component.id}
-              className={`absolute top-1 z-10 inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-faint opacity-80 transition-opacity hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus group-hover/cell:opacity-100 ${component.type === "table" ? "right-12" : "right-1"}`}
-            >
-              <Maximize2 className="h-5 w-5" aria-hidden />
-            </button>
+          {!maximized && (tableAllowed || onMaximize || !ownMenu) && MAXIMIZABLE.has(component.type) ? (
+            <span className="absolute right-1 top-1 z-10 flex items-center gap-1 opacity-80 transition-opacity group-hover/cell:opacity-100">
+              {tableAllowed ? (
+                <button type="button" onClick={openTable}
+                        aria-label={t.reportParams.dataTable.title(title)}
+                        title={t.reportParams.dataTable.action}
+                        data-table-action={component.id}
+                        className="hidden h-11 w-11 items-center justify-center rounded-lg text-ink-faint hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:inline-flex">
+                  <Table2 className="h-5 w-5" aria-hidden />
+                </button>
+              ) : null}
+              {!ownMenu ? (
+                <CardMenu title={title} onDownloadCsv={exportCsv}
+                          onViewAsTable={openTable}
+                          onMaximize={onMaximize ? () => onMaximize(component.id) : undefined} />
+              ) : null}
+              {onMaximize ? (
+                <button type="button" onClick={() => onMaximize(component.id)}
+                        aria-label={t.layout.maximize(title)}
+                        title={t.layout.maximize(title)}
+                        data-maximize={component.id}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-faint hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  <Maximize2 className="h-5 w-5" aria-hidden />
+                </button>
+              ) : null}
+            </span>
           ) : null}
         </div>
-      ))}
+        );
+      })}
       {notes.length > 0 ? <Notes notes={notes} /> : null}
     </div>
   );
@@ -193,6 +246,7 @@ function Component({
   params,
   crossFilter,
   onMaximize,
+  onViewAsTable,
   maximized,
 }: {
   component: WebComponent;
@@ -203,6 +257,7 @@ function Component({
   params?: LayoutParamsWiring;
   crossFilter?: CrossFilterState;
   onMaximize?: () => void;
+  onViewAsTable?: () => void;
   maximized?: boolean;
 }) {
   const t = useT();
@@ -274,8 +329,8 @@ function Component({
                              dimension={resolvedDimension(component, view)} />;
     case "table":
       return <TableComponent component={component} view={view} def={def} csvBase={csvBase}
-                             size={size} onMaximize={onMaximize} maximized={maximized}
-                             crossFilter={interactive} />;
+                             size={size} onMaximize={onMaximize} onViewAsTable={onViewAsTable}
+                             maximized={maximized} crossFilter={interactive} />;
     default:
       return (
         <ErrorCard code="layout_component_unknown" component={component.id} type={component.type}
@@ -305,7 +360,7 @@ function viewUsesDimension(component: WebComponent, view: ReportView, dimension:
 }
 
 /** Feature 063: `ignore` uses the unfiltered-by-cross view; the source chart keeps its dimension. */
-function componentView(
+export function componentView(
   component: WebComponent,
   view: ReportView,
   data: ReportData,
@@ -626,6 +681,7 @@ function TableComponent({
   csvBase,
   size,
   onMaximize,
+  onViewAsTable,
   maximized,
   crossFilter,
 }: {
@@ -635,6 +691,7 @@ function TableComponent({
   csvBase?: string;
   size: "normal" | "tv";
   onMaximize?: () => void;
+  onViewAsTable?: () => void;
   maximized?: boolean;
   crossFilter?: CrossFilterState;
 }) {
@@ -668,6 +725,7 @@ function TableComponent({
       pageSize={clampNumber(component.page_size, 5, 200, DEFAULT_PAGE_SIZE)}
       image={tableImage(def, component)}
       onMaximize={onMaximize}
+      onViewAsTable={onViewAsTable}
       maximized={maximized}
       crossFilter={crossFilter}
     />

@@ -292,6 +292,29 @@ dimensions:
 - Una dimensión es filtrable aunque no esté en `filters:`; esa lista solo decide qué ofrece la hoja.
 - Un id que no es una dimensión del reporte se rechaza con 422.
 
+## Ver los datos como tabla (feature 064)
+
+Cada tarjeta de datos ofrece **Ver como tabla**: las filas que ya dibuja, con búsqueda, orden, contador
+de filas, **Copiar** y **Descargar CSV**. El diálogo se comparte con `?tabla=<id del componente>` y
+también se abre desde el icono de tabla junto a **Ampliar**, con doble clic en la tarjeta o con `T`
+sobre una tarjeta enfocada. Un ranking o una tabla truncados ofrecen **Ver todas las filas** (hasta
+1.000, 50 por página).
+
+```yaml
+interactions:
+  data_table: true            # por defecto; false oculta los accesos en todo el reporte
+
+layout:
+  web:
+    components:
+      - {id: marcas, type: bar, view: marcas, category: marca}
+      - {id: interno, type: table, view: detalle, data_table: false}
+```
+
+- `data_table: false` oculta el elemento del menú, el icono, el doble clic y `T` en ese componente.
+- Los enlaces compartidos conservan la tabla; Copiar y CSV se ocultan cuando el reporte desactiva la
+  exportación.
+
 ## 6. Validar
 
 ```bash

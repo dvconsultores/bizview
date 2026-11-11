@@ -62,6 +62,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **See the data behind any card as a table (feature 064)**. Every data card now offers **Ver como
+  tabla** in its `⋯` menu and a table icon beside **Ampliar** (double-click or `T` also work): the
+  dialog shows exactly the rows the chart drew, with the report's labels and formats, search,
+  sorting, a row counter, **Copiar** and **Descargar CSV**. `?tabla=<component id>` makes the table
+  shareable and composes with `?ampliar=`; the maximized card gains a **Gráfico | Tabla** switch that
+  survives ← →. A truncated ranking or table offers **Ver todas las filas** (`full=1`, up to 1,000
+  rows, 50 per page). Authors can hide it with `data_table: false` on a component or
+  `interactions: {data_table: false}` for the report; help topic **Ver los datos de un gráfico**
+  (ES/EN) and the authoring guides cover it.
+
 - **Click-to-filter across the whole dashboard (feature 063)**. A bar, slice, ranking row,
   dimension cell, asset card or default-view card now filters every component — KPIs included — with
   the dimension value that was pressed, exactly as if it had been chosen in Filtros. Pressing the

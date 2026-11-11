@@ -231,6 +231,20 @@ topics:
       es: ["cross-filter", "hacer clic", "pulsar", "filtrar con un clic", "seleccionar un valor"]
       en: ["cross-filter", "click", "tap", "click to filter", "select a value"]
     related: [ver-reporte, filtros-y-periodos]
+  - id: ver-datos-grafico
+    section: tableros
+    title: {es: "Ver los datos de un gráfico", en: "See a chart's data"}
+    summary:
+      es: "Cómo abrir la tabla con las cifras de cualquier tarjeta, buscarla, ordenarla y copiarla."
+      en: "How to open any card's figures as a table, search, sort and copy them."
+    roles: [user]
+    routes: ["/r/:id"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["ver como tabla", "datos del gráfico", "tabla de datos", "copiar datos", "ver todas las filas"]
+      en: ["view as table", "chart data", "data table", "copy data", "all rows"]
+    related: [filtrar-haciendo-clic, ver-reporte]
   - id: ver-reporte
     section: tableros
     title: {es: "Ver un reporte", en: "View a report"}

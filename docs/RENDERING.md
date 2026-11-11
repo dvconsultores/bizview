@@ -190,6 +190,14 @@ that dimension, so the chart keeps all its marks and highlights the chosen one. 
 `cross_filter: ignore` reads `ignore_views[view id]` instead. A dimension may declare
 `key: <sql>`; the filter uses it and the view still shows `sql`.
 
+## View as table (feature 064)
+
+A card's table is built in the browser from the view the payload already carries; opening it makes
+no request. `?tabla=<component id>` names it, alone or beside `ampliar`. **View all rows** requests
+the same selection with `full=1`, which lifts the ranking/table `limit` to 1,000 and sets
+`truncated` on the views, under a cache key of its own (`<selection hash>:full`). The model lives in
+[dataTable.ts](../frontend/src/lib/dataTable.ts); the dialog reuses `CardDialog` and its focus trap.
+
 ## 6. Freshness — when the numbers change
 
 | What you see | What happened |

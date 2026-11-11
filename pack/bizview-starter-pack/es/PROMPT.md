@@ -75,6 +75,9 @@ e `incremental:` (`window_days`, `full_rebuild_cron`, `mode`). Un dataset con ve
   defecto; `interactions: {cross_filter: false}` lo apaga. En un componente, `cross_filter: false` lo
   deja inerte e `ignore` lo mantiene con los totales. Si la etiqueta visible no es única, declara la
   dimensión con `{label, sql, key}`: se filtra por `key` y se muestra `sql`.
+- **Ver como tabla (064)**: cada tarjeta ofrece sus filas con búsqueda, orden, copia y CSV, y
+  `?tabla=<id>` abre esa tabla. Está activo por defecto; `interactions: {data_table: false}` lo
+  apaga y `data_table: false` lo oculta en un componente.
 - Un reporte directo (sin integración) declara `direct: {source, tables: {alias: esquema.objeto}}`
   en lugar de `uses`, más `date` y, si aplica, `joins`. La forma corta de `tables` solo vale si la
   fuente es BI-ready.

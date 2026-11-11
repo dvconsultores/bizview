@@ -318,6 +318,47 @@ describe("cross-filter (feature 063)", () => {
   });
 });
 
+describe("view as table (feature 064)", () => {
+  it("opens the table from the icon, a double-click and the T key", () => {
+    const open = vi.fn();
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ id: "barras", type: "bar", view: "productos", x: "product" }] }}
+        data={data}
+        def={def}
+        onViewAsTable={open}
+      />,
+    );
+    const cell = node.querySelector("[data-layout-id='barras']") as HTMLElement;
+    const button = node.querySelector("[data-table-action='barras']") as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    act(() => button.click());
+    expect(open).toHaveBeenCalledWith("barras");
+
+    act(() => cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    expect(open).toHaveBeenCalledTimes(2);
+
+    act(() => cell.dispatchEvent(new KeyboardEvent("keydown", { key: "t", bubbles: true })));
+    expect(open).toHaveBeenCalledTimes(3);
+  });
+
+  it("hides every entry point with data_table: false", () => {
+    const open = vi.fn();
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ id: "barras", type: "bar", view: "productos", x: "product", data_table: false }] }}
+        data={data}
+        def={def}
+        onViewAsTable={open}
+      />,
+    );
+    expect(node.querySelector("[data-table-action]")).toBeNull();
+    const cell = node.querySelector("[data-layout-id='barras']") as HTMLElement;
+    act(() => cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    expect(open).not.toHaveBeenCalled();
+  });
+});
+
 describe("bar", () => {
   it("draws one bar per series and category when it is grouped", () => {
     render({ id: "barras", type: "bar", view: "marcas", x: "product", series: ["net_sales", "orders"] });

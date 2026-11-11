@@ -35,8 +35,8 @@ def test_index_loads_with_valid_ids_sections_and_related(loaded):
     # `parametros-y-filtros-del-reporte`; 054 added `ingreso-con-google`; 057b added
     # `como-se-dibuja-un-tablero`; 058 added `listas-de-correo` and `corregir-envio-de-correo`;
     # 060 added `la-fuente-no-admite-mas-conexiones`; 061 added `otros-tipos-de-fuente`;
-    # 063 added `filtrar-haciendo-clic`.
-    assert len(ids) == len(set(ids)) == 70
+    # 063 added `filtrar-haciendo-clic`; 064 added `ver-datos-grafico`.
+    assert len(ids) == len(set(ids)) == 71
     sections = {section.id for section in loaded.sections}
     for topic in loaded.topics:
         assert guide.TOPIC_ID.match(topic.id), topic.id

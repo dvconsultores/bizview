@@ -21,6 +21,8 @@ export function CardDialog({
   onNext,
   onDownloadCsv,
   onDownloadPng,
+  mode,
+  onModeChange,
   children,
 }: {
   open: boolean;
@@ -35,6 +37,9 @@ export function CardDialog({
   onNext?: () => void;
   onDownloadCsv?: () => void;
   onDownloadPng?: () => void;
+  /** Feature 064: the maximized card switches between its drawing and its table. */
+  mode?: "chart" | "table";
+  onModeChange?: (mode: "chart" | "table") => void;
   children: ReactNode;
 }) {
   const t = useT();
@@ -99,6 +104,18 @@ export function CardDialog({
             {title}
           </h2>
           <div className="flex shrink-0 items-center gap-1">
+            {mode && onModeChange ? (
+              <div role="group" aria-label={t.reportParams.dataTable.chart}
+                   className="mr-1 inline-flex rounded-lg border border-line p-0.5">
+                {(["chart", "table"] as const).map((entry) => (
+                  <button key={entry} type="button" aria-pressed={mode === entry}
+                          onClick={() => onModeChange(entry)}
+                          className={`min-h-tap rounded-md px-2 text-sm font-semibold ${mode === entry ? "bg-accent-soft text-accent" : "text-ink-2 hover:bg-subtle"}`}>
+                    {entry === "chart" ? t.reportParams.dataTable.chart : t.reportParams.dataTable.table}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {onPrevious ? (
               <button type="button" onClick={onPrevious} aria-label={t.layout.previousCard}
                       className="inline-flex min-h-tap min-w-tap items-center justify-center rounded-lg text-ink-2 hover:bg-subtle">

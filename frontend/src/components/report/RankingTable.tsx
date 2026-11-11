@@ -22,10 +22,12 @@ interface RankingTableProps {
   maximized?: boolean;
   /** Feature 063: a row filters the ranking's dimension. */
   crossFilter?: CrossFilterState;
+  /** Feature 064: open the rows as a table. */
+  onViewAsTable?: () => void;
 }
 
 export function RankingTable({ view, currency, compared, better, csvFileBase, onMaximize,
-                              maximized = false, crossFilter }: RankingTableProps) {
+                              maximized = false, crossFilter, onViewAsTable }: RankingTableProps) {
   const t = useT();
   const max = Math.max(0, ...view.items.map((i) => Math.abs(i.value ?? 0)));
 
@@ -42,7 +44,7 @@ export function RankingTable({ view, currency, compared, better, csvFileBase, on
       {maximized ? null : (
         <div className="flex items-start justify-between gap-3">
           <h2 className="min-w-0 text-lg font-semibold text-ink [overflow-wrap:anywhere]">{localized(view, "title")}</h2>
-          {view.items.length > 0 ? <CardMenu title={localized(view, "title")} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} /> : null}
+          {view.items.length > 0 ? <CardMenu title={localized(view, "title")} onDownloadCsv={handleDownloadCsv} onMaximize={onMaximize} onViewAsTable={onViewAsTable} /> : null}
         </div>
       )}
       {view.items.length === 0 ? (
