@@ -405,7 +405,9 @@ services:
   # Pulls a new image when the tag in BIZVIEW_VERSION is republished, and recreates only the
   # labelled services above (never other stacks on a shared host). Remove it to upgrade by hand.
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    # containrrr/watchtower 1.7.1 speaks Docker API 1.25, which Engine 29+ rejects
+    # ("client version ... is too old"): the maintained fork carries the newer client.
+    image: nickfedor/watchtower:1.24.0
     container_name: bizview-watchtower
     restart: unless-stopped
     environment:

@@ -777,6 +777,18 @@ registro, así que el siguiente sondeo puede devolverlo a lo que tenga `:latest`
 (y deja que Watchtower lo aplique) o compila localmente y mantén Watchtower al margen (una etiqueta de
 versión fija, o elimina el servicio mientras desarrollas).
 
+Watchtower tiene que hablar la API de Docker del host. Engine 29 subió el mínimo a la API 1.44 y
+`containrrr/watchtower:1.7.1` todavía habla la 1.25, así que termina con `client version 1.25 is too
+old` y nunca actualiza ninguna imagen. El stack ahora ejecuta `nickfedor/watchtower:1.24.0`, el fork
+mantenido con el cliente nuevo. Una instalación cuyo `bizview.yml` aún nombre `containrrr` solo tiene
+que cambiar esa línea `image:` y recrear el servicio una vez (no se actualiza a sí mismo):
+
+```bash
+sed -i 's#containrrr/watchtower:1.7.1#nickfedor/watchtower:1.24.0#' bizview.yml
+docker compose -f bizview.yml up -d --no-deps --force-recreate watchtower
+docker logs --tail 20 bizview-watchtower   # sin "client version ... is too old"
+```
+
 Para comprobar de inmediato en lugar de esperar: `docker compose -f bizview.yml run --rm watchtower
 --run-once`. Necesita el socket de Docker, que puede controlar todos los contenedores del host; quita el
 servicio `watchtower` del archivo compose si eso no es aceptable, y actualiza con los comandos de
