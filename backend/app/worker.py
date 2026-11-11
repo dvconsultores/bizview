@@ -211,11 +211,11 @@ class Worker:
                 log.exception("housekeeping pruning failed")
             self.last_housekeeping = now
             try:
-                bi_ready.recheck_all(get_sessionmaker, self.settings)
+                bi_ready.recheck_all(get_sessionmaker(), self.settings)
             except Exception:      # a proof that cannot run must not stop the worker
                 log.exception("BI-ready re-check failed")
             try:
-                snapshot.snapshot_all(get_sessionmaker, self.settings)
+                snapshot.snapshot_all(get_sessionmaker(), self.settings)
             except Exception:
                 log.exception("daily snapshot failed")
 

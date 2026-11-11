@@ -8,6 +8,8 @@ import time
 import types
 from datetime import date
 
+from sqlalchemy import text as sql_text
+
 import bizview_cli.validate as wsv
 import psycopg
 import pytest
@@ -929,6 +931,33 @@ def test_worker_housekeeping_prunes_the_direct_read_log(monkeypatch):
         assert calls == [1]
         w.housekeeping()
         assert calls == [1]
+    finally:
+        w.pool.shutdown(wait=False)
+
+
+def test_worker_housekeeping_passes_a_session_factory(monkeypatch):
+    """The housekeeping jobs call `sessionmaker()`, so the worker must pass the factory itself."""
+    from app import worker as worker_module
+    from app.worker import Worker
+
+    seen = []
+
+    def fake_recheck(factory, settings):
+        with factory() as db:
+            db.execute(sql_text("SELECT 1"))
+        seen.append("recheck")
+
+    def fake_snapshot(factory, settings):
+        with factory() as db:
+            db.execute(sql_text("SELECT 1"))
+        seen.append("snapshot")
+
+    monkeypatch.setattr(worker_module.bi_ready, "recheck_all", fake_recheck)
+    monkeypatch.setattr(worker_module.snapshot, "snapshot_all", fake_snapshot)
+    w = Worker()
+    try:
+        w.housekeeping()
+        assert seen == ["recheck", "snapshot"]
     finally:
         w.pool.shutdown(wait=False)
 
