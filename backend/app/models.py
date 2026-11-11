@@ -30,6 +30,7 @@ AUDIT_KINDS = (
     "login_ok", "login_failed", "login_locked", "logout",
     "user_created", "user_created_without_password", "user_updated", "user_deactivated",
     "user_reactivated", "role_changed", "password_changed", "password_reset",
+    "password_removed",
     "dashboard_granted", "dashboard_revoked",
     "superuser_created", "superuser_promoted", "superuser_recovered",
     # feature 004

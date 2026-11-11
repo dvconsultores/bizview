@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **An existing «Clave temporal» account can become Google/Telegram-only**. The user detail page
+  now has **Quitar contraseña**: it removes the hash and the forced change, closes the account's
+  sessions, audits `password_removed` and leaves the badge as **Solo Google** or **Solo Telegram**.
+  The password form then refuses the account with the generic message, and the admin can add a
+  password again from the same page.
+
 - **The temporary-password step no longer follows the person, only the credential (convergence
   054b)**. An account an administrator created with a temporary password was sent to
   `/cambiar-clave` even after **Continuar con Google**: the gate read `must_change_password`, not

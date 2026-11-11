@@ -58,6 +58,13 @@ def test_creating_without_a_password_needs_a_provider(admin):
     assert sql("SELECT count(*) FROM app_user WHERE email = 'solo@example.com'")[0][0] == 0
 
 
+def test_removing_a_password_needs_a_provider(admin, user):
+    r = signed_in(admin.email).delete(f"/api/admin/users/{user.id}/password")
+    assert r.status_code == 422
+    assert sql("SELECT password_hash IS NOT NULL FROM app_user WHERE id = :u",
+               u=user.id)[0][0] is True
+
+
 @pytest.mark.parametrize("payload,field", [
     ({"email": "not-an-email"}, "email"),
     ({"full_name": "   "}, "full_name"),

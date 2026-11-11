@@ -179,6 +179,33 @@ test("an administrator creates a Google-only user and the granted dashboards are
   await expect(page.getByRole("link", { name: granted!.name }).first()).toBeVisible();
 });
 
+test("an administrator removes a temporary password so the account is Google-only", async ({ page }, info) => {
+  const email = `sin-clave-${info.project.name}-${Date.now()}@empresa.com`;
+  await signIn(page);
+
+  const made = await page.request.post("/api/admin/users", {
+    headers: FETCH,
+    data: { email, full_name: "Sin Clave", role: "user", temporary_password: "Temporal-pass-91" },
+  });
+  expect(made.status()).toBe(201);
+  const id = ((await made.json()) as { id: number }).id;
+
+  await page.goto(`/admin/usuarios/${id}`);
+  await expect(page.getByText("Clave temporal")).toBeVisible();
+  await page.getByRole("button", { name: "Quitar contraseña" }).click();
+  const confirm = page.getByRole("region", { name: "Quitar contraseña" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Quitar contraseña" }).click();
+  await expect(page.getByText("Contraseña eliminada.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Solo Google")).toBeVisible();
+  await expect(page.getByText("Clave temporal")).toHaveCount(0);
+
+  await page.context().clearCookies();
+  await signInWithGoogle(page, email);
+  await expect(page).not.toHaveURL(/ingresar|cambiar-clave/);
+  expect((await me(page)).email).toBe(email);
+});
+
 test("the Seguridad card edits the domains and the rules, and the sheet is accessible", async ({ page }) => {
   await signIn(page);
   await page.goto("/admin/seguridad");

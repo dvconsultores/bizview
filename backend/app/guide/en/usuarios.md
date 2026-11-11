@@ -24,6 +24,8 @@ An **Administrator** manages **User** accounts. Only the **Superuser** manages a
 - **Deactivate user**: they can no longer sign in and their open sessions are closed.
   **Reactivate user** brings them back.
 - **Reset password**: closes their sessions and gives them a temporary password.
+- **Remove password**: the account no longer has a password and signs in with Google or Telegram
+  only; the badge changes to **Google only** or **Telegram only**.
 - **Reset two-factor**: the person sets up two-step verification again.
 - **Remove Telegram link**: they cannot sign in with Telegram until they link it again.
 

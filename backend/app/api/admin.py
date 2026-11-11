@@ -130,6 +130,12 @@ def reset_password(user_id: int, body: ResetPasswordIn, request: Request,
                          client_ip(request))
 
 
+@router.delete("/users/{user_id}/password", status_code=204)
+def remove_password(user_id: int, request: Request, actor: AppUser = Depends(require_admin),
+                    db: Session = DB):
+    users.remove_password(db, actor, _target(db, user_id), client_ip(request))
+
+
 @router.put("/users/{user_id}/dashboards")
 def set_grants(user_id: int, body: GrantsIn, request: Request,
                actor: AppUser = Depends(require_admin), db: Session = DB):

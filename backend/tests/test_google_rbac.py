@@ -342,6 +342,34 @@ def test_an_admin_creates_an_account_for_google_only(superuser, google_on, monke
     assert again.get("/api/me").json()["must_change_password"] is False
 
 
+def test_an_admin_removes_a_temporary_password_for_google_only(superuser, google_on, monkeypatch):
+    """Convergence 054b follow-up: an existing «Clave temporal» account becomes Google-only."""
+    c = signed_in("root@example.com")
+    made = c.post("/api/admin/users", json={
+        "email": "quitar.clave@example.org", "full_name": "Sin Clave", "role": "user",
+        "temporary_password": "Temporal-pass-91"})
+    assert made.status_code == 201, made.text
+    uid = made.json()["id"]
+    assert made.json()["has_password"] is True
+
+    removed = c.delete(f"/api/admin/users/{uid}/password")
+    assert removed.status_code == 204, removed.text
+    user = c.get(f"/api/admin/users/{uid}").json()["user"]
+    assert (user["has_password"], user["auth_provider"], user["must_change_password"]) == \
+        (False, "google", False)
+    assert "password_removed" in [k for (k,) in sql("select kind from audit_event")]
+
+    attempt = TestClient(app, headers={"X-Requested-With": "fetch"}).post(
+        "/api/auth/login", json={"email": "quitar.clave@example.org",
+                                 "password": "Temporal-pass-91"})
+    assert attempt.status_code == 401
+    assert attempt.json()["error"]["code"] == "invalid_credentials"
+
+    signed = google_session(monkeypatch, identity(email="quitar.clave@example.org"))
+    assert signed.get("/api/me").json()["has_password"] is False
+    assert signed.get("/api/me").json()["must_change_password"] is False
+
+
 def test_an_admin_gives_a_provisioned_account_its_password(superuser, google_on, monkeypatch):
     """FR-012: the existing reset is the only way in — hash written, change forced, link kept."""
     c = reauth(signed_in("root@example.com"))

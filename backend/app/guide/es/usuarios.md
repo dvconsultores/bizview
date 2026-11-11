@@ -25,6 +25,8 @@ los administradores.
 - **Desactivar usuario**: ya no puede ingresar y sus sesiones abiertas se cierran.
   **Reactivar usuario** lo devuelve.
 - **Restablecer contraseña**: cierra sus sesiones y le da una contraseña temporal.
+- **Quitar contraseña**: la cuenta deja de tener contraseña y entra solo con Google o Telegram;
+  el distintivo cambia a **Solo Google** o **Solo Telegram**.
 - **Restablecer doble factor**: la persona configura de nuevo la verificación en dos pasos.
 - **Quitar vínculo de Telegram**: ya no podrá ingresar con Telegram hasta vincularlo otra vez.
 

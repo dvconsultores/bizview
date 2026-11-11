@@ -185,3 +185,8 @@ for Google/Telegram needs no password at all.
 - [x] T047 `backend/app/guide/{es,en}/ingreso-con-google.md`: one line saying a temporary-password
       account that signs in with Google does not have to change it; `CHANGELOG.md` under Unreleased
       (missing)
+- [x] T048 `DELETE /api/admin/users/{id}/password` + **Quitar contraseña** in
+      `frontend/src/pages/admin/UserDetail.tsx`: an existing temporary-password account becomes
+      Google/Telegram-only (hash and flag removed, provider set, sessions closed, audit
+      `password_removed`), so the badge becomes **Solo Google** / **Solo Telegram** and Gmail works
+      (missing)

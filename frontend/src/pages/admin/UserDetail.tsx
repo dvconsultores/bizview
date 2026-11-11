@@ -1,4 +1,4 @@
-import { Clock, KeyRound, ShieldOff, Unlink, User as UserIcon, UserCheck, UserX, Wand2 } from "lucide-react";
+import { Clock, KeyRound, ShieldOff, Unlink, Unlock, User as UserIcon, UserCheck, UserX, Wand2 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { api, ApiError } from "../../api/client";
@@ -17,6 +17,7 @@ import { RoleTiles } from "../../components/RoleTiles";
 import { Spinner } from "../../components/Spinner";
 import { Switch } from "../../components/Switch";
 import { useToast } from "../../components/Toast";
+import { useBranding } from "../../config/BrandingContext";
 import { RoleBadge, StatusBadges } from "../../components/UserBadges";
 import { View } from "../../components/View";
 import { t, useT } from "../../i18n";
@@ -245,11 +246,13 @@ export function UserDetail() {
   const t = useT();
   const { id = "" } = useParams();
   const { user: me } = useAuth();
+  const { google_auth, telegram_sign_in } = useBranding();
   const toast = useToast();
   const [data, setData] = useState<Detail | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [resetOpen, setResetOpen] = useState(false);
+  const [removePwOpen, setRemovePwOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [mfaOpen, setMfaOpen] = useState(false);
   const [tgOpen, setTgOpen] = useState(false);
@@ -298,6 +301,7 @@ export function UserDetail() {
   const canChangeRole = canManage && me.is_superuser;
   const setUser = (user: User) => setData((d) => (d ? { ...d, user } : d));
   const canResetMfa = canManage && me.is_superuser && u.mfa_enabled;
+  const canRemovePassword = canManage && u.has_password && (google_auth || telegram_sign_in);
 
   const clearActionError = () => setActionError(null);
 
@@ -308,6 +312,21 @@ export function UserDetail() {
       await api.del(`/api/admin/users/${u.id}/telegram`);
       setTgOpen(false);
       toast(t.telegram.adminUnlinked);
+      setAttempt((n) => n + 1);
+    } catch (err) {
+      setActionError(message(err));
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const removePassword = async () => {
+    setToggling(true);
+    setActionError(null);
+    try {
+      await api.del(`/api/admin/users/${u.id}/password`);
+      setRemovePwOpen(false);
+      toast(t.admin.passwordRemoved);
       setAttempt((n) => n + 1);
     } catch (err) {
       setActionError(message(err));
@@ -414,6 +433,11 @@ export function UserDetail() {
             <Button variant="secondary" className="w-full sm:w-auto" icon={<KeyRound className="h-5 w-5" aria-hidden />} onClick={() => setResetOpen(true)}>
               {t.admin.resetPassword}
             </Button>
+            {canRemovePassword ? (
+              <Button variant="secondary" className="w-full sm:w-auto" icon={<Unlock className="h-5 w-5" aria-hidden />} onClick={() => { clearActionError(); setRemovePwOpen(true); }}>
+                {t.admin.removePassword}
+              </Button>
+            ) : null}
             {canResetMfa ? (
               <Button variant="secondary" className="w-full sm:w-auto" icon={<ShieldOff className="h-5 w-5" aria-hidden />} onClick={() => { clearActionError(); setMfaOpen(true); }}>
                 {t.mfa.reset}
@@ -464,6 +488,20 @@ export function UserDetail() {
       </View>
 
       <ResetPasswordView user={u} open={resetOpen} onClose={() => setResetOpen(false)} onDone={() => setAttempt((n) => n + 1)} />
+
+      <View
+        open={removePwOpen}
+        title={t.admin.removePassword}
+        onClose={() => setRemovePwOpen(false)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRemovePwOpen(false)}>{t.common.cancel}</Button>
+            <Button variant="danger" onClick={removePassword} loading={toggling}>{t.admin.removePassword}</Button>
+          </>
+        }
+      >
+        <p>{t.admin.removePasswordConfirm}</p>
+      </View>
 
       <View
         open={confirmOpen}

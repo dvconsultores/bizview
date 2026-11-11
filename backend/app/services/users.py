@@ -187,6 +187,25 @@ def reset_password(db: Session, actor: AppUser, target: AppUser, temporary_passw
     audit.record(db, "password_reset", actor_id=actor.id, target_id=target.id, ip=ip)
 
 
+def remove_password(db: Session, actor: AppUser, target: AppUser, ip: str | None) -> AppUser:
+    """Turn an existing account into a Google/Telegram-only one (convergence 054b follow-up).
+
+    The hash and the forced change go away together: there is no credential left to change. The
+    provider is the enabled one, so the badge says how the person will sign in from now on."""
+    ensure_can_manage(actor, target, "reset_password")
+    provider = _passwordless_provider(db)
+    target.password_hash = None
+    target.must_change_password = False
+    target.auth_provider = provider
+    target.failed_attempts = 0
+    target.locked_until = None
+    sessions.delete_all(db, target.id)
+    audit.record(db, "password_removed", actor_id=actor.id, target_id=target.id, ip=ip,
+                 detail={"auth_provider": provider})
+    db.flush()
+    return target
+
+
 def set_password(user: AppUser, password: str, *, temporary: bool) -> None:
     user.password_hash = passwords.hash_password(password)
     user.must_change_password = temporary
