@@ -931,8 +931,12 @@ export const en: Catalogue = {
     stale: (time: string) => `Data from ${time}; the source didn't respond`,
     inProgress: "In progress",
     chooseDates: "Choose the dates for the custom period.",
+    clickToFilter: "Click to filter",
+    clickToRemoveFilter: "Click to remove the filter",
     activeFilters: "Active filters",
     noFilters: "No filters",
+    selectedValues: (n: number) => `${n} selected`,
+    removeFilterAll: (label: string) => `Remove the ${label} filter`,
     removeFilter: (label: string, value: string) =>
       `Remove filter ${label}: ${value}`,
     exportCaptionApplied: "The applied selection is exported.",

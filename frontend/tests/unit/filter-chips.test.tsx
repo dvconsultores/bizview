@@ -41,13 +41,14 @@ const def = {
 
 async function render(props: Partial<Parameters<typeof FilterChips>[0]>) {
   const onRemove = vi.fn();
+  const onRemoveAll = vi.fn();
   const onMore = vi.fn();
   await act(async () => {
     root?.render(
-      <FilterChips def={def} applied={{ period: "mtd", from: "", to: "", compare: "none", filters: {} }} onRemove={onRemove} onMore={onMore} {...props} />,
+      <FilterChips def={def} applied={{ period: "mtd", from: "", to: "", compare: "none", filters: {} }} onRemove={onRemove} onRemoveAll={onRemoveAll} onMore={onMore} {...props} />,
     );
   });
-  return { onRemove, onMore };
+  return { onRemove, onRemoveAll, onMore };
 }
 
 describe("FilterChips", () => {
@@ -69,8 +70,21 @@ describe("FilterChips", () => {
     expect(onRemove).toHaveBeenCalledWith("zone", "norte");
   });
 
-  it("collapses the overflow into +N más", async () => {
+  it("collapses a multi-value dimension into one chip", async () => {
     const filters = { status: ["a", "b", "c", "d", "e", "f", "g"] };
+    const { onRemoveAll } = await render({
+      applied: { period: "mtd", from: "", to: "", compare: "none", filters },
+    });
+    const chip = document.querySelector("button") as HTMLButtonElement;
+    expect(chip.textContent?.trim()).toBe("Estatus: 7 seleccionados");
+    await act(async () => chip.click());
+    expect(onRemoveAll).toHaveBeenCalledWith("status");
+  });
+
+  it("collapses the overflow into +N más", async () => {
+    const filters = {
+      status: ["a"], zone: ["b"], d3: ["c"], d4: ["d"], d5: ["e"], d6: ["f"], d7: ["g"],
+    };
     const { onMore } = await render({
       applied: { period: "mtd", from: "", to: "", compare: "none", filters },
       limit: 6,

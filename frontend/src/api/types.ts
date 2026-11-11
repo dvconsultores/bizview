@@ -277,6 +277,8 @@ export interface ReportDefinition {
   periods: { default: PeriodPreset; allowed: PeriodPreset[] };
   compare: { default: CompareMode; allowed: CompareMode[] };
   filters: string[];
+  /** Feature 063: click-to-filter is on unless the report turns it off. */
+  interactions?: { cross_filter?: boolean };
   pdf: boolean;
   /** Deprecated and ignored since 0.2.0: the narrative generator is gone. The key stays so
    *  a project written for an older installation still validates. */
@@ -391,7 +393,7 @@ export type ReportView =
       dimension_label: string;
       dimension_label_en?: string;
       format: MetricFormat;
-      items: { key: string | number | null; value: number | null; share: number | null; previous: number | null; change: Change | null }[];
+      items: { key: string | number | null; filter?: string | number | null; value: number | null; share: number | null; previous: number | null; change: Change | null }[];
     } & DerivedViewFacts)
   | ({
       type: "table";
@@ -427,6 +429,10 @@ export interface ReportData {
   filters: Record<string, string[]>;
   freshness: ReportFreshness;
   views: ReportView[];
+  /** Feature 063: `source_views[dimension][view id]`, computed without that dimension. */
+  source_views?: Record<string, Record<string, ReportView>>;
+  /** Feature 063: the view computed without cross-filters, for `cross_filter: ignore`. */
+  ignore_views?: Record<string, ReportView>;
   /** Feature 038: the reference this payload's error cards carry in the server log. */
   render_reference?: string;
   /** Advisory layout warnings (feature 026); errors are refused before a version is applied. */
@@ -497,6 +503,8 @@ export interface WebComponent {
   colors?: ColorRole | ColorRole[];
   /** Default true: announce and show the engine's text summary (accessibility). */
   summary?: boolean;
+  /** Feature 063: `false` makes this card inert; `ignore` keeps it out of cross-filtering. */
+  cross_filter?: boolean | "ignore";
 
   // kpi
   metric?: string;

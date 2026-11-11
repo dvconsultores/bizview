@@ -1,6 +1,7 @@
 import type { ReportImageSet, WebComponent } from "../../../api/types";
 import { formatValue, formatValueCompact } from "../../../lib/numbers";
 import { ReportImage } from "../ReportImage";
+import { markState, type CrossFilterState } from "../crossFilter";
 
 type AssetView = { rows: Record<string, unknown>[] };
 
@@ -35,11 +36,16 @@ export function AssetGrid({
   component,
   view,
   image,
+  dimension,
+  crossFilter,
 }: {
   component: WebComponent;
   view: AssetView;
   /** Feature 044: a declared image set; its key column takes the place of the first role. */
   image?: ReportImageSet;
+  /** Feature 063: the dimension the title column represents, when it is a declared one. */
+  dimension?: string;
+  crossFilter?: CrossFilterState;
 }) {
   const roles = resolveRoles(component);
   const rows = Array.isArray(view.rows) ? view.rows : [];
@@ -81,9 +87,26 @@ export function AssetGrid({
               ? Number(rawDelta)
               : null;
           const positive = pct !== null && pct >= 0;
+          const mark = dimension
+            ? markState(crossFilter, dimension, title === "" ? null : title)
+            : null;
+          const dimmed = (crossFilter?.filters[dimension ?? ""] ?? []).length > 0
+            && mark !== null && !mark.selected;
 
           return (
-            <div key={idx} className="flex min-w-0 flex-col gap-1">
+            <div
+              key={idx}
+              role={mark ? "button" : undefined}
+              tabIndex={mark ? 0 : undefined}
+              aria-pressed={mark ? mark.selected : undefined}
+              onClick={(event) => mark && dimension && crossFilter?.toggle(dimension, mark.value, event.ctrlKey || event.metaKey)}
+              onKeyDown={(event) => {
+                if (!mark || !dimension || (event.key !== "Enter" && event.key !== " ")) return;
+                event.preventDefault();
+                crossFilter?.toggle(dimension, mark.value, event.ctrlKey || event.metaKey);
+              }}
+              className={`flex min-w-0 flex-col gap-1 rounded-lg ${mark ? "min-h-8 cursor-pointer hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" : ""} ${dimmed ? "opacity-60" : ""}`}
+            >
               {image ? (
                 <ReportImage set={image} name={imageName} value={imageValue} size={40} />
               ) : null}

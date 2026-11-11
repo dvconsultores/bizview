@@ -70,6 +70,10 @@ windowed dataset filters with `:window_start` and `:window_end` and declares bot
   **In a ranking, `dimension` and `metric` are singular**, never `dimensions`/`metrics`.
 - In the layout, **a `bar` component uses `x` and `series`**; `line` uses `x` and `series`; `kpi`
   uses `metric`; `table` uses `columns`. `span` runs from 1 to 12.
+- **Cross-filter (063)**: pressing a bar, slice, row or cell filters the dashboard. It is on by
+  default; `interactions: {cross_filter: false}` turns it off. On one component, `cross_filter:
+  false` makes it inert and `ignore` keeps it on the company totals. If the display label is not
+  unique, declare the dimension as `{label, sql, key}`: filter by `key`, show `sql`.
 - A direct report (no integration) declares `direct: {source, tables: {alias: schema.object}}`
   instead of `uses`, plus `date` and, when needed, `joins`. The short form of `tables` only works on
   a BI-ready source.

@@ -71,6 +71,10 @@ e `incremental:` (`window_days`, `full_rebuild_cron`, `mode`). Un dataset con ve
   **En un ranking, `dimension` y `metric` van en singular**, nunca `dimensions`/`metrics`.
 - En el layout, **un componente `bar` usa `x` y `series`**; `line` usa `x` y `series`; `kpi` usa
   `metric`; `table` usa `columns`. `span` va de 1 a 12.
+- **Cross-filter (063)**: pulsar una barra, porción, fila o celda filtra el tablero. Está activo por
+  defecto; `interactions: {cross_filter: false}` lo apaga. En un componente, `cross_filter: false` lo
+  deja inerte e `ignore` lo mantiene con los totales. Si la etiqueta visible no es única, declara la
+  dimensión con `{label, sql, key}`: se filtra por `key` y se muestra `sql`.
 - Un reporte directo (sin integración) declara `direct: {source, tables: {alias: esquema.objeto}}`
   en lugar de `uses`, más `date` y, si aplica, `joins`. La forma corta de `tables` solo vale si la
   fuente es BI-ready.

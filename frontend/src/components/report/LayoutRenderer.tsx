@@ -28,6 +28,7 @@ import { BarChart } from "./charts/BarChart";
 import { LineChart } from "./charts/LineChart";
 import { PieChart } from "./charts/PieChart";
 import { toNumber, type ChartCategory, type ChartFrame, type ChartSeries } from "./charts/series";
+import type { CrossFilterState } from "./crossFilter";
 
 /** Feature 026: renders a `layout.web` (contracts/layout-web.md). One column on phones, `span`
  * columns of 12 from the md breakpoint, declared order as the DOM order (constitution 2.1).
@@ -73,6 +74,8 @@ export interface LayoutRendererProps {
   problems?: LayoutProblem[];
   /** The report screen's own filter wiring, so a `filters` component reuses the same controls. */
   params?: LayoutParamsWiring;
+  /** Feature 063: click-to-filter state, shared by every data card. */
+  crossFilter?: CrossFilterState;
   /** Feature 056: opens the card full screen; the screen owns `?ampliar=` so it can be shared. */
   onMaximize?: (id: string) => void;
   /** Feature 056b: the grid and its single cell stretch to the container (the dialog). */
@@ -89,6 +92,7 @@ export function LayoutRenderer({
   csvBase,
   problems,
   params,
+  crossFilter,
   onMaximize,
   fill = false,
   maximized = false,
@@ -110,7 +114,7 @@ export function LayoutRenderer({
           data-layout-span={clampSpan(component)}
         >
           <Component component={component} data={data} def={def} size={size} csvBase={csvBase}
-                     params={params} maximized={maximized}
+                     params={params} crossFilter={crossFilter} maximized={maximized}
                      onMaximize={maximized ? undefined : onMaximize ? () => onMaximize(component.id) : undefined} />
           {onMaximize && !maximized && MAXIMIZABLE.has(component.type) ? (
             <button
@@ -187,6 +191,7 @@ function Component({
   size,
   csvBase,
   params,
+  crossFilter,
   onMaximize,
   maximized,
 }: {
@@ -196,6 +201,7 @@ function Component({
   size: "normal" | "tv";
   csvBase?: string;
   params?: LayoutParamsWiring;
+  crossFilter?: CrossFilterState;
   onMaximize?: () => void;
   maximized?: boolean;
 }) {
@@ -214,13 +220,15 @@ function Component({
     );
   }
 
-  const view = resolveView(component, data);
-  if (!view) {
+  const resolved = resolveView(component, data);
+  if (!resolved) {
     return (
       <ErrorCard component={component.id} reference={data.render_reference}
                  message={t.layout.missingView(component.id, component.view ?? "")} />
     );
   }
+  const view = componentView(component, resolved, data, crossFilter);
+  const interactive = component.cross_filter === false ? undefined : crossFilter;
   // Feature 038: the engine names what failed; the component shows that card, not a blank cell.
   if (view.error) return <RenderErrorCard error={view.error} />;
   if (view.empty) return <NoDataCard error={view.empty} />;
@@ -248,7 +256,10 @@ function Component({
                      message={t.layout.errorCard(component.id, component.type)} />
         );
       }
-      return <AssetGrid component={component} view={view} image={imageSet(def, component)} />;
+      const titleColumn = Array.isArray(component.columns) ? component.columns[1] : undefined;
+      return <AssetGrid component={component} view={view} image={imageSet(def, component)}
+                        dimension={titleColumn && def.dimensions[titleColumn] ? titleColumn : undefined}
+                        crossFilter={interactive} />;
     }
     case "kpi":
       return <KpiComponent component={component} view={view} data={data} def={def} size={size}
@@ -258,10 +269,13 @@ function Component({
     case "bar":
     case "pie":
     case "donut":
-      return <ChartComponent component={component} view={view} def={def} maximized={maximized} />;
+      return <ChartComponent component={component} view={view} def={def} maximized={maximized}
+                             crossFilter={interactive}
+                             dimension={resolvedDimension(component, view)} />;
     case "table":
       return <TableComponent component={component} view={view} def={def} csvBase={csvBase}
-                             size={size} onMaximize={onMaximize} maximized={maximized} />;
+                             size={size} onMaximize={onMaximize} maximized={maximized}
+                             crossFilter={interactive} />;
     default:
       return (
         <ErrorCard code="layout_component_unknown" component={component.id} type={component.type}
@@ -269,6 +283,45 @@ function Component({
                    message={t.layout.errorCard(component.id, component.type)} />
       );
   }
+}
+
+/** The category dimension of a view (ranking's dimension; table's first dimension column). */
+function resolvedDimension(component: WebComponent, view: ReportView): string | undefined {
+  if (view.type === "ranking") return view.dimension;
+  if (view.type === "table") {
+    const wanted = component.x ?? component.category;
+    return wanted ?? view.columns.find((column) => column.kind === "dimension")?.id;
+  }
+  return undefined;
+}
+
+function viewUsesDimension(component: WebComponent, view: ReportView, dimension: string): boolean {
+  if (view.type === "ranking") return view.dimension === dimension;
+  if (view.type === "table") {
+    const wanted = component.columns?.length ? component.columns : view.columns.map((c) => c.id);
+    return wanted.includes(dimension);
+  }
+  return false;
+}
+
+/** Feature 063: `ignore` uses the unfiltered-by-cross view; the source chart keeps its dimension. */
+function componentView(
+  component: WebComponent,
+  view: ReportView,
+  data: ReportData,
+  crossFilter?: CrossFilterState,
+): ReportView {
+  if (!crossFilter?.enabled || component.cross_filter === false) return view;
+  const id = view.id;
+  if (component.cross_filter === "ignore") {
+    return (id && data.ignore_views?.[id]) || view;
+  }
+  for (const dimension of Object.keys(crossFilter.filters)) {
+    if (!viewUsesDimension(component, view, dimension)) continue;
+    const source = id ? data.source_views?.[dimension]?.[id] : undefined;
+    if (source) return source;
+  }
+  return view;
 }
 
 /** Feature 044: the set a component names, or `undefined` when it names none or an unknown one. */
@@ -416,6 +469,9 @@ function buildChartData(
       categories: view.items.map((item, index) => ({
         key: `${item.key ?? ""}-${index}`,
         label: item.key === null || item.key === undefined ? "—" : String(item.key),
+        value: item.filter === null || item.filter === undefined
+          ? (item.key === null || item.key === undefined ? null : String(item.key))
+          : String(item.filter),
       })),
       series: [
         {
@@ -448,6 +504,7 @@ function buildChartData(
       categories: view.rows.map((row, index) => ({
         key: `${row[category.id] ?? ""}-${index}`,
         label: row[category.id] === null || row[category.id] === undefined ? "—" : String(row[category.id]),
+        value: row[category.id] === null || row[category.id] === undefined ? null : String(row[category.id]),
       })),
       series: chosen.map(({ column, role }) => ({
         id: column.id,
@@ -468,11 +525,15 @@ function ChartComponent({
   view,
   def,
   maximized,
+  crossFilter,
+  dimension,
 }: {
   component: WebComponent;
   view: ReportView;
   def: ReportDefinition;
   maximized?: boolean;
+  crossFilter?: CrossFilterState;
+  dimension?: string;
 }) {
   const t = useT();
   const roles = componentRoles(component);
@@ -503,6 +564,8 @@ function ChartComponent({
         emptyText={t.reportParams.display.noData}
         labels={component.labels}
         maximized={maximized}
+        crossFilter={crossFilter}
+        dimension={dimension}
       />
     );
   }
@@ -524,6 +587,8 @@ function ChartComponent({
         stacked={component.stacked === true && series.length >= 2}
         labels={component.labels === true}
         maximized={maximized}
+        crossFilter={crossFilter}
+        dimension={dimension}
       />
     );
   }
@@ -544,6 +609,8 @@ function ChartComponent({
       stacked={false}
       labels={component.labels === true}
       maximized={maximized}
+      crossFilter={crossFilter}
+      dimension={dimension}
     />
   );
 }
@@ -560,6 +627,7 @@ function TableComponent({
   size,
   onMaximize,
   maximized,
+  crossFilter,
 }: {
   component: WebComponent;
   view: ReportView;
@@ -568,6 +636,7 @@ function TableComponent({
   size: "normal" | "tv";
   onMaximize?: () => void;
   maximized?: boolean;
+  crossFilter?: CrossFilterState;
 }) {
   const t = useT();
   if (view.type !== "table") {
@@ -600,6 +669,7 @@ function TableComponent({
       image={tableImage(def, component)}
       onMaximize={onMaximize}
       maximized={maximized}
+      crossFilter={crossFilter}
     />
   );
 }

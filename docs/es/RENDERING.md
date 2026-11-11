@@ -188,6 +188,16 @@ ampliada, `ampliar=<id del componente>` ([reportQuery.ts](../../frontend/src/lib
 modo TV ignora `ampliar`, así que un enlace compartido no puede dejar un televisor atrapado en un
 diálogo.
 
+
+## Cross-filter (feature 063)
+
+Un clic en una marca se convierte en un parámetro normal `filter.<dimension>=<valor>`; el motor lo ve
+en `selection` y todas las vistas se agregan con él. Para la vista dueña de la dimensión activa el
+payload lleva además `source_views[dimension][view id]`, calculada con todos los filtros **menos** esa
+dimensión, para que el gráfico conserve todas sus marcas y resalte la elegida. Un componente con
+`cross_filter: ignore` lee `ignore_views[view id]`. Una dimensión puede declarar `key: <sql>`; el
+filtro lo usa y la vista sigue mostrando `sql`.
+
 ## 6. Frescura — cuándo cambian los números
 
 | Lo que ves | Qué pasó |

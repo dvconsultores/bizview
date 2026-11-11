@@ -51,6 +51,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Click-to-filter across the whole dashboard (feature 063)**. A bar, slice, ranking row,
+  dimension cell, asset card or default-view card now filters every component — KPIs included — with
+  the dimension value that was pressed, exactly as if it had been chosen in Filtros. Pressing the
+  same mark removes the filter; Ctrl/Cmd-click adds a second value of the same dimension (`IN`);
+  another dimension adds an AND filter. The source chart keeps all its marks and highlights the
+  chosen one; the chip row shows `Producto: BRAVECTO` or `Producto: 3 seleccionados`; the URL carries
+  the same `filter.<dimension>=<value>` parameters, so sharing, reload, PDF/CSV and email keep it.
+  `interactions.cross_filter: false`, component `cross_filter: false` and `cross_filter: ignore` let
+  authors control the behaviour, and a dimension may declare `key:` to filter by an id while showing
+  a label. Help topic **Filtrar haciendo clic** and the authoring docs cover it; the engine accepts a
+  filter on any declared dimension and refuses an unknown id with 422.
+
 - **Legal pages in every footer, per installation**. `LEGAL_PRIVACY_URL` and `LEGAL_TERMS_URL`
   name the operator's public privacy policy and terms of service; when set they appear in the app
   footer and in every public shared dashboard, opening in a new tab, and are exposed in

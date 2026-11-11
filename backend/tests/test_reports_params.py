@@ -2,6 +2,11 @@
 import re
 from urllib.parse import quote
 
+from types import SimpleNamespace
+from datetime import date
+
+import pytest
+
 from app.engine import report as engine
 from app.reports import pdf
 from tests.conftest import sql
@@ -24,6 +29,39 @@ def test_two_values_equal_the_sum_of_each(applied):
     assert {"P1", "P2"} <= keys
 
 
+def test_cross_views_computes_source_and_ignore(monkeypatch):
+    ctx = SimpleNamespace(
+        definition={"filters": ["product"], "views": [
+            {"id": "productos", "type": "ranking", "dimension": "product"},
+            {"id": "clientes", "type": "ranking", "dimension": "cliente"},
+        ]},
+        dimensions={"product": {"label": "Producto"}, "cliente": {"label": "Cliente"}},
+        report_id="r",
+    )
+
+    def fake(ctx, vdef, sel, filters, tz, reference=None, *, session=None):
+        return {"id": vdef["id"], "filters": filters}
+
+    monkeypatch.setattr(engine, "_run_view", fake)
+    out = engine.cross_views(ctx, None, {"product": ["A"]}, "UTC")
+    assert out["source_views"]["product"]["productos"]["filters"] == {}
+    assert "ignore_views" not in out                    # product is a sheet filter
+    out = engine.cross_views(ctx, None, {"cliente": ["ACME"]}, "UTC")
+    assert out["source_views"]["cliente"]["clientes"]["filters"] == {}
+    assert out["ignore_views"]["productos"]["filters"] == {}
+
+
+def test_the_source_view_keeps_the_clicked_dimension(applied):
+    # Feature 063: the ranking that owns `product` must still show every product.
+    r = applied.get(f"/api/reports/ventas/data?{SELECTION}&filter.product=P1")
+    assert r.status_code == 200
+    body = r.json()
+    main = next(v for v in body["views"] if v.get("id") == "productos")
+    source = body["source_views"]["product"]["productos"]
+    assert {row["key"] for row in main["items"]} == {"P1"}
+    assert {"P1", "P2"} <= {row["key"] for row in source["items"]}
+
+
 def test_single_value_link_still_works(applied):
     r = applied.get(f"/api/reports/ventas/data?{SELECTION}&filter.product=P1")
     assert r.status_code == 200
@@ -43,12 +81,23 @@ def test_single_value_link_still_works(applied):
     assert body["filters"] == {}
 
 
-def test_unknown_filter_ignored(applied):
+def test_any_declared_dimension_is_filterable_even_outside_filters():
+    ctx = SimpleNamespace(
+        definition={"periods": {}, "compare": {}, "filters": ["product"],
+                    "dimensions": {}},
+        dimensions={"product": {"label": "Producto", "sql": "p.code"},
+                    "cliente": {"label": "Cliente", "sql": "c.name"}},
+    )
+    sel, filters = engine.selection(ctx, [("filter.cliente", "ACME")], date(2026, 11, 11))
+    assert filters == {"cliente": ["ACME"]}
+    assert sel.period == "mtd"
+
+
+def test_unknown_filter_is_refused(applied):
+    # Feature 063: any declared dimension is filterable; an undeclared id is a client error.
     r = applied.get(f"/api/reports/ventas/data?{SELECTION}&filter.nope=x")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["views"][0]["items"][0]["value"] == 11.75
-    assert body["filters"] == {}
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "unknown_filter"
 
 
 def test_too_many_values(applied):

@@ -24,7 +24,7 @@ const fixture: ReportDefinition = {
   icon: null,
   currency: "MXN",
   metrics: {},
-  dimensions: {},
+  dimensions: { brand: { label: "Marca" }, store: { label: "Tienda" } },
   periods: {
     default: "mtd",
     allowed: ["mtd", "last_month", "custom"],

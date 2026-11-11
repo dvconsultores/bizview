@@ -919,8 +919,12 @@ export const es = {
     stale: (time: string) => `Datos de ${time}; la fuente no respondió`,
     inProgress: "En curso",
     chooseDates: "Elige las fechas del período personalizado.",
+    clickToFilter: "Clic para filtrar",
+    clickToRemoveFilter: "Clic para quitar el filtro",
     activeFilters: "Filtros activos",
     noFilters: "Sin filtros",
+    selectedValues: (n: number) => `${n} seleccionados`,
+    removeFilterAll: (label: string) => `Quitar el filtro ${label}`,
     removeFilter: (label: string, value: string) =>
       `Quitar filtro ${label}: ${value}`,
     exportCaptionApplied: "Se exporta la selección aplicada.",

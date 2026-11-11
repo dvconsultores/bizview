@@ -13,6 +13,7 @@ interface ReportMetaLineProps {
   applied: ReportSelection;
   data: ReportData | null;
   onRemoveFilter: (filterId: string, value: string) => void;
+  onRemoveAllFilters?: (filterId: string) => void;
   onOpenFilters: () => void;
   /** Feature 053: the reader's palette preview and light/dark, shown as removable chips. */
   view?: {
@@ -34,6 +35,7 @@ export function ReportMetaLine({
   applied,
   data,
   onRemoveFilter,
+  onRemoveAllFilters,
   onOpenFilters,
   view,
 }: ReportMetaLineProps) {
@@ -85,7 +87,9 @@ export function ReportMetaLine({
             onRemove={view.onRemove}
           />
         ) : null}
-        <FilterChips def={def} applied={applied} onRemove={onRemoveFilter} onMore={onOpenFilters} />
+        <FilterChips def={def} applied={applied} onRemove={onRemoveFilter}
+                     onRemoveAll={onRemoveAllFilters ?? (() => undefined)}
+                     onMore={onOpenFilters} />
       </div>
     </div>
   );

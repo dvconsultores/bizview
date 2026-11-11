@@ -254,6 +254,39 @@ images:
   never calls the third party.
 - Without a file, or with `fallback: none`, the tile draws the initial and a palette colour.
 
+## Click to filter (feature 063)
+
+Any mark that stands for **one value of a dimension** filters the dashboard when pressed: a bar, a
+slice, a ranking row, a dimension cell in a table or an `asset` card. It is the same filter as the
+Filtros sheet (`filter.<dimension>=<value>`), so the URL, PDF/CSV and email keep it. Pressing the same
+value removes it; Ctrl/Cmd-click adds another value of the same dimension (`IN`); a value of another
+dimension adds a second filter (AND). "Others", totals and the trend are not clickable.
+
+```yaml
+interactions:
+  cross_filter: true          # default; false turns clicking off for the whole report
+
+layout:
+  web:
+    components:
+      - {id: brands, type: bar, view: brands, category: brand}
+      - {id: total, type: kpi, view: summary, metric: net_sales, cross_filter: ignore}
+      - {id: note, type: text, text: "...", cross_filter: false}
+
+dimensions:
+  product:
+    label: Product
+    sql: products.name
+    key: products.product_code   # filter by code, show the name
+```
+
+- `cross_filter: false` makes that component inert.
+- `cross_filter: ignore` keeps it out of cross-filtering: it still shows the company total when the
+  reader clicks another card.
+- A dimension is filterable even when it is not listed in `filters:`; that list only decides what the
+  sheet offers.
+- An id that is not a dimension of the report is refused with 422.
+
 ## 6. Validate
 
 ```bash

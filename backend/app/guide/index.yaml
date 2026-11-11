@@ -217,6 +217,20 @@ topics:
       es: ["tableros", "buscar tablero", "tarjetas", "vista de tabla", "enlace a un tablero"]
       en: ["dashboards", "search dashboard", "cards", "table view", "dashboard link"]
     related: [inicio-y-favoritos, ver-reporte, compartir-enlace]
+  - id: filtrar-haciendo-clic
+    section: tableros
+    title: {es: "Filtrar haciendo clic", en: "Click to filter"}
+    summary:
+      es: "Cómo filtrar todo el tablero pulsando una barra, una porción, una fila o una celda, y cómo quitar el filtro."
+      en: "How to filter the whole dashboard by pressing a bar, a slice, a row or a cell, and how to remove it."
+    roles: [user]
+    routes: ["/r/:id"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["cross-filter", "hacer clic", "pulsar", "filtrar con un clic", "seleccionar un valor"]
+      en: ["cross-filter", "click", "tap", "click to filter", "select a value"]
+    related: [ver-reporte, filtros-y-periodos]
   - id: ver-reporte
     section: tableros
     title: {es: "Ver un reporte", en: "View a report"}

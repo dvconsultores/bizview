@@ -326,6 +326,11 @@
             "description": "Expresión SQL sobre alias.columna, p. ej. products.name.",
             "type": "string",
             "maxLength": 1000
+          },
+          "key": {
+            "description": "Expresión SQL del valor con el que se filtra la dimensión (opcional). Se usa para filtrar y 'sql' para mostrar; sirve cuando la etiqueta visible no es única.",
+            "type": "string",
+            "maxLength": 1000
           }
         }
       }
@@ -660,7 +665,11 @@
             },
             "mode": {
               "description": "Modo del área del informe: auto sigue la apariencia de la aplicación; light y dark la ignoran.",
-              "enum": ["auto", "light", "dark"]
+              "enum": [
+                "auto",
+                "light",
+                "dark"
+              ]
             }
           }
         }
@@ -702,6 +711,17 @@
         "$ref": "#/$defs/image_set"
       },
       "maxProperties": 20
+    },
+    "interactions": {
+      "description": "Comportamiento interactivo del dashboard.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cross_filter": {
+          "description": "Filtrar al hacer clic en cualquier valor (por defecto true).",
+          "type": "boolean"
+        }
+      }
     }
   },
   "$defs": {
@@ -1100,6 +1120,17 @@
           "description": "Conjunto de imágenes (clave de `images`) que usa el componente: en table, la imagen de la celda clave; en kpi y asset, junto a la etiqueta.",
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]{0,40}$"
+        },
+        "cross_filter": {
+          "description": "false deja el componente inerte; ignore lo mantiene fuera del cross-filter y le devuelve los totales de la compañía.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "const": "ignore"
+            }
+          ]
         }
       },
       "allOf": [

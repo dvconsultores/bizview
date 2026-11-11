@@ -19,8 +19,8 @@ def test_each_role_sees_its_topics(superuser, admin, user):
     assert "seguridad" not in admin_ids and "proyectos" not in admin_ids
     assert user_ids < admin_ids < super_ids
     # Every topic of the index is visible to the super user; the count moves when a feature
-    # adds one (061 added `otros-tipos-de-fuente`).
-    assert len(super_ids) == 69
+    # adds one (063 added `filtrar-haciendo-clic`).
+    assert len(super_ids) == 70
 
 
 def test_hidden_or_unknown_topic_is_404(superuser, user):

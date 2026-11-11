@@ -12,6 +12,7 @@ import { Alert } from "../components/Alert";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import { PageHeader } from "../components/PageHeader";
 import { ReportViews, SingleView, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import type { CrossFilterState } from "../components/report/crossFilter";
 import { cardTitle } from "../lib/cardTitle";
 import { CardDialog } from "../components/report/CardDialog";
 import { LayoutRenderer } from "../components/report/LayoutRenderer";
@@ -486,6 +487,30 @@ export function ReportView() {
     [applied, apply, loadOptions],
   );
 
+  // Feature 063: one click either replaces the dimension's value, removes it, or adds to it.
+  const crossFilter = useMemo<CrossFilterState | undefined>(() => {
+    if (!def || !applied) return undefined;
+    return {
+      enabled: def.interactions?.cross_filter !== false,
+      filters: applied.filters,
+      toggle: (dimension, value, additive) => {
+        const current = applied.filters[dimension] ?? [];
+        let values: string[];
+        if (additive) {
+          values = current.includes(value)
+            ? current.filter((entry) => entry !== value)
+            : [...current, value];
+        } else {
+          values = current.length === 1 && current[0] === value ? [] : [value];
+        }
+        const filters = { ...applied.filters };
+        if (values.length > 0) filters[dimension] = values;
+        else delete filters[dimension];
+        apply({ ...applied, filters });
+      },
+    };
+  }, [applied, apply, def]);
+
   const renderViews = useCallback(
     (kpiSize: "normal" | "tv") => {
       if (!data) return null;
@@ -493,10 +518,11 @@ export function ReportView() {
         <ReportViews data={data} def={def!} kpiSize={kpiSize}
           csvBase={kpiSize === "normal" ? csvBase : undefined}
           params={layoutParams}
+          crossFilter={crossFilter}
           onMaximize={maximize} />
       );
     },
-    [data, def, csvBase, layoutParams, maximize],
+    [data, def, csvBase, layoutParams, crossFilter, maximize],
   );
 
   if (!def) {
@@ -647,6 +673,11 @@ export function ReportView() {
             applied={applied}
             data={fresh ? data : null}
             onRemoveFilter={(filterId, value) => apply(withoutFilterValue(applied, filterId, value))}
+            onRemoveAllFilters={(filterId) => {
+              const filters = { ...applied.filters };
+              delete filters[filterId];
+              apply({ ...applied, filters });
+            }}
             onOpenFilters={openFilters}
             view={{
               theme: viewState.theme,
@@ -700,6 +731,7 @@ export function ReportView() {
           def={def}
           csvBase={csvBase}
           params={layoutParams}
+          crossFilter={crossFilter}
           onMaximize={maximize}
           onClose={closeMaximized}
         />
@@ -827,12 +859,13 @@ function maximizedView(id: string, data: ReportData, def: ReportDefinition) {
  * through `SingleView`), so a maximised card cannot show something the dashboard does not. The
  * arrows walk the dashboard's cards; the CSV is the view's own export; the PNG is the drawing.
  */
-function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: {
+function MaximizedCard({ id, data, def, csvBase, params, crossFilter, onMaximize, onClose }: {
   id: string;
   data: ReportData;
   def: ReportDefinition;
   csvBase?: string;
   params?: LayoutParamsWiring;
+  crossFilter?: CrossFilterState;
   onMaximize: (id: string, replace?: boolean) => void;
   onClose: () => void;
 }) {
@@ -887,7 +920,8 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
           dialog's: one card across the whole width, no own title, no menu. */}
       <div ref={frame} className="flex h-full min-h-0 flex-col">
         {byView ? (
-          <SingleView index={index} data={data} def={def} csvBase={csvBase} params={params} />
+          <SingleView index={index} data={data} def={def} csvBase={csvBase} params={params}
+                      crossFilter={crossFilter} />
         ) : def.layout?.web && component ? (
           <LayoutRenderer
             layout={{ ...def.layout.web, gutter: "md", components: [{ ...component, span: 12 }] }}
@@ -895,6 +929,7 @@ function MaximizedCard({ id, data, def, csvBase, params, onMaximize, onClose }: 
             def={def}
             csvBase={csvBase}
             params={params}
+            crossFilter={crossFilter}
             fill
             maximized
           />

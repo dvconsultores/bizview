@@ -46,9 +46,9 @@ REPORT = """
     periods: {{default: mtd, allowed: [mtd, last_7_days, custom]}}
     compare: {{default: previous_period, allowed: [none, previous_period, previous_year]}}
     views:
-      - {{type: kpis, metrics: [net_sales, orders, avg_ticket]}}
-      - {{type: trend, metric: net_sales, grain: auto}}
-      - {{type: ranking, dimension: product, metric: net_sales, limit: 5}}
+      - {{id: resumen, type: kpis, metrics: [net_sales, orders, avg_ticket]}}
+      - {{id: tendencia, type: trend, metric: net_sales, grain: auto}}
+      - {{id: productos, type: ranking, dimension: product, metric: net_sales, limit: 5}}
     filters: [product]
     pdf: {{enabled: true}}
     ai_narrative: {{enabled: true, inputs: [net_sales, orders], with_comparison: true,

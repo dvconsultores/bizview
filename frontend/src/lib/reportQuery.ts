@@ -53,8 +53,14 @@ export function parseSelection(params: URLSearchParams, def: ReportDefinition): 
     if (DATE_RE.test(rawTo)) to = rawTo;
   }
 
+  // Feature 063: a click can filter any declared dimension, not only the ones the sheet lists.
+  const ids = new Set<string>(def.filters);
+  for (const [key] of params) {
+    if (key.startsWith("filter.")) ids.add(key.slice("filter.".length));
+  }
   const filters: Record<string, string[]> = {};
-  for (const id of def.filters) {
+  for (const id of ids) {
+    if (!def.dimensions[id]) continue;
     const rawValues = params.getAll(`filter.${id}`);
     const seen = new Set<string>();
     const values: string[] = [];
@@ -73,7 +79,7 @@ export function parseSelection(params: URLSearchParams, def: ReportDefinition): 
 /** Feature 030 edge case: filter ids the URL carries that the report no longer declares. They are
  * ignored by `parseSelection`; the sheet tells the reader instead of silently dropping them. */
 export function unknownFilterIds(params: URLSearchParams, def: ReportDefinition): string[] {
-  const declared = new Set(def.filters);
+  const declared = new Set(Object.keys(def.dimensions));
   const unknown = new Set<string>();
   for (const [key] of params) {
     if (!key.startsWith("filter.")) continue;
@@ -92,7 +98,9 @@ export function serializeSelection(s: ReportSelection, def?: ReportDefinition): 
     if (s.to) params.set("to", s.to);
   }
 
-  const ids = def ? def.filters : Object.keys(s.filters).sort();
+  const ids = def
+    ? [...def.filters, ...Object.keys(s.filters).filter((id) => !def.filters.includes(id)).sort()]
+    : Object.keys(s.filters).sort();
   for (const id of ids) {
     const values = s.filters[id] ?? [];
     for (const value of values) {

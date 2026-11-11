@@ -1715,6 +1715,14 @@ def _check_report(entry: Entry, integrations: dict[str, Entry], issues: list[Iss
         for p in sqlsafety.check_expression(d["sql"], colsets):
             issues.append(Issue(f"{entry.key}.dimensions.{did}", p.code, p.message,
                                 file=ry, path=dpath + "/sql"))
+        if d.get("key"):
+            for p in sqlsafety.check_expression(d["key"], colsets):
+                issues.append(Issue(f"{entry.key}.dimensions.{did}", p.code, p.message,
+                                    file=ry, path=dpath + "/key"))
+        if d.get("key"):
+            for p in sqlsafety.check_expression(d["key"], colsets):
+                issues.append(Issue(f"{entry.key}.dimensions.{did}", p.code, p.message,
+                                    file=ry, path=dpath + "/key"))
     if a.get("materialize") == "daily" and "direct" not in a:
         for p in materialize.check_report(a):
             issues.append(Issue(entry.key, "materialize_ineligible", p.message, file=ry,

@@ -79,6 +79,44 @@ async function expectAccessible(
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 900 }, colorScheme: "light" });
 
+  test("clicking a ranking row filters every view, and clicking it again clears it", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
+    await signIn(page);
+    await page.goto(`/r/ventas?${SELECTION}`);
+    await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
+
+    const row = page.getByRole("button", { name: "Producto: Alimento premium", exact: true });
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page).toHaveURL(/filter\.product=Alimento/);
+    await expect(kpi(page, "Ventas netas")).toContainText(/7,50\sUSD/);
+    await expect(page.getByRole("button", { name: /Quitar filtro Producto: Alimento premium/ })).toBeVisible();
+    // The source ranking keeps every product; the click only highlights one.
+    await expect(page.getByRole("button", { name: "Producto: Vacuna triple", exact: true })).toBeVisible();
+    expect(await row.getAttribute("aria-pressed")).toBe("true");
+
+    await page.reload();
+    await expect(kpi(page, "Ventas netas")).toContainText(/7,50\sUSD/);
+    await page.getByRole("button", { name: "Producto: Alimento premium", exact: true }).click();
+    await expect(page).not.toHaveURL(/filter\.product=/);
+    await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
+  });
+
+  test("Ctrl-click adds a second value and the chip counts the selection", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
+    await signIn(page);
+    await page.goto(`/r/ventas?${SELECTION}`);
+    await page.getByRole("button", { name: "Producto: Alimento premium", exact: true }).click();
+    await page.getByRole("button", { name: "Producto: Vacuna triple", exact: true }).click({ modifiers: ["Control"] });
+    await expect(page).toHaveURL(/filter\.product=Alimento/);
+    await expect(page).toHaveURL(/filter\.product=Vacuna/);
+    const multi = page.getByRole("button", { name: "Quitar el filtro Producto" });
+    await expect(multi).toContainText("Producto: 2 seleccionados");
+    await expect(kpi(page, "Ventas netas")).toContainText(/11,75\sUSD/);
+    await page.getByRole("button", { name: /Quitar el filtro Producto/ }).click();
+    await expect(page).not.toHaveURL(/filter\.product=/);
+  });
+
   test("Parámetros opens the same sheet on its tab and applies live", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name.endsWith("-320"), "desktop layout checked once per engine");
     await signIn(page);

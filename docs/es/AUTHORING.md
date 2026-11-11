@@ -260,6 +260,38 @@ images:
   del lector nunca llama al tercero.
 - Sin archivo, o con `fallback: none`, la tarjeta dibuja la inicial y un color de la paleta.
 
+## Filtrar haciendo clic (feature 063)
+
+Cualquier marca que represente **un valor de una dimensión** filtra el tablero al pulsarla: barra,
+porción, fila de ranking, celda de una columna de dimensión o tarjeta de `asset`. El filtro es el
+mismo de la hoja Filtros (`filter.<dimension>=<valor>`), así que la URL, el PDF/CSV y el correo lo
+conservan. Pulsar el mismo valor lo quita; Ctrl/Cmd-clic añade otro valor de la misma dimensión
+(`IN`); un valor de otra dimensión añade un segundo filtro (AND). «Otros», los totales y la tendencia
+no se pulsan.
+
+```yaml
+interactions:
+  cross_filter: true          # por defecto; false apaga el clic en todo el reporte
+
+layout:
+  web:
+    components:
+      - {id: marcas, type: bar, view: marcas, category: marca}
+      - {id: total, type: kpi, view: resumen, metric: ventas_netas, cross_filter: ignore}
+      - {id: nota, type: text, text: "...", cross_filter: false}
+
+dimensions:
+  producto:
+    label: Producto
+    sql: products.name
+    key: products.product_code   # filtra por el código, muestra el nombre
+```
+
+- `cross_filter: false` deja ese componente inerte.
+- `cross_filter: ignore` lo mantiene fuera del cross-filter: sigue mostrando el total de la compañía.
+- Una dimensión es filtrable aunque no esté en `filters:`; esa lista solo decide qué ofrece la hoja.
+- Un id que no es una dimensión del reporte se rechaza con 422.
+
 ## 6. Validar
 
 ```bash

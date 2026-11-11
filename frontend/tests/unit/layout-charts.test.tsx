@@ -1,6 +1,6 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportData, ReportDefinition, ReportView, WebComponent } from "../../src/api/types";
 import { LayoutRenderer } from "../../src/components/report/LayoutRenderer";
 import { t } from "../../src/i18n/es";
@@ -231,6 +231,90 @@ describe("line and area", () => {
       (path) => path.getAttribute("fill-opacity") === "0.12",
     );
     expect(gapped).toHaveLength(0);
+  });
+});
+
+describe("cross-filter (feature 063)", () => {
+  it("turns a bar into a filter for its dimension", () => {
+    const toggle = vi.fn();
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ id: "barras", type: "bar", view: "productos", x: "product" }] }}
+        data={data}
+        def={def}
+        crossFilter={{ enabled: true, filters: {}, toggle }}
+      />,
+    );
+    const marks = Array.from(node.querySelectorAll('g[role="button"]'));
+    expect(marks.length).toBeGreaterThan(0);
+    act(() => {
+      marks[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(toggle).toHaveBeenCalledWith("product", "Alimento premium", false);
+    expect(marks[0].getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("filters from the keyboard with Enter", () => {
+    const toggle = vi.fn();
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ id: "barras", type: "bar", view: "productos", x: "product" }] }}
+        data={data}
+        def={def}
+        crossFilter={{ enabled: true, filters: {}, toggle }}
+      />,
+    );
+    const mark = node.querySelector('g[role="button"]') as SVGGElement;
+    act(() => {
+      mark.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    expect(toggle).toHaveBeenCalledWith("product", "Alimento premium", false);
+  });
+
+  it("keeps its unfiltered data with cross_filter: ignore", () => {
+    const filtered: ReportData = {
+      ...data,
+      views: data.views.map((view) =>
+        view.id === "productos"
+          ? { ...view, items: (view as Extract<ReportView, { type: "ranking" }>).items.slice(0, 1) }
+          : view,
+      ),
+      ignore_views: { productos: productos },
+    };
+    const layout = {
+      components: [{ id: "productos", type: "bar" as const, view: "productos", cross_filter: "ignore" as const }],
+    };
+    const ignored = mount(
+      <LayoutRenderer
+        layout={layout}
+        data={filtered}
+        def={def}
+        crossFilter={{ enabled: true, filters: { product: ["Alimento premium"] }, toggle: vi.fn() }}
+      />,
+    );
+    expect(ignored.querySelectorAll('g[role="button"]')).toHaveLength(5);
+
+    const reacting = mount(
+      <LayoutRenderer
+        layout={{ components: [{ ...layout.components[0], cross_filter: undefined }] }}
+        data={filtered}
+        def={def}
+        crossFilter={{ enabled: true, filters: { product: ["Alimento premium"] }, toggle: vi.fn() }}
+      />,
+    );
+    expect(reacting.querySelectorAll('g[role="button"]')).toHaveLength(1);
+  });
+
+  it("honours cross_filter: false", () => {
+    const node = mount(
+      <LayoutRenderer
+        layout={{ components: [{ id: "barras", type: "bar", view: "productos", x: "product", cross_filter: false }] }}
+        data={data}
+        def={def}
+        crossFilter={{ enabled: true, filters: {}, toggle: vi.fn() }}
+      />,
+    );
+    expect(node.querySelectorAll('g[role="button"]')).toHaveLength(0);
   });
 });
 

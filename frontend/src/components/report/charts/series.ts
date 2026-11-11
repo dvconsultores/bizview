@@ -6,6 +6,8 @@ import type { ColorRole, MetricFormat } from "../../../api/types";
 export interface ChartCategory {
   key: string;
   label: string;
+  /** Feature 063: the dimension value the mark filters by; absent for totals and "otros". */
+  value?: string | null;
 }
 
 export interface ChartSeries {

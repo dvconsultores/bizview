@@ -17,6 +17,8 @@ import {
 } from "./chartScale";
 import { fillClass } from "../layoutRoles";
 import { chartSummary, type ChartCategory, type ChartFrame, type ChartSeries } from "./series";
+import { markState, type CrossFilterState } from "../crossFilter";
+import { useT } from "../../../i18n";
 
 export interface BarChartProps {
   frame: ChartFrame;
@@ -28,6 +30,9 @@ export interface BarChartProps {
   labels?: boolean;
   /** Feature 056b: the card is drawn in the dialog, so its labels get the dialog's width. */
   maximized?: boolean;
+  /** Feature 063: click a bar to filter its dimension. */
+  crossFilter?: CrossFilterState;
+  dimension?: string;
 }
 
 const HORIZONTAL_ROW = 26;
@@ -37,7 +42,7 @@ const CHIP_W = 190;
 
 /** Bars as SVG: vertical or horizontal, grouped or stacked (feature 026, research R5). */
 export function BarChart({ frame, categories, series, orientation, stacked, labels,
-                          maximized = false }: BarChartProps) {
+                          maximized = false, crossFilter, dimension }: BarChartProps) {
   const label = chartSummary(frame);
   const drawn = series.filter((entry) => entry.values.some((value) => value !== null));
 
@@ -53,10 +58,12 @@ export function BarChart({ frame, categories, series, orientation, stacked, labe
         orientation === "horizontal" ? (
           <HorizontalBars width={width} height={Math.max(CHART_MIN_HEIGHT, available)}
                           categories={categories} series={drawn} stacked={stacked}
-                          label={label} labels={labels} frame={frame} maximized={maximized} />
+                          label={label} labels={labels} frame={frame} maximized={maximized}
+                          crossFilter={crossFilter} dimension={dimension} />
         ) : (
           <VerticalBars width={width} categories={categories} series={drawn} stacked={stacked}
-                        label={label} labels={labels} frame={frame} />
+                        label={label} labels={labels} frame={frame}
+                        crossFilter={crossFilter} dimension={dimension} />
         )
       }
     </ChartCard>
@@ -91,7 +98,7 @@ function parts(category: ChartCategory, entry: ChartSeries, index: number, frame
 }
 
 function VerticalBars({
-  width, categories, series, stacked, label, labels, frame,
+  width, categories, series, stacked, label, labels, frame, crossFilter, dimension,
 }: {
   width: number;
   categories: ChartCategory[];
@@ -100,7 +107,10 @@ function VerticalBars({
   label?: string;
   labels?: boolean;
   frame: ChartFrame;
+  crossFilter?: CrossFilterState;
+  dimension?: string;
 }) {
+  const t = useT();
   const reduced = useReducedMotion();
   const pointer = usePointerChip();
   const [hover, setHover] = useState<number | null>(null);
@@ -114,20 +124,39 @@ function VerticalBars({
   const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
 
   const spot = pointer.place(width, CHART_HEIGHT);
+  const selected = dimension ? crossFilter?.filters[dimension] ?? [] : [];
+  const selectMark = (additive: boolean, mark: ReturnType<typeof markState>) => {
+    if (mark && dimension) crossFilter?.toggle(dimension, mark.value, additive);
+  };
+  const dims = (value: string | null | undefined) =>
+    selected.length > 0 && value !== null && value !== undefined && !selected.includes(value);
   return (
     <div className="relative" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
          onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
-      <svg width={width} height={CHART_HEIGHT} role={label ? "img" : undefined} aria-label={label} className="block">
+      <svg width={width} height={CHART_HEIGHT}
+             role={crossFilter?.enabled && dimension ? "group" : label ? "img" : undefined}
+             aria-label={label} className="block">
         <ValueGrid scale={scale} width={width} />
         {categories.map((category, i) => {
           let positive = 0;
           let negative = 0;
           const dim = hover !== null && hover !== i;
+          const mark = markState(crossFilter, dimension, category.value);
           return (
             <g key={category.key}
                onPointerEnter={() => setHover(i)}
                onPointerLeave={() => setHover((current) => (current === i ? null : current))}
-               onClick={() => setHover(i)}>
+               role={mark ? "button" : undefined}
+               tabIndex={mark ? 0 : undefined}
+               aria-pressed={mark ? mark.selected : undefined}
+               aria-label={mark ? `${category.label}` : undefined}
+               className={mark ? "cursor-pointer focus-visible:outline-none" : undefined}
+               onClick={(event) => selectMark(event.ctrlKey || event.metaKey, mark)}
+               onKeyDown={(event) => {
+                 if (!mark || (event.key !== "Enter" && event.key !== " ")) return;
+                 event.preventDefault();
+                 selectMark(event.ctrlKey || event.metaKey, mark);
+               }}>
               <title>{`${trimLabel(category.label)}: ${formatValue(series[0]?.values[i], series[0]?.format, frame.currency)}`}</title>
               {series.map((entry, j) => {
                 const value = entry.values[i];
@@ -149,7 +178,9 @@ function VerticalBars({
                     width={Math.max(1, stacked ? group : bar - 2)}
                     height={h}
                     className={fillClass(entry.role)}
-                    opacity={dim ? 0.7 : 1}
+                    stroke={mark?.selected ? "var(--focus)" : undefined}
+                    strokeWidth={mark?.selected ? 2 : undefined}
+                    opacity={dim || dims(category.value) ? 0.7 : 1}
                     style={{
                       transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
                       transformBox: "fill-box",
@@ -176,7 +207,10 @@ function VerticalBars({
       {hovered ? (
         <ValueChip x={spot?.left ?? center(hover!) - CHIP_W / 2} y={spot?.top ?? PAD.top - 6}
                    width={width}
-                   text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
+                   text={[hovered.name, hovered.value, hovered.share,
+                          markState(crossFilter, dimension, categories[hover ?? 0]?.value)
+                            ?.selected ? t.reportParams.clickToRemoveFilter : t.reportParams.clickToFilter]
+                     .filter(Boolean).join(" · ")} />
       ) : null}
     </div>
   );
@@ -194,6 +228,7 @@ function BarValue({ x, y, text, barPx }: { x: number; y: number; text: string; b
 
 function HorizontalBars({
   width, height, categories, series, stacked, label, labels, frame, maximized = false,
+  crossFilter, dimension,
 }: {
   width: number;
   height: number;
@@ -204,7 +239,10 @@ function HorizontalBars({
   labels?: boolean;
   frame: ChartFrame;
   maximized?: boolean;
+  crossFilter?: CrossFilterState;
+  dimension?: string;
 }) {
+  const t = useT();
   const reduced = useReducedMotion();
   const pointer = usePointerChip();
   const [hover, setHover] = useState<number | null>(null);
@@ -226,12 +264,20 @@ function HorizontalBars({
   const bar = stacked ? row * 0.62 : Math.max(1, (row * 0.62) / Math.max(1, series.length));
   const axisLine = chartHeight - PAD.bottom + 14;
   const hovered = hover === null ? null : parts(categories[hover], series[0], hover, frame);
+  const selected = dimension ? crossFilter?.filters[dimension] ?? [] : [];
+  const selectMark = (additive: boolean, mark: ReturnType<typeof markState>) => {
+    if (mark && dimension) crossFilter?.toggle(dimension, mark.value, additive);
+  };
+  const dims = (value: string | null | undefined) =>
+    selected.length > 0 && value !== null && value !== undefined && !selected.includes(value);
 
   const spot = pointer.place(width, chartHeight);
   return (
     <div className="relative" ref={pointer.ref} onPointerMove={pointer.onPointerMove}
          onPointerLeave={() => { pointer.onPointerLeave(); setHover(null); }}>
-      <svg width={width} height={chartHeight} role={label ? "img" : undefined} aria-label={label} className="block">
+      <svg width={width} height={chartHeight}
+             role={crossFilter?.enabled && dimension ? "group" : label ? "img" : undefined}
+             aria-label={label} className="block">
         {!above ? (
           <>
             {ticks.map((tick) => (
@@ -250,11 +296,22 @@ function HorizontalBars({
           const center = above ? PAD.top + i * row + row / 2 + 8 : PAD.top + i * row + row / 2;
           let accumulated = 0;
           const dim = hover !== null && hover !== i;
+          const mark = markState(crossFilter, dimension, category.value);
           return (
             <g key={category.key}
                onPointerEnter={() => setHover(i)}
                onPointerLeave={() => setHover((current) => (current === i ? null : current))}
-               onClick={() => setHover(i)}>
+               role={mark ? "button" : undefined}
+               tabIndex={mark ? 0 : undefined}
+               aria-pressed={mark ? mark.selected : undefined}
+               aria-label={mark ? `${category.label}` : undefined}
+               className={mark ? "cursor-pointer focus-visible:outline-none" : undefined}
+               onClick={(event) => selectMark(event.ctrlKey || event.metaKey, mark)}
+               onKeyDown={(event) => {
+                 if (!mark || (event.key !== "Enter" && event.key !== " ")) return;
+                 event.preventDefault();
+                 selectMark(event.ctrlKey || event.metaKey, mark);
+               }}>
               <title>{`${trimLabel(category.label)}: ${formatValue(series[0]?.values[i], series[0]?.format, frame.currency)}`}</title>
               {above ? (
                 <text x={4} y={center - row / 2 + 11} fontSize="11" textAnchor="start" className="fill-chart-label">
@@ -284,7 +341,9 @@ function HorizontalBars({
                     width={Math.max(1, Math.abs(to - from))}
                     height={barHeight}
                     className={fillClass(entry.role)}
-                    opacity={dim ? 0.7 : 1}
+                    stroke={mark?.selected ? "var(--focus)" : undefined}
+                    strokeWidth={mark?.selected ? 2 : undefined}
+                    opacity={dim || dims(category.value) ? 0.7 : 1}
                     style={{
                       transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
                       transformBox: "fill-box",
@@ -306,7 +365,10 @@ function HorizontalBars({
       {hovered ? (
         <ValueChip x={spot?.left ?? left} y={spot?.top ?? PAD.top + (hover ?? 0) * row - 4}
                    width={width}
-                   text={[hovered.name, hovered.value, hovered.share].filter(Boolean).join(" · ")} />
+                   text={[hovered.name, hovered.value, hovered.share,
+                          markState(crossFilter, dimension, categories[hover ?? 0]?.value)
+                            ?.selected ? t.reportParams.clickToRemoveFilter : t.reportParams.clickToFilter]
+                     .filter(Boolean).join(" · ")} />
       ) : null}
     </div>
   );

@@ -6,6 +6,8 @@ import { usePointerChip } from "../../../lib/usePointerChip";
 import { ChartCard } from "./ChartCard";
 import { fillClass, roleAt, surfaceClass } from "../layoutRoles";
 import { chartSummary, type ChartCategory, type ChartFrame } from "./series";
+import { markState, type CrossFilterState } from "../crossFilter";
+import { useT } from "../../../i18n";
 
 export interface PieChartProps {
   frame: ChartFrame;
@@ -22,6 +24,9 @@ export interface PieChartProps {
   labels?: boolean | "values" | "percent" | "both";
   /** Feature 056b: the dialog gives the ring its own size instead of the card's 240 px. */
   maximized?: boolean;
+  /** Feature 063: click a slice or legend entry to filter its dimension. */
+  crossFilter?: CrossFilterState;
+  dimension?: string;
 }
 
 interface Slice {
@@ -29,6 +34,8 @@ interface Slice {
   label: string;
   value: number;
   role: ColorRole;
+  /** Feature 063: the dimension value to filter by; absent on the grouped "otros" slice. */
+  filter: string | null;
 }
 
 const SIZE = 240;
@@ -85,8 +92,14 @@ export function topSlices(
   roles: ColorRole[],
 ): Slice[] {
   const usable = categories
-    .map((category, i) => ({ key: category.key, label: category.label, value: values[i] ?? null }))
-    .filter((entry): entry is { key: string; label: string; value: number } => entry.value !== null && entry.value > 0);
+    .map((category, i) => ({
+      key: category.key,
+      label: category.label,
+      value: values[i] ?? null,
+      filter: category.value ?? null,
+    }))
+    .filter((entry): entry is { key: string; label: string; value: number; filter: string | null } =>
+      entry.value !== null && entry.value > 0);
   const kept = usable.slice(0, Math.max(1, topN));
   const slices = kept.map((entry, i) => ({ ...entry, role: roleAt(roles, i) }));
   const rest = usable.slice(kept.length);
@@ -96,6 +109,7 @@ export function topSlices(
       label: otherLabel,
       value: rest.reduce((sum, entry) => sum + entry.value, 0),
       role: roleAt(roles, kept.length),
+      filter: null,
     });
   }
   return slices;
@@ -114,13 +128,22 @@ export function PieChart({
   emptyText,
   labels,
   maximized = false,
+  crossFilter,
+  dimension,
 }: PieChartProps) {
+  const t = useT();
   const label = chartSummary(frame);
   const reduced = useReducedMotion();
   const pointer = usePointerChip();
   const [hover, setHover] = useState<string | null>(null);
   const slices = topSlices(categories, values, topN, otherLabel, roles);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const selected = dimension ? crossFilter?.filters[dimension] ?? [] : [];
+  const selectMark = (additive: boolean, mark: ReturnType<typeof markState>) => {
+    if (mark && dimension) crossFilter?.toggle(dimension, mark.value, additive);
+  };
+  const dims = (value: string | null | undefined) =>
+    selected.length > 0 && value !== null && value !== undefined && !selected.includes(value);
 
   return (
     <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}
@@ -148,14 +171,19 @@ export function PieChart({
               width={size}
               height={size}
               viewBox={`0 0 ${size} ${size}`}
-              role={label ? "img" : undefined}
+              role={crossFilter?.enabled && dimension ? "group" : label ? "img" : undefined}
               aria-label={label}
               className="shrink-0"
             >
               {slices.length === 1 ? (
                 // A 360° arc has coincident endpoints, which SVG draws as nothing: use a circle.
                 <>
-                  <circle cx={size / 2} cy={size / 2} r={radius} className={fillClass(slices[0].role)} />
+                  <circle cx={size / 2} cy={size / 2} r={radius} className={fillClass(slices[0].role)}
+                          role={markState(crossFilter, dimension, slices[0].filter) ? "button" : undefined}
+                          tabIndex={markState(crossFilter, dimension, slices[0].filter) ? 0 : undefined}
+                          aria-pressed={markState(crossFilter, dimension, slices[0].filter)?.selected}
+                          onClick={(event) => selectMark(event.ctrlKey || event.metaKey,
+                                                         markState(crossFilter, dimension, slices[0].filter))} />
                   {inner > 0 ? <circle cx={size / 2} cy={size / 2} r={inner} className="fill-surface" /> : null}
                 </>
               ) : null}
@@ -164,6 +192,7 @@ export function PieChart({
                 const from = angle;
                 const to = Math.max(angle + GAP_DEG, angle + sweep);
                 angle += sweep;
+                const mark = markState(crossFilter, dimension, slice.filter);
                 const dim = hover !== null && hover !== slice.key;
                 const mid = from + sweep / 2;
                 const [lx, ly] = point(size / 2, size / 2, radius * (inner > 0 ? 0.78 : 0.68), mid);
@@ -171,12 +200,24 @@ export function PieChart({
                   <g key={slice.key}
                      onPointerEnter={() => setHover(slice.key)}
                      onPointerLeave={() => setHover((current) => (current === slice.key ? null : current))}
-                     onClick={() => setHover(slice.key)}>
+                     role={mark ? "button" : undefined}
+                     tabIndex={mark ? 0 : undefined}
+                     aria-pressed={mark ? mark.selected : undefined}
+                     aria-label={mark ? slice.label : undefined}
+                     className={mark ? "cursor-pointer focus-visible:outline-none" : undefined}
+                     onClick={(event) => selectMark(event.ctrlKey || event.metaKey, mark)}
+                     onKeyDown={(event) => {
+                       if (!mark || (event.key !== "Enter" && event.key !== " ")) return;
+                       event.preventDefault();
+                       selectMark(event.ctrlKey || event.metaKey, mark);
+                     }}>
                     <title>{`${slice.label}: ${formatValue(slice.value, format, frame.currency)} · ${formatValue((slice.value / total) * 100, "percent")}`}</title>
                     <path
                       d={arcPath(size / 2, size / 2, radius, inner, from, to)}
                       className={fillClass(slice.role)}
-                      opacity={dim ? 0.7 : 1}
+                      stroke={mark?.selected ? "var(--focus)" : undefined}
+                      strokeWidth={mark?.selected ? 2 : undefined}
+                      opacity={dim || dims(slice.filter) ? 0.7 : 1}
                       style={{
                         transition: reduced ? "opacity 150ms" : "opacity 150ms, transform 150ms",
                         transformBox: "fill-box",
@@ -205,28 +246,41 @@ export function PieChart({
                               top: Math.max(0, spot?.top ?? ay - 20) }}>
                   <span className="block text-ink [overflow-wrap:anywhere]">
                     {slice.label} · {formatValue(slice.value, format, frame.currency)} ·{" "}
-                    {formatValue((slice.value / total) * 100, "percent")}
+                    {formatValue((slice.value / total) * 100, "percent")} ·{" "}
+                    {markState(crossFilter, dimension, slice.filter)?.selected
+                      ? t.reportParams.clickToRemoveFilter : t.reportParams.clickToFilter}
                   </span>
                 </div>
               );
             })()}
             </div>
             <ul className="w-full min-w-0 space-y-1.5 text-sm">
-              {slices.map((slice) => (
-                <li key={slice.key}
-                    className={`flex items-center gap-2 ${hover === slice.key ? "text-ink" : ""}`}
-                    onPointerEnter={() => setHover(slice.key)}
-                    onPointerLeave={() => setHover((current) => (current === slice.key ? null : current))}>
-                  <span className={`${surfaceClass(slice.role)} h-2.5 w-2.5 shrink-0 rounded-sm`} aria-hidden />
-                  <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-ink-2">{slice.label}</span>
-                  <span className="shrink-0 tabular-nums text-ink-muted">
-                    {formatValue(slice.value, format, frame.currency)}
-                  </span>
-                  <span className="w-14 shrink-0 text-right tabular-nums text-ink">
-                    {formatValue((slice.value / total) * 100, "percent")}
-                  </span>
-                </li>
-              ))}
+              {slices.map((slice) => {
+                const mark = markState(crossFilter, dimension, slice.filter);
+                return (
+                  <li key={slice.key}
+                      className={`flex items-center gap-2 ${hover === slice.key ? "text-ink" : ""}`}
+                      onPointerEnter={() => setHover(slice.key)}
+                      onPointerLeave={() => setHover((current) => (current === slice.key ? null : current))}>
+                    <button
+                      type="button"
+                      disabled={!mark}
+                      aria-pressed={mark ? mark.selected : undefined}
+                      onClick={(event) => selectMark(event.ctrlKey || event.metaKey, mark)}
+                      className={`flex min-h-8 w-full items-center gap-2 rounded-lg px-1 text-left ${mark ? "cursor-pointer hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" : "cursor-default"} ${dims(slice.filter) ? "opacity-60" : ""}`}
+                    >
+                      <span className={`${surfaceClass(slice.role)} h-2.5 w-2.5 shrink-0 rounded-sm`} aria-hidden />
+                      <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-ink-2">{slice.label}</span>
+                      <span className="shrink-0 tabular-nums text-ink-muted">
+                        {formatValue(slice.value, format, frame.currency)}
+                      </span>
+                      <span className="w-14 shrink-0 text-right tabular-nums text-ink">
+                        {formatValue((slice.value / total) * 100, "percent")}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         );

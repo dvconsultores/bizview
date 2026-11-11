@@ -281,6 +281,12 @@ def _dim(ctx: Context, did: str) -> sql.Composable:
     return expression(ctx, ctx.dimensions[did]["sql"])
 
 
+def _filter_expr(ctx: Context, did: str) -> sql.Composable:
+    """Feature 063: a dimension may carry a `key` expression; filtering uses it, rendering `sql`."""
+    key = ctx.dimensions[did].get("key")
+    return expression(ctx, key) if key else _dim(ctx, did)
+
+
 def _metric(ctx: Context, mid: str) -> sql.Composable:
     if ctx.rollup is not None:
         return ctx.rollup.metrics[mid]
@@ -346,7 +352,7 @@ def _where(ctx: Context, r: periods.Range, filters: dict[str, list[str]]) -> sql
     for dim, values in sorted(filters.items()):
         if not values:
             continue
-        expr = _dim(ctx, dim)
+        expr = _filter_expr(ctx, dim)
         lits = sql.SQL(", ").join(sql.Literal(v) for v in values)
         parts.append(sql.SQL("({})::text IN ({})").format(expr, lits))
     return sql.SQL(" AND ").join(parts)
@@ -598,6 +604,9 @@ def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict
                                report_id=ctx.report_id)
     limit = view.get("limit") or 10
     group = [("key", _dim(ctx, did))]
+    keyed = bool(ctx.dimensions[did].get("key"))
+    if keyed:
+        group.append(("filter_key", _filter_expr(ctx, did)))
     rows = aggregate(ctx, [mid], sel.current, filters, tz, group=group, order_metric=mid,
                      limit=limit, session=session)
     prev = {}
@@ -606,7 +615,9 @@ def view_ranking(ctx: Context, view: dict, sel: periods.Selection, filters: dict
             ctx, [mid], sel.previous, filters, tz, group=group,
             keys=[r["key"] for r in rows], session=session)}
     total = aggregate(ctx, [mid], sel.current, filters, tz, session=session)[0][mid]
-    items = [{"key": _json_key(r["key"]), "value": r[mid],
+    items = [{"key": _json_key(r["key"]),
+              **({"filter": _json_key(r["filter_key"])} if keyed else {}),
+              "value": r[mid],
               "share": (r[mid] / total * 100) if total and r[mid] is not None else None,
               "previous": prev.get(r["key"]) if sel.previous else None,
               "change": periods.change(r[mid], prev.get(r["key"])) if sel.previous else None}
@@ -633,6 +644,8 @@ def view_table(ctx: Context, view: dict, sel: periods.Selection, filters: dict, 
         render_errors.check_format(ctx.metrics[mid].get("format"), metric=mid,
                                    report_id=ctx.report_id)
     group = [(d, _dim(ctx, d)) for d in view["dimensions"]]
+    keyed = [d for d in view["dimensions"] if ctx.dimensions[d].get("key")]
+    group += [(f"__key_{d}", _filter_expr(ctx, d)) for d in keyed]
     limit = view.get("limit") or 100
     if ctx.direct is not None:
         limit = min(limit, ctx.direct.max_rows)
@@ -648,8 +661,11 @@ def view_table(ctx: Context, view: dict, sel: periods.Selection, filters: dict, 
     return {"type": "table", **_view_id(view), "title": view.get("title"),
             **_en(view, "title"),
             "columns": columns,
-            "rows": [{k: _json_key(v) if k in view["dimensions"] else v for k, v in r.items()}
-                     for r in rows]}
+            "rows": [
+                {**{k: _json_key(v) if k in view["dimensions"] else v
+                   for k, v in r.items() if not k.startswith("__key_")},
+                 **{f"__key_{d}": _json_key(r[f"__key_{d}"]) for d in keyed}}
+                for r in rows]}
 
 
 VIEWS = {"kpis": view_kpis, "trend": view_trend, "ranking": view_ranking, "table": view_table}
@@ -871,17 +887,23 @@ def selection(ctx: Context, params: Iterable[tuple[str, str]] | Mapping[str, str
     except periods.PeriodError as e:
         raise ReportError(e.message) from None
 
-    collected: dict[str, set[str]] = {dim: set() for dim in d.get("filters") or []}
+    # Feature 063: a filter may name any dimension the report declares; `filters:` only decides
+    # what the Filtros sheet offers. An id that is not a dimension is still refused.
+    collected: dict[str, set[str]] = {}
     for key, value in pairs:
         if not key.startswith("filter."):
             continue
         dim = key[len("filter."):]
-        if dim not in collected or value in (None, ""):
+        if not dim:
             continue
-        collected[dim].add(str(value)[:200])
+        if dim not in ctx.dimensions:
+            raise ReportError(M("report.unknown_filter", id=dim), 422, "unknown_filter")
+        if value in (None, ""):
+            continue
+        collected.setdefault(dim, set()).add(str(value)[:200])
 
     filters: dict[str, list[str]] = {}
-    for dim in d.get("filters") or []:
+    for dim in sorted(collected):
         values = sorted(collected[dim])
         if not values:
             continue
@@ -1259,6 +1281,46 @@ def _run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str,
     _sort_facts(ctx, vdefs, views, sel, filters, tz)
     _mark_empty(ctx, views, tz)
     return views
+
+
+def _uses_dimension(vdef: dict, dim: str) -> bool:
+    if vdef.get("type") == "ranking":
+        return vdef.get("dimension") == dim
+    if vdef.get("type") == "table":
+        return dim in (vdef.get("dimensions") or [])
+    return False
+
+
+def cross_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str, *,
+                reference: str | None = None) -> dict:
+    """Feature 063: extra payload views for cross-filtering.
+
+    `source_views[dimension][view id]` is the view computed with every filter except that
+    dimension, so the chart that owns the selection keeps all its marks. `ignore_views[view id]`
+    is the view with the cross-filters removed, for a component declared `cross_filter: ignore`.
+    The URL does not distinguish a sheet filter from a click, so a dimension listed in `filters:`
+    is treated as a sheet filter for the ignore case.
+    """
+    if not filters:
+        return {}
+    reference = reference or render_reference()
+    vdefs = [v for v in ctx.definition["views"] if v.get("type") in VIEWS and v.get("id")]
+    sources: dict[str, dict[str, dict]] = {}
+    for dim in filters:
+        others = {key: value for key, value in filters.items() if key != dim}
+        for vdef in vdefs:
+            if not _uses_dimension(vdef, dim):
+                continue
+            sources.setdefault(dim, {})[vdef["id"]] = _run_view(
+                ctx, vdef, sel, others, tz, reference)
+    ignore: dict[str, dict] = {}
+    sheets = set(ctx.definition.get("filters") or [])
+    if any(dim not in sheets for dim in filters):
+        sheet_filters = {key: value for key, value in filters.items() if key in sheets}
+        for vdef in vdefs:
+            ignore[vdef["id"]] = _run_view(ctx, vdef, sel, sheet_filters, tz, reference)
+    return {**({"source_views": sources} if sources else {}),
+            **({"ignore_views": ignore} if ignore else {})}
 
 
 def run_views(ctx: Context, sel: periods.Selection, filters: dict, tz: str, *,

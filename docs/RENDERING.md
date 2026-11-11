@@ -180,6 +180,16 @@ The URL keeps the state: `period`, `compare`, `from`/`to`, `filter.<dimension>` 
 card, `ampliar=<component id>` ([reportQuery.ts](../frontend/src/lib/reportQuery.ts)). TV mode
 ignores `ampliar`, so a shared link cannot leave a wall screen stuck in a dialog.
 
+
+## Cross-filter (feature 063)
+
+A click on a mark becomes an ordinary `filter.<dimension>=<value>` query parameter; the engine sees
+it in `selection` and every view is aggregated with it. For the view that owns the active dimension
+the payload also carries `source_views[dimension][view id]`, computed with every filter **except**
+that dimension, so the chart keeps all its marks and highlights the chosen one. A component with
+`cross_filter: ignore` reads `ignore_views[view id]` instead. A dimension may declare
+`key: <sql>`; the filter uses it and the view still shows `sql`.
+
 ## 6. Freshness — when the numbers change
 
 | What you see | What happened |

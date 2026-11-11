@@ -6,6 +6,7 @@ import { CardMenu } from "./CardMenu";
 import { ChangeChip } from "./KpiGrid";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
+import { markState, type CrossFilterState } from "./crossFilter";
 
 type Ranking = Extract<ReportView, { type: "ranking" }>;
 
@@ -19,10 +20,12 @@ interface RankingTableProps {
   onMaximize?: () => void;
   /** Feature 056b: in the dialog the rows breathe and the card drops its own heading. */
   maximized?: boolean;
+  /** Feature 063: a row filters the ranking's dimension. */
+  crossFilter?: CrossFilterState;
 }
 
 export function RankingTable({ view, currency, compared, better, csvFileBase, onMaximize,
-                              maximized = false }: RankingTableProps) {
+                              maximized = false, crossFilter }: RankingTableProps) {
   const t = useT();
   const max = Math.max(0, ...view.items.map((i) => Math.abs(i.value ?? 0)));
 
@@ -46,8 +49,25 @@ export function RankingTable({ view, currency, compared, better, csvFileBase, on
         <p className="mt-3 text-sm text-ink-muted">{t.reportParams.display.noData}</p>
       ) : (
         <ol className={`${maximized ? "mt-0 space-y-5 sm:space-y-6" : "mt-4 space-y-4"}`}>
-          {view.items.map((it, i) => (
-            <li key={`${it.key}-${i}`} className="min-w-0">
+          {view.items.map((it, i) => {
+            const mark = markState(crossFilter, view.dimension, it.key === null ? null : String(it.key));
+            const dimmed = (crossFilter?.filters[view.dimension] ?? []).length > 0
+              && mark !== null && !mark.selected;
+            return (
+            <li key={`${it.key}-${i}`} className={`min-w-0 rounded-lg ${dimmed ? "opacity-60" : ""}`}>
+              <div
+                role={mark ? "button" : undefined}
+                tabIndex={mark ? 0 : undefined}
+                aria-pressed={mark ? mark.selected : undefined}
+                aria-label={mark ? `${localized(view, "dimension_label")}: ${it.key}` : undefined}
+                onClick={(event) => mark && crossFilter?.toggle(view.dimension, mark.value, event.ctrlKey || event.metaKey)}
+                onKeyDown={(event) => {
+                  if (!mark || (event.key !== "Enter" && event.key !== " ")) return;
+                  event.preventDefault();
+                  crossFilter?.toggle(view.dimension, mark.value, event.ctrlKey || event.metaKey);
+                }}
+                className={`min-h-8 rounded-lg ${mark ? "cursor-pointer px-1 -mx-1 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" : ""}`}
+              >
               <div className="flex items-baseline justify-between">
                 <span className="mr-3 flex min-w-0 items-center text-sm text-ink-2 [overflow-wrap:anywhere]">
                   <span className="mr-2 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-xs font-bold text-accent">
@@ -68,8 +88,10 @@ export function RankingTable({ view, currency, compared, better, csvFileBase, on
                   </span>
                 ) : null}
               </div>
+              </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
     </Card>

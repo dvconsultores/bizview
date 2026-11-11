@@ -8,6 +8,7 @@ import { CardMenu } from "./CardMenu";
 import { useT } from "../../i18n";
 import { localized } from "../../lib/labels";
 import { ReportImage, imageColumn } from "./ReportImage";
+import { markState, type CrossFilterState } from "./crossFilter";
 
 type Table = Extract<ReportView, { type: "table" }>;
 
@@ -28,6 +29,8 @@ interface DataTableProps {
   onMaximize?: () => void;
   /** Feature 056b: the dialog shows the title, so the card drops its heading and its menu. */
   maximized?: boolean;
+  /** Feature 063: a dimension cell filters its dimension. */
+  crossFilter?: CrossFilterState;
 }
 
 /** A cached-URL set's picture for one row: the column the set declares, never the key. */
@@ -77,6 +80,7 @@ export function DataTable({
   image,
   onMaximize,
   maximized = false,
+  crossFilter,
 }: DataTableProps) {
   const t = useT();
   const [page, setPage] = useState(0);
@@ -141,26 +145,46 @@ export function DataTable({
           <tbody className="divide-y divide-line tabular-nums">
             {visible.map((r, i) => (
               <tr key={i} className="transition-colors hover:bg-subtle">
-                {shown.map((c, idx) => (
-                  <td
-                    key={c.id}
-                    className={`px-4 py-3 ${c.kind === "metric" ? "whitespace-nowrap text-right" : ""} ${
-                      idx === 0 ? "font-semibold text-ink" : "text-ink-2"
-                    }`}
-                  >
-                    {image && c.id === image.column ? (
-                      <span className="flex items-center gap-2">
-                        <ReportImage set={image.set} name={r[c.id]} size={20}
-                                     value={valueOf(r, image.set)} />
-                        {r[c.id] ?? "—"}
-                      </span>
-                    ) : c.kind === "metric" ? (
-                      formatValue(r[c.id] as number | null, c.format, currency)
-                    ) : (
-                      (r[c.id] ?? "—")
-                    )}
-                  </td>
-                ))}
+                {shown.map((c, idx) => {
+                  const raw = r[c.id];
+                  const filterValue = r[`__key_${c.id}`] ?? raw;
+                  const mark = c.kind === "dimension"
+                    ? markState(crossFilter, c.id, filterValue === null || filterValue === undefined ? null : String(filterValue))
+                    : null;
+                  const dimmed = c.kind === "dimension" && (crossFilter?.filters[c.id] ?? []).length > 0
+                    && mark !== null && !mark.selected;
+                  const content = image && c.id === image.column ? (
+                    <span className="flex items-center gap-2">
+                      <ReportImage set={image.set} name={r[c.id]} size={20}
+                                   value={valueOf(r, image.set)} />
+                      {r[c.id] ?? "—"}
+                    </span>
+                  ) : c.kind === "metric" ? (
+                    formatValue(r[c.id] as number | null, c.format, currency)
+                  ) : (
+                    (r[c.id] ?? "—")
+                  );
+                  return (
+                    <td
+                      key={c.id}
+                      className={`px-4 py-3 ${c.kind === "metric" ? "whitespace-nowrap text-right" : ""} ${
+                        idx === 0 ? "font-semibold text-ink" : "text-ink-2"
+                      } ${dimmed ? "opacity-60" : ""}`}
+                    >
+                      {mark ? (
+                        <button
+                          type="button"
+                          aria-pressed={mark.selected}
+                          aria-label={`${localized(c, "label")}: ${raw}`}
+                          onClick={(event) => crossFilter?.toggle(c.id, mark.value, event.ctrlKey || event.metaKey)}
+                          className="min-h-8 cursor-pointer rounded-lg px-1 -mx-1 text-left hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        >
+                          {content}
+                        </button>
+                      ) : content}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
