@@ -177,6 +177,18 @@ describe("PieChart sizing (feature 062)", () => {
     expect(row.className).toContain("sm:flex-row");
   });
 
+  it("centres the ring and legend in the card instead of dropping them to the bottom", () => {
+    mount(
+      <PieChart frame={frame} categories={donut.categories as never} values={donut.values as never}
+        roles={["blue", "green"]} topN={6} otherLabel="Otros" donut format="currency"
+        emptyText="Sin datos" summary={<p>resumen</p>} maximized />,
+    );
+    const box = container.querySelector(".flex.w-full.flex-1") as HTMLElement;
+    expect(box).not.toBeNull();
+    expect(box.className).toContain("items-center");
+    expect(box.className).not.toContain("items-end");
+  });
+
   it("reserves the ring's height before the data arrives, so the card does not jump", () => {
     mount(
       <PieChart frame={frame} categories={[]} values={[]} roles={["blue"]} topN={6}

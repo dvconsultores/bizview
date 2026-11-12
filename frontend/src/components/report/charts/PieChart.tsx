@@ -147,7 +147,7 @@ export function PieChart({
 
   return (
     <ChartCard title={frame.title} caption={label} signature={JSON.stringify(values)}
-               maximized={maximized} minHeight={maximized ? undefined : RING_FLOOR}>
+               maximized={maximized} minHeight={maximized ? undefined : RING_FLOOR} align="center">
       {(width, height) => {
         if (total <= 0) return <p className="text-sm text-ink-muted">{emptyText}</p>;
         // Feature 062: the ring is the container's, never a constant and never `window`. In a card it

@@ -14,6 +14,7 @@ export function ChartCard({
   signature,
   maximized = false,
   minHeight = CHART_MIN_HEIGHT,
+  align = "end",
   children,
 }: {
   title: string;
@@ -27,6 +28,8 @@ export function ChartCard({
   /** Feature 062: a kind whose drawing has a floor of its own (a 240 px ring), reserved before the
    * first measurement so the card does not grow when the data lands. */
   minHeight?: number;
+  /** Feature 064: a ring is centred in its card; bar and line charts keep their baseline at the bottom. */
+  align?: "end" | "center";
   children: (width: number, height: number) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -45,7 +48,8 @@ export function ChartCard({
         </div>
       )}
       <figure className={`flex min-h-0 flex-1 flex-col ${maximized ? "" : "mt-3"}`}>
-        <div ref={ref} className="flex w-full flex-1 items-end" style={{ minHeight }}>
+        <div ref={ref} className={`flex w-full flex-1 ${align === "center" ? "items-center" : "items-end"}`}
+             style={{ minHeight }}>
           {width > 0 ? (
             <div key={signature} className="chart-data-in w-full">
               {children(width, height)}
