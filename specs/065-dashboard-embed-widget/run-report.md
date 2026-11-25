@@ -382,3 +382,37 @@ Chromium was executed here); the pre-existing 018 failure was diagnosed by code 
 not by running the old tree (the fix does not touch it); a genuine long-lived deployment (a widget
 surviving 90 days, a public host page behind a CDN) — those follow from the design and are not
 observed.
+
+## Packaging defect found after the review pass (same day)
+
+**The backend image could not start.** Building the image from this working tree and running it
+failed at start-up with
+
+```
+PermissionError: [Errno 13] Permission denied: '/app/backend/alembic/versions/0059_dashboard_widgets.py'
+```
+
+**Cause.** Everything created for this feature was written with mode `0600` in the working tree
+(the repository's files are `0664`). The backend image does `COPY backend/ ./` and then `USER app`
+(uid 10001), so Docker preserved the mode and ownership and the application user could not read the
+new files — Alembic fails first because it loads every revision file, and the API would have failed
+next on `app/api/widgets.py`. Git stores only the executable bit, so a clone of the same commit would
+have produced `0664`; the defect was in this working tree, which is what the image build context
+copies.
+
+**Fix, two parts.**
+
+1. Every file this feature added is at `0664` (and the new deploy test script at `0775`, like the
+   other ones), so the tree matches what a checkout produces.
+2. [backend/Dockerfile](../../backend/Dockerfile) now runs `chmod -R a+rX /app/backend /app/cli
+   /app/pack` in the same step that creates the `app` user, so a contributor's umask can never leave
+   the image unreadable again.
+
+**Verified by running.** The exact failure was reproduced with the real file: a copy at `0600`, read
+by uid 10001 inside a container, raises `PermissionError: [Errno 13] Permission denied`; the same file
+after the fix is read and parsed as uid 10001 inside the container. The build contexts
+(`backend/`, `cli/`, `pack/`, `deploy/`, `frontend/`) now have no file or directory that is not group-
+and world-readable. The image itself was not rebuilt here (the build downloads the dependency set);
+the changed build step is a single `chmod` and the read is proved with the container's own user.
+
+No schema, API or behaviour changed: this is packaging only.

@@ -34,7 +34,10 @@ COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --no-dev --no-install-project --frozen --extra sources
 
 COPY backend/ ./
+# The image runs as `app` (uid 10001): make the code readable whatever umask the build context was
+# written with (a source file left at 0600 makes Alembic fail with PermissionError at start-up).
 RUN useradd --system --uid 10001 app && chmod +x entrypoint.sh \
+    && chmod -R a+rX /app/backend /app/cli /app/pack \
     && mkdir -p /app/data/projects /app/data/workspace /app/data/image-cache \
     && chown app:app /app/data/projects /app/data/workspace /app/data/image-cache
 USER app
