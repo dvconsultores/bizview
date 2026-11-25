@@ -412,7 +412,23 @@ copies.
 by uid 10001 inside a container, raises `PermissionError: [Errno 13] Permission denied`; the same file
 after the fix is read and parsed as uid 10001 inside the container. The build contexts
 (`backend/`, `cli/`, `pack/`, `deploy/`, `frontend/`) now have no file or directory that is not group-
-and world-readable. The image itself was not rebuilt here (the build downloads the dependency set);
-the changed build step is a single `chmod` and the read is proved with the container's own user.
+and world-readable.
+
+The two images on this machine show the difference, and that a stale image is what keeps failing:
+
+| Image | `ls -l` of the file as `app` | Reading it as `app` |
+|---|---|---|
+| built before the fix (20 min earlier) | `-rw-------` | `PermissionError` (the reported traceback) |
+| built after the fix | `-rw-rw-r--` | readable; **0** unreadable files under `/app` |
+
+So rebuilding the backend image and recreating its container fixes the start-up; restarting a
+container does not, because it keeps the image it was created from.
+
+The start-up now also says this in words instead of a traceback: `backend/entrypoint.sh` checks that
+the running user can read every `.py` under `/app/backend`, `/app/cli` and `/app/pack` before it
+migrates, and the Alembic failure branch recognises `Permission denied`. Verified by running the real
+entrypoint inside the image with an unreadable file mounted over the migration: three actionable lines
+and exit 1, no traceback; with a readable file it passes the check and proceeds to Alembic (which then
+failed only on a deliberately bogus database address).
 
 No schema, API or behaviour changed: this is packaging only.
