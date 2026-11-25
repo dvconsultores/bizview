@@ -31,8 +31,19 @@
 		-Server
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "same-origin"
-		X-Frame-Options "DENY"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+
+	# Framing is refused everywhere (feature 018, FR-008): no page of the product may be shown
+	# inside another site. A widget (feature 065) is the one exception, and its permission is the
+	# widget's own list of sites — a decision only the backend can make, because only it knows
+	# which widget a key belongs to. So the refusal is scoped to every path but /w/*, and the
+	# /w/* document below takes its headers from the backend. Nothing else changes.
+	# NOTE: this policy string and app/sharing/widgets.py's CSP are one policy; the backend test
+	# `test_widget_csp_matches_the_edge_default` fails if the two drift.
+	@not_widget not path /w/*
+	header @not_widget {
+		X-Frame-Options "DENY"
 		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 	}
 
@@ -57,6 +68,41 @@
 		reverse_proxy backend:8000 {
 			health_uri /api/health
 			health_interval 15s
+		}
+	}
+
+	# A widget's framed document (feature 065). The backend is asked, where the widget is known,
+	# which sites may frame it, and its answer is copied onto the static page: Caddy never decides
+	# framing on its own and never relaxes it for anything but a widget's own list. The consultation
+	# always answers 200 (`frame-ancestors 'none'` for a key that no longer works), so a revoked
+	# widget still shows its neutral message inside the host page instead of a broken navigation.
+	handle_path /w/* {
+		# `route` keeps the order written here. Caddy's default order would run `try_files` before
+		# `forward_auth`, and `try_files` rewrites {uri} to /index.html — the backend would then be
+		# asked about a page that does not exist instead of about this widget.
+		route {
+			# Fail closed: a widget answer that is missing keeps the site-wide refusal, so a broken
+			# backend can never make the product frameable.
+			header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+			header X-Robots-Tag "noindex, nofollow"
+			header Cache-Control "no-store"
+			# `forward_auth` copies the answer's headers onto the request (it is designed to pass
+			# them to an upstream), and the two lines after it put those values on the response.
+			# A header the client sent itself is deleted by copy_headers first, so it cannot forge
+			# the policy.
+			forward_auth backend:8000 {
+				uri /api/widgets/frame{uri}
+				copy_headers {
+					Content-Security-Policy
+					X-Robots-Tag
+					Cache-Control
+				}
+			}
+			@widget_policy header_regexp Content-Security-Policy .+
+			header @widget_policy Content-Security-Policy "{http.request.header.Content-Security-Policy}"
+			root * /srv
+			try_files {path} /index.html
+			file_server
 		}
 	}
 

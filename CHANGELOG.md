@@ -68,6 +68,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Embed a dashboard as a widget in another web page (feature 065)**. From a dashboard's sharing
+  screen an administrator creates a **widget**: a name, up to ten allowed sites (`https://www.cliente.com`)
+  and, optionally, the theme, the language, whether the title, the filters and the PDF are shown, and
+  an expiry date. The product shows the iframe snippet once, with the plain-words warning that anyone
+  who can see the host page sees the whole dashboard and that filters are a convenience, not a
+  restriction. **Probar** frames the widget inside the product at phone, tablet and desktop widths
+  without any external site listed and without counting as a visit. Each dashboard holds 50 active
+  widgets, counted apart from its 20 share links; a widget never expires unless a date is set and is
+  revoked for ever, and a replaced snippet stops working at once — every action is audited. The
+  framed document is allowed by **that widget's** list of sites and by nothing else: `deploy/caddy`
+  keeps `X-Frame-Options: DENY` and `frame-ancestors 'none'` on every other route and asks the backend
+  (which knows the widget) for `/w/*`, failing closed when no answer arrives. The widget never reads
+  the viewer's session, is never indexed and is never cached, and one widget may make
+  `WIDGET_RATE_LIMIT` requests per minute (300 by default) before its visitors are told to retry;
+  image and cached-picture requests do not spend that ceiling, and a PDF download no longer holds the
+  widget's row while it renders. The framed page learns only the one origin that framed it — never
+  the widget's list of sites and never the administrator's internal name for it — and the snippet,
+  which carries the key, is held in memory only: it is never written to browser storage, so the test
+  page shows it only in the session where the widget was created or replaced. Off until
+  `EMBED_WIDGETS_ENABLED` is set, and it needs `SHARE_LINKS_ENABLED`. New help topic
+  **Insertar un tablero en una web**, a new `docs/WIDGETS.md` and the installation guide cover it.
+
 - **See the data behind any card as a table (feature 064)**. Every data card now offers **Ver como
   tabla** in its `⋯` menu and a table icon beside **Ampliar** (double-click or `T` also work): the
   dialog shows exactly the rows the chart drew, with the report's labels and formats, search,

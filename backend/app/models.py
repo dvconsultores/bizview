@@ -83,6 +83,8 @@ AUDIT_KINDS = (
     # feature 054 — the Google policy: domains, provisioning and role rules
     "google_settings_updated", "google_rule_created", "google_rule_updated",
     "google_rule_deleted", "google_user_provisioned", "google_rule_applied",
+    # feature 065 — widgets embedded in other sites
+    "widget_created", "widget_updated", "widget_key_replaced", "widget_revoked",
 )
 #: Audit kinds a database may already contain that the product no longer emits (feature 045
 #: removed the in-app authoring agent). They exist so historical rows stay readable and so the
@@ -1015,6 +1017,81 @@ class ShareLink(Base):
     # Feature 030 (T047): the theme the shared view applies on its first load; NULL follows the
     # viewer's own choice (today's behaviour).
     theme: Mapped[str | None] = mapped_column(String(5))
+
+
+WIDGET_THEMES = ("light", "dark")
+WIDGET_LANGUAGES = ("es", "en")
+
+
+class DashboardWidget(Base):
+    """A dashboard embedded in other sites (feature 065).
+
+    A standing permission: it does not expire unless an admin sets a date, and it is revoked, never
+    restored. Only the SHA-256 of its key is stored. `rate_window_start`/`rate_count` are the
+    per-widget request ceiling (FR-015), bumped with one atomic statement per request.
+    """
+
+    __tablename__ = "dashboard_widget"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(name)) BETWEEN 1 AND 80", name="name_len"),
+        CheckConstraint("expires_at IS NULL OR expires_at > created_at", name="expiry"),
+        CheckConstraint("visits >= 0", name="visits"),
+        CheckConstraint("rate_count >= 0", name="rate"),
+        CheckConstraint(_in("theme", WIDGET_THEMES), name="theme"),
+        CheckConstraint(_in("language", WIDGET_LANGUAGES), name="language"),
+        Index(
+            "ix_dashboard_widget_active",
+            "dashboard_id",
+            "expires_at",
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    dashboard_id: Mapped[int] = mapped_column(
+        SmallInteger, ForeignKey("dashboard.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(Text)
+    key_hash: Mapped[bytes] = mapped_column(LargeBinary, unique=True)
+    theme: Mapped[str | None] = mapped_column(Text)
+    language: Mapped[str | None] = mapped_column(Text)
+    show_title: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    show_filters: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    # FR-024: PDF is off unless the admin asks for it.
+    pdf_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # FR-005: NULL = never expires.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("app_user.id"))
+    visits: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rate_window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rate_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+
+
+class DashboardWidgetSite(Base):
+    """One site a widget may be shown in: a canonical origin, and whether it is a local one."""
+
+    __tablename__ = "dashboard_widget_site"
+    __table_args__ = (
+        UniqueConstraint("widget_id", "origin", name="uq_dashboard_widget_site_widget_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    widget_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("dashboard_widget.id", ondelete="CASCADE"),
+        index=True,
+    )
+    origin: Mapped[str] = mapped_column(Text)
+    development: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 MAIL_LIST_VISIBILITIES = ("personal", "compartida")

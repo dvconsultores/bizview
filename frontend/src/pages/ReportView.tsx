@@ -1,4 +1,4 @@
-import { CalendarClock, FileDown, History, Mail, Moon, Share2, Sun, Tv } from "lucide-react";
+import { CalendarClock, Code, FileDown, History, Mail, Moon, Share2, Sun, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { api, ApiError } from "../api/client";
@@ -86,6 +86,7 @@ import { useTheme } from "../theme/ThemeContext";
 import { EmailSendPanel } from "../components/sharing/EmailSendPanel";
 import { SendHistoryPanel } from "../components/sharing/SendHistory";
 import { ShareLinksPanel } from "../components/sharing/ShareLinksPanel";
+import { WidgetsPanel } from "../components/sharing/WidgetsPanel";
 import { SubscriptionsPanel } from "../components/sharing/SubscriptionsPanel";
 
 async function downloadPdf(
@@ -281,7 +282,7 @@ export function ReportView() {
   }, [loaded, user, id]);
 
   const [sharePanel, setSharePanel] = useState<
-    "share" | "email" | "sends" | "schedules" | null
+    "share" | "email" | "sends" | "schedules" | "widgets" | null
   >(null);
   const [dashCode, setDashCode] = useState<string | null>(null);
   const [emailAvailable, setEmailAvailable] = useState(false);
@@ -672,6 +673,14 @@ export function ReportView() {
                   show: !!dashCode && emailAvailable,
                 },
                 {
+                  // Feature 065: the dashboard embedded in another site.
+                  id: "widgets",
+                  label: t.reportActions.widgets,
+                  icon: Code,
+                  onClick: () => setSharePanel("widgets"),
+                  show: user?.role === "admin" && !!dashCode,
+                },
+                {
                   id: "schedules",
                   label: t.reportActions.schedules,
                   icon: CalendarClock,
@@ -894,6 +903,16 @@ export function ReportView() {
         onClose={() => setSharePanel(null)}
       >
         {sharePanel === "sends" && dashCode ? <SendHistoryPanel code={dashCode} /> : null}
+      </View>
+
+      <View
+        open={sharePanel === "widgets"}
+        title={t.widgets.panelTitle}
+        onClose={() => setSharePanel(null)}
+      >
+        {sharePanel === "widgets" && dashCode ? (
+          <WidgetsPanel code={dashCode} />
+        ) : null}
       </View>
 
       <View

@@ -20,7 +20,7 @@ ADMIN_ONLY_PREFIXES = ("/api/projects",)
 # Admin-only share controls under /api/dashboards: minting a public link, sending by e-mail and
 # scheduled subscriptions. Their GET reads stay available; only the state-changing methods are
 # covered below.
-DASHBOARD_ADMIN_SEGMENTS = frozenset({"links", "email", "subscriptions"})
+DASHBOARD_ADMIN_SEGMENTS = frozenset({"links", "email", "subscriptions", "widgets"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _last_audit: dict[str, float] = {}
 

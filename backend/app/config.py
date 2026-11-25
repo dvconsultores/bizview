@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     # 058: `admin` restricts free addresses to administrators; list members are unaffected.
     email_free_addresses_role: Literal["user", "admin"] = "user"
     share_links_enabled: bool = False
+    # Feature 065: embedding a dashboard in another site (a widget). Off until the operator enables
+    # it, and only ever together with share links (FR-007). WIDGET_RATE_LIMIT is the per-widget
+    # request ceiling of FR-015, counted across all visitors and all Uvicorn workers: 300/min is
+    # ~5 req/s, dozens of active visitors, and a scripted loop against a copied key is cut off in
+    # seconds (research R5).
+    embed_widgets_enabled: bool = False
+    widget_rate_limit: int = Field(default=300, ge=1, le=100_000)
 
     # Google sign-in (feature 027): an additional identity for accounts that already exist, off
     # unless the installation configures its own OAuth client. The secret is read only here.
@@ -325,6 +332,14 @@ class Settings(BaseSettings):
             return 50 if info.field_name == "email_batch_size" else 10
         return v
 
+    @field_validator("widget_rate_limit", mode="before")
+    @classmethod
+    def _widget_ceiling_default(cls, v):
+        """An empty WIDGET_RATE_LIMIT in a generated .env means the product's default, not zero."""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return 300
+        return v
+
     @field_validator("smtp_security", mode="before")
     @classmethod
     def _smtp_security_lower(cls, v):
@@ -349,7 +364,8 @@ class Settings(BaseSettings):
         return v
 
     @field_validator("email_individual_messages", "email_sending_paused",
-                     "share_links_enabled", "google_auth_enabled", mode="before")
+                     "share_links_enabled", "embed_widgets_enabled", "google_auth_enabled",
+                     mode="before")
     @classmethod
     def _empty_bool_to_false(cls, v):
         if v is None or (isinstance(v, str) and v.strip() == ""):

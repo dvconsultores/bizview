@@ -6,10 +6,12 @@ export type RouteAccess = "public" | "user" | "admin" | "superuser";
 export const ROUTES: { pattern: string; access: RouteAccess }[] = [
   { pattern: "/ingresar", access: "public" },
   { pattern: "/s/:token", access: "public" },
+  { pattern: "/w/:token", access: "public" },
   { pattern: "/cambiar-clave", access: "user" },
   { pattern: "/", access: "user" },
   { pattern: "/tableros", access: "user" },
   { pattern: "/d/:code", access: "user" },
+  { pattern: "/d/:code/widgets/:id/probar", access: "admin" },
   { pattern: "/r/:id", access: "user" },
   { pattern: "/perfil", access: "user" },
   { pattern: "/ayuda", access: "user" },

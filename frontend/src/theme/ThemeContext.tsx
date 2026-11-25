@@ -30,14 +30,18 @@ const ThemeContext = createContext<ThemeState | null>(null);
 
 /** Owns the theme after /theme-init.js set the first one. Before sign-in the device cache and the
  * device appearance decide (FR-007); once the user is known their account value wins. */
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, force = null }: {
+  children: ReactNode;
+  /** Feature 065: a widget may pin light or dark; `null` follows the visitor as usual. */
+  force?: ResolvedTheme | null;
+}) {
   const t = useT();
   const { user, setUser } = useAuth();
   const toast = useToast();
   const branding = useBranding();
   const [preference, setPref] = useState<ThemePreference>(readCachedPreference);
   const [prefersDark, setPrefersDark] = useState(systemPrefersDark);
-  const resolved = resolveTheme(preference, prefersDark);
+  const resolved = force ?? resolveTheme(preference, prefersDark);
   const [override, setPaletteOverride] = useState<string | null>(null);
   const palette = reportThemeId(
     override ? { id: override } : null,

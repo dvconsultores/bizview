@@ -326,6 +326,9 @@ SETTINGS_OVERRIDABLE = (
     "smtp_from_name",
     "email_allowed_domains",
     "share_links_enabled",
+    # Feature 065: embedding a dashboard in another site, and its request ceiling.
+    "embed_widgets_enabled",
+    "widget_rate_limit",
 )
 _ORIGINAL: dict[str, object] = {}
 

@@ -59,7 +59,10 @@ check "http site: direct reports allowed" 'grep -q "^DIRECT_REPORTS_BI=true" "$D
 check "AI off by default" 'grep -q "^AI_PROVIDER=none" "$D/.env"'
 check "email placeholders commented" 'grep -q "^# SMTP_HOST=" "$D/.env"'
 check "share links placeholder commented" 'grep -q "^# SHARE_LINKS_ENABLED=false" "$D/.env"'
-check "no active email/share links setting" '! grep -qE "^(SMTP_|EMAIL_ALLOWED_DOMAINS|SHARE_LINKS_ENABLED)" "$D/.env"'
+# 065: embedding is off until the operator asks for it; the request ceiling ships as a default.
+check "widget placeholder commented" 'grep -q "^# EMBED_WIDGETS_ENABLED=false" "$D/.env"'
+check "widget ceiling placeholder commented" 'grep -q "^# WIDGET_RATE_LIMIT=300" "$D/.env"'
+check "no active email/share links/widget setting" '! grep -qE "^(SMTP_|EMAIL_ALLOWED_DOMAINS|SHARE_LINKS_ENABLED|EMBED_WIDGETS_ENABLED|WIDGET_RATE_LIMIT)" "$D/.env"'
 check "unstamped source url commented" 'grep -q "^# SOURCE_URL=" "$D/.env"'
 check "no placeholders left" '! grep -q "__[A-Z_]*__" "$D/.env" "$D/bizview.yml"'
 key=$(sed -n "s/^BIZVIEW_SECRET_KEY='\(.*\)'$/\1/p" "$D/.env")

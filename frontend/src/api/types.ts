@@ -1000,6 +1000,88 @@ export interface CreatedShareLink extends ShareLink {
 }
 export type ShareLinkOrigin = "manual" | "email" | "subscription";
 
+/* ---------------------------------------------------------------------------------------------
+ * Feature 065: a dashboard embedded in another site (a widget).
+ * -------------------------------------------------------------------------------------------*/
+
+export type WidgetTheme = "light" | "dark";
+export type WidgetLanguage = "es" | "en";
+export type WidgetState = "active" | "revoked" | "expired";
+
+/** One site a widget may be shown in; `development` marks a local address (FR-020). */
+export interface WidgetSite {
+  origin: string;
+  development: boolean;
+}
+
+export interface DashboardWidget {
+  id: number;
+  name: string;
+  sites: WidgetSite[];
+  created_by: { id: number; name: string | null };
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  state: WidgetState;
+  active: boolean;
+  theme: WidgetTheme | null;
+  language: WidgetLanguage | null;
+  show_title: boolean;
+  show_filters: boolean;
+  pdf: boolean;
+  visits: number;
+  last_visit_at: string | null;
+}
+
+/** What creation and replacement answer once: the key and its snippet are shown only then. */
+export interface CreatedWidget extends DashboardWidget {
+  key: string;
+  url: string;
+  snippet: string;
+}
+
+export interface WidgetsState {
+  items: DashboardWidget[];
+  /** Widgets may be created here: the installation switch AND share links are on. */
+  enabled: boolean;
+  embed_enabled: boolean;
+  share_links_enabled: boolean;
+  /** This dashboard may be embedded at all (its project allows sharing). */
+  shareable: boolean;
+  max_active: number;
+  active_count: number;
+  max_sites: number;
+  name_max: number;
+}
+
+/** The admin test page's short-lived door (FR-018): a ticket, never the widget's key. */
+export interface WidgetPreview {
+  url: string;
+  expires_at: string;
+}
+
+/** The public definition of a widget: what `/api/widgets/<token>` answers. */
+export interface WidgetDefinition {
+  widget: {
+    id: number;
+    theme: WidgetTheme | null;
+    language: WidgetLanguage | null;
+    show_title: boolean;
+    show_filters: boolean;
+    pdf: boolean;
+    preview: boolean;
+    expires_at: string | null;
+    /**
+     * Feature 065 (FR-017): the one origin the backend confirmed for the page that framed this
+     * document, or null. The site list itself is never published; without a confirmed origin the
+     * page posts no sizing message at all.
+     */
+    parent_origin: string | null;
+  };
+  dashboard: { code: string; name: string; name_en?: string };
+  report: ReportDefinition;
+}
+
 export type EmailDeliveryStatus = "queued" | "sent" | "failed" | "skipped";
 export type EmailSendStatus = "queued" | "sending" | "sent" | "partial" | "failed";
 

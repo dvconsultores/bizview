@@ -13,10 +13,9 @@ import { ReportMetaLine } from "../components/report/ReportMetaLine";
 import { ReportParamsPanel } from "../components/report/ReportParamsPanel";
 import { ReportSheet } from "../components/report/ReportSheet";
 import { ReportArea } from "../components/report/ReportArea";
-import { ReportViews, VIEW_CARD_PREFIX } from "../components/report/ReportViews";
+import { ReportViews } from "../components/report/ReportViews";
 import { CardDialog } from "../components/report/CardDialog";
 import { CardDataTable } from "../components/report/CardDataTable";
-import { componentView } from "../components/report/LayoutRenderer";
 import type { MultiSelectOptions } from "../components/MultiSelect";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
@@ -27,7 +26,6 @@ import { readViewerMode, reportMode } from "../theme/library";
 import type { ThemeMode } from "../theme/themes";
 import { useT } from "../i18n";
 import { localized } from "../lib/labels";
-import { cardTitle } from "../lib/cardTitle";
 import { downloadPdf } from "../lib/download";
 import { formatDate } from "../lib/format";
 import { isStale, staleText } from "../lib/freshness";
@@ -43,6 +41,7 @@ import {
 } from "../lib/reportQuery";
 import type { ReportSelection } from "../lib/reportQuery";
 import { parseViewState, togglePanel } from "../lib/reportView";
+import { tableEntry } from "../lib/reportTable";
 import { errorText } from "../lib/sharing";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -58,28 +57,6 @@ type LoadState =
   | { status: "throttled" }
   | { status: "error"; message: string }
   | { status: "ok"; shared: SharedDashboardData };
-
-/** Feature 064: the view, component and title behind a `?tabla=` id on a shared report. */
-function sharedTableEntry(id: string, data: ReportData, report: ReportDefinition) {
-  if (report.interactions?.data_table === false) return null;
-  if (id.startsWith(VIEW_CARD_PREFIX)) {
-    const view = data.views[Number(id.slice(VIEW_CARD_PREFIX.length))];
-    if (!view || view.error || view.empty) return null;
-    const title = ("title" in view && localized(view as { title?: string }, "title"))
-      || (view.type === "ranking" ? localized(view, "label") : undefined)
-      || localized(report, "title");
-    return { view, title };
-  }
-  const component = (report.layout?.web?.components ?? []).find((entry) => entry.id === id);
-  if (!component || component.data_table === false) return null;
-  const base = component.view ? data.views.find((view) => view.id === component.view) : undefined;
-  if (!base || base.error || base.empty) return null;
-  return {
-    view: componentView(component, base, data),
-    component,
-    title: cardTitle(report, id, base as { title?: string }) ?? localized(report, "title"),
-  };
-}
 
 /** Public, read-only view of one dashboard through an expiring share link (feature 018). */
 export function SharedDashboard() {
@@ -263,7 +240,7 @@ export function SharedDashboard() {
   }, [base, report, query]);
 
   const fresh = data !== null && dataQuery === query;
-  const tableCard = tableId && data && report ? sharedTableEntry(tableId, data, report) : null;
+  const tableCard = tableId && data && report ? tableEntry(tableId, data, report) : null;
 
   const handlePdf = async () => {
     if (!report || !query) return;

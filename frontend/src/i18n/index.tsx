@@ -54,7 +54,11 @@ const LocaleContext = createContext<LocaleState>({
 
 // Owns the UI language; resolution account → device → browser → DEFAULT_LOCALE (FR-002).
 // <html lang> follows it (FR-011). A device choice is saved once to an account whose locale is still null (US1 AC3).
-export function LocaleProvider({ children }: { children: ReactNode }) {
+export function LocaleProvider({ children, force = null }: {
+  children: ReactNode;
+  /** Feature 065: a widget may pin the language; `null` follows the visitor as usual. */
+  force?: Locale | null;
+}) {
   const { user, setUser } = useAuth();
   const toast = useToast();
   const { default_locale } = useBranding();
@@ -62,7 +66,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const latestSave = useRef(0);
   const syncedUserId = useRef<number | null>(null);
-  const locale = resolveLocale({
+  const locale = force ?? resolveLocale({
     account: preference,
     languages: browserLanguages(),
     defaultLocale: default_locale,

@@ -29,6 +29,7 @@ from app.api import (
     telegram,
     themes,
     tokens,
+    widgets,
     workspace,
 )
 from app.config import get_settings
@@ -93,7 +94,8 @@ def create_app() -> FastAPI:
                 return JSONResponse(errors.error_body("csrf_failed", M("security.csrf_failed")),
                                     status_code=403)
         response = await call_next(request)
-        if request.url.path.startswith(shared.router.prefix + "/"):
+        if (request.url.path.startswith(shared.router.prefix + "/")
+                or request.url.path.startswith(widgets.router.prefix + "/")):
             for key, value in shared.PUBLIC_HEADERS.items():
                 response.headers[key] = value
         elif request.url.path.startswith("/api/"):
@@ -104,7 +106,7 @@ def create_app() -> FastAPI:
 
     for module in (health, auth, me, dashboards, admin, ai, sources, security, workspace,
                    reports, tokens, telegram, projects, shared, sharing, guide, oauth,
-                   appearance, themes, google_admin, mail_lists):
+                   appearance, themes, google_admin, mail_lists, widgets):
         app.include_router(module.router)
     if os.environ.get("BIZVIEW_TEST_HOOKS") == "1":   # e2e only (feature 007); never in images
         from app.api import testhooks

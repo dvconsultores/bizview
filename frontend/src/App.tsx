@@ -31,6 +31,8 @@ import { NotFound } from "./pages/NotFound";
 import { Profile } from "./pages/Profile";
 import { Help } from "./pages/Help";
 import { SharedDashboard } from "./pages/SharedDashboard";
+import { WidgetTestPage } from "./pages/WidgetTestPage";
+import { WidgetView } from "./pages/WidgetView";
 import { SignIn } from "./pages/SignIn";
 import { LocaleProvider } from "./i18n";
 import { ThemeProvider } from "./theme/ThemeContext";
@@ -56,6 +58,9 @@ export function App() {
                   <Route path="/ingresar" element={<SignIn />} />
                   {/* Feature 018: public, read-only shared dashboard (outside the authenticated shell). */}
                   <Route path="/s/:token" element={<SharedDashboard />} />
+                  {/* Feature 065: the document a widget frames. It never asks who the viewer is
+                      (AuthProvider skips /api/me here), so an admin sees the anonymous view. */}
+                  <Route path="/w/:token" element={<WidgetView />} />
                   <Route path="/cambiar-clave" element={<RequireAuth><ChangePassword /></RequireAuth>} />
                   <Route element={<RequireAuth><AppShell /></RequireAuth>}>
                     <Route index element={<Home />} />
@@ -64,6 +69,7 @@ export function App() {
                     <Route path="mis-listas" element={<Lists />} />
                     <Route path="admin/listas-de-correo" element={<RequireAdmin><Lists admin /></RequireAdmin>} />
                     <Route path="d/:code" element={<DashboardGate />} />
+                    <Route path="d/:code/widgets/:id/probar" element={<RequireAdmin><WidgetTestPage /></RequireAdmin>} />
                     <Route path="r/:id" element={<ReportView />} />
                     <Route path="perfil" element={<Profile />} />
                     <Route path="ayuda" element={<Help />} />

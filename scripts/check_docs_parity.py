@@ -37,7 +37,8 @@ ROOT_PAIRS = (
     ("DIAGNOSIS.md", "DIAGNOSIS.es.md"),
 )
 #: `docs/<name>.md` ↔ `docs/es/<name>.md`.
-DOCS_PAIRS = ("AUTHORING", "IMPORT", "REPORTS", "RENDERING", "INSTALL", "THEMES", "DESIGN-SYSTEM")
+DOCS_PAIRS = ("AUTHORING", "IMPORT", "REPORTS", "RENDERING", "INSTALL", "THEMES", "DESIGN-SYSTEM",
+              "WIDGETS")
 #: The starter pack: the two languages use their own file names, so the pairs are explicit.
 PACK_DIR = Path("pack/bizview-starter-pack")
 PACK_PAIRS = (

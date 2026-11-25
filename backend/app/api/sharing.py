@@ -1,5 +1,6 @@
 """Share links, email, and scheduled sends of a dashboard (feature 018)."""
 
+from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -11,14 +12,17 @@ from app.auth.deps import client_ip, current_user, require_admin
 from app.config import get_settings
 from app.db import DB
 from app.errors import validation
+from app.i18n import M
 from app.mail import lists as mail_lists
 from app.mail import sends, subscriptions
 from app.mail import settings as mail_settings
 from app.models import AppUser, EmailSend, EmailSubscription
 from app.services import dashboards
-from app.sharing import links
+from app.sharing import links, widgets
 
 router = APIRouter(prefix="/api/dashboards")
+WidgetTheme = Literal["light", "dark"]
+WidgetLanguage = Literal["es", "en"]
 
 Email = Annotated[str, Field(max_length=254)]
 SelectionValue = str | list[Annotated[str, Field(max_length=200)]]
@@ -29,6 +33,38 @@ class LinkIn(BaseModel):
     note: str | None = Field(default=None, max_length=links.NOTE_MAX)
     # Feature 030 (T047): the theme the shared view applies on its first load.
     theme: Literal["light", "dark"] | None = None
+
+
+class WidgetIn(BaseModel):
+    """Feature 065: one dashboard embedded in other sites (FR-001/009/024)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=widgets.NAME_MAX)
+    #: At most ten are kept; the bound here only stops an absurd body from being parsed.
+    sites: list[str] = Field(min_length=1, max_length=50)
+    theme: WidgetTheme | None = None
+    language: WidgetLanguage | None = None
+    show_title: bool = True
+    show_filters: bool = True
+    #: FR-024: the PDF is off unless the admin asks for it.
+    pdf: bool = False
+    #: FR-005: absent means it never expires.
+    expires_at: datetime | None = None
+
+
+class WidgetPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=widgets.NAME_MAX)
+    sites: list[str] | None = Field(default=None, min_length=1, max_length=50)
+    #: Explicit null follows the visitor; an absent key leaves the value alone.
+    theme: WidgetTheme | None = None
+    language: WidgetLanguage | None = None
+    show_title: bool | None = None
+    show_filters: bool | None = None
+    pdf: bool | None = None
+    expires_at: datetime | None = None
 
 
 class EmailIn(BaseModel):
@@ -365,3 +401,131 @@ def delete_subscription(
         ip=client_ip(request),
     )
     return Response(status_code=204)
+
+
+# ------------------------------------------------------------------ widgets (feature 065)
+
+
+def _widget_json(db: Session, widget) -> dict:
+    sites = widgets.site_map(db, [widget.id]).get(widget.id, [])
+    creator = db.scalar(select(AppUser.full_name).where(AppUser.id == widget.created_by))
+    return widgets.to_json(widget, creator, sites)
+
+
+def _snippet_body(request: Request, widget, raw: str) -> dict:
+    """The one time the key leaves the product: at creation and at replacement (FR-002)."""
+    base = links.public_base(request, get_settings())
+    return {
+        "key": raw,
+        "url": widgets.widget_url(base, raw),
+        "snippet": widgets.snippet(base, raw, widget),
+    }
+
+
+@router.get("/{code}/widgets")
+def list_widgets(
+    code: str,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    return {
+        "items": widgets.list_for(db, dash),
+        "enabled": widgets.widgets_enabled(),
+        "embed_enabled": get_settings().embed_widgets_enabled,
+        "share_links_enabled": links.sharing_enabled(),
+        "shareable": widgets.shareable(db, dash),
+        "max_active": widgets.MAX_ACTIVE,
+        "active_count": widgets.counted_active(db, dash),
+        "max_sites": widgets.MAX_SITES,
+        "name_max": widgets.NAME_MAX,
+    }
+
+
+@router.post("/{code}/widgets", status_code=201)
+def create_widget(
+    code: str,
+    body: WidgetIn,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    widget, raw = widgets.create(
+        db,
+        user,
+        dash,
+        name=body.name,
+        sites=body.sites,
+        theme=body.theme,
+        language=body.language,
+        show_title=body.show_title,
+        show_filters=body.show_filters,
+        pdf=body.pdf,
+        expires_at=body.expires_at,
+        ip=client_ip(request),
+    )
+    return {**_widget_json(db, widget), **_snippet_body(request, widget, raw)}
+
+
+@router.patch("/{code}/widgets/{widget_id}")
+def patch_widget(
+    code: str,
+    widget_id: int,
+    body: WidgetPatch,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    changes = body.model_dump(exclude_unset=True)
+    # These three drive NOT NULL columns. An explicit null is a client mistake, so it is answered
+    # like every other one in this module (422 naming the field), not by failing at the database.
+    for field in ("show_title", "show_filters", "pdf"):
+        if field in changes and changes[field] is None:
+            raise validation({field: "required"}, M("widget.control_required"))
+    widget = widgets.update(db, user, dash, widget_id, changes, ip=client_ip(request))
+    db.flush()
+    return _widget_json(db, widget)
+
+
+@router.post("/{code}/widgets/{widget_id}/replace")
+def replace_widget_key(
+    code: str,
+    widget_id: int,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    widget, raw = widgets.replace_key(db, user, dash, widget_id, ip=client_ip(request))
+    db.flush()
+    return {**_widget_json(db, widget), **_snippet_body(request, widget, raw)}
+
+
+@router.delete("/{code}/widgets/{widget_id}", status_code=204)
+def revoke_widget(
+    code: str,
+    widget_id: int,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    dash = dashboards.get_for_open(db, user, code)
+    widgets.revoke(db, user, dash, widget_id, ip=client_ip(request))
+    return Response(status_code=204)
+
+
+@router.post("/{code}/widgets/{widget_id}/frame")
+def widget_test_frame(
+    code: str,
+    widget_id: int,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    """The admin's test page (FR-018/019): a short-lived frame ticket, never the widget's key."""
+    dash = dashboards.get_for_open(db, user, code)
+    ticket, expires = widgets.preview(db, user, dash, widget_id)
+    base = links.public_base(request, get_settings())
+    return {"url": widgets.widget_url(base, ticket), "expires_at": expires}

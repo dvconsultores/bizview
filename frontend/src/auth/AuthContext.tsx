@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { api, ApiError, setUnauthenticatedHandler } from "../api/client";
 import type { LoginResult, User } from "../api/types";
@@ -17,6 +17,12 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** A widget's framed document never asks who the viewer is (feature 065, FR-010). The share-link
+ * page (018) keeps its own behaviour untouched. */
+export function isWidgetPage(path: string): boolean {
+  return path.startsWith("/w/");
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // The widget page must not read the session at all: it shows a signed-in admin exactly what an
+  // anonymous visitor sees (065 FR-010). No other page changes.
+  const initialPath = useRef(location.pathname);
   useEffect(() => {
+    if (isWidgetPage(initialPath.current)) {
+      setLoading(false);
+      return;
+    }
     refresh()
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
@@ -43,7 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthenticatedHandler(() => {
       setUser(null);
       // The public shared-dashboard page (/s/<token>, feature 018) never redirects to sign-in.
-      if (!location.pathname.startsWith("/ingresar") && !location.pathname.startsWith("/s/")) {
+      if (!location.pathname.startsWith("/ingresar") && !location.pathname.startsWith("/s/")
+          && !isWidgetPage(location.pathname)) {
         const next = location.pathname + location.search;
         navigate(`/ingresar?expirada=1&next=${encodeURIComponent(next)}`, { replace: true });
       }

@@ -329,6 +329,11 @@ AI_TIMEOUT_SECONDS=30
 # EMAIL_ALLOWED_DOMAINS=
 #   read-only dashboard links that expire after 1-90 days (Compartir)
 # SHARE_LINKS_ENABLED=false
+#   dashboards embedded in another website (feature 065); needs SHARE_LINKS_ENABLED,
+#   never expires unless the admin sets a date, 50 active widgets per dashboard
+# EMBED_WIDGETS_ENABLED=false
+#   requests one widget may make per minute, across all its visitors (feature 065)
+# WIDGET_RATE_LIMIT=300
 
 DOCS_ENABLED=false
 LOG_LEVEL=INFO

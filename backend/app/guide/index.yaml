@@ -331,6 +331,20 @@ topics:
       es: ["compartir", "enlace", "revocar", "vigencia", "vista compartida"]
       en: ["share", "link", "revoke", "expiry", "shared view"]
     related: [tableros, enviar-por-correo, envios-programados]
+  - id: insertar-un-widget
+    section: compartir
+    title: {es: "Insertar un tablero en una web", en: "Embed a dashboard in a website"}
+    summary:
+      es: "Cómo dar a un desarrollador un fragmento para mostrar un tablero dentro de otra página, sin cuenta, y cómo probarlo y revocarlo."
+      en: "How to give a developer a snippet that shows a dashboard inside another page, with no account, and how to test and revoke it."
+    roles: [admin, superuser]
+    routes: ["/d/:code", "/d/:code/widgets/:id/probar", "/w/:token"]
+    tiles: []
+    commands: []
+    aliases:
+      es: ["widget", "insertar", "incrustar", "iframe", "fragmento", "embed", "sitios permitidos"]
+      en: ["widget", "embed", "iframe", "snippet", "allowed sites", "integrate"]
+    related: [compartir-enlace, tableros, distribuciones]
   - id: enviar-por-correo
     section: compartir
     title: {es: "Enviar por correo", en: "Send by email"}

@@ -729,7 +729,45 @@ alcanzable desde donde abran el enlace.
 
 Los envíos programados usan la zona horaria de la instalación (`TIMEZONE`).
 
+### Insertar tableros en otras webs (opcional)
+
+Un widget muestra un tablero, en solo lectura, dentro de una página de un sitio que el administrador
+indica, para visitantes sin cuenta. Está apagado por defecto y necesita los enlaces compartidos,
+porque ambos son la misma puerta pública. El `.env` de la instalación ya trae estas variables
+comentadas:
+
+   ```
+   EMBED_WIDGETS_ENABLED=true
+   WIDGET_RATE_LIMIT=300
+   ```
+
+El borde decide el enmarcado por widget, nunca de forma global. Todas las rutas responden
+`X-Frame-Options: DENY` y `frame-ancestors 'none'`; solo `/w/*` pregunta al backend —el único lugar
+que sabe a qué widget pertenece una clave— por la política construida con la lista de sitios de ese
+widget, y copia esa respuesta. En `deploy/caddy/Caddyfile` no se edita nada por cliente, y una clave
+que dejó de valer responde `frame-ancestors 'none'`. Si pones otro proxy inverso delante de Caddy,
+deja esas cabeceras intactas.
+
+Un widget no usa nunca la sesión de quien mira: su API no toma cookies y su página nunca pregunta
+quién eres, así que un administrador con sesión abierta ve exactamente lo que un visitante sin cuenta.
+No lo indexan los buscadores ni lo guardan las cachés, y no ofrece ninguna ruta al resto del producto;
+las páginas legales de la instalación siguen accesibles.
+
+`WIDGET_RATE_LIMIT` es el techo de peticiones por minuto de un widget, sumando todos sus visitantes;
+se cuenta en la base de datos entre workers, y quien lo supera ve «inténtalo de nuevo en un momento»
+sin que la página anfitriona se vea afectada. La lista de sitios evita que otros sitios enmarquen el
+widget en un navegador; no evita que quien copia la clave pida los datos por otro medio, y por eso
+existen el techo, el reemplazo del fragmento y la revocación. Cualquiera que pueda ver la página
+anfitriona ve todo el tablero: díselo al cliente antes de activarlo.
+
+Los widgets no vencen salvo que el administrador ponga una fecha, y un tablero admite hasta 50
+activos, contados aparte de sus 20 enlaces compartidos. Las tablas llegan con la versión y nada
+cambia hasta que se define `EMBED_WIDGETS_ENABLED`.
+
+La guía para el desarrollador es `docs/WIDGETS.md`.
+
 ## 8. Actualizar
+
 
 ```bash
 cd /opt/bizview

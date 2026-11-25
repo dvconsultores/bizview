@@ -702,7 +702,44 @@ emails. Recipients outside the network need the site to be reachable from where 
 
 Scheduled sends use the installation time zone (`TIMEZONE`).
 
+### Embedding dashboards in other websites (optional)
+
+A widget shows one dashboard, read-only, inside a page of a site the administrator lists, for visitors
+with no account. It is off by default and needs shared links, because both are the same public door.
+The installation `.env` already has these variables commented out:
+
+   ```
+   EMBED_WIDGETS_ENABLED=true
+   WIDGET_RATE_LIMIT=300
+   ```
+
+The edge decides framing per widget, never globally. Every route answers `X-Frame-Options: DENY` and
+`frame-ancestors 'none'`; only `/w/*` asks the backend — the only place that knows which widget a key
+belongs to — for the policy built from that widget's own list of sites, and copies that answer. Nothing
+in `deploy/caddy/Caddyfile` is edited per customer, and a key that no longer works answers
+`frame-ancestors 'none'`. If you put another reverse proxy in front of Caddy, keep those headers
+untouched.
+
+A widget never uses the viewer's session: its API takes no cookie and its page never asks who the
+viewer is, so a signed-in administrator sees exactly what an anonymous visitor sees. It is never
+indexed and never cached, and it offers no route into the rest of the product; the installation's
+legal pages stay reachable.
+
+`WIDGET_RATE_LIMIT` is the ceiling one widget may request per minute across all its visitors, counted
+in the database across workers; a visitor past it is told to try again in a moment and the host page
+is unaffected. The allowed-site list stops other sites from framing the widget in a browser; it does
+not stop a person who copies the key from requesting the data by other means, which is why the
+ceiling, the snippet replacement and revocation exist. Anyone who can see the host page can see the
+whole dashboard: say so to the customer before enabling it.
+
+Widgets do not expire unless the administrator sets a date, and a dashboard holds up to 50 active
+ones, counted apart from its 20 share links. The tables arrive with the version and nothing changes
+until `EMBED_WIDGETS_ENABLED` is set.
+
+The developer-facing guide is `docs/WIDGETS.md`.
+
 ## 8. Upgrade
+
 
 ```bash
 cd /opt/bizview
