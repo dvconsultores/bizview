@@ -64,6 +64,11 @@ de peticiones por widget (`WIDGET_RATE_LIMIT`, 300 por minuto por defecto), un r
 fragmento anterior al instante, una revocación que no se puede deshacer y una entrada de auditoría por
 cada acción.
 
+Un widget también se puede **eliminar**, en cualquier estado y aunque la inserción esté desactivada
+en la instalación: sale de la lista del tablero, uno activo deja de funcionar en ese momento y la
+entrada de auditoría (nombre, sitios, estado y visitas, nunca la clave) es el único registro que
+queda. Revocar conserva el widget en la lista como historial; eliminar no.
+
 El widget no usa nunca la sesión de quien mira: un administrador con sesión abierta que abre la página
 anfitriona ve exactamente lo que ve un visitante anónimo. Cualquiera que pueda ver la página anfitriona
 puede ver todo el tablero —los filtros son una comodidad para el visitante, no una restricción—, así

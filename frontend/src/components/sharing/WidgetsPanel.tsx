@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
-import { Ban, ExternalLink, Link2, Pencil, RefreshCw, RotateCw, X } from "lucide-react";
+import { Ban, ExternalLink, Link2, Pencil, RefreshCw, RotateCw, Trash2, X } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import type { CreatedWidget, DashboardWidget, WidgetsState } from "../../api/types";
 import { useT } from "../../i18n";
@@ -93,7 +93,9 @@ function Form({
   onSubmit,
   onCancel,
   error,
-  fieldError,
+  nameError,
+  sitesError,
+  onEdit,
 }: {
   initial: FormValues;
   maxSites: number;
@@ -103,7 +105,10 @@ function Form({
   onSubmit: (values: FormValues) => void;
   onCancel?: () => void;
   error?: string | null;
-  fieldError?: string | null;
+  nameError?: string | null;
+  sitesError?: string | null;
+  /** A field was edited: the panel drops that field's message until the next submit. */
+  onEdit?: (field: "name" | "sites") => void;
 }) {
   const t = useT();
   const [values, setValues] = useState<FormValues>(initial);
@@ -116,15 +121,20 @@ function Form({
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    // `noValidate`: the required fields are marked (and refused) by the product, so the message is
+    // the product's own, at the field and in the interface's language, never the browser's bubble.
+    <form onSubmit={submit} noValidate className="space-y-4">
       <Input
         label={t.widgets.nameLabel}
         hint={t.widgets.nameHint}
         maxLength={nameMax}
         required
         value={values.name}
-        onChange={(event) => set("name", event.target.value)}
-        error={fieldError}
+        onChange={(event) => {
+          set("name", event.target.value);
+          onEdit?.("name");
+        }}
+        error={nameError}
       />
       <div>
         <label htmlFor="widget-sites" className="mb-1.5 block text-sm font-semibold text-ink-2">
@@ -134,12 +144,28 @@ function Form({
         <textarea
           id="widget-sites"
           rows={3}
+          required
+          aria-required="true"
+          aria-invalid={sitesError ? true : undefined}
+          aria-describedby={sitesError ? "widget-sites-error" : "widget-sites-hint"}
           value={values.sites}
-          onChange={(event) => set("sites", event.target.value)}
-          placeholder={t.widgets.sitesPlaceholder}
-          className="block w-full rounded-xl border border-transparent bg-field px-4 py-3 font-mono text-sm text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-field-focus"
+          onChange={(event) => {
+            set("sites", event.target.value);
+            onEdit?.("sites");
+          }}
+          className={`block w-full rounded-xl border bg-field px-4 py-3 font-mono text-sm text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-field-focus ${
+            sitesError ? "border-danger" : "border-transparent"
+          }`}
         />
-        <p className="mt-1.5 text-sm text-ink-soft">{t.widgets.sitesHint(maxSites)}</p>
+        {sitesError ? (
+          <p id="widget-sites-error" role="alert" className="mt-1.5 text-sm text-danger">
+            {sitesError}
+          </p>
+        ) : (
+          <p id="widget-sites-hint" className="mt-1.5 text-sm text-ink-soft">
+            {t.widgets.sitesHint(maxSites)}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -248,7 +274,9 @@ export function WidgetsPanel({ code }: { code: string }) {
   const [createdReplacement, setCreatedReplacement] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [sitesError, setSitesError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<number | null>(null);
   const [confirmReplace, setConfirmReplace] = useState<number | null>(null);
@@ -280,10 +308,37 @@ export function WidgetsPanel({ code }: { code: string }) {
     return null;
   }, [state, t]);
 
+  const sitesOf = (raw: string) =>
+    raw.split(/\r?\n/).map((site) => site.trim()).filter(Boolean);
+
+  /**
+   * The words for a field the request model rejected.
+   *
+   * The model answers with a code (`missing`, `too_short`, `too_long`, …) and the generic
+   * "check the data you entered"; a service rule answers with its own message in both languages.
+   * Either way the admin reads a sentence at the field, never only the generic one (FR-027).
+   */
+  const fieldMessage = (e: ApiError, field: "name" | "sites", code: string): string => {
+    if ((e.details as { key?: unknown }).key !== "common.validation") return e.message;
+    const maxName = state?.name_max ?? 80;
+    const maxSites = state?.max_sites ?? 10;
+    if (code === "missing" || code.endsWith("too_short")) {
+      return field === "name" ? t.widgets.nameRequired : t.widgets.sitesRequired;
+    }
+    if (code.endsWith("too_long")) {
+      return field === "name" ? t.widgets.nameTooLong(maxName) : t.widgets.sitesTooMany(maxSites);
+    }
+    return field === "name" ? t.widgets.nameInvalid : t.widgets.sitesInvalid;
+  };
+
   const failure = (e: unknown) => {
     if (e instanceof ApiError) {
       if (e.status === 422 && e.fields.name) {
-        setFieldError(e.message);
+        setNameError(fieldMessage(e, "name", e.fields.name));
+        return;
+      }
+      if (e.status === 422 && e.fields.sites) {
+        setSitesError(fieldMessage(e, "sites", e.fields.sites));
         return;
       }
       if (e.status === 422 || e.status === 409) {
@@ -294,9 +349,33 @@ export function WidgetsPanel({ code }: { code: string }) {
     setError(errorText(e));
   };
 
-  const create = async (values: FormValues) => {
+  /**
+   * Both fields are required: mark the problem at the field and do not send a request that the
+   * product would refuse (FR-027). The same check guards the edit form.
+   */
+  const check = (values: FormValues): boolean => {
     setError(null);
-    setFieldError(null);
+    const name = values.name.trim();
+    const sites = sitesOf(values.sites);
+    const maxName = state?.name_max ?? 80;
+    const maxSites = state?.max_sites ?? 10;
+    const nameProblem = !name
+      ? t.widgets.nameRequired
+      : name.length > maxName
+        ? t.widgets.nameTooLong(maxName)
+        : null;
+    const sitesProblem = sites.length === 0
+      ? t.widgets.sitesRequired
+      : sites.length > maxSites
+        ? t.widgets.sitesTooMany(maxSites)
+        : null;
+    setNameError(nameProblem);
+    setSitesError(sitesProblem);
+    return !nameProblem && !sitesProblem;
+  };
+
+  const create = async (values: FormValues) => {
+    if (!check(values)) return;
     setBusy(true);
     try {
       const widget = await api.post<CreatedWidget>(url, {
@@ -322,8 +401,7 @@ export function WidgetsPanel({ code }: { code: string }) {
   };
 
   const save = async (id: number, values: FormValues) => {
-    setError(null);
-    setFieldError(null);
+    if (!check(values)) return;
     setBusy(true);
     try {
       await api.patch(url + `/${id}`, {
@@ -370,6 +448,23 @@ export function WidgetsPanel({ code }: { code: string }) {
       toast(t.widgets.revokedToast);
       setConfirmRevoke(null);
       setEditing(null);
+      await load();
+    } catch (e) {
+      failure(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.del(url + `/${id}/permanent`);
+      toast(t.widgets.deletedToast);
+      setConfirmDelete(null);
+      setEditing(null);
+      if (created?.id === id) setCreated(null);
       await load();
     } catch (e) {
       failure(e);
@@ -448,7 +543,9 @@ export function WidgetsPanel({ code }: { code: string }) {
             submitLabel={t.widgets.create}
             onSubmit={(values) => void create(values)}
             error={error}
-            fieldError={fieldError}
+            nameError={nameError}
+            sitesError={sitesError}
+            onEdit={(field) => (field === "name" ? setNameError(null) : setSitesError(null))}
           />
         </Card>
       ) : null}
@@ -497,7 +594,8 @@ export function WidgetsPanel({ code }: { code: string }) {
                             onClick={() => {
                               setEditing(widget.id);
                               setError(null);
-                              setFieldError(null);
+                              setNameError(null);
+                              setSitesError(null);
                             }}
                           >
                             {t.widgets.edit}
@@ -542,6 +640,31 @@ export function WidgetsPanel({ code }: { code: string }) {
                           )}
                         </>
                       ) : null}
+                      {/* Any state: an active widget stops working, a revoked or expired one just
+                          leaves the list. */}
+                      {editing !== widget.id ? (
+                        confirmDelete === widget.id ? (
+                          <>
+                            <Button variant="danger" loading={busy}
+                                    onClick={() => void remove(widget.id)}>
+                              {widget.active
+                                ? t.widgets.confirmDeleteActive
+                                : t.widgets.confirmDelete}
+                            </Button>
+                            <Button variant="secondary" onClick={() => setConfirmDelete(null)}>
+                              {t.common.cancel}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            icon={<Trash2 className="h-5 w-5" aria-hidden />}
+                            onClick={() => setConfirmDelete(widget.id)}
+                          >
+                            {t.widgets.delete}
+                          </Button>
+                        )
+                      ) : null}
                     </div>
                   </div>
                   {editing === widget.id ? (
@@ -555,7 +678,10 @@ export function WidgetsPanel({ code }: { code: string }) {
                         onSubmit={(values) => void save(widget.id, values)}
                         onCancel={() => setEditing(null)}
                         error={error}
-                        fieldError={fieldError}
+                        nameError={nameError}
+                        sitesError={sitesError}
+                        onEdit={(field) =>
+                          field === "name" ? setNameError(null) : setSitesError(null)}
                       />
                     </div>
                   ) : null}

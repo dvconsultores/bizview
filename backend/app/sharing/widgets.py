@@ -484,6 +484,38 @@ def revoke(
     return widget
 
 
+def delete(
+    db: Session, user: AppUser, dash: Dashboard, widget_id: int, *, ip: str | None
+) -> None:
+    """Remove a widget for good, in any state: its key stops working and it leaves the list.
+
+    Unlike revocation it keeps no row, so the audit entry is the only record: it carries the name,
+    the sites, the state it was in and its usage figures (never the key). Like revocation it does
+    not need the feature to be enabled, so an installation that switched it off can still clean up.
+    """
+    if user.role != "admin":
+        raise forbidden()
+    widget = get(db, dash, widget_id)
+    audit.record(
+        db,
+        "widget_deleted",
+        actor_id=user.id,
+        ip=ip,
+        detail={
+            "widget": widget.id,
+            "dashboard": dash.code,
+            "name": widget.name,
+            "sites": list(site_origins(db, widget.id)),
+            "state": state(widget),
+            "visits": widget.visits,
+        },
+    )
+    # The ORM delete keeps the session consistent (the object leaves the identity map) and the
+    # allowed sites go with it: `dashboard_widget_site.widget_id` is ON DELETE CASCADE.
+    db.delete(widget)
+    db.flush()
+
+
 # --------------------------------------------------------------------- the preview (test page)
 
 def _secret() -> bytes | None:

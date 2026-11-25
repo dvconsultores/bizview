@@ -28,7 +28,11 @@ APP_TABLES = {"alembic_version", "app_user", "audit_event", "dashboard", "dashbo
               "google_link", "ai_status", "appearance_settings", "image_cache",
               "theme", "direct_snapshot", "project_limits", "source_sample_request",
               "source_structure_flag", "google_settings", "google_rule",
-              "project_revision"}          # 055: a project's own numbered revisions
+              "project_revision",          # 055: a project's own numbered revisions
+              # 058 and 065 added tables; this census was not extended with them, so the two
+              # "exactly these tables" tests failed from 058 on. The list is the expectation, not a
+              # filter: every table the product creates belongs here.
+              "mail_list", "mail_list_member", "dashboard_widget", "dashboard_widget_site"}
 
 
 def schema_tables():

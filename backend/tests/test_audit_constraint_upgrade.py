@@ -113,6 +113,64 @@ def test_a_database_with_history_upgrades_and_keeps_every_row():
         _leave_at_head()
 
 
+def test_a_database_at_0059_grows_the_deletion_kind_and_keeps_its_history():
+    """`0060` only grows the audit CHECK, as `0056` taught.
+
+    Runs on the state a deployed installation is in: migrated by `0059`, with history behind it —
+    including a kind a rolled-back build wrote, which no list in the code knows. The upgrade must
+    accept `widget_deleted`, keep every row and keep every literal the constraint already had; a
+    second upgrade changes nothing, and the downgrade does not narrow anything either.
+    """
+    unknown = "kind_from_a_rolled_back_build_0060"
+    try:
+        _reset_and_build("0059_dashboard_widgets")
+        # Add the history kind to the live constraint (only a database can know it), then seed.
+        accepted = sorted(_kinds_in(_constraint()))
+        literals = ", ".join(repr(kind) for kind in [*accepted, unknown])
+        with get_engine().begin() as c:
+            c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+            c.execute(text(f"ALTER TABLE audit_event DROP CONSTRAINT {AUDIT_CHECK}"))
+            c.execute(text(f"ALTER TABLE audit_event ADD CONSTRAINT {AUDIT_CHECK} "
+                           f"CHECK (kind IN ({literals}))"))
+        before_definition = _constraint()
+        _seed({"login_ok": 2, "widget_created": 1, unknown: 1})
+        before = _rows()
+        assert len(before) == 4
+
+        # As `0059` shipped: the new kind does not exist yet.
+        with pytest.raises(IntegrityError):
+            with get_engine().begin() as c:
+                c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+                c.execute(text("INSERT INTO audit_event (kind) VALUES ('widget_deleted')"))
+
+        command.upgrade(alembic_cfg(), "head")
+
+        assert _rows() == before, "the migration changed or lost audit rows"
+        after = _kinds_in(_constraint())
+        assert "widget_deleted" in after, "0060 did not add its kind"
+        assert _kinds_in(before_definition) <= after, "the upgrade narrowed what is accepted"
+        assert unknown in after, "a kind only this database knew was dropped"
+
+        # It accepts the deletion kind now, and still refuses a kind nobody knows.
+        with get_engine().begin() as c:
+            c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+            c.execute(text("INSERT INTO audit_event (kind) VALUES ('widget_deleted')"))
+        with pytest.raises(IntegrityError):
+            with get_engine().begin() as c:
+                c.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}"'))
+                c.execute(text("INSERT INTO audit_event (kind) VALUES ('kind_from_the_future')"))
+        assert len(_rows()) == 5
+
+        # Re-running the upgrade changes nothing; the downgrade keeps rows and the wider CHECK.
+        command.upgrade(alembic_cfg(), "head")
+        assert len(_rows()) == 5
+        command.downgrade(alembic_cfg(), "0059_dashboard_widgets")
+        assert len(_rows()) == 5
+        assert "widget_deleted" in _kinds_in(_constraint())
+    finally:
+        _leave_at_head()
+
+
 def test_the_removed_tables_are_gone_and_the_audit_rows_are_not():
     try:
         _reset_and_build("0040_auto_run_stages")

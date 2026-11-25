@@ -41,6 +41,10 @@ the same numbers as the signed-in view, the second shows nothing.
 5. **Given** an installation with embedding disabled, or a project whose sharing policy forbids
    sharing, **When** an admin opens the sharing screen, **Then** the option to create a widget is
    absent or refused with the reason.
+6. **Given** the creation form, **When** the admin leaves the name or the allowed sites empty,
+   **Then** both fields are marked as required, the form does not send the request, and the message
+   appears at the empty field saying what is missing; a field the product rejects is reported the
+   same way, never only as "check the data you entered".
 
 ---
 
@@ -98,8 +102,11 @@ other keeps working.
    working, the new one works, and the allowed sites, name and usage history are kept.
 4. **Given** a widget, **When** the admin removes a site from its list, **Then** that site stops
    showing the dashboard while the others continue.
-5. **Given** any creation, edit, replacement or revocation, **When** it happens, **Then** it is
-   recorded in the audit log with the actor and the widget.
+5. **Given** any creation, edit, replacement, revocation or deletion, **When** it happens,
+   **Then** it is recorded in the audit log with the actor and the widget.
+6. **Given** a widget in any state, **When** the admin deletes it after confirming, **Then** it
+   leaves the list for ever; an active one stops serving at that moment, and the audit entry keeps
+   what it was (name, dashboard, sites, state and visits) without its key.
 
 ---
 
@@ -152,6 +159,12 @@ scrollbar at 375 px and at 1280 px.
   it as expired.
 - A dashboard reaches the maximum number of active widgets: creation is refused with the limit in
   the message; revoked and expired widgets do not count.
+- A host page still holds the snippet of a widget that was deleted: it shows the same neutral
+  message as a revoked one, and deleting again finds nothing.
+- An admin deletes a revoked or expired widget: it leaves the list; revocation is the state that
+  keeps a widget as history, deletion is the one that removes it.
+- The name or the allowed sites are submitted empty: the form refuses before sending and marks the
+  field, so the request never reaches the product.
 
 ## Requirements *(mandatory)*
 
@@ -194,8 +207,9 @@ scrollbar at 375 px and at 1280 px.
 - **FR-015**: the product MUST limit how many requests one widget may make per minute across all
   visitors, in addition to today's per-address limits, and MUST tell the visitor to retry when the
   ceiling is reached; the ceiling is set per installation.
-- **FR-016**: creating, editing, replacing and revoking a widget MUST be recorded in the audit log
-  with the actor, the widget, the dashboard and the allowed sites.
+- **FR-016**: creating, editing, replacing, revoking and deleting a widget MUST be recorded in the
+  audit log with the actor, the widget, the dashboard and the allowed sites; a deletion MUST keep,
+  in that entry, enough to know what was removed (see FR-028).
 - **FR-017**: messages exchanged between the widget and its host page (for sizing) MUST carry no
   dashboard data, and each side MUST ignore messages from anywhere but the other.
 
@@ -214,7 +228,8 @@ scrollbar at 375 px and at 1280 px.
 - **FR-021**: the sharing screen MUST list a dashboard's widgets with name, allowed sites, creator,
   creation date, expiry, state (active, revoked, expired), last view and view count.
 - **FR-022**: an admin MUST be able to rename a widget, edit its allowed sites and appearance
-  options, replace its snippet and revoke it; a revoked widget cannot be restored.
+  options, replace its snippet, revoke it and delete it; a revoked widget cannot be restored, and a
+  deleted widget leaves the dashboard's list for ever (FR-028).
 
 **Appearance**
 
@@ -227,13 +242,40 @@ scrollbar at 375 px and at 1280 px.
 - **FR-025**: the widget MUST fill the width its host gives it, MUST grow to the height of its
   content so the host shows no inner scrollbar, and MUST stay readable at 375 px.
 - **FR-026**: the admin help (ES/EN), the operator's installation guide and the CHANGELOG MUST
-  document enabling the feature, creating and testing a widget, and the warning of FR-012.
+  document enabling the feature, creating and testing a widget, deleting one, the warning of FR-012
+  and the required fields of FR-027.
+
+**Required fields**
+
+- **FR-027**: the name and the list of allowed sites MUST be required, and the form MUST show that
+  before the admin submits. An empty required field MUST stop the form from sending the request and
+  MUST be reported at that field, in the interface language, with a message that says what is
+  missing. A field the product rejects MUST be reported the same way — at the field, in words —
+  whether the error comes from the request model or from the rule that validates the value; the
+  generic "check the data you entered" MUST NOT be the only thing the admin sees for a missing name
+  or a missing site. The edit form of an existing widget MUST follow the same rules, and an example
+  shown inside a field MUST NOT be mistakable for content the admin entered.
+
+**Deleting**
+
+- **FR-028**: an admin MUST be able to delete a widget in any state (active, revoked or expired),
+  after a confirmation that states plainly, for an active widget, that it will stop working on the
+  sites that embed it. Deleting an active widget MUST stop it serving at once, like revocation, and
+  MUST remove it and its allowed sites from the product. Deletion MUST work while embedding is
+  switched off, like revocation. It MUST be recorded in the audit log with the widget, the
+  dashboard, the name, the allowed sites, the state it had and its visit count, and never its key.
+  A widget of one dashboard MUST NOT be deleted through another, a non-administrator MUST NOT delete
+  at all, and the administrator-network restriction MUST cover the action. The count of active
+  widgets and the per-dashboard limit MUST stay correct afterwards. Revocation MUST keep its current
+  meaning and its current route.
 
 ### Key Entities
 
 - **Widget**: a standing permission to show one dashboard inside other sites. It has a name, the
   dashboard, a secret key (never stored readable), its allowed sites, appearance options, an
-  optional expiry, who created it and when, whether and when it was revoked, and usage figures.
+  optional expiry, who created it and when, whether and when it was revoked, and usage figures. A
+  revoked widget stays in the list as history; a deleted one is removed with its sites, and only
+  its audit entry remains.
 - **Allowed site**: one site address a widget may be shown in; may be flagged as a development
   address.
 - **Snippet**: the text a developer pastes into a page; it carries the widget's key and nothing

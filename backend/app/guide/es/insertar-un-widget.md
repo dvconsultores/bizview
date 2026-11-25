@@ -17,6 +17,8 @@ Lo crea un **Administrador** o el **Superusuario**, cuando la instalación tiene
 2. Escribe un **Nombre del widget**: es para reconocerlo en la lista.
 3. En **Sitios permitidos** escribe uno por línea, con su esquema: `https://www.cliente.com`. Sin
    rutas, sin parámetros y sin comodines. Un widget admite hasta diez.
+   El nombre y los sitios son obligatorios: si falta uno, el aviso aparece en ese mismo campo y el
+   formulario no envía nada hasta que lo completes.
 4. Opcional: el tema, el idioma, si se ven el título, los filtros y el PDF, y una fecha de
    vencimiento. El PDF está apagado por defecto.
 5. Pulsa **Crear widget** y copia el fragmento: no se vuelve a mostrar y no se guarda en el navegador.
@@ -36,6 +38,9 @@ Lo crea un **Administrador** o el **Superusuario**, cuando la instalación tiene
   los sitios y las visitas se conservan.
 - **Revocar** apaga el widget para siempre; una página que lo tenga muestra un mensaje neutro. Cada
   tablero admite 50 widgets activos, contados aparte de los enlaces compartidos.
+- **Eliminar** quita el widget de la lista, esté activo, revocado o vencido, y también cuando la
+  inserción está desactivada en la instalación (así se puede limpiar). Si estaba activo deja de
+  funcionar en ese momento. No se puede deshacer y solo queda su entrada en la auditoría.
 - Un sitio que empiece por `http://localhost` o por una dirección privada se marca como **Desarrollo**
   para que no se olvide en la lista.
 - Un icono de candado o la ausencia del tablero en la página del cliente casi siempre significa que el

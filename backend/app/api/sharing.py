@@ -516,6 +516,20 @@ def revoke_widget(
     return Response(status_code=204)
 
 
+@router.delete("/{code}/widgets/{widget_id}/permanent", status_code=204)
+def delete_widget(
+    code: str,
+    widget_id: int,
+    request: Request,
+    user: AppUser = Depends(require_admin),
+    db: Session = DB,
+):
+    """Delete a widget for good, in any state: it stops working and leaves the list."""
+    dash = dashboards.get_for_open(db, user, code)
+    widgets.delete(db, user, dash, widget_id, ip=client_ip(request))
+    return Response(status_code=204)
+
+
 @router.post("/{code}/widgets/{widget_id}/frame")
 def widget_test_frame(
     code: str,

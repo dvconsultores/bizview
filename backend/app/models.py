@@ -85,6 +85,7 @@ AUDIT_KINDS = (
     "google_rule_deleted", "google_user_provisioned", "google_rule_applied",
     # feature 065 — widgets embedded in other sites
     "widget_created", "widget_updated", "widget_key_replaced", "widget_revoked",
+    "widget_deleted",
 )
 #: Audit kinds a database may already contain that the product no longer emits (feature 045
 #: removed the in-app authoring agent). They exist so historical rows stay readable and so the

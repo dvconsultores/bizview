@@ -23,6 +23,7 @@ Feature 018's own suite (`test_sharing_links.py`) runs unchanged, which is the p
 import hashlib
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -57,6 +58,23 @@ def embed(monkeypatch):
     monkeypatch.setattr(get_settings(), "embed_widgets_enabled", True)
     set_mail(share_links_enabled=True)
     return True
+
+
+def freeze_clock(monkeypatch, module, moment: datetime | None = None) -> None:
+    """Pin "now" for a module that counts within a minute.
+
+    Both ceilings (per address and per widget) use whole-minute windows: a request that lands just
+    after the minute rolls starts the count again, which made these tests fail at random once every
+    few hundred runs. Freezing the clock tests the rule instead of the wall clock.
+    """
+    fixed = moment or datetime(2026, 11, 24, 12, 0, 5, tzinfo=UTC)
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed
+
+    monkeypatch.setattr(module, "datetime", Frozen)
 
 
 def new_widget(c, *, name="Ventas cliente", sites=(SITE,), **extra) -> dict:
@@ -767,6 +785,7 @@ def test_widget_theme_language_and_title(applied, embed):
 # -------------------------------------------------------------------------------- the ceiling
 
 def test_per_widget_ceiling_answers_retry(applied, embed, monkeypatch):
+    freeze_clock(monkeypatch, widgets)
     first = new_widget(applied, name="Uno")
     second = new_widget(applied, name="Dos")
     monkeypatch.setattr(get_settings(), "widget_rate_limit", 3)
@@ -801,6 +820,7 @@ def test_per_widget_ceiling_answers_retry(applied, embed, monkeypatch):
 def test_address_limits_still_apply(applied, embed, monkeypatch):
     from app.security import throttle
 
+    freeze_clock(monkeypatch, throttle)
     new_widget(applied)
     monkeypatch.setattr(throttle, "PUBLIC_LIMIT_PER_MINUTE", 2)
     monkeypatch.setattr(throttle, "_public_hits", {})
@@ -917,3 +937,96 @@ def test_admin_networks_cover_widgets(applied, embed, monkeypatch):
                                                 "password": PASSWORD}).status_code == 200
     assert inside.post("/api/dashboards/ventas/widgets",
                        json={"name": "x", "sites": [SITE]}).status_code == 201
+
+    # FR-028: deleting is a state change like the others, so the same restriction covers it.
+    widget = inside.post("/api/dashboards/ventas/widgets",
+                        json={"name": "Para borrar", "sites": [SITE]}).json()
+    delete = f"/api/dashboards/ventas/widgets/{widget['id']}/permanent"
+    r = outside.delete(delete)
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "address_not_allowed"
+    assert sql("SELECT count(*) FROM dashboard_widget WHERE id = :i", i=widget["id"])[0][0] == 1
+    assert inside.delete(delete).status_code == 204
+
+
+# ------------------------------------------------------------------------------------ deletion
+
+def test_delete_removes_the_widget_in_any_state_and_is_audited(applied, embed, user):
+    active = new_widget(applied, name="Activo", sites=[SITE, "https://blog.cliente.com"])
+    revoked = new_widget(applied, name="Revocado")
+    base = "/api/dashboards/ventas/widgets"
+    assert applied.delete(f"{base}/{revoked['id']}").status_code == 204   # revoke: stays listed
+    assert {w["id"] for w in applied.get(base).json()["items"]} == {active["id"], revoked["id"]}
+
+    pub = client()
+    assert pub.get(f"/api/widgets/{active['key']}").status_code == 200
+
+    # Only an admin deletes, and only through the widget's own dashboard.
+    assert signed_in(user.email).delete(
+        f"{base}/{active['id']}/permanent").status_code == 403
+    sql("INSERT INTO dashboard (code, name, description, icon, status) "
+        "VALUES ('otro', 'Otro', '', 'chart-line', 'available')")
+    assert applied.delete(
+        f"/api/dashboards/otro/widgets/{active['id']}/permanent").status_code == 404
+
+    # An active widget stops serving at once and leaves the list, sites included.
+    assert applied.delete(f"{base}/{active['id']}/permanent").status_code == 204
+    assert pub.get(f"/api/widgets/{active['key']}").status_code == 404
+    assert "'none'" in frame_ancestors(
+        pub.get(f"/api/widgets/frame/{active['key']}").headers["content-security-policy"])
+    assert sql("SELECT count(*) FROM dashboard_widget_site WHERE widget_id = :i",
+               i=active["id"])[0][0] == 0
+
+    # A revoked one is deleted the same way; a second delete finds nothing.
+    assert applied.delete(f"{base}/{revoked['id']}/permanent").status_code == 204
+    assert applied.delete(f"{base}/{revoked['id']}/permanent").status_code == 404
+    listed = applied.get(base).json()
+    assert listed["items"] == [] and listed["active_count"] == 0
+
+    # The audit entry is the only record left: what it was, never its key.
+    rows = sql("SELECT detail::text FROM audit_event WHERE kind = 'widget_deleted' ORDER BY id")
+    assert len(rows) == 2
+    assert '"Activo"' in rows[0][0] and "blog.cliente.com" in rows[0][0]
+    assert '"active"' in rows[0][0] and '"revoked"' in rows[1][0]
+    assert active["key"] not in rows[0][0] and revoked["key"] not in rows[1][0]
+
+
+def test_delete_works_with_the_feature_switched_off(applied, embed, monkeypatch):
+    widget = new_widget(applied)
+    monkeypatch.setattr(get_settings(), "embed_widgets_enabled", False)
+    url = f"/api/dashboards/ventas/widgets/{widget['id']}/permanent"
+    assert applied.delete(url).status_code == 204
+    assert sql("SELECT count(*) FROM dashboard_widget")[0][0] == 0
+
+
+def test_delete_an_expired_widget_and_keep_the_count_right(applied, embed, monkeypatch):
+    """FR-028: expired counts as "any state", and a deletion keeps the limit's arithmetic right."""
+    monkeypatch.setattr(widgets, "MAX_ACTIVE", 2)
+    base = "/api/dashboards/ventas/widgets"
+    first = new_widget(applied, name="Uno")
+    second = new_widget(applied, name="Dos")
+    third = applied.post(base, json={"name": "Tres", "sites": [SITE]})
+    assert third.status_code == 409
+    assert applied.get(base).json()["active_count"] == 2
+
+    # Deleting an expired widget does not change the count of active ones…
+    assert client().get(f"/api/widgets/{first['key']}").status_code == 200   # one visit
+    sql("UPDATE dashboard_widget SET created_at = now() - interval '2 days', "
+        "expires_at = now() - interval '1 second' WHERE id = :i", i=first["id"])
+    assert applied.get(base).json()["items"][-1]["state"] == "expired"
+    assert applied.delete(f"{base}/{first['id']}/permanent").status_code == 204
+    assert applied.get(base).json()["active_count"] == 1
+    # …and the freed slot is usable: the limit counts rows that exist.
+    assert applied.post(base, json={"name": "Tres", "sites": [SITE]}).status_code == 201
+    assert applied.get(base).json()["active_count"] == 2
+    assert applied.delete(f"{base}/{second['id']}/permanent").status_code == 204
+    assert applied.get(base).json()["active_count"] == 1
+
+    # The expired one's audit entry says so, with its name, sites, state and visits.
+    detail = sql("SELECT detail FROM audit_event WHERE kind = 'widget_deleted' "
+                 "AND detail->>'name' = 'Uno'")[0][0]
+    assert detail["dashboard"] == "ventas"
+    assert detail["sites"] == [SITE]
+    assert detail["state"] == "expired"
+    assert detail["visits"] == 1          # the document was fetched once, before the expiry
+    assert "key" not in detail and first["key"] not in str(detail)

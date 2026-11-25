@@ -432,3 +432,145 @@ and exit 1, no traceback; with a readable file it passes the check and proceeds 
 failed only on a deliberately bogus database address).
 
 No schema, API or behaviour changed: this is packaging only.
+
+---
+
+# Third pass — convergence (the owner's two changes)
+
+The owner used the deployed feature and asked for two things: the creation form must mark its
+required fields and say where something is missing, and an administrator must be able to delete a
+widget (today a revoked or expired one stays in the list for ever). This pass amended the spec, ran
+`speckit-converge` against the code, appended the remaining work as Phase 9 of `tasks.md`, and
+implemented it. The site-wide headers, feature 018, the session-free public routes and the
+per-widget framing decision are unchanged.
+
+## Spec amendments (made before converging)
+
+- **US1, acceptance scenario 6**: an empty name or sites field is marked, refused before sending,
+  and the message is at the field; a rejected field is never reported only as "check the data".
+- **US3, acceptance scenario 5** now includes deletion in the audited actions, and **scenario 6**
+  adds deletion in any state after a confirmation, with the audit entry keeping what it was.
+- **New FR-027 (required fields)**: both fields required and marked before submitting; an empty one
+  stops the request and is reported at the field, in the interface language; a value the product
+  rejects is reported the same way whether the request model or the service caught it; the generic
+  "check the data you entered" must not be the only thing shown; the edit form follows the same
+  rules; an example inside a field must not be mistakable for content.
+- **New FR-028 (deleting)**: deletion in any state after a confirmation that says plainly, for an
+  active widget, that it will stop working on the sites that embed it; it stops serving at once and
+  removes the widget and its sites; it works with embedding off; the audit entry keeps widget,
+  dashboard, name, sites, state and visits and never the key; scoped to its dashboard, admins only,
+  covered by the administrator-network restriction; active count and the limit stay correct;
+  revocation keeps its meaning and its route.
+- **Edge cases** gained the deleted-while-embedded case, the revoked-vs-deleted distinction and the
+  empty-required-field refusal; **FR-016** lists deletion; **FR-022** mentions deleting; **FR-026**
+  includes deleting and the required fields; **Key Entities** says a revoked widget stays as history
+  and a deleted one is removed with its sites.
+
+## Convergence findings (appended as `## Phase 9: Convergence`, T035–T044)
+
+| Finding | Requirement | State found | Severity |
+|---|---|---|---|
+| F1 the form validated after the browser had already blocked the submit, so the product's messages never showed; only `missing`/`too_short` model codes got words; errors did not clear | FR-027 | partial (draft) | HIGH |
+| F2 the sites placeholder still read like entered content | FR-027 | partial (draft) | HIGH |
+| F3 deletion existed but had never passed a test: any-state, cascade, count/limit, audit content and key, scope, non-admin, embedding off | FR-028 | partial (draft) | HIGH |
+| F4 the administrator-network restriction was not proven for the new route | FR-028 | partial | HIGH |
+| F5 migration 0060 unverified: 0059→head, growth-only CHECK, re-run, downgrade | FR-016/FR-028 | partial (draft) | HIGH |
+| F6 the active-widget confirmation did not say it stops on the sites that embed it | FR-028 | partial (draft) | MEDIUM |
+| F7 docs/guide/CHANGELOG paragraphs existed but did not mention the required fields or embedding-off | FR-026 | partial (draft) | MEDIUM |
+| F8 the e2e spec covered neither an empty required field nor a deletion | US1/AC6, US3/AC6 | missing | HIGH |
+| F9 the draft's `.env.example` rewrite and an indentation glitch in both catalogues | — | unrequested | LOW |
+
+## The draft: kept, fixed or replaced
+
+| Piece | Decision | Why |
+|---|---|---|
+| `widgets.delete()` | **kept, one fix** | The shape is right (audit before the row goes, sites read while they exist, works with the feature off). The core `DELETE` + `db.expunge()` was **replaced** by `db.delete(widget)` + `db.flush()`: it is the ORM path, so the object leaves the identity map instead of being left as a stale persistent row, and `ON DELETE CASCADE` still removes the sites. Tests prove the sites are gone and the row is gone. |
+| `DELETE /api/dashboards/{code}/widgets/{id}/permanent` | **kept** | It is a distinct route, so `DELETE …/{id}` keeps meaning revoke (asserted by the existing tests). Verified: admins only, own dashboard only, any state, covered by `is_protected()` (DELETE + the `widgets` segment) — with a test now, not an assumption. |
+| `AUDIT_KINDS += "widget_deleted"` | **kept** | The audit `record()` assertion and the CHECK need it; the label, the filter (built from the catalogue) and `audit-labels.test.ts` all follow from it. |
+| `0060_widget_deletion.py` | **kept, tidied** | It rebuilds the CHECK from what the live constraint accepts plus the kind (0056's rule) and never narrows; 0059 is untouched. I deduplicated the parsed kinds and verified the 0059→head path with a new test. |
+| `WidgetsPanel` required sites, per-field errors, delete button | **kept, fixed** | The structure is good; fixed so the product's messages are the ones that show: `noValidate` (the browser's own bubbles were hiding ours), a per-field sentence for **every** request-model code (`missing`, `*too_short`, `*too_long`, anything else) and for service errors (their own message), the same check on create and edit, and the message cleared as the field is edited. |
+| i18n strings (delete, confirmations, audit label, required) | **kept, extended** | Added `nameTooLong`, `sitesTooMany`, `nameInvalid`, `sitesInvalid`; the active confirmation now says "…on the sites that show it"; removed the example that looked like content (`sitesPlaceholder`); fixed the indentation the draft left in both catalogues. |
+| draft backend tests (two, at the end) | **kept, extended** | Fixed the `signed_in(user.email)` call the draft had already corrected; added the expired state, the visit figure, the audit fields and no-key check, the active-count/limit arithmetic, and the administrator-network assertion on the new route. |
+| docs, both guides, CHANGELOG | **kept, extended** | Added the required-field sentence to the guide, the embedding-off note to the guide and `docs/WIDGETS.md` (ES/EN), and the required-field behaviour to the CHANGELOG. |
+| `.env.example` rewrite | **kept** | It is accurate (it names both switches, the web image requirement, the ceiling and the warning) and was already part of the uncommitted work; it is documentation the deployment needs. |
+
+## What changed, by area
+
+- **Backend**: `widgets.delete()` (ORM delete, audited with name, dashboard, sites, state and
+  visits), the `/permanent` route, `widget_deleted` in `AUDIT_KINDS`, migration `0060`.
+- **Frontend**: `WidgetsPanel` — required marks on both fields, `noValidate`, per-field messages,
+  client-side refusal for empty/too-many sites, the delete action with its confirmation in every
+  state, and the in-memory snippet untouched.
+- **Tests**: the deletion/validation backend tests, the `0059→head` migration test, the frozen clock
+  in the two minute-window tests, and two new Chromium e2e scenarios.
+
+## Test results
+
+| Run | Result |
+|---|---|
+| `pytest tests/test_widgets.py` — **full** | `28 passed, 1 failed` on the first full run (29 tests); the failure was `test_address_limits_still_apply`, the per-address ceiling straddling a minute boundary (**200 instead of 429**). Fixed by freezing the clock in the two minute-window tests and run again — see the next line |
+| `pytest tests/test_widgets.py` — **full, after the fix** | **29 passed** (the 26 earlier tests plus the three deletion ones) |
+| `pytest tests/test_migrations.py tests/test_audit_constraint_upgrade.py` — **full** | first run: **2 failed, 15 passed**; the failures were the two "exactly these tables" tests, whose literal `APP_TABLES` had never been extended with 058's `mail_list*` nor 065's `dashboard_widget*` (see below). After completing that census: **19 passed** (including the new 0059→head case) |
+| `pytest tests/test_sharing_links.py` — **full** | **15 passed, 1 failed**: `test_admin_networks_cover_share_links_and_keep_user_reads`, the failure that predates this feature (it expects `410` where the address middleware answers `403`); left unchanged and not counted as this pass's |
+| `npx tsc -b` | passed |
+| `npx vitest run` | **823 passed** (82 files) |
+| `npm run build` | passed (`built in 1.49s`) |
+| `npx playwright test tests/e2e/widgets.spec.ts --project=chromium-375` | first run **6 passed, 1 failed**: the per-widget-ceiling test hit the same minute boundary (`200` instead of `429`); fixed by waiting for a fresh minute before the three requests. **Second run: 7 passed (4.9 min)**, including the two new scenarios |
+| `python3 scripts/check_docs_parity.py` | 94 pairs |
+| `scripts/gates/01, 02, 03, 04, 06, 07, 08` | all passed |
+
+**Two existing tests had to change, and here is why their old expectation was wrong:**
+
+- `test_migrations.py::APP_TABLES` is a literal census of "the tables the product creates". It was
+  never extended when 058 added `mail_list`/`mail_list_member` or when 065 added
+  `dashboard_widget`/`dashboard_widget_site`, so `test_migrations_create_only_the_product_schema`
+  and `test_upgrade_is_idempotent_and_stops_downgrading_on_purpose` had been failing since 058/065
+  (`Extra items in the left set`). The expectation (exactly the product's tables) is right; the
+  literal was incomplete. Completing it is not a weakening — the tests now assert the real schema.
+- `test_address_limits_still_apply` and `test_per_widget_ceiling_answers_retry` (both written for
+  this feature) count within a whole minute, so a run that crossed the minute boundary reset the
+  count and answered `200` where `429` was expected. The expectation is right; the tests were
+  reading the wall clock. They now freeze "now" (backend) and wait for a fresh minute (browser), so
+  they test the rule instead of the clock.
+
+## Verified by running, and reasoned
+
+**Run here:** the full `test_widgets.py` (29 passed), `test_migrations.py` and
+`test_audit_constraint_upgrade.py` (19 passed, including the new 0059→head case), the full
+`test_sharing_links.py` (15 passed, the one known pre-existing failure), the frontend type check, the
+823 unit tests and the build, the Chromium e2e spec (7 passed, the two new scenarios included), the
+docs parity check and every gate. The migration was exercised on a schema built from empty (every
+backend run) and on one at `0059_dashboard_widgets` (the new test), including a second `upgrade head`
+and a `downgrade`; the audit CHECK grew and kept a kind only the database knew. The deletion route was
+run through the tests listed above: any state, cascade, audit content, scope, non-admin, the
+administrator-network restriction and the count/limit arithmetic.
+
+**Reasoned only:**
+- the upgrade of the **deployed** installation: this pass never touches the `public` schema (the
+  suites use throwaway `app_test_*` schemas and assert `public` unchanged), so what is proved is the
+  same migration from 0059 on a disposable schema, not the production one;
+- the browser's own look at the two new screens beyond what the e2e asserts (the e2e checks the
+  message at the field, no request sent, the confirmation text, the deletion and its 404);
+- the wording of a field error that only a malformed, hand-made request would trigger (`nameInvalid`,
+  `sitesInvalid`): the mapping is exercised by a unit-level check of the codes but not by a browser
+  scenario.
+
+`0060_widget_deletion.py` was created with mode `0600` (as every file the draft wrote was); it is now
+`0664`, and the `chmod -R a+rX` added to `backend/Dockerfile` in the previous pass would have covered
+it anyway.
+
+## Deployment
+
+Migration `0060` runs by itself: the backend image's entrypoint runs `alembic upgrade head` before
+serving, so recreating the backend container applies it; nothing has to be done by hand and no SQL
+is needed. Two things do have to be rebuilt and redeployed, because the change is in both images:
+
+1. the **backend** image (the route, the delete logic and migration 0060);
+2. the **web** image (the form and the delete button live in the SPA that Caddy serves).
+
+Then recreate the containers (`docker compose up -d --force-recreate backend worker web`) — a plain
+`restart` keeps the old images. The worker shares the backend image and does not migrate (its
+entrypoint receives a command, so it starts `python -m app.worker` directly), which is why the
+backend must be recreated first; compose's `depends_on: backend: service_healthy` already orders
+them. No new setting is involved: `EMBED_WIDGETS_ENABLED` and `WIDGET_RATE_LIMIT` do not change, and
+deletion works with embedding off, so an installation can clean up even before switching it on.

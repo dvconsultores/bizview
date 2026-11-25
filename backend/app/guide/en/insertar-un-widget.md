@@ -17,6 +17,8 @@ An **Administrator** or the **Superuser** creates it, when the installation has 
 2. Type a **Widget name**: it is for recognising it in the list.
 3. In **Allowed sites** write one per line, with its scheme: `https://www.example.com`. No paths, no
    queries and no wildcards. A widget holds up to ten.
+   The name and the sites are required: when one is missing the message appears at that field and
+   the form sends nothing until it is filled.
 4. Optional: the theme, the language, whether the title, the filters and the PDF are shown, and an
    expiry date. The PDF is off by default.
 5. Press **Create widget** and copy the snippet: it is never shown again and is not stored in the
@@ -36,6 +38,9 @@ An **Administrator** or the **Superuser** creates it, when the installation has 
   and the visits are kept.
 - **Revoke** switches the widget off for ever; a page holding it shows a neutral message. Each
   dashboard holds 50 active widgets, counted apart from share links.
+- **Delete** removes the widget from the list, whether it is active, revoked or expired, and also
+  while embedding is switched off in the installation (so it can be cleaned up). An active one stops
+  working at that moment. It cannot be undone and only its audit entry remains.
 - A site starting with `http://localhost` or with a private address is marked **Development** so it is
   not forgotten in the list.
 - No dashboard on the client's page usually means the site is not listed with the scheme it really

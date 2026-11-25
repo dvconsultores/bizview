@@ -93,6 +93,96 @@ test("an admin creates a widget, copies its snippet and sees the warning", async
   await expectNoHorizontalScroll(page);
 });
 
+test("a required field is reported at the field and no request is sent", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/r/ventas?${SELECTION}`);
+  await reportAction(page, "Insertar en un sitio web");
+  const panel = page.getByRole("region", { name: "Insertar en un sitio web" });
+  await expect(panel).toBeVisible();
+
+  // FR-027: the form knows before sending, and says it at the empty field.
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/api/dashboards/ventas/widgets")) {
+      posts.push(request.url());
+    }
+  });
+
+  await panel.getByLabel("Nombre del widget").fill("Sin sitios");
+  await panel.getByRole("button", { name: "Crear widget" }).click();
+  await expect(panel.getByText(
+    "Indica al menos un sitio, por ejemplo https://www.cliente.com.")).toBeVisible();
+  await expect(panel.getByLabel("Sitios permitidos")).toHaveAttribute("aria-invalid", "true");
+  await expect(panel.getByLabel("Sitios permitidos")).toHaveAttribute("required", "");
+  expect(posts, "an empty required field must not send the request").toEqual([]);
+
+  // The message moves to the other empty field, and the first one clears as it is typed.
+  await panel.getByLabel("Sitios permitidos").fill(SITE);
+  await expect(panel.getByText(
+    "Indica al menos un sitio, por ejemplo https://www.cliente.com.")).toHaveCount(0);
+  await panel.getByLabel("Nombre del widget").fill("");
+  await panel.getByRole("button", { name: "Crear widget" }).click();
+  await expect(panel.getByText("Escribe un nombre para el widget.")).toBeVisible();
+  expect(posts).toEqual([]);
+
+  // No example sits inside the field any more: an empty box cannot look filled (T036).
+  await expect(panel.getByLabel("Sitios permitidos")).not.toHaveAttribute("placeholder", /\S/);
+
+  // With both filled the request goes and the widget is created.
+  await panel.getByLabel("Nombre del widget").fill("Con sitios");
+  await panel.getByRole("button", { name: "Crear widget" }).click();
+  await expect(panel.getByText("Copia el fragmento ahora: no se volverá a mostrar.")).toBeVisible();
+  expect(posts.length).toBe(1);
+  await expectNoHorizontalScroll(page);
+});
+
+test("a widget is deleted in any state after a plain confirmation", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/r/ventas?${SELECTION}`);
+  await reportAction(page, "Insertar en un sitio web");
+  const panel = page.getByRole("region", { name: "Insertar en un sitio web" });
+  await expect(panel).toBeVisible();
+
+  // 1. Active: the confirmation says plainly that it stops working where it is embedded.
+  await panel.getByLabel("Nombre del widget").fill("Para eliminar");
+  await panel.getByLabel("Sitios permitidos").fill(SITE);
+  await panel.getByRole("button", { name: "Crear widget" }).click();
+  await expect(panel.getByText("Copia el fragmento ahora: no se volverá a mostrar.")).toBeVisible();
+  const snippet = (await panel.locator("pre").first().textContent()) ?? "";
+  const key = snippet.match(/\/w\/([A-Za-z0-9_-]{20,})/)?.[1] ?? "";
+  expect(key).not.toBe("");
+  expect((await page.request.get(`/api/widgets/${key}`)).status()).toBe(200);
+
+  const active = panel.locator("ul > li").filter({ hasText: "Para eliminar" });
+  await expect(active).toBeVisible();
+  await active.getByRole("button", { name: "Eliminar" }).click();
+  // FR-028: for an active widget the confirmation says it will stop on its sites.
+  await expect(active.getByRole("button", { name: /dejará de funcionar en los sitios/ }))
+    .toBeVisible();
+  await active.getByRole("button", { name: /dejará de funcionar en los sitios/ }).click();
+  await expect(page.getByText("Widget eliminado.")).toBeVisible();
+  await expect(panel.locator("ul > li").filter({ hasText: "Para eliminar" })).toHaveCount(0);
+  // It stops serving at once.
+  expect((await page.request.get(`/api/widgets/${key}`)).status()).toBe(404);
+  expect((await page.request.get(`/api/widgets/frame/${key}`)).status()).toBe(200);
+
+  // 2. Revoked: the neutral confirmation, and it leaves the list too.
+  const revoked = await createWidget(page, [SITE], { name: "Eliminar revocado" });
+  expect((await page.request.delete(
+    `/api/dashboards/ventas/widgets/${revoked.id}`, { headers: FETCH })).status()).toBe(204);
+  await page.reload();
+  await reportAction(page, "Insertar en un sitio web");
+  const reopened = page.getByRole("region", { name: "Insertar en un sitio web" });
+  const item = reopened.locator("ul > li").filter({ hasText: "Eliminar revocado" });
+  await expect(item).toContainText("Revocado");
+  await item.getByRole("button", { name: "Eliminar" }).click();
+  await expect(item.getByRole("button", { name: "Confirmar eliminación" })).toBeVisible();
+  await item.getByRole("button", { name: "Confirmar eliminación" }).click();
+  await expect(reopened.locator("ul > li").filter({ hasText: "Eliminar revocado" }))
+    .toHaveCount(0);
+  await expectNoHorizontalScroll(page);
+});
+
 test("the snippet is held in memory, never in browser storage, and shown once", async ({ page }) => {
   await signIn(page);
   await page.goto(`/r/ventas?${SELECTION}`);
@@ -269,6 +359,10 @@ test("the per-widget ceiling shows a retry inside the host page", async ({ page 
   await enableWidgets(page, { widget_rate_limit: 2 });
   const widget = await createWidget(page, [SITE], { name: "Con techo" });
 
+  // The ceiling counts within a whole minute; starting near the roll would reset the count between
+  // two requests and the third would answer 200. Wait for a fresh window first (the check takes
+  // well under a second).
+  await page.waitForFunction(() => new Date().getSeconds() < 45, null, { timeout: 70_000 });
   const base = `/api/widgets/${widget.key}`;
   expect((await page.request.get(base)).status()).toBe(200);
   expect((await page.request.get(`${base}/data?${SELECTION}`)).status()).toBe(200);

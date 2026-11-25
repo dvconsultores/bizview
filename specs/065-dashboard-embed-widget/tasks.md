@@ -59,3 +59,16 @@
 - [x] T032 `npx tsc -b`, `npx vitest run`, `npm run build`, `npx playwright test tests/e2e/widgets.spec.ts`
 - [x] T033 `deploy/tests/test_install.sh`, `deploy/tests/test_caddy_widget.sh`, `python3 scripts/check_docs_parity.py`
 - [x] T034 `run-report.md`
+
+## Phase 9: Convergence
+
+- [x] T035 Make the form's own validation the one that runs and speaks: `noValidate` on the create and edit forms so the browser does not hide the product's messages, both fields marked required, every request-model field code (`missing`, `too_short`, `too_long`, …) and every service rejection turned into a readable sentence at its field, the error cleared as the field is corrected per FR-027 (partial)
+- [x] T036 Stop the allowed-sites field from looking pre-filled: remove the example placeholder (the hint below already carries the format) or label it explicitly as an example, in both catalogues per FR-027 (partial)
+- [x] T037 Complete and prove deletion per FR-028: any state (active, revoked, expired), sites removed with it, it stops serving at once, it works with embedding off, the audit entry keeps name, dashboard, sites, state and visits and never the key, it is scoped to its own dashboard, only admins may delete, and the active count and the 50-per-dashboard limit stay correct (partial)
+- [x] T038 Prove the administrator-network restriction covers the deletion route, as it already does for creation and revocation, per FR-028 (partial)
+- [x] T039 Verify migration 0060 against the 0056 rule: it grows the audit CHECK from what the live constraint accepts, works on a database built from empty and on one already at 0059, keeps every audit row, is harmless to re-run and has a safe downgrade; add the 0059→head case to `test_audit_constraint_upgrade.py` and run `test_migrations.py` in full per FR-016/FR-028 (partial)
+- [x] T040 Make the confirmation for an active widget say plainly that it will stop working on the sites that embed it, with a neutral confirmation for revoked and expired widgets, in both languages per FR-028 (partial)
+- [x] T041 Update `docs/WIDGETS.md` and `docs/es/WIDGETS.md`, both guide topics and `CHANGELOG.md` for required fields, per-field messages and deletion, keeping the ES/EN parity per FR-026 (partial)
+- [x] T042 Extend `frontend/tests/e2e/widgets.spec.ts`: an empty required field shows its message at the field and sends no request, and a widget is deleted after the plain confirmation (active) and from the revoked state, in Chromium per US1/AC6 and US3/AC6 (missing)
+- [x] T043 Review the draft's `.env.example` rewrite and the broken indentation in the two i18n catalogues: keep the documentation if it is accurate, fix the formatting per FR-026 (unrequested)
+- [x] T044 Run the whole verification set after the changes (all four backend suites, the frontend type check, unit suite and build, the Chromium e2e spec, the docs parity check and every gate) and record the results in the third-pass section of `run-report.md` (missing)

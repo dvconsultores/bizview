@@ -89,6 +89,13 @@ All notable changes to this project are documented here. The format follows
   page shows it only in the session where the widget was created or replaced. Off until
   `EMBED_WIDGETS_ENABLED` is set, and it needs `SHARE_LINKS_ENABLED`. New help topic
   **Insertar un tablero en una web**, a new `docs/WIDGETS.md` and the installation guide cover it.
+  A widget can be **deleted** in any state (**Eliminar**), after a confirmation that tells an active
+  widget's admin it will stop working on the sites that show it: it leaves the list, an active one
+  stops working at once, and the audit keeps `widget_deleted` with its name, sites, state and visits
+  (migration `0060_widget_deletion` adds that audit kind). Deletion works even with embedding
+  switched off. The widget form marks the name and **Sitios permitidos** as required, refuses to
+  submit while one is empty and shows the problem at that field instead of the generic «Revisa los
+  datos ingresados»; the example that looked like entered content is gone from the box.
 
 - **See the data behind any card as a table (feature 064)**. Every data card now offers **Ver como
   tabla** in its `⋯` menu and a table icon beside **Ampliar** (double-click or `T` also work): the

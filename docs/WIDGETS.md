@@ -62,6 +62,11 @@ in a browser can tell that program from a visitor. That is why the product also 
 request ceiling (`WIDGET_RATE_LIMIT`, 300 per minute by default), a replacement that stops the old
 snippet at once, revocation that cannot be undone, and an audit entry for each action.
 
+A widget can also be **deleted**, in any state and even while embedding is switched off in the
+installation: it leaves the dashboard's list, an active one stops working at that moment, and the
+audit entry (name, sites, state and visits, never the key) is the only record that remains. Revoke
+keeps the widget in the list as history; delete does not.
+
 The widget never uses the viewer's session: an administrator who is signed in and opens the host page
 sees exactly what an anonymous visitor sees. Anyone who can see the host page can see the whole
 dashboard — filters are a convenience for the visitor, not a restriction — so say so to the customer
