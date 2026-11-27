@@ -231,8 +231,10 @@ export function AppShell() {
                   );
                 })}
               </ul>
-              {/* The control stays next to the menu it acts on, so the space left below is one
-                  clean block instead of being split by a pinned row. */}
+            </nav>
+            {/* The control lives at the foot of the sidebar (owner, 2026-11-26): the menu above it
+                scrolls when it is long, and the button never drifts away from the bottom edge. */}
+            <div className={`shrink-0 border-t border-line py-3 ${navCollapsed ? "px-1.5" : "px-3"}`}>
               <button
                 type="button"
                 onClick={() => toggleNav(!navCollapsed)}
@@ -248,7 +250,7 @@ export function AppShell() {
                               : <ChevronsLeft className="mr-3 h-[18px] w-[18px] shrink-0" aria-hidden />}
                 {!navCollapsed ? <span>{t.nav.collapse}</span> : null}
               </button>
-            </nav>
+            </div>
           </aside>
         ) : null}
 
